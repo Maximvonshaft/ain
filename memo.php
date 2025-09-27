@@ -1017,7 +1017,9 @@ if ($view === 'map_edit') {
       *{box-sizing:border-box}
       html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:15px/1.6 "Inter","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
       a{color:inherit;text-decoration:none}
-      .layout{min-height:100vh;display:grid;grid-template-columns:320px 1fr}
+      .layout{min-height:100vh;display:grid;grid-template-columns:320px 1fr;position:relative}
+      .sidebar-mask{display:none}
+      .mobile-topbar{display:none}
       @media (max-width:1100px){ .layout{grid-template-columns:1fr} .sidebar{position:static;height:auto} }
       .sidebar{background:#f8fafc;border-right:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow:auto}
       .sidebar h1{margin:0;font-size:20px;font-weight:800;color:#0f172a}
@@ -1052,10 +1054,45 @@ if ($view === 'map_edit') {
       #drag-overlay{position:absolute;inset:0;pointer-events:none}
       #drag-overlay line{stroke:rgba(148,163,184,.7);stroke-width:2;stroke-dasharray:6 6;stroke-linecap:round}
       #drag-overlay circle{fill:rgba(96,165,250,.3);stroke:rgba(59,130,246,.9);stroke-width:2}
+      #mobile-command-bar{display:none}
+      #mobile-save{display:inline-flex;align-items:center;justify-content:center}
+      #mobile-save.dirty{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+      #mobile-save:disabled{opacity:.6}
+      @media (max-width:900px){
+        body.mobile-sidebar-open{overflow:hidden}
+        .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+        .mobile-topbar{display:flex;align-items:center;gap:12px;background:#0f172a;color:#fff;padding:12px 16px;position:sticky;top:0;z-index:150}
+        .mobile-topbar button{border:0;background:rgba(255,255,255,.12);color:#fff;padding:8px 12px;border-radius:999px;font-size:14px;font-weight:600}
+        .mobile-topbar button.icon{width:40px;height:40px;padding:0;font-size:20px}
+        .mobile-topbar .title-wrap{flex:1;min-width:0}
+        .mobile-topbar h2{margin:0;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .mobile-topbar .subtitle{font-size:12px;opacity:.8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .sidebar{position:fixed;top:0;left:0;bottom:0;max-width:320px;width:82%;transform:translateX(-110%);transition:transform .3s ease;z-index:160;height:100vh;box-shadow:0 20px 40px rgba(15,23,42,.35)}
+        .sidebar.show-mobile{transform:translateX(0)}
+        .sidebar-mask{display:block;position:fixed;inset:0;background:rgba(15,23,42,.45);opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:140}
+        .sidebar-mask.show{opacity:1;pointer-events:auto}
+        .editor-pane{order:2;min-height:calc(100vh - 60px);padding-bottom:100px}
+        #jsmind-container{height:calc(100vh - 60px)}
+        .map-toolbar{display:none}
+        #mobile-command-bar{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;gap:8px;padding:10px 12px;background:rgba(15,23,42,.92);border-radius:22px;box-shadow:0 20px 40px rgba(15,23,42,.35);z-index:145;backdrop-filter:blur(12px)}
+        #mobile-command-bar button{border:0;background:rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:14px;font-size:13px;font-weight:600;min-width:64px}
+        #mobile-command-bar button.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+        #mobile-command-bar button:active{transform:scale(.97)}
+        #node-handle{width:42px;height:42px;font-size:24px}
+      }
     </style>
   </head>
   <body>
     <div class="layout">
+      <div class="sidebar-mask" id="sidebar-mask"></div>
+      <header class="mobile-topbar" id="mobile-topbar">
+        <button class="icon" id="mobile-menu-toggle" type="button" aria-label="打开侧边栏">☰</button>
+        <div class="title-wrap">
+          <h2 id="mobile-title-text"><?php echo h($mind['title']); ?></h2>
+          <div class="subtitle" id="mobile-selected-topic">未选中节点</div>
+        </div>
+        <button id="mobile-save" type="button" disabled>保存</button>
+      </header>
       <aside class="sidebar">
         <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
           <h1>思维导图编辑器</h1>
@@ -1117,6 +1154,14 @@ if ($view === 'map_edit') {
           <button id="btn-collapse">折叠/展开节点</button>
           <button id="btn-reset">恢复默认主题</button>
         </div>
+        <div id="mobile-command-bar" role="toolbar">
+          <button data-action="sibling" type="button">同级</button>
+          <button data-action="child" type="button" class="primary">子级</button>
+          <button data-action="collapse" type="button">折叠</button>
+          <button data-action="center" type="button">居中</button>
+          <button data-action="fit" type="button">适配</button>
+          <button data-action="theme" type="button">主题</button>
+        </div>
       </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/es6/jsmind.js"></script>
@@ -1126,7 +1171,46 @@ if ($view === 'map_edit') {
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
     const jmContainer=document.getElementById('jsmind-container');
     const paletteItems=document.querySelectorAll('.palette-item');
+    const sidebar=document.querySelector('.sidebar');
+    const sidebarMask=document.getElementById('sidebar-mask');
+    const mobileMenuToggle=document.getElementById('mobile-menu-toggle');
+    const mobileMedia=window.matchMedia('(max-width: 900px)');
+    const mobileTitleText=document.getElementById('mobile-title-text');
+    const mobileSelectedTopic=document.getElementById('mobile-selected-topic');
+    const mobileSaveBtn=document.getElementById('mobile-save');
+    const mobileCommandBar=document.getElementById('mobile-command-bar');
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    function openMobileSidebar(){
+      if(!sidebar || !mobileMedia.matches) return;
+      sidebar.classList.add('show-mobile');
+      if(sidebarMask){ sidebarMask.classList.add('show'); }
+      document.body.classList.add('mobile-sidebar-open');
+    }
+    function closeMobileSidebar(force){
+      if(!sidebar) return;
+      if(!mobileMedia.matches && !force) return;
+      sidebar.classList.remove('show-mobile');
+      if(sidebarMask){ sidebarMask.classList.remove('show'); }
+      document.body.classList.remove('mobile-sidebar-open');
+    }
+    if(mobileMenuToggle){
+      mobileMenuToggle.addEventListener('click',()=>{
+        if(sidebar && sidebar.classList.contains('show-mobile')) closeMobileSidebar(true);
+        else openMobileSidebar();
+      });
+    }
+    if(sidebarMask){ sidebarMask.addEventListener('click',()=>closeMobileSidebar(true)); }
+    if(sidebar){
+      sidebar.addEventListener('click',evt=>{
+        if(!mobileMedia.matches) return;
+        const link=evt.target.closest ? evt.target.closest('a') : (evt.target.tagName==='A' ? evt.target : null);
+        if(link) closeMobileSidebar(true);
+      });
+    }
+    const handleMediaChange=()=>{ if(!mobileMedia.matches) closeMobileSidebar(true); };
+    if(mobileMedia.addEventListener) mobileMedia.addEventListener('change',handleMediaChange);
+    else if(mobileMedia.addListener) mobileMedia.addListener(handleMediaChange);
+    document.addEventListener('keydown',evt=>{ if(evt.key==='Escape') closeMobileSidebar(true); });
     overlay.id='drag-overlay';
     overlay.setAttribute('width','100%');
     overlay.setAttribute('height','100%');
@@ -1279,8 +1363,39 @@ if ($view === 'map_edit') {
       window.__mindmapCommands=commandLog;
       const layouts=['fresh-blue','fresh-red','fresh-green','fresh-blue','nephrite','greensea','pink'];
       let themeIndex=0;
-      function markDirty(){ dirty=true; saveState.textContent='未保存'; saveState.classList.add('show','dirty'); }
-      function markSaved(){ dirty=false; saveState.textContent='已保存'; saveState.classList.add('show'); saveState.classList.remove('dirty'); setTimeout(()=>saveState.classList.remove('show'),1200); }
+      function updateMobileTitle(){ if(mobileTitleText){ mobileTitleText.textContent=(titleInput.value.trim()||'未命名导图'); } }
+      function updateMobileSelected(){
+        if(!mobileSelectedTopic) return;
+        const node=jm.get_selected_node();
+        if(node){
+          const raw=typeof node.topic==='string' ? node.topic : '';
+          const text=raw.replace(/<[^>]*>/g,'').trim() || '未命名';
+          mobileSelectedTopic.textContent='选中：'+text;
+        }
+        else { mobileSelectedTopic.textContent='未选中节点'; }
+      }
+      function markDirty(){
+        dirty=true;
+        saveState.textContent='未保存';
+        saveState.classList.add('show','dirty');
+        if(mobileSaveBtn){
+          mobileSaveBtn.disabled=false;
+          mobileSaveBtn.classList.add('dirty');
+          mobileSaveBtn.textContent='保存*';
+        }
+      }
+      function markSaved(){
+        dirty=false;
+        saveState.textContent='已保存';
+        saveState.classList.add('show');
+        saveState.classList.remove('dirty');
+        setTimeout(()=>saveState.classList.remove('show'),1200);
+        if(mobileSaveBtn){
+          mobileSaveBtn.disabled=true;
+          mobileSaveBtn.classList.remove('dirty');
+          mobileSaveBtn.textContent='保存';
+        }
+      }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
       function ensureNode(){
         let node=jm.get_selected_node();
@@ -1319,6 +1434,7 @@ if ($view === 'map_edit') {
         commandLog.push(command);
         window.__mindmapCommands=commandLog;
         jm.select_node(newNode.id);
+        updateMobileSelected();
         markDirty();
         requestAnimationFrame(updateHandlePosition);
         return newNode;
@@ -1431,50 +1547,79 @@ if ($view === 'map_edit') {
           const template=buildTemplateFromDataset(item);
           const parentNode=ensureNode() || jm.get_root();
           if(parentNode) applyTemplateToParent(template, parentNode, null);
+          if(mobileMedia.matches) closeMobileSidebar();
         });
       });
-      document.getElementById('btn-add-sibling').onclick=()=>{
+      function addSiblingNode(){
         const node=ensureNode(); if(!node || node.isroot) return;
-        if(node.parent){
-          executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' });
-        }
-      };
-      document.getElementById('btn-add-child').onclick=()=>{
+        if(node.parent){ executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' }); }
+      }
+      function addChildNode(){
         const node=ensureNode();
         if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
-      };
-      document.getElementById('btn-delete').onclick=()=>{
+      }
+      function deleteSelectedNode(){
         const node=ensureNode(); if(!node || node.isroot) return;
-        jm.remove_node(node.id); markDirty();
-        requestAnimationFrame(updateHandlePosition);
-      };
+        jm.remove_node(node.id);
+        markDirty();
+        requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
+      }
       function callView(method, ...args){
         if(jm.view && typeof jm.view[method] === 'function'){
           try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
         }
         return false;
       }
-      document.getElementById('btn-fit').onclick=()=>{
+      function fitView(){
         if(!callView('zoomToFit') && !callView('zoom_to_fit')){
           callView('set_zoom', 1);
           if(!callView('move_to_center')) callView('center_root');
         }
-      };
-      document.getElementById('btn-center').onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); };
-      document.getElementById('btn-zoom-in').onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); };
-      document.getElementById('btn-zoom-out').onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); };
-      document.getElementById('btn-collapse').onclick=()=>{
-        const node=ensureNode(); if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
-      };
-      document.getElementById('btn-reset').onclick=()=>{
+      }
+      function centerView(){ if(!callView('move_to_center')) callView('center_root'); }
+      function zoomIn(){ if(!callView('zoomIn')) callView('zoom_in'); }
+      function zoomOut(){ if(!callView('zoomOut')) callView('zoom_out'); }
+      function collapseSelected(){
+        const node=ensureNode();
+        if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); }); }
+      }
+      function resetTheme(){
         const snapshot=JSON.parse(JSON.stringify(initialData));
-        jm.show(snapshot); markDirty();
-        requestAnimationFrame(updateHandlePosition);
-      };
-      document.getElementById('btn-theme').onclick=()=>{
-        themeIndex=(themeIndex+1)%layouts.length;
-        jm.set_theme(layouts[themeIndex]);
-      };
+        jm.show(snapshot);
+        markDirty();
+        requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
+      }
+      function nextTheme(){ themeIndex=(themeIndex+1)%layouts.length; jm.set_theme(layouts[themeIndex]); }
+      document.getElementById('btn-add-sibling').onclick=addSiblingNode;
+      document.getElementById('btn-add-child').onclick=addChildNode;
+      document.getElementById('btn-delete').onclick=deleteSelectedNode;
+      document.getElementById('btn-fit').onclick=fitView;
+      document.getElementById('btn-center').onclick=centerView;
+      document.getElementById('btn-zoom-in').onclick=zoomIn;
+      document.getElementById('btn-zoom-out').onclick=zoomOut;
+      document.getElementById('btn-collapse').onclick=collapseSelected;
+      document.getElementById('btn-reset').onclick=resetTheme;
+      document.getElementById('btn-theme').onclick=nextTheme;
+      if(mobileCommandBar){
+        const mobileActions={
+          sibling:addSiblingNode,
+          child:addChildNode,
+          collapse:collapseSelected,
+          center:centerView,
+          fit:fitView,
+          theme:nextTheme,
+          delete:deleteSelectedNode,
+          zoomin:zoomIn,
+          zoomout:zoomOut,
+        };
+        mobileCommandBar.addEventListener('click',evt=>{
+          const btn=evt.target.closest('button[data-action]');
+          if(!btn) return;
+          const action=(btn.dataset.action||'').toLowerCase();
+          if(mobileActions[action]) mobileActions[action]();
+        });
+      }
+      if(jmContainer){ jmContainer.addEventListener('pointerdown',()=>closeMobileSidebar()); }
       jmContainer.addEventListener('dragenter',e=>{
         e.preventDefault();
         jmContainer.classList.add('dragover');
@@ -1510,13 +1655,17 @@ if ($view === 'map_edit') {
           handleDroppedText(text, parent, e);
         }
       });
-      titleInput.addEventListener('input', markDirty);
+      titleInput.addEventListener('input',()=>{ markDirty(); updateMobileTitle(); });
+      updateMobileTitle();
+      updateMobileSelected();
+      if(mobileSaveBtn){ mobileSaveBtn.disabled=true; }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             requestAnimationFrame(updateHandlePosition);
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
+          requestAnimationFrame(updateMobileSelected);
         });
       }
       document.getElementById('btn-export-json').onclick=()=>{
@@ -1543,6 +1692,7 @@ if ($view === 'map_edit') {
         reader.readAsText(file,'utf-8');
       });
       document.getElementById('btn-save').onclick=saveMindmap;
+      if(mobileSaveBtn){ mobileSaveBtn.addEventListener('click', saveMindmap); }
       async function saveMindmap(){
         const title=titleInput.value.trim()||'未命名导图';
         const payload=JSON.stringify(jm.get_data('node_tree'));
