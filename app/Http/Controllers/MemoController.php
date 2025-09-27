@@ -126,6 +126,7 @@ class MemoController
     {
         $memoRepository = new \App\Repositories\MemoRepository();
         $subtaskRepository = new \App\Repositories\SubtaskRepository();
+        $mindmapRepository = new \App\Repositories\MindmapRepository();
         $memo = $memoRepository->find($memoId);
         if (!$memo) {
             throw new \RuntimeException('Memo missing after update');
@@ -148,6 +149,16 @@ class MemoController
                 'is_done' => $subtask->isDone,
                 'order' => $subtask->order,
             ], $subtaskRepository->forMemo($memo->id)),
+            'mindmaps' => array_map(fn($mindmap) => [
+                'id' => $mindmap->id,
+                'memo_id' => $mindmap->memoId,
+                'title' => $mindmap->title,
+                'canvas_w' => $mindmap->canvasW,
+                'canvas_h' => $mindmap->canvasH,
+                'viewport' => $mindmap->viewport,
+                'created_at' => $mindmap->createdAt,
+                'updated_at' => $mindmap->updatedAt,
+            ], $mindmapRepository->forMemo($memo->id)),
         ];
     }
 

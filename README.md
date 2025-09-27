@@ -23,7 +23,17 @@ php bin/migrate          # 初始化 SQLite 数据库与表结构
 php -S localhost:8000 -t public
 ```
 
-访问 http://localhost:8000 可体验基础备忘录、子任务与勾选功能。
+访问 http://localhost:8000 可体验基础备忘录、子任务、思维导图等功能。
+
+### 思维导图模块
+
+- 在备忘录卡片底部点击“创建思维导图”即可为该备忘录生成导图，并跳转到画布页。
+- 画布支持拖拽节点、双指/按钮缩放、连接/断开节点、重命名与删除操作，移动端会自动切换为底部滚动工具栏。
+- REST API 位于 `/api/v1/mindmaps/...`，其中：
+  - `PATCH /api/v1/mindmaps/{id}/nodes` 支持批量新增/更新/删除节点；
+  - `PATCH /api/v1/mindmaps/{id}/edges` 用于批量维护连线；
+  - `POST /api/v1/memos/{memo}/mindmaps` 为指定备忘录创建导图。
+  所有 API 自动应用 `APP_BASE_PATH` 前缀，可直接部署在子目录环境。
 
 ### 部署在子目录
 

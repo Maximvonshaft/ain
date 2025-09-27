@@ -122,6 +122,56 @@
             font-weight: 600;
             cursor: pointer;
         }
+        .mindmap-actions {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+        }
+        .mindmap-actions a,
+        .mindmap-actions button {
+            border: none;
+            border-radius: 999px;
+            padding: 0.4rem 1.1rem;
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .mindmap-actions a:hover,
+        .mindmap-actions button:hover {
+            background: rgba(56, 189, 248, 0.3);
+        }
+        .mindmap-actions .secondary {
+            background: rgba(99, 102, 241, 0.2);
+            color: #a855f7;
+        }
+        .mindmap-actions .hint {
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        @media (max-width: 768px) {
+            header {
+                padding: 1rem;
+            }
+            main {
+                padding: 1rem;
+            }
+            .mindmap-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .mindmap-actions a,
+            .mindmap-actions button {
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -159,6 +209,21 @@
                 <input type="text" name="title" placeholder="添加子任务">
                 <button type="submit">添加</button>
             </form>
+            <div class="mindmap-actions" data-memo-id="<?= (int)$memo->id ?>" data-memo-title="<?= htmlspecialchars($memo->title) ?>">
+                <?php $mindmaps = $bundle['mindmaps'] ?? []; ?>
+                <?php if (!empty($mindmaps)): ?>
+                    <?php $primaryMindmap = $mindmaps[0];
+                    $prefix = $basePath ?: '';
+                    $mindmapUrl = rtrim($prefix, '/') . '/mindmaps/' . $primaryMindmap->id;
+                    if ($mindmapUrl[0] !== '/') { $mindmapUrl = '/' . $mindmapUrl; }
+                    ?>
+                    <a href="<?= htmlspecialchars($mindmapUrl) ?>">打开导图</a>
+                    <span class="hint">已有 <?= count($mindmaps) ?> 张导图</span>
+                    <button type="button" class="create-mindmap secondary">新建导图</button>
+                <?php else: ?>
+                    <button type="button" class="create-mindmap">创建思维导图</button>
+                <?php endif; ?>
+            </div>
         </article>
     <?php endforeach; ?>
 </main>
@@ -235,6 +300,34 @@ document.querySelectorAll('.memo-card ul.subtasks input[type="checkbox"]').forEa
         const res = await fetch(withBase(`/api/v1/subtasks/${subtaskId}/toggle`), { method: 'PATCH' });
         if (res.ok) {
             location.reload();
+        }
+    });
+});
+
+document.querySelectorAll('.mindmap-actions .create-mindmap').forEach(button => {
+    button.addEventListener('click', async (event) => {
+        const container = event.currentTarget.closest('.mindmap-actions');
+        if (!container) {
+            return;
+        }
+        const memoId = Number(container.dataset.memoId);
+        const memoTitle = container.dataset.memoTitle || '新导图';
+        const title = prompt('为新导图命名', memoTitle + ' 导图');
+        if (title === null) {
+            return;
+        }
+        const payload = { title: title.trim() === '' ? memoTitle + ' 导图' : title.trim() };
+        const res = await fetch(withBase(`/api/v1/memos/${memoId}/mindmaps`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const mindmapId = data.mindmap.id;
+            window.location.href = withBase(`/mindmaps/${mindmapId}`);
+        } else {
+            alert('导图创建失败');
         }
     });
 });

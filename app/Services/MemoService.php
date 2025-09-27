@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\MemoRepository;
+use App\Repositories\MindmapRepository;
 use App\Repositories\SubtaskRepository;
 
 class MemoService
@@ -10,6 +11,7 @@ class MemoService
     public function __construct(
         private MemoRepository $memos = new MemoRepository(),
         private SubtaskRepository $subtasks = new SubtaskRepository(),
+        private MindmapRepository $mindmaps = new MindmapRepository(),
     ) {
     }
 
@@ -21,6 +23,7 @@ class MemoService
             $result[] = [
                 'memo' => $memo,
                 'subtasks' => $this->subtasks->forMemo($memo->id),
+                'mindmaps' => $this->mindmaps->forMemo($memo->id),
             ];
         }
         return $result;
