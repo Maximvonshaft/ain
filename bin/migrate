@@ -1,0 +1,22 @@
+#!/usr/bin/env php
+<?php
+
+require __DIR__ . '/../bootstrap/app.php';
+
+use App\Support\Database;
+
+$pdo = Database::connection();
+
+$files = glob(base_path('database/migrations/*.php'));
+sort($files);
+
+foreach ($files as $file) {
+    $migration = require $file;
+    if (!is_callable($migration)) {
+        fwrite(STDERR, "Migration {$file} must return a callable.\n");
+        exit(1);
+    }
+    $migration($pdo);
+}
+
+echo "Migrations executed." . PHP_EOL;
