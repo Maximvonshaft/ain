@@ -37,3 +37,30 @@ if (!function_exists('env_value')) {
     }
 }
 
+if (!function_exists('app_base_path')) {
+    function app_base_path(): string
+    {
+        static $cached;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $configured = trim((string) config('app.base_path', ''), '/');
+        if ($configured !== '') {
+            $cached = '/' . $configured;
+        } else {
+            $url = (string) config('app.url', '');
+            $parts = $url ? parse_url($url) : [];
+            $path = is_array($parts) ? ($parts['path'] ?? '') : '';
+            $path = trim((string) $path, '/');
+            $cached = $path !== '' ? '/' . $path : '';
+        }
+
+        if ($cached === '/') {
+            $cached = '';
+        }
+
+        return $cached;
+    }
+}
+

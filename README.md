@@ -25,6 +25,22 @@ php -S localhost:8000 -t public
 
 访问 http://localhost:8000 可体验基础备忘录、子任务与勾选功能。
 
+### 部署在子目录
+
+如需将应用部署在 `https://domain.com/memo/` 等子目录下：
+
+1. 在 `.env` 中将 `APP_URL` 设置为完整地址（例如 `https://domain.com/memo`）。
+2. 若服务器无法正确传递 `REQUEST_URI`，可以额外指定 `APP_BASE_PATH=memo` 强制前缀。
+3. Web 服务器需要把 `/memo/...` 的请求重写到 `public/index.php`，例如：
+
+   ```nginx
+   location /memo/ {
+       try_files $uri $uri/ /memo/index.php?$query_string;
+   }
+   ```
+
+前端的 AJAX 与后端路由都会自动套用配置的子目录前缀，无需再手工调整。
+
 ## 后续迁移建议
 
 - 将当前自定义容器替换为官方 Laravel 容器，复用现有分层代码。

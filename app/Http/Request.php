@@ -13,7 +13,29 @@ class Request
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
-        return rtrim($path, '/') ?: '/';
+        $path = $path === '' ? '/' : $path;
+
+        if ($path !== '/' && str_ends_with($path, '/')) {
+            $path = rtrim($path, '/');
+        }
+
+        $base = \app_base_path();
+        if ($base !== '' && $base !== '/') {
+            if ($path === $base) {
+                $path = '/';
+            } elseif (str_starts_with($path, $base . '/')) {
+                $path = substr($path, strlen($base));
+                if ($path === '') {
+                    $path = '/';
+                }
+            }
+        }
+
+        if ($path !== '/' && str_ends_with($path, '/')) {
+            $path = rtrim($path, '/');
+        }
+
+        return $path === '' ? '/' : $path;
     }
 
     public function query(string $key, mixed $default = null): mixed

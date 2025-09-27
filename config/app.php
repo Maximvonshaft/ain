@@ -5,6 +5,7 @@ return [
     'env' => env_value('APP_ENV', 'local'),
     'debug' => env_value('APP_DEBUG', 'true') === 'true',
     'url' => env_value('APP_URL', 'http://localhost'),
+    'base_path' => trim(env_value('APP_BASE_PATH', ''), '/'),
     'timezone' => env_value('APP_TIMEZONE', 'Asia/Shanghai'),
     'features' => [
         'auth' => env_value('FEATURES_AUTH', 'false') === 'true',

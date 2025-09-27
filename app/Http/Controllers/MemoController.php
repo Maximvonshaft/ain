@@ -18,6 +18,7 @@ class MemoController
         return Response::view('memos/index', [
             'items' => $data,
             'appName' => config('app.name'),
+            'basePath' => \app_base_path(),
         ]);
     }
 

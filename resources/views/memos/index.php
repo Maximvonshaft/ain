@@ -125,6 +125,7 @@
     </style>
 </head>
 <body>
+<?php $basePath = isset($basePath) ? (string)$basePath : ''; ?>
 <header>
     <h1><?= htmlspecialchars($appName) ?> · 备忘录</h1>
     <form id="create-memo">
@@ -162,13 +163,27 @@
     <?php endforeach; ?>
 </main>
 <script>
+const BASE_PATH = <?= json_encode($basePath) ?>;
+const withBase = (path) => {
+    if (!BASE_PATH) {
+        return path;
+    }
+    if (!path.startsWith('/')) {
+        path = '/' + path;
+    }
+    if (path === '/') {
+        return BASE_PATH || '/';
+    }
+    return `${BASE_PATH}${path}`;
+};
+
 const createForm = document.getElementById('create-memo');
 createForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
     const payload = Object.fromEntries(formData.entries());
-    const res = await fetch('/api/v1/memos', {
+    const res = await fetch(withBase('/api/v1/memos'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -185,7 +200,7 @@ document.querySelectorAll('.memo-card .toggle').forEach(button => {
         const memoEl = event.currentTarget.closest('.memo-card');
         const memoId = memoEl?.dataset.memoId;
         if (!memoId) return;
-        const res = await fetch(`/api/v1/memos/${memoId}/toggle`, { method: 'PATCH' });
+        const res = await fetch(withBase(`/api/v1/memos/${memoId}/toggle`), { method: 'PATCH' });
         if (res.ok) {
             location.reload();
         }
@@ -201,7 +216,7 @@ document.querySelectorAll('.memo-card .subtask-form').forEach(form => {
         const input = form.querySelector('input[name="title"]');
         const title = input?.value.trim();
         if (!title) return;
-        const res = await fetch(`/api/v1/memos/${memoId}/subtasks`, {
+        const res = await fetch(withBase(`/api/v1/memos/${memoId}/subtasks`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title })
@@ -217,7 +232,7 @@ document.querySelectorAll('.memo-card ul.subtasks input[type="checkbox"]').forEa
         const li = event.currentTarget.closest('li');
         const subtaskId = li?.dataset.subtaskId;
         if (!subtaskId) return;
-        const res = await fetch(`/api/v1/subtasks/${subtaskId}/toggle`, { method: 'PATCH' });
+        const res = await fetch(withBase(`/api/v1/subtasks/${subtaskId}/toggle`), { method: 'PATCH' });
         if (res.ok) {
             location.reload();
         }
