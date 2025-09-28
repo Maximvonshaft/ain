@@ -1671,12 +1671,16 @@ if ($view === 'map_edit') {
       #jsmind-container{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:linear-gradient(160deg,rgba(21,26,30,.82),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6);touch-action:none}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
-      .mind-links{pointer-events:none;filter:drop-shadow(0 0 8px rgba(227,198,139,.25))}
-      .mind-links path{fill:none;stroke:var(--fiber);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:18 32;animation:fiberFlow 8s linear infinite}
-      .mind-links path[data-status="doing"]{stroke:var(--gold-400);stroke-dasharray:12 24;animation:fiberPulse 3s linear infinite}
-      .mind-links path[data-status="done"]{stroke:rgba(201,168,106,.5);opacity:.8;stroke-dasharray:20 36}
-      @keyframes fiberFlow{0%{stroke-dashoffset:0;opacity:.85}100%{stroke-dashoffset:-480;opacity:1}}
-      @keyframes fiberPulse{0%{stroke-dashoffset:0;opacity:.9}100%{stroke-dashoffset:-320;opacity:1}}
+      .mind-links{pointer-events:none;overflow:visible}
+      .mind-links .trace-group{mix-blend-mode:screen}
+      .mind-links .trace-layer{fill:none;pointer-events:none;stroke-linecap:round;stroke-linejoin:bevel}
+      .mind-links .trace-underlay{stroke:rgba(122,94,54,.58);stroke-width:2.6;opacity:.55;filter:url(#mind-soft-glow);stroke-linejoin:round}
+      .mind-links .trace-core{stroke-width:1.6;filter:url(#mind-soft-glow)}
+      .mind-links .trace-core.padded{marker-start:url(#mind-pad-round);marker-end:url(#mind-pad-round)}
+      .mind-links .trace-highlight{stroke:rgba(255,242,218,.34);stroke-width:0.8;filter:url(#mind-soft-glow);opacity:.85}
+      .mind-links .trace-group.status-doing .trace-core{stroke-opacity:.95}
+      .mind-links .trace-group.status-done .trace-core{opacity:.68}
+      .mind-links .trace-group.status-done .trace-highlight{opacity:.5}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
       @media (max-width:600px){
@@ -1704,10 +1708,6 @@ if ($view === 'map_edit') {
       .mobile-toolbar{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);width:min(640px,calc(100% - 32px));display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;background:rgba(12,16,18,.88);border:1px solid rgba(201,168,106,.28);border-radius:20px;padding:12px;box-shadow:0 18px 36px rgba(0,0,0,.5);backdrop-filter:blur(16px);z-index:80}
       .mobile-toolbar button{min-width:0;padding:10px 12px;width:100%}
       @media (max-width:820px){.map-toolbar{display:none}}
-      .mobile-save-status{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.34);background:rgba(21,26,30,.9);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;box-shadow:0 18px 44px rgba(0,0,0,.55);backdrop-filter:blur(14px);opacity:0;pointer-events:none;transition:opacity var(--t) ease;z-index:85}
-      .mobile-save-status.show{opacity:1}
-      .mobile-save-status.state-success{border-color:rgba(36,194,160,.42);color:#CFFAEA;box-shadow:0 0 28px rgba(36,194,160,.32)}
-      .mobile-save-status.state-error{border-color:rgba(209,75,75,.52);color:#F6D6D6;box-shadow:0 0 28px rgba(209,75,75,.32)}
       .sidebar-toggle{position:absolute;top:22px;left:22px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.86);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;display:none;z-index:95;box-shadow:0 12px 28px rgba(0,0,0,.45)}
       @media (max-width:1024px){
         .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(86vw,360px);transform:translateX(-105%);transition:transform var(--transition);border-right:1px solid rgba(201,168,106,.28);border-radius:0 24px 24px 0}
@@ -1832,13 +1832,15 @@ if ($view === 'map_edit') {
           <button data-action="attach-link">链接</button>
           <button data-action="delete" class="danger">删除</button>
         </div>
-        <div class="mobile-save-status" id="mobile-save-status" role="status" aria-live="polite"></div>
       </main>
     </div>
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     <script>
       (function(){
       const DOUBLE_TAP_WINDOW=320;
+      const SVG_NS='http://www.w3.org/2000/svg';
+      const TRACE_GRID=8;
+      const TRACE_CHAMFER=6;
       const NODE_TYPES=[
         {value:'idea',label:'创意',icon:'💡',accent:'#0284c7'},
         {value:'task',label:'任务',icon:'✅',accent:'#ca8a04'},
@@ -1930,8 +1932,12 @@ if ($view === 'map_edit') {
           this.container.appendChild(this.background);
           this.viewport=document.createElement('div');
           this.viewport.className='mind-viewport';
-          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.linkLayer=document.createElementNS(SVG_NS,'svg');
           this.linkLayer.classList.add('mind-links');
+          this.linkLayer.setAttribute('width','100%');
+          this.linkLayer.setAttribute('height','100%');
+          this.linkDefs=null;
+          this.initializeLinkDefs();
           this.viewport.appendChild(this.linkLayer);
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
@@ -1952,6 +1958,192 @@ if ($view === 'map_edit') {
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
+        }
+        initializeLinkDefs(){
+          if(!this.linkLayer) return;
+          if(this.linkDefs && this.linkDefs.parentNode===this.linkLayer){
+            this.linkLayer.removeChild(this.linkDefs);
+          }
+          const defs=document.createElementNS(SVG_NS,'defs');
+          defs.setAttribute('data-static-defs','true');
+          const softGlow=document.createElementNS(SVG_NS,'filter');
+          softGlow.id='mind-soft-glow';
+          softGlow.setAttribute('x','-50%');
+          softGlow.setAttribute('y','-50%');
+          softGlow.setAttribute('width','200%');
+          softGlow.setAttribute('height','200%');
+          const blur=document.createElementNS(SVG_NS,'feGaussianBlur');
+          blur.setAttribute('in','SourceGraphic');
+          blur.setAttribute('stdDeviation','0.6');
+          blur.setAttribute('result','blur');
+          const merge=document.createElementNS(SVG_NS,'feMerge');
+          const mergeNodeBlur=document.createElementNS(SVG_NS,'feMergeNode');
+          mergeNodeBlur.setAttribute('in','blur');
+          const mergeNodeSource=document.createElementNS(SVG_NS,'feMergeNode');
+          mergeNodeSource.setAttribute('in','SourceGraphic');
+          merge.appendChild(mergeNodeBlur);
+          merge.appendChild(mergeNodeSource);
+          softGlow.appendChild(blur);
+          softGlow.appendChild(merge);
+          defs.appendChild(softGlow);
+          const padGradient=document.createElementNS(SVG_NS,'radialGradient');
+          padGradient.id='mind-pad-gradient';
+          padGradient.setAttribute('cx','50%');
+          padGradient.setAttribute('cy','45%');
+          padGradient.setAttribute('r','60%');
+          padGradient.setAttribute('data-static-def','true');
+          const stops=[
+            {offset:'0%',color:'#EAD8A8',opacity:'0.95'},
+            {offset:'60%',color:'#C9A86A',opacity:'0.95'},
+            {offset:'100%',color:'#7A5E36',opacity:'0.85'},
+          ];
+          stops.forEach(stopInfo=>{
+            const stop=document.createElementNS(SVG_NS,'stop');
+            stop.setAttribute('offset',stopInfo.offset);
+            stop.setAttribute('stop-color',stopInfo.color);
+            if(stopInfo.opacity){ stop.setAttribute('stop-opacity',stopInfo.opacity); }
+            padGradient.appendChild(stop);
+          });
+          defs.appendChild(padGradient);
+          const padMarker=document.createElementNS(SVG_NS,'marker');
+          padMarker.id='mind-pad-round';
+          padMarker.setAttribute('markerWidth','8');
+          padMarker.setAttribute('markerHeight','8');
+          padMarker.setAttribute('refX','4');
+          padMarker.setAttribute('refY','4');
+          padMarker.setAttribute('orient','auto');
+          const padCircle=document.createElementNS(SVG_NS,'circle');
+          padCircle.setAttribute('cx','4');
+          padCircle.setAttribute('cy','4');
+          padCircle.setAttribute('r','3.2');
+          padCircle.setAttribute('fill','url(#mind-pad-gradient)');
+          padMarker.appendChild(padCircle);
+          const fresnel=document.createElementNS(SVG_NS,'circle');
+          fresnel.setAttribute('cx','4');
+          fresnel.setAttribute('cy','4');
+          fresnel.setAttribute('r','3.6');
+          fresnel.setAttribute('fill','none');
+          fresnel.setAttribute('stroke','rgba(76,195,209,.18)');
+          fresnel.setAttribute('stroke-width','0.6');
+          padMarker.appendChild(fresnel);
+          defs.appendChild(padMarker);
+          this.linkLayer.appendChild(defs);
+          this.linkDefs=defs;
+        }
+        clearLinkLayer(){
+          if(this.linkLayer){
+            this.linkLayer.querySelectorAll('g.trace-group').forEach(group=>group.remove());
+          }
+          if(this.linkDefs){
+            this.linkDefs.querySelectorAll('[data-trace-gradient]').forEach(grad=>grad.remove());
+          }
+        }
+        updateTraceGroupState(node){
+          if(!node || !node.linkGroup) return;
+          const status=(node.data && node.data.status) || 'backlog';
+          const type=(node.data && node.data.type) || 'idea';
+          node.linkGroup.setAttribute('data-status', status);
+          node.linkGroup.setAttribute('data-type', type);
+          node.linkGroup.setAttribute('data-depth', String(node.depth||0));
+          Array.from(node.linkGroup.classList)
+            .filter(cls=>cls.startsWith('status-'))
+            .forEach(cls=>node.linkGroup.classList.remove(cls));
+          node.linkGroup.classList.add(`status-${status}`);
+        }
+        ensureTraceGradient(nodeId){
+          if(!this.linkDefs) return null;
+          const gradientId=`mind-trace-gradient-${nodeId}`;
+          let gradient=this.linkDefs.querySelector(`#${gradientId}`);
+          if(gradient) return gradient;
+          gradient=document.createElementNS(SVG_NS,'linearGradient');
+          gradient.id=gradientId;
+          gradient.setAttribute('gradientUnits','userSpaceOnUse');
+          gradient.setAttribute('data-trace-gradient', nodeId);
+          const stops=[
+            {offset:'0%',color:'#E3C68B'},
+            {offset:'50%',color:'#C9A86A'},
+            {offset:'100%',color:'#AA8C54'},
+          ];
+          stops.forEach(info=>{
+            const stop=document.createElementNS(SVG_NS,'stop');
+            stop.setAttribute('offset',info.offset);
+            stop.setAttribute('stop-color',info.color);
+            gradient.appendChild(stop);
+          });
+          this.linkDefs.appendChild(gradient);
+          return gradient;
+        }
+        snapCoordinate(value){
+          if(!Number.isFinite(value)) return 0;
+          return Math.round(value/TRACE_GRID)*TRACE_GRID;
+        }
+        formatCoordinate(value){
+          if(!Number.isFinite(value)) return 0;
+          return Math.round(value*100)/100;
+        }
+        buildTracePoints(start, end){
+          if(!start || !end) return [start,end].filter(Boolean);
+          const points=[{x:start.x,y:start.y}];
+          const dx=end.x-start.x;
+          const dirX=dx>=0?1:-1;
+          const totalDx=Math.abs(dx);
+          const approach=Math.max(20, Math.min(32, totalDx*0.25));
+          let elbowX=start.x + dirX * Math.max(32, Math.min(totalDx*0.55, totalDx - approach));
+          const finalApproach=end.x - dirX * approach;
+          if(dirX>0 && elbowX>finalApproach){ elbowX=(start.x + finalApproach)/2; }
+          if(dirX<0 && elbowX<finalApproach){ elbowX=(start.x + finalApproach)/2; }
+          elbowX=this.snapCoordinate(elbowX);
+          const horizontalPoint={x:elbowX,y:start.y};
+          if(Math.hypot(horizontalPoint.x-start.x, horizontalPoint.y-start.y)>0.5){
+            points.push(horizontalPoint);
+          }
+          if(Math.abs(end.y-start.y)>4){
+            points.push({x:elbowX,y:end.y});
+          }
+          points.push({x:end.x,y:end.y});
+          return points;
+        }
+        buildChamferedPath(points, chamfer=TRACE_CHAMFER){
+          if(!points || points.length<2) return '';
+          const fmt=value=>this.formatCoordinate(value);
+          const commands=[`M${fmt(points[0].x)} ${fmt(points[0].y)}`];
+          for(let i=1;i<points.length;i++){
+            const curr=points[i];
+            if(i===points.length-1){
+              commands.push(`L${fmt(curr.x)} ${fmt(curr.y)}`);
+              continue;
+            }
+            const prev=points[i-1];
+            const next=points[i+1];
+            const prevVec={x:curr.x-prev.x,y:curr.y-prev.y};
+            const nextVec={x:next.x-curr.x,y:next.y-curr.y};
+            const prevLen=Math.hypot(prevVec.x, prevVec.y);
+            const nextLen=Math.hypot(nextVec.x, nextVec.y);
+            if(prevLen<0.001 || nextLen<0.001){
+              commands.push(`L${fmt(curr.x)} ${fmt(curr.y)}`);
+              continue;
+            }
+            const cut=Math.min(chamfer, prevLen/2, nextLen/2);
+            const entry={
+              x:curr.x - (prevVec.x/prevLen)*cut,
+              y:curr.y - (prevVec.y/prevLen)*cut,
+            };
+            const exit={
+              x:curr.x + (nextVec.x/nextLen)*cut,
+              y:curr.y + (nextVec.y/nextLen)*cut,
+            };
+            commands.push(`L${fmt(entry.x)} ${fmt(entry.y)}`);
+            commands.push(`L${fmt(exit.x)} ${fmt(exit.y)}`);
+          }
+          return commands.join(' ');
+        }
+        computeTraceWidth(node){
+          if(!node || !node.parent) return 1.6;
+          if(node.parent.isroot) return 2.0;
+          const siblings=node.parent.children || [];
+          if(siblings.length>=6) return 1.2;
+          if(siblings.length>=4) return 1.4;
+          return 1.6;
         }
         setupPan(){
           const updatePinchBaseline=()=>{
@@ -2532,7 +2724,7 @@ if ($view === 'map_edit') {
         }
         render(){
           this.nodeLayer.innerHTML='';
-          while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          this.clearLinkLayer();
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
           if(!this.root) return;
@@ -2549,13 +2741,31 @@ if ($view === 'map_edit') {
             this.updateNodePosition(node);
             this.updateAnchors(node);
             if(node.parent){
-              const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-              path.setAttribute('data-from', node.parent.id);
-              path.setAttribute('data-to', node.id);
-              path.setAttribute('data-type', node.data && node.data.type ? node.data.type : 'idea');
-              this.linkLayer.appendChild(path);
-              node.linkPath=path;
-              this.linkRegistry.set(node.id,path);
+              const group=document.createElementNS(SVG_NS,'g');
+              group.classList.add('trace-group');
+              group.setAttribute('data-from', node.parent.id);
+              group.setAttribute('data-to', node.id);
+              group.setAttribute('data-type', node.data && node.data.type ? node.data.type : 'idea');
+              group.setAttribute('data-status', node.data && node.data.status ? node.data.status : 'backlog');
+              group.setAttribute('data-depth', String(node.depth||0));
+              const underlay=document.createElementNS(SVG_NS,'path');
+              underlay.classList.add('trace-layer','trace-underlay');
+              const core=document.createElementNS(SVG_NS,'path');
+              core.classList.add('trace-layer','trace-core','padded');
+              core.setAttribute('data-from', node.parent.id);
+              core.setAttribute('data-to', node.id);
+              const highlight=document.createElementNS(SVG_NS,'path');
+              highlight.classList.add('trace-layer','trace-highlight');
+              group.appendChild(underlay);
+              group.appendChild(core);
+              group.appendChild(highlight);
+              this.linkLayer.appendChild(group);
+              node.linkGroup=group;
+              node.linkUnderlay=underlay;
+              node.linkPath=core;
+              node.linkHighlight=highlight;
+              this.linkRegistry.set(node.id,core);
+              this.updateTraceGroupState(node);
               this.updateLinkPath(node);
             }
             if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
@@ -2591,13 +2801,29 @@ if ($view === 'map_edit') {
           if(!node.parent.anchors) this.updateAnchors(node.parent);
           const parent=node.parent;
           const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
-          const start=isLeft ? parent.anchors.left : parent.anchors.right;
-          const end=isLeft ? node.anchors.right : node.anchors.left;
-          const horizontalGap=Math.max(60, Math.abs(end.x-start.x)*0.35);
-          const controlX=start.x + (isLeft?-horizontalGap:horizontalGap);
-          const controlY1=start.y;
-          const controlY2=end.y;
-          node.linkPath.setAttribute('d', `M${start.x} ${start.y} C ${controlX} ${controlY1} ${controlX} ${controlY2} ${end.x} ${end.y}`);
+          const startAnchor=isLeft ? parent.anchors.left : parent.anchors.right;
+          const endAnchor=isLeft ? node.anchors.right : node.anchors.left;
+          const startPoint={x:startAnchor.x,y:startAnchor.y};
+          const endPoint={x:endAnchor.x,y:endAnchor.y};
+          const points=this.buildTracePoints(startPoint,endPoint);
+          const pathData=this.buildChamferedPath(points);
+          if(!pathData) return;
+          if(node.linkUnderlay){ node.linkUnderlay.setAttribute('d', pathData); }
+          node.linkPath.setAttribute('d', pathData);
+          if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          const width=this.computeTraceWidth(node);
+          node.linkPath.setAttribute('stroke-width', this.formatCoordinate(width));
+          if(node.linkUnderlay){ node.linkUnderlay.setAttribute('stroke-width', this.formatCoordinate(width+0.8)); }
+          if(node.linkHighlight){ node.linkHighlight.setAttribute('stroke-width', this.formatCoordinate(Math.max(0.6, width*0.5))); }
+          const gradient=this.ensureTraceGradient(node.id);
+          if(gradient){
+            gradient.setAttribute('x1', this.formatCoordinate(startPoint.x));
+            gradient.setAttribute('y1', this.formatCoordinate(startPoint.y));
+            gradient.setAttribute('x2', this.formatCoordinate(endPoint.x));
+            gradient.setAttribute('y2', this.formatCoordinate(endPoint.y));
+            node.linkPath.setAttribute('stroke', `url(#${gradient.id})`);
+          }
+          this.updateTraceGroupState(node);
         }
         handleNodeResize(entries){
           if(!entries || !entries.length) return;
@@ -2726,14 +2952,14 @@ if ($view === 'map_edit') {
       }
       return;
     }
-    const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    const overlay=document.createElementNS(SVG_NS,'svg');
     overlay.id='drag-overlay';
     overlay.setAttribute('width','100%');
     overlay.setAttribute('height','100%');
     overlay.setAttribute('viewBox','0 0 100 100');
-    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+    const ghostLine=document.createElementNS(SVG_NS,'line');
     ghostLine.setAttribute('opacity','0');
-    const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const ghostRing=document.createElementNS(SVG_NS,'circle');
     ghostRing.setAttribute('opacity','0');
     overlay.appendChild(ghostLine);
     overlay.appendChild(ghostRing);
@@ -3071,7 +3297,6 @@ if ($view === 'map_edit') {
       const nodeTagsPreview=document.getElementById('node-tags-preview');
       const mobileToolbar=document.getElementById('mobile-toolbar');
       const mobileSaveButton=mobileToolbar ? mobileToolbar.querySelector('button[data-action="save"]') : null;
-      const mobileSaveStatus=document.getElementById('mobile-save-status');
       const sidebarToggle=document.getElementById('sidebar-toggle');
       const sidebarBackdrop=document.getElementById('sidebar-backdrop');
       const saveButton=document.getElementById('btn-save');
@@ -3085,32 +3310,12 @@ if ($view === 'map_edit') {
       let mobileSaveDefault=mobileSaveButton ? mobileSaveButton.textContent : '保存';
       if(mobileSaveButton){ mobileSaveButton.dataset.defaultLabel=mobileSaveDefault; }
       let dirty=false;
-      let mobileStatusTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
       const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v'];
-      function setMobileSaveStatus(text, state, opts={}){
-        if(!mobileSaveStatus) return;
-        if(mobileStatusTimer){ clearTimeout(mobileStatusTimer); mobileStatusTimer=null; }
-        if(!text){
-          mobileSaveStatus.textContent='';
-          mobileSaveStatus.className='mobile-save-status';
-          return;
-        }
-        mobileSaveStatus.textContent=text;
-        mobileSaveStatus.className='mobile-save-status show';
-        if(state){ mobileSaveStatus.classList.add(`state-${state}`); }
-        if(opts.autoHide){
-          const duration=typeof opts.duration==='number' && isFinite(opts.duration)?opts.duration:1800;
-          mobileStatusTimer=setTimeout(()=>{
-            mobileStatusTimer=null;
-            if(!dirty){ setMobileSaveStatus('', null); }
-          }, duration);
-        }
-      }
       function setSaveButtonState(text, disabled){
         if(typeof text==='string'){
           if(saveButton) saveButton.textContent=text;
@@ -3131,7 +3336,6 @@ if ($view === 'map_edit') {
           saveState.classList.add('show','dirty');
         }
         setSaveButtonState('未保存',false);
-        setMobileSaveStatus('未保存','dirty');
       }
       function showSaving(){
         if(saveState){
@@ -3140,7 +3344,6 @@ if ($view === 'map_edit') {
           saveState.classList.remove('dirty');
         }
         setSaveButtonState('⏳ 保存中...', true);
-        setMobileSaveStatus('保存中...','saving');
       }
       function markSaved(){
         dirty=false;
@@ -3150,14 +3353,20 @@ if ($view === 'map_edit') {
           saveState.classList.remove('dirty');
         }
         setSaveButtonState('✅ 保存成功', false);
-        setMobileSaveStatus('保存成功','success',{autoHide:true});
         setTimeout(()=>{
           if(!dirty){
             if(saveState) saveState.classList.remove('show');
             setSaveButtonState(null,false);
-            setMobileSaveStatus('', null);
           }
         },1500);
+      }
+      function showSaveError(message){
+        const text=message && String(message).trim()?String(message).trim():'保存失败';
+        if(saveState){
+          saveState.textContent=text;
+          saveState.classList.add('show','dirty');
+        }
+        setSaveButtonState('未保存', false);
       }
       const inspectorFields=[nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput].filter(Boolean);
       let inspectorSyncing=false;
@@ -3723,9 +3932,10 @@ if ($view === 'map_edit') {
           if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
           markSaved();
         }catch(err){
-          alert(err.message||'保存失败');
+          const message=err && err.message ? err.message : '保存失败';
+          alert(message);
           markDirty();
-          setMobileSaveStatus(err && err.message ? err.message : '保存失败','error');
+          showSaveError(message);
         }
       }
       window.addEventListener('beforeunload',e=>{
