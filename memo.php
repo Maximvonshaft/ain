@@ -1068,7 +1068,6 @@ if ($view === 'map_edit') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>思维导图编辑器 · <?php echo h($mind['title']); ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/style/jsmind.css">
     <style>
       :root{ --bg:#0f172a; --surface:#ffffff; --border:#e2e8f0; --muted:#64748b; --text:#0f172a; --acc:#2563eb; --acc2:#60a5fa; --ok:#16a34a; --bad:#dc2626; }
       *{box-sizing:border-box}
@@ -1091,11 +1090,22 @@ if ($view === 'map_edit') {
       .tips strong{font-weight:700}
       .tips code{background:rgba(15,23,42,.08);padding:2px 5px;border-radius:6px;font-size:12px}
       .editor-pane{background:#0f172a;position:relative}
-      #jsmind-container{position:relative;width:100%;height:100vh;overflow:hidden}
+      #jsmind-container{position:relative;width:100%;height:100vh;overflow:hidden;background:radial-gradient(circle at top,#1f2a40 0%,#111b2f 60%,#0b1223 100%);}
       .map-toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px;flex-wrap:wrap}
       .map-toolbar button{padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.65);color:#fff;font-size:12px;cursor:pointer}
       .map-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e2e8f0;text-align:center;padding:40px 24px;font-size:16px;gap:8px}
       .map-error strong{font-size:20px;color:#f8fafc}
+      .mind-viewport{position:absolute;inset:0;transform-origin:0 0;will-change:transform;}
+      .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
+      .mind-links path{fill:none;stroke:rgba(148,163,184,.65);stroke-width:2;stroke-linecap:round}
+      .mind-nodes{position:absolute;inset:0}
+      .jsmind-node{position:absolute;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;background:#f8fafc;color:#0f172a;box-shadow:0 18px 32px rgba(15,23,42,.2);border:1px solid rgba(148,163,184,.35);min-width:140px;max-width:240px;text-align:center;font-weight:700;font-size:14px;line-height:1.4;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+      .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 22px 38px rgba(37,99,235,.22)}
+      .jsmind-node.selected{border:2px solid #2563eb;box-shadow:0 30px 48px rgba(37,99,235,.3)}
+      .jsmind-node[data-direction="left"]{text-align:right;justify-content:flex-end}
+      .jsmind-node[data-direction="right"]{justify-content:flex-start}
+      .jsmind-node .node-topic{display:block;word-break:break-word}
+      .mind-background{position:absolute;inset:-400px;background:radial-gradient(circle,#172038 0%,rgba(15,23,42,0) 70%);pointer-events:none}
       .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#475569;font:12px/1 ui-monospace}
       .save-tip{font-size:12px;color:var(--ok);display:none}
       .save-tip.show{display:inline}
@@ -1181,18 +1191,417 @@ if ($view === 'map_edit') {
         </div>
       </main>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/jsmind.min.js"></script>
     <script>
       (function(){
+      class SimpleMind {
+        constructor(options){
+          this.options=options||{};
+          const containerOpt=this.options.container;
+          this.container=typeof containerOpt==='string'?document.getElementById(containerOpt):containerOpt;
+          if(!this.container) throw new Error('Mind container not found');
+          this.listeners=[];
+          this.scale=1;
+          this.offsetX=0;
+          this.offsetY=0;
+          this.mind=null;
+          this.nodes=new Map();
+          this.root=null;
+          this.selectedId=null;
+          this.container.innerHTML='';
+          this.container.classList.add('mind-container');
+          this.background=document.createElement('div');
+          this.background.className='mind-background';
+          this.container.appendChild(this.background);
+          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.linkLayer.classList.add('mind-links');
+          this.linkLayer.setAttribute('width','100%');
+          this.linkLayer.setAttribute('height','100%');
+          this.container.appendChild(this.linkLayer);
+          this.viewport=document.createElement('div');
+          this.viewport.className='mind-viewport';
+          this.nodeLayer=document.createElement('div');
+          this.nodeLayer.className='mind-nodes';
+          this.viewport.appendChild(this.nodeLayer);
+          this.container.appendChild(this.viewport);
+          this.dragState=null;
+          this.setupPan();
+        }
+        setupPan(){
+          const startPan=(evt)=>{
+            if(evt.button!==0 && evt.pointerType!=='touch') return;
+            if(evt.target.closest('.jsmind-node')) return;
+            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+            this.container.setPointerCapture(evt.pointerId);
+          };
+          const movePan=(evt)=>{
+            if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
+            const dx=evt.clientX-this.dragState.startX;
+            const dy=evt.clientY-this.dragState.startY;
+            this.offsetX=this.dragState.baseX+dx;
+            this.offsetY=this.dragState.baseY+dy;
+            this.applyTransform();
+          };
+          const endPan=(evt)=>{
+            if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
+            this.dragState=null;
+            try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
+          };
+          this.container.addEventListener('pointerdown',startPan);
+          this.container.addEventListener('pointermove',movePan);
+          this.container.addEventListener('pointerup',endPan);
+          this.container.addEventListener('pointercancel',endPan);
+        }
+        add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
+        emit(type){ this.listeners.forEach(fn=>{ try{ fn(type); }catch(err){ console.warn(err); } }); }
+        show(mindData){
+          this.mind=(typeof structuredClone==='function')?structuredClone(mindData):JSON.parse(JSON.stringify(mindData));
+          this.nodes.clear();
+          this.root=null;
+          this.selectedId=null;
+          const data=this.mind && this.mind.data ? this.mind.data : null;
+          if(!data) return;
+          const build=(item,parent)=>{
+            const node={
+              id:item.id || ('node-'+Math.random().toString(36).slice(2,9)),
+              topic:item.topic || '',
+              data:item.data || null,
+              parent:parent,
+              children:[],
+              direction:item.direction || (parent?parent.direction:'right'),
+              expanded:item.expanded!==false,
+              isroot:!parent,
+              style:item.style || null,
+              meta:item.meta || null,
+              model:item,
+            };
+            if(node.isroot){ node.direction='center'; }
+            this.nodes.set(node.id,node);
+            if(parent){ parent.children.push(node); node.model.parentId=parent.id; }
+            else this.root=node;
+            if(Array.isArray(item.children)){
+              node.children=item.children.map(child=>build(child,node));
+            }
+            return node;
+          };
+          build(data,null);
+          this.hasCentered=false;
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.show);
+          if(this.root){ this.select_node(this.root.id); }
+        }
+        get_root(){ return this.root; }
+        get_node(id){ return this.nodes.get(id) || null; }
+        get_selected_node(){
+          const node=this.nodes.get(this.selectedId);
+          if(node){ node.selected=true; }
+          return node || null;
+        }
+        select_node(id){
+          if(!id || !this.nodes.has(id)) return;
+          if(this.selectedId && this.selectedId!==id){
+            const prev=this.nodes.get(this.selectedId);
+            if(prev && prev.el){ prev.el.classList.remove('selected'); prev.selected=false; }
+          }
+          this.selectedId=id;
+          const node=this.nodes.get(id);
+          if(node && node.el){ node.el.classList.add('selected'); }
+          if(node){ node.selected=true; }
+          this.emit(SimpleMind.event_type.select);
+        }
+        ensureModelChildren(node){
+          if(!node.model.children) node.model.children=[];
+          return node.model.children;
+        }
+        add_node(parentNode,newId,topic,data){
+          const parent=typeof parentNode==='string'?this.get_node(parentNode):parentNode;
+          if(!parent) return null;
+          if(!newId) newId='node-'+Math.random().toString(36).slice(2,10);
+          const model={id:newId,topic:topic||'新节点',data:data||null,children:[]};
+          const children=this.ensureModelChildren(parent);
+          children.push(model);
+          const node={
+            id:newId,
+            topic:model.topic,
+            data:model.data,
+            parent:parent,
+            children:[],
+            direction:model.direction || parent.direction,
+            expanded:true,
+            isroot:false,
+            style:model.style || null,
+            meta:model.meta || null,
+            model:model,
+          };
+          parent.children.push(node);
+          this.nodes.set(newId,node);
+          this.computeLayout();
+          this.render();
+          this.select_node(newId);
+          this.emit(SimpleMind.event_type.update);
+          return node;
+        }
+        remove_node(id){
+          const node=this.nodes.get(id);
+          if(!node || node.isroot) return;
+          const parent=node.parent;
+          parent.children=parent.children.filter(child=>child!==node);
+          if(parent.model && parent.model.children){
+            parent.model.children=parent.model.children.filter(child=>child.id!==id);
+          }
+          const stack=[node];
+          while(stack.length){
+            const cur=stack.pop();
+            this.nodes.delete(cur.id);
+            if(cur.children && cur.children.length){ stack.push(...cur.children); }
+          }
+          this.computeLayout();
+          this.render();
+          this.select_node(parent.id);
+          this.emit(SimpleMind.event_type.update);
+        }
+        toggle_node(id){
+          const node=this.nodes.get(id);
+          if(!node) return;
+          node.expanded=!node.expanded;
+          node.model.expanded=node.expanded;
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.refresh);
+        }
+        set_node_color(id,bg,fg){
+          const node=this.nodes.get(id);
+          if(node && node.el){
+            node.style=node.style||{};
+            if(bg){ node.style.background=bg; node.el.style.background=bg; node.el.dataset.bg=bg; }
+            if(fg){ node.style.foreground=fg; node.el.style.color=fg; node.el.dataset.fg=fg; }
+          }
+        }
+        update_node(id,topic){
+          const node=this.nodes.get(id);
+          if(!node) return;
+          node.topic=topic;
+          node.model.topic=topic;
+          if(node.el){ node.el.querySelector('.node-topic').textContent=topic; }
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.edit);
+          this.emit(SimpleMind.event_type.after_edit);
+        }
+        get_data(format){
+          if(format && format!=='node_tree'){ return null; }
+          return this.mind ? ((typeof structuredClone==='function')?structuredClone(this.mind):JSON.parse(JSON.stringify(this.mind))) : null;
+        }
+        computeLayout(){
+          if(!this.root) return;
+          const H_SPACING=200;
+          const V_SPACING=120;
+          const NODE_HEIGHT=80;
+          const measure=(node)=>{
+            if(!node) return NODE_HEIGHT;
+            if(!node.expanded || !node.children.length) return NODE_HEIGHT;
+            let total=0;
+            const visible=node.children;
+            for(let i=0;i<visible.length;i++){
+              total+=measure(visible[i]);
+              if(i<visible.length-1) total+=V_SPACING;
+            }
+            return Math.max(NODE_HEIGHT,total);
+          };
+          const left=this.root.children.filter(child=>(child.direction||'right')==='left');
+          const right=this.root.children.filter(child=>child.direction==='right'||child.direction==='center'||child.direction===undefined||child.direction===null||child.direction==='');
+          const leftHeight=left.length?left.reduce((sum,child)=>sum+measure(child),0)+V_SPACING*(left.length-1):0;
+          const rightHeight=right.length?right.reduce((sum,child)=>sum+measure(child),0)+V_SPACING*(right.length-1):0;
+          this.root.x=0;
+          this.root.y=(Math.max(NODE_HEIGHT, leftHeight, rightHeight))/2;
+          const assign=(node,depth,dir,startTop)=>{
+            const height=measure(node);
+            node.x=(dir===0?0:dir*depth*H_SPACING);
+            node.y=startTop+height/2;
+            node.dir=dir;
+            if(!node.expanded || !node.children.length) return height;
+            let top=startTop;
+            const children=node.children;
+            for(const child of children){
+              const childDir = child.direction==='left'? -1 : (child.direction==='right'? 1 : (dir===0?1:dir));
+              const childHeight=assign(child, depth+1, childDir, top);
+              top+=childHeight+V_SPACING;
+            }
+            return height;
+          };
+          let leftTop=this.root.y - leftHeight/2;
+          for(const child of left){
+            const h=assign(child,1,-1,leftTop);
+            leftTop+=h+V_SPACING;
+          }
+          let rightTop=this.root.y - rightHeight/2;
+          for(const child of right){
+            const h=assign(child,1,1,rightTop);
+            rightTop+=h+V_SPACING;
+          }
+          this.bounds={minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity};
+          for(const node of this.nodes.values()){
+            if(node.y<this.bounds.minY) this.bounds.minY=node.y;
+            if(node.y>this.bounds.maxY) this.bounds.maxY=node.y;
+            if(node.x<this.bounds.minX) this.bounds.minX=node.x;
+            if(node.x>this.bounds.maxX) this.bounds.maxX=node.x;
+          }
+          if(!isFinite(this.bounds.minY)){ this.bounds={minX:-100,maxX:100,minY:0,maxY:400}; }
+          const margin=80;
+          const shiftX=-this.bounds.minX+margin;
+          const shiftY=-this.bounds.minY+margin;
+          this.bounds.width=this.bounds.maxX-this.bounds.minX+margin*2;
+          this.bounds.height=this.bounds.maxY-this.bounds.minY+margin*2;
+          for(const node of this.nodes.values()){
+            node.absX=node.x+shiftX;
+            node.absY=node.y+shiftY;
+          }
+          this.linkLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
+          this.linkLayer.setAttribute('width',`${this.bounds.width}`);
+          this.linkLayer.setAttribute('height',`${this.bounds.height}`);
+          this.nodeLayer.style.width=`${this.bounds.width}px`;
+          this.nodeLayer.style.height=`${this.bounds.height}px`;
+        }
+        render(){
+          this.nodeLayer.innerHTML='';
+          while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          if(!this.root) return;
+          const createNodeEl=(node)=>{
+            const el=document.createElement('div');
+            el.className='jsmind-node';
+            if(node.selected){ el.classList.add('selected'); }
+            el.dataset.nodeid=node.id;
+            el.setAttribute('nodeid', node.id);
+            if(node.direction==='left'){ el.dataset.direction='left'; }
+            else if(node.direction==='right'){ el.dataset.direction='right'; }
+            const span=document.createElement('span');
+            span.className='node-topic';
+            span.textContent=node.topic || '';
+            el.appendChild(span);
+            el.addEventListener('click',()=>{ this.select_node(node.id); });
+            el.addEventListener('dblclick',()=>{ this.promptRename(node); });
+            return el;
+          };
+          const walk=(node)=>{
+            node.el=createNodeEl(node);
+            if(node.style){
+              if(node.style.background){ node.el.style.background=node.style.background; }
+              if(node.style.foreground){ node.el.style.color=node.style.foreground; }
+            }
+            this.nodeLayer.appendChild(node.el);
+            node.width=node.el.offsetWidth;
+            node.height=node.el.offsetHeight;
+            node.el.style.left=`${node.absX - node.width/2}px`;
+            node.el.style.top=`${node.absY - node.height/2}px`;
+            if(node.parent){
+              const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+              const parentEdge=node.parent.absX + (node.parent.direction==='left' ? -node.parent.width/2 : node.parent.width/2);
+              const startX=parentEdge;
+              const startY=node.parent.absY;
+              const childEdge=node.absX + (node.direction==='left' ? node.width/2 : -node.width/2);
+              const endX=childEdge;
+              const endY=node.absY;
+              const midX=(startX+endX)/2;
+              path.setAttribute('d',`M${startX} ${startY} C ${midX} ${startY} ${midX} ${endY} ${endX} ${endY}`);
+              this.linkLayer.appendChild(path);
+            }
+            if(node.expanded){
+              node.children.forEach(child=>walk(child));
+            }
+          };
+          walk(this.root);
+          this.applyTransform(true);
+        }
+        applyTransform(initial){
+          if(!this.bounds){ return; }
+          if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
+          const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
+          this.viewport.style.transform=transform;
+          this.linkLayer.style.transform=transform;
+        }
+        zoom(step){
+          const prev=this.scale;
+          this.scale=Math.max(0.3, Math.min(2.5, this.scale*step));
+          if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
+        }
+        viewCommand(cmd){
+          switch(cmd){
+            case 'zoomToFit': return this.zoomToFit();
+            case 'zoom_to_fit': return this.zoomToFit();
+            case 'set_zoom': return this.set_zoom(arguments[1]);
+            case 'move_to_center': return this.center_root();
+            case 'center_root': return this.center_root();
+            case 'zoomIn': this.zoom(1.15); return true;
+            case 'zoom_in': this.zoom(1.15); return true;
+            case 'zoomOut': this.zoom(1/1.15); return true;
+            case 'zoom_out': this.zoom(1/1.15); return true;
+            default: return false;
+          }
+        }
+        get view(){
+          return {
+            zoomToFit:()=>this.zoomToFit(),
+            zoom_to_fit:()=>this.zoomToFit(),
+            set_zoom:(v)=>this.set_zoom(v),
+            move_to_center:()=>this.center_root(),
+            center_root:()=>this.center_root(),
+            zoomIn:()=>{ this.zoom(1.15); return true; },
+            zoom_in:()=>{ this.zoom(1.15); return true; },
+            zoomOut:()=>{ this.zoom(1/1.15); return true; },
+            zoom_out:()=>{ this.zoom(1/1.15); return true; },
+          };
+        }
+        zoomToFit(){
+          if(!this.bounds) return false;
+          const rect=this.container.getBoundingClientRect();
+          if(rect.width<=0 || rect.height<=0) return false;
+          const scale=Math.min(rect.width/(this.bounds.width+200), rect.height/(this.bounds.height+200));
+          this.scale=Math.max(0.3, Math.min(2.5, scale));
+          this.center_root();
+          return true;
+        }
+        set_zoom(z){
+          if(typeof z!=='number' || !isFinite(z)) return false;
+          this.scale=Math.max(0.3, Math.min(2.5, z));
+          this.applyTransform();
+          return true;
+        }
+        center_root(){
+          if(!this.root || !this.bounds) return false;
+          const rect=this.container.getBoundingClientRect();
+          const centerX=this.root.absX + (this.root.el?this.root.el.offsetWidth/2:0);
+          const centerY=this.root.absY + (this.root.el?this.root.el.offsetHeight/2:0);
+          this.offsetX=rect.width/2 - centerX*this.scale;
+          this.offsetY=rect.height/2 - centerY*this.scale;
+          this.applyTransform();
+          return true;
+        }
+        promptRename(node){
+          if(!node) return;
+          const text=prompt('请输入节点标题', node.topic || '');
+          if(text===null) return;
+          const cleaned=text.trim();
+          if(!cleaned) return;
+          this.update_node(node.id, cleaned);
+        }
+      }
+      SimpleMind.event_type={
+        show:'show',
+        select:'select',
+        refresh:'refresh',
+        update:'update',
+        edit:'edit',
+        after_edit:'after_edit'
+      };
+      if(typeof window.jsMind==='undefined'){ window.jsMind=SimpleMind; }
       const defaultData = <?php echo json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
     const jmContainer=document.getElementById('jsmind-container');
     if(!window.jsMind){
       if(jmContainer){
-        jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请检查网络后重试。</span></div>';
+        jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
       }
-      console.error('jsMind library failed to load.');
       return;
     }
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -1501,7 +1910,7 @@ if ($view === 'map_edit') {
             const data={
               attachment:{
                 name:file.name,
-                size=file.size,
+                size:file.size,
                 type:file.type || 'application/octet-stream',
                 content:dataUrl,
               }
@@ -1564,6 +1973,21 @@ if ($view === 'map_edit') {
         jm.remove_node(node.id); markDirty();
         requestAnimationFrame(updateHandlePosition);
       }
+      function renameSelectedNode(){
+        const node=ensureNode();
+        if(!node) return;
+        const text=prompt('请输入节点标题', node.topic || '');
+        if(text===null) return;
+        const cleaned=text.trim();
+        if(!cleaned) return;
+        if(typeof jm.update_node === 'function'){ jm.update_node(node.id, cleaned); }
+        markDirty();
+        requestAnimationFrame(updateHandlePosition);
+      }
+      function focusParentNode(){
+        const node=ensureNode();
+        if(node && node.parent){ jm.select_node(node.parent.id); requestAnimationFrame(updateHandlePosition); }
+      }
       function openAttachmentDialog(){
         const node=ensureNode();
         if(!node){ alert('请先选择一个节点'); return; }
@@ -1619,6 +2043,15 @@ if ($view === 'map_edit') {
           }
         });
       }
+      document.addEventListener('keydown',e=>{
+        const activeTag=(document.activeElement && document.activeElement.tagName) || '';
+        if(/input|textarea|select/i.test(activeTag)) return;
+        if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); addSiblingNode(); }
+        else if(e.key==='Tab' && e.shiftKey){ e.preventDefault(); focusParentNode(); }
+        else if(e.key==='Tab'){ e.preventDefault(); addChildNode(); }
+        else if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); deleteSelectedNode(); }
+        else if(e.key==='F2'){ e.preventDefault(); renameSelectedNode(); }
+      });
       function callView(method, ...args){
         if(jm.view && typeof jm.view[method] === 'function'){
           try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
