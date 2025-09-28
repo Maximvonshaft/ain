@@ -1346,9 +1346,16 @@ if ($view === 'map_edit') {
       *{box-sizing:border-box}
       html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:15px/1.6 "Inter","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
       a{color:inherit;text-decoration:none}
-      .layout{min-height:100vh;display:grid;grid-template-columns:320px 1fr}
-      @media (max-width:1100px){ .layout{grid-template-columns:1fr} .sidebar{position:static;height:auto} }
-      .sidebar{background:#f8fafc;border-right:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow:auto}
+      .layout{min-height:100vh;display:grid;grid-template-columns:minmax(300px,340px) 1fr;transition:transform .3s ease}
+      .layout.compact{grid-template-columns:1fr}
+      .sidebar{background:#f8fafc;border-right:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow:auto;transition:transform .3s ease,box-shadow .3s ease;z-index:90}
+      @media (max-width:1024px){
+        body{overflow:hidden}
+        .layout{grid-template-columns:1fr}
+        .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(86vw,340px);max-width:360px;height:auto;transform:translateX(-105%);box-shadow:0 28px 60px rgba(15,23,42,.35)}
+        body.sidebar-open .sidebar{transform:translateX(0)}
+        .layout.compact{grid-template-columns:1fr}
+      }
       .sidebar h1{margin:0;font-size:20px;font-weight:800;color:#0f172a}
       .sidebar .meta{color:var(--muted);font:12px/1.4 ui-monospace}
       .sidebar label{font-weight:700;color:#0f172a;font-size:13px}
@@ -1362,9 +1369,9 @@ if ($view === 'map_edit') {
       .tips{background:#e0f2fe;border:1px solid #bae6fd;color:#0c4a6e;padding:12px;border-radius:12px;font-size:13px;line-height:1.6}
       .tips strong{font-weight:700}
       .tips code{background:rgba(15,23,42,.08);padding:2px 5px;border-radius:6px;font-size:12px}
-      .editor-pane{background:#0f172a;position:relative}
-      #jsmind-container{position:relative;width:100%;height:100vh;overflow:hidden;background:radial-gradient(circle at top,#1f2a40 0%,#111b2f 60%,#0b1223 100%);}
-      .map-toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px;flex-wrap:wrap}
+      .editor-pane{background:#0f172a;position:relative;overflow:hidden}
+      #jsmind-container{position:relative;width:100%;height:100vh;height:100dvh;max-height:100%;overflow:hidden;background:radial-gradient(circle at top,#1e293b 0%,#0f172a 65%,#020617 100%);touch-action:none}
+      .map-toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px;flex-wrap:wrap;z-index:40}
       .map-toolbar button{padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.65);color:#fff;font-size:12px;cursor:pointer}
       .map-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e2e8f0;text-align:center;padding:40px 24px;font-size:16px;gap:8px}
       .map-error strong{font-size:20px;color:#f8fafc}
@@ -1372,12 +1379,15 @@ if ($view === 'map_edit') {
       .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
       .mind-links path{fill:none;stroke:rgba(148,163,184,.65);stroke-width:2;stroke-linecap:round}
       .mind-nodes{position:absolute;inset:0}
-      .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:14px;background:#f8fafc;color:#0f172a;box-shadow:0 18px 32px rgba(15,23,42,.2);border:1px solid rgba(148,163,184,.35);min-width:140px;max-width:240px;text-align:center;font-weight:700;font-size:14px;line-height:1.4;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+      .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:14px;background:#f8fafc;color:#0f172a;box-shadow:0 18px 32px rgba(15,23,42,.2);border:1px solid rgba(148,163,184,.35);min-width:140px;max-width:260px;text-align:center;font-weight:700;font-size:14px;line-height:1.4;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
       .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 22px 38px rgba(37,99,235,.22)}
       .jsmind-node.selected{border:2px solid #2563eb;box-shadow:0 30px 48px rgba(37,99,235,.3)}
       .jsmind-node[data-direction="left"]{text-align:right;align-items:flex-end}
       .jsmind-node[data-direction="right"]{align-items:flex-start}
       .jsmind-node.editing{border:2px solid #60a5fa;box-shadow:0 26px 48px rgba(59,130,246,.35);background:#f8fafc;color:#0f172a;cursor:text}
+      .jsmind-node.has-attachment{background:#eef2ff;border-color:rgba(99,102,241,.4)}
+      .jsmind-node.has-link{box-shadow:0 22px 40px rgba(16,185,129,.24)}
+      .jsmind-node.drop-target{border:2px dashed rgba(59,130,246,.85);background:rgba(37,99,235,.15)}
       .jsmind-node .node-topic{display:block;word-break:break-word;white-space:pre-wrap;cursor:inherit}
       .jsmind-node .node-topic[contenteditable="true"]{outline:none;cursor:text}
       .jsmind-node .node-affordances{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
@@ -1387,7 +1397,17 @@ if ($view === 'map_edit') {
       .jsmind-node .node-badge.link{background:rgba(16,185,129,.12);color:#047857}
       .jsmind-node .node-badge.link:hover{background:rgba(16,185,129,.18);color:#0f766e}
       .jsmind-node .node-badge:disabled{opacity:.55;cursor:not-allowed}
-      .mind-background{position:absolute;inset:-400px;background:radial-gradient(circle,#172038 0%,rgba(15,23,42,0) 70%);pointer-events:none}
+      .mind-background{position:absolute;inset:-400px;background:radial-gradient(circle,#1e293b 0%,rgba(15,23,42,0) 70%);pointer-events:none}
+      .sidebar-toggle{position:absolute;top:16px;left:16px;padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.7);color:#f8fafc;font-weight:600;display:none;z-index:50}
+      @media (max-width:1024px){
+        .sidebar-toggle{display:inline-flex;align-items:center;gap:6px}
+        body.sidebar-open .sidebar-toggle{background:rgba(15,23,42,.9)}
+      }
+      .sidebar-backdrop{display:none}
+      @media (max-width:1024px){
+        .sidebar-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(2px);z-index:80;display:none;opacity:0;transition:opacity .25s ease}
+        body.sidebar-open .sidebar-backdrop{display:block;opacity:1}
+      }
       .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#475569;font:12px/1 ui-monospace}
       .save-tip{font-size:12px;color:var(--ok);display:none}
       .save-tip.show{display:inline}
@@ -1401,14 +1421,15 @@ if ($view === 'map_edit') {
       #drag-overlay circle{fill:rgba(96,165,250,.3);stroke:rgba(59,130,246,.9);stroke-width:2}
       .mobile-toolbar{display:none}
       @media (max-width:1100px){
-        .mobile-toolbar{position:fixed;left:16px;right:16px;bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;background:rgba(15,23,42,.82);backdrop-filter:blur(12px);padding:10px;border-radius:16px;z-index:60;box-shadow:0 18px 38px rgba(15,23,42,.35)}
-        .mobile-toolbar button{padding:12px 0;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#f8fafc;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer}
+        .mobile-toolbar{position:fixed;left:50%;transform:translateX(-50%);bottom:72px;width:calc(100% - 48px);max-width:520px;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;background:rgba(15,23,42,.82);backdrop-filter:blur(14px);padding:12px;border-radius:20px;z-index:60;box-shadow:0 24px 48px rgba(15,23,42,.38)}
+        .mobile-toolbar button{padding:12px 0;border:0;border-radius:12px;background:rgba(255,255,255,.14);color:#f8fafc;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer}
         .mobile-toolbar button.danger{background:rgba(248,113,113,.25);color:#fee2e2}
-        .jsmind-node{min-width:120px;max-width:200px;font-size:13px;padding:9px 12px}
+        .jsmind-node{min-width:120px;max-width:220px;font-size:13px;padding:9px 12px}
       }
       @media (max-width:700px){
-        .jsmind-node{min-width:110px;max-width:180px;padding:8px 10px;font-size:12px}
+        .jsmind-node{min-width:108px;max-width:180px;padding:8px 10px;font-size:12px}
       }
+      .mind-measure{position:absolute;left:-9999px;top:-9999px;pointer-events:none;visibility:hidden;z-index:-1}
     </style>
   </head>
   <body>
@@ -1447,7 +1468,7 @@ if ($view === 'map_edit') {
           <strong>快捷键</strong><br>
           <code>Enter</code> 同级 · <code>Tab</code> 子级 · <code>Shift+Tab</code> 升级 · <code>Del</code> 删除 · <code>F2</code> 重命名 · <code>Ctrl/Cmd+Z</code> 撤销<br>
           鼠标中键/空格拖拽 · 滚轮缩放 · 按住 <code>Alt</code> 拖动可复制节点。<br>
-          可从外部拖入图片、PDF、ZIP、文本或视频至画布，系统会引导选择创建同级或子级节点。
+          将图片、PDF、ZIP、文本或视频文件拖到节点上即可为该节点附加附件，超过 15MB 或不在白名单内的文件将被拒绝。
         </div>
         <div>
           <span class="badge">提示</span>
@@ -1463,6 +1484,7 @@ if ($view === 'map_edit') {
         <?php endif; ?>
       </aside>
       <main class="editor-pane">
+        <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="false">☰ 操作</button>
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
         <div class="map-toolbar">
           <button id="btn-collapse">折叠/展开节点</button>
@@ -1477,11 +1499,32 @@ if ($view === 'map_edit') {
         </div>
       </main>
     </div>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     <script>
       (function(){
       const DOUBLE_TAP_WINDOW=320;
       const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
       let lastTapInfo={id:null,time:0};
+      function normalizeNodeData(value){
+        if(!value || typeof value!=='object' || Array.isArray(value)) return {};
+        const data=value;
+        if(data.attachment && !data.attachments){
+          data.attachments=Array.isArray(data.attachment)?data.attachment.slice():[data.attachment];
+        }
+        if(!Array.isArray(data.attachments)){ data.attachments=[]; }
+        else{
+          data.attachments=data.attachments.filter(item=>item && typeof item==='object');
+        }
+        if(data.attachments.length){ data.attachment=data.attachments[0]; }
+        else if('attachment' in data){ delete data.attachment; }
+        return data;
+      }
+      function gatherAttachments(data){
+        if(!data) return [];
+        if(Array.isArray(data.attachments)){ return data.attachments.map(att=>att && typeof att==='object'?att:null).filter(Boolean); }
+        if(data.attachment && typeof data.attachment==='object') return [data.attachment];
+        return [];
+      }
       class SimpleMind {
         constructor(options){
           this.options=options||{};
@@ -1512,6 +1555,14 @@ if ($view === 'map_edit') {
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
           this.container.appendChild(this.viewport);
+          this.sizeCache=new Map();
+          this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
+          if(!this.measureHost.classList.contains('mind-measure')){
+            this.measureHost.className='mind-measure';
+            document.body.appendChild(this.measureHost);
+          }else if(!this.measureHost.parentElement){
+            document.body.appendChild(this.measureHost);
+          }
           this.dragState=null;
           this.setupPan();
         }
@@ -1539,6 +1590,31 @@ if ($view === 'map_edit') {
           this.container.addEventListener('pointermove',movePan);
           this.container.addEventListener('pointerup',endPan);
           this.container.addEventListener('pointercancel',endPan);
+          this.container.addEventListener('wheel',evt=>this.handleWheel(evt),{passive:false});
+        }
+        handleWheel(evt){
+          if(!evt) return;
+          if(evt.ctrlKey || evt.metaKey){
+            evt.preventDefault();
+            const delta=Math.max(-1, Math.min(1, evt.deltaY));
+            const factor=delta<0?1.12:0.9;
+            const prevScale=this.scale;
+            const nextScale=Math.max(0.3, Math.min(2.5, prevScale*factor));
+            if(Math.abs(nextScale-prevScale)<0.0001) return;
+            const rect=this.container.getBoundingClientRect();
+            const originX=(evt.clientX-rect.left - this.offsetX)/this.scale;
+            const originY=(evt.clientY-rect.top - this.offsetY)/this.scale;
+            this.scale=nextScale;
+            this.offsetX=evt.clientX-rect.left - originX*this.scale;
+            this.offsetY=evt.clientY-rect.top - originY*this.scale;
+            this.applyTransform();
+            return;
+          }
+          evt.preventDefault();
+          const multiplier=evt.deltaMode===1?16:(evt.deltaMode===2?240:1);
+          this.offsetX-=evt.deltaX*multiplier;
+          this.offsetY-=evt.deltaY*multiplier;
+          this.applyTransform();
         }
         add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
         emit(type){ this.listeners.forEach(fn=>{ try{ fn(type); }catch(err){ console.warn(err); } }); }
@@ -1550,10 +1626,12 @@ if ($view === 'map_edit') {
           const data=this.mind && this.mind.data ? this.mind.data : null;
           if(!data) return;
           const build=(item,parent)=>{
+            const normalizedData=normalizeNodeData(item && item.data ? item.data : {});
+            item.data=normalizedData;
             const node={
               id:item.id || ('node-'+Math.random().toString(36).slice(2,9)),
               topic:item.topic || '',
-              data:item.data || null,
+              data:normalizedData,
               parent:parent,
               children:[],
               direction:item.direction || (parent?parent.direction:'right'),
@@ -1563,6 +1641,7 @@ if ($view === 'map_edit') {
               meta:item.meta || null,
               model:item,
             };
+            node.model.data=normalizedData;
             if(node.isroot){ node.direction='center'; }
             this.nodes.set(node.id,node);
             if(parent){ parent.children.push(node); node.model.parentId=parent.id; }
@@ -1606,7 +1685,8 @@ if ($view === 'map_edit') {
           const parent=typeof parentNode==='string'?this.get_node(parentNode):parentNode;
           if(!parent) return null;
           if(!newId) newId='node-'+Math.random().toString(36).slice(2,10);
-          const model={id:newId,topic:topic||'新节点',data:data||null,children:[]};
+          const normalized=normalizeNodeData(data||{});
+          const model={id:newId,topic:topic||'新节点',data:normalized,children:[]};
           const children=this.ensureModelChildren(parent);
           children.push(model);
           const node={
@@ -1681,52 +1761,104 @@ if ($view === 'map_edit') {
           if(format && format!=='node_tree'){ return null; }
           return this.mind ? ((typeof structuredClone==='function')?structuredClone(this.mind):JSON.parse(JSON.stringify(this.mind))) : null;
         }
+        collectNodeSizes(){
+          if(!this.root || !this.measureHost) return;
+          this.sizeCache.clear();
+          this.measureHost.innerHTML='';
+          const measureNode=(node)=>{
+            if(!node) return;
+            const el=this.buildNodeElement(node,{forMeasure:true});
+            this.measureHost.appendChild(el);
+            const rect=el.getBoundingClientRect();
+            this.sizeCache.set(node.id,{width:rect.width,height:rect.height});
+            el.remove();
+            if(node.expanded!==false && node.children && node.children.length){ node.children.forEach(child=>measureNode(child)); }
+          };
+          measureNode(this.root);
+        }
         computeLayout(){
           if(!this.root) return;
-          const H_SPACING=200;
-          const V_SPACING=120;
-          const NODE_HEIGHT=80;
+          this.collectNodeSizes();
+          const H_SPACING=220;
+          const MIN_SPACING=40;
+          const MIN_HEIGHT=60;
+          const heightMap=new Map();
+          const getNodeHeight=(node)=>{
+            if(!node) return MIN_HEIGHT;
+            const cached=this.sizeCache.get(node.id);
+            if(cached && cached.height){ return Math.max(MIN_HEIGHT, cached.height); }
+            return MIN_HEIGHT;
+          };
+          const gapBetween=(a,b)=>Math.max(MIN_SPACING, Math.min(160,(a+b)*0.25));
           const measure=(node)=>{
-            if(!node) return NODE_HEIGHT;
-            if(!node.expanded || !node.children.length) return NODE_HEIGHT;
+            if(!node) return MIN_HEIGHT;
+            if(heightMap.has(node.id)) return heightMap.get(node.id);
+            const base=getNodeHeight(node);
+            if(!node.expanded || !node.children.length){ heightMap.set(node.id, base); return base; }
+            const visible=node.children.filter(Boolean);
+            if(!visible.length){ heightMap.set(node.id, base); return base; }
+            const childHeights=visible.map(child=>measure(child));
             let total=0;
-            const visible=node.children;
-            for(let i=0;i<visible.length;i++){
-              total+=measure(visible[i]);
-              if(i<visible.length-1) total+=V_SPACING;
+            for(let i=0;i<childHeights.length;i++){
+              total+=childHeights[i];
+              if(i<childHeights.length-1){ total+=gapBetween(childHeights[i], childHeights[i+1]); }
             }
-            return Math.max(NODE_HEIGHT,total);
+            const result=Math.max(base,total);
+            heightMap.set(node.id,result);
+            return result;
+          };
+          const subtreeHeight=(nodes)=>{
+            if(!nodes || !nodes.length) return 0;
+            let total=0;
+            for(let i=0;i<nodes.length;i++){
+              const node=nodes[i];
+              const h=measure(node);
+              total+=h;
+              if(i<nodes.length-1){ total+=gapBetween(h, measure(nodes[i+1])); }
+            }
+            return total;
           };
           const left=this.root.children.filter(child=>(child.direction||'right')==='left');
           const right=this.root.children.filter(child=>child.direction==='right'||child.direction==='center'||child.direction===undefined||child.direction===null||child.direction==='');
-          const leftHeight=left.length?left.reduce((sum,child)=>sum+measure(child),0)+V_SPACING*(left.length-1):0;
-          const rightHeight=right.length?right.reduce((sum,child)=>sum+measure(child),0)+V_SPACING*(right.length-1):0;
+          const leftHeight=subtreeHeight(left);
+          const rightHeight=subtreeHeight(right);
+          const rootHeight=getNodeHeight(this.root);
+          const canvasHeight=Math.max(rootHeight, leftHeight, rightHeight);
           this.root.x=0;
-          this.root.y=(Math.max(NODE_HEIGHT, leftHeight, rightHeight))/2;
+          this.root.y=canvasHeight/2;
           const assign=(node,depth,dir,startTop)=>{
             const height=measure(node);
             node.x=(dir===0?0:dir*depth*H_SPACING);
             node.y=startTop+height/2;
             node.dir=dir;
             if(!node.expanded || !node.children.length) return height;
-            let top=startTop;
-            const children=node.children;
-            for(const child of children){
+            let cursor=startTop;
+            const children=node.children.filter(Boolean);
+            for(let i=0;i<children.length;i++){
+              const child=children[i];
               const childDir = child.direction==='left'? -1 : (child.direction==='right'? 1 : (dir===0?1:dir));
-              const childHeight=assign(child, depth+1, childDir, top);
-              top+=childHeight+V_SPACING;
+              const childHeight=assign(child, depth+1, childDir, cursor);
+              cursor+=childHeight;
+              if(i<children.length-1){
+                const nextHeight=measure(children[i+1]);
+                cursor+=gapBetween(childHeight, nextHeight);
+              }
             }
             return height;
           };
           let leftTop=this.root.y - leftHeight/2;
-          for(const child of left){
+          for(let i=0;i<left.length;i++){
+            const child=left[i];
             const h=assign(child,1,-1,leftTop);
-            leftTop+=h+V_SPACING;
+            leftTop+=h;
+            if(i<left.length-1){ leftTop+=gapBetween(h, measure(left[i+1])); }
           }
           let rightTop=this.root.y - rightHeight/2;
-          for(const child of right){
+          for(let i=0;i<right.length;i++){
+            const child=right[i];
             const h=assign(child,1,1,rightTop);
-            rightTop+=h+V_SPACING;
+            rightTop+=h;
+            if(i<right.length-1){ rightTop+=gapBetween(h, measure(right[i+1])); }
           }
           this.bounds={minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity};
           for(const node of this.nodes.values()){
@@ -1751,56 +1883,67 @@ if ($view === 'map_edit') {
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
         }
-        render(){
-          this.nodeLayer.innerHTML='';
-          while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
-          if(!this.root) return;
-          const createNodeEl=(node)=>{
-            const el=document.createElement('div');
-            el.className='jsmind-node';
-            if(node.selected){ el.classList.add('selected'); }
-            el.dataset.nodeid=node.id;
-            el.setAttribute('nodeid', node.id);
-            let orientation=null;
-            if(node.direction==='left' || node.dir===-1) orientation='left';
-            else if(node.direction==='right' || node.dir===1) orientation='right';
-            else if(node.parent){
-              if(node.absX < node.parent.absX) orientation='left';
-              else if(node.absX > node.parent.absX) orientation='right';
-            }
-            if(orientation){ el.dataset.direction=orientation; }
-            else{ el.removeAttribute('data-direction'); }
-            const span=document.createElement('span');
-            span.className='node-topic';
-            span.textContent=node.topic || '';
-            el.appendChild(span);
-            const data=node.data || {};
-            const badges=[];
-            if(data.attachment){
+        buildNodeElement(node,{forMeasure=false}={}){
+          const el=document.createElement('div');
+          el.className='jsmind-node';
+          if(node.selected && !forMeasure){ el.classList.add('selected'); }
+          el.dataset.nodeid=node.id;
+          el.setAttribute('nodeid', node.id);
+          let orientation=null;
+          if(node.direction==='left' || node.dir===-1) orientation='left';
+          else if(node.direction==='right' || node.dir===1) orientation='right';
+          else if(node.parent){
+            if(node.absX < node.parent.absX) orientation='left';
+            else if(node.absX > node.parent.absX) orientation='right';
+          }
+          if(orientation){ el.dataset.direction=orientation; }
+          else{ el.removeAttribute('data-direction'); }
+          const span=document.createElement('span');
+          span.className='node-topic';
+          span.textContent=node.topic || '';
+          el.appendChild(span);
+          const data=node.data || {};
+          const attachments=gatherAttachments(data);
+          if(attachments.length){ el.classList.add('has-attachment'); }
+          if(data.url){ el.classList.add('has-link'); }
+          const badges=[];
+          if(attachments.length){
+            attachments.forEach(att=>{
               const badge=document.createElement('button');
               badge.type='button';
               badge.className='node-badge attachment';
-              const label=attachmentLabel(data.attachment);
+              const label=attachmentLabel(att);
               badge.textContent='📎 '+label;
               badge.title=`打开附件：${label}`;
-              badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(data.attachment); });
+              if(forMeasure){
+                badge.disabled=true;
+              }else{
+                badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(att); });
+              }
               badges.push(badge);
-            }
-            if(data.url){
-              const badge=document.createElement('button');
-              badge.type='button';
-              badge.className='node-badge link';
-              badge.textContent='🔗 打开链接';
-              badge.title='打开链接';
+            });
+          }
+          if(data.url){
+            const badge=document.createElement('button');
+            badge.type='button';
+            badge.className='node-badge link';
+            const linkLabel=data.linkTitle || '打开链接';
+            badge.textContent='🔗 '+linkLabel;
+            badge.title=linkLabel;
+            if(forMeasure){
+              badge.disabled=true;
+            }else{
               badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapLink(data.url); });
-              badges.push(badge);
             }
-            if(badges.length){
-              const wrap=document.createElement('div');
-              wrap.className='node-affordances';
-              badges.forEach(btn=>wrap.appendChild(btn));
-              el.appendChild(wrap);
-            }
+            badges.push(badge);
+          }
+          if(badges.length){
+            const wrap=document.createElement('div');
+            wrap.className='node-affordances';
+            badges.forEach(btn=>wrap.appendChild(btn));
+            el.appendChild(wrap);
+          }
+          if(!forMeasure){
             el.addEventListener('click',(evt)=>{
               const wasSelected=!!node.selected;
               this.select_node(node.id);
@@ -1814,10 +1957,15 @@ if ($view === 'map_edit') {
               }
             });
             el.addEventListener('dblclick',()=>{ this.promptRename(node); });
-            return el;
-          };
+          }
+          return el;
+        }
+        render(){
+          this.nodeLayer.innerHTML='';
+          while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          if(!this.root) return;
           const walk=(node)=>{
-            node.el=createNodeEl(node);
+            node.el=this.buildNodeElement(node,{forMeasure:false});
             if(node.style){
               if(node.style.background){ node.el.style.background=node.style.background; }
               if(node.style.foreground){ node.el.style.color=node.style.foreground; }
@@ -1825,6 +1973,7 @@ if ($view === 'map_edit') {
             this.nodeLayer.appendChild(node.el);
             node.width=node.el.offsetWidth;
             node.height=node.el.offsetHeight;
+            this.sizeCache.set(node.id,{width:node.width,height:node.height});
             node.el.style.left=`${node.absX - node.width/2}px`;
             node.el.style.top=`${node.absY - node.height/2}px`;
             if(node.parent){
@@ -2023,10 +2172,14 @@ if ($view === 'map_edit') {
         if(!win){ window.location.href=target; }
       }
       function attachmentLabel(descriptor){
-        if(!descriptor) return '附件';
-        if(descriptor.name) return descriptor.name;
-        if(descriptor.assetId) return `附件 #${descriptor.assetId}`;
-        return '附件';
+        let label='附件';
+        if(descriptor){
+          if(descriptor.name) label=descriptor.name;
+          else if(descriptor.filename) label=descriptor.filename;
+          else if(descriptor.assetId) label=`附件 #${descriptor.assetId}`;
+        }
+        label=String(label || '附件');
+        return label.length>16 ? label.slice(0,15)+'…' : label;
       }
       async function uploadMindmapFile(file, nodeId){
         const fd=new FormData();
@@ -2277,6 +2430,8 @@ if ($view === 'map_edit') {
       const attachFileBtn=document.getElementById('btn-attach-file');
       const attachLinkBtn=document.getElementById('btn-attach-link');
       const mobileToolbar=document.getElementById('mobile-toolbar');
+      const sidebarToggle=document.getElementById('sidebar-toggle');
+      const sidebarBackdrop=document.getElementById('sidebar-backdrop');
       const saveButton=document.getElementById('btn-save');
       const fitButton=document.getElementById('btn-fit');
       const fitFloatingButton=document.getElementById('btn-fit-floating');
@@ -2337,6 +2492,14 @@ if ($view === 'map_edit') {
         if(node && !node.selected){ jm.select_node(node.id); node=jm.get_selected_node(); }
         return node;
       }
+      function ensureNodeDataObject(node){
+        if(!node) return null;
+        const current=node.model && node.model.data ? node.model.data : {};
+        const normalized=normalizeNodeData(current);
+        node.model.data=normalized;
+        node.data=normalized;
+        return normalized;
+      }
       function executeCreateNodeCommand(input){
         commitInlineEditing();
         if(!input || !input.parentId) return null;
@@ -2377,8 +2540,24 @@ if ($view === 'map_edit') {
         return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
       }
       function findNodeElementByEvent(event){
-        if(!event || !event.target) return null;
-        return event.target.closest ? event.target.closest('.jsmind-node') : null;
+        if(!event) return null;
+        if(event.target && event.target.closest){
+          const el=event.target.closest('.jsmind-node');
+          if(el) return el;
+        }
+        if(event.composedPath){
+          for(const entry of event.composedPath()){
+            if(entry && entry.classList && entry.classList.contains && entry.classList.contains('jsmind-node')){ return entry; }
+          }
+        }
+        if(typeof event.clientX==='number' && typeof event.clientY==='number'){
+          const hovered=document.elementFromPoint(event.clientX, event.clientY);
+          if(hovered && hovered.closest){
+            const el=hovered.closest('.jsmind-node');
+            if(el) return el;
+          }
+        }
+        return null;
       }
       function resolveDropParent(event){
         const el=findNodeElementByEvent(event);
@@ -2423,36 +2602,35 @@ if ($view === 'map_edit') {
         }
         return accepted;
       }
-      async function createAttachmentNodes(parentNode, files, basePoint, placement){
-        if(!parentNode || !files || !files.length) return;
-        for(let index=0; index<files.length; index++){
-          const file=files[index];
-          const nodeId=randomId();
+      async function attachFilesToNode(targetNode, files){
+        if(!targetNode || !files || !files.length) return;
+        const accepted=sanitizeAttachmentFiles(files);
+        if(!accepted.length) return;
+        const data=ensureNodeDataObject(targetNode);
+        data.attachments=data.attachments || [];
+        for(const file of accepted){
           try{
-            const uploaded=await uploadMindmapFile(file, nodeId);
-            const data={
-              attachment:{
-                assetId:uploaded.id,
-                name:uploaded.name || file.name,
-                size:uploaded.size ?? file.size,
-                mime:uploaded.mime || file.type || 'application/octet-stream',
-                url:uploaded.url,
-              }
-            };
-            const offset=basePoint ? {x:basePoint.x + index*18, y:basePoint.y + index*18} : null;
-            executeCreateNodeCommand({
-              id:nodeId,
-              parentId:parentNode.id,
-              topic:'📎 '+(uploaded.name || file.name),
-              data:data,
-              position:offset,
-              meta:{source:'file', placement:placement||'child'}
+            const uploaded=await uploadMindmapFile(file, targetNode.id);
+            data.attachments.push({
+              assetId:uploaded.id,
+              name:uploaded.name || file.name,
+              size:uploaded.size ?? file.size,
+              mime:uploaded.mime || file.type || 'application/octet-stream',
+              url:uploaded.url,
+              uploadedAt:Date.now()
             });
           }catch(err){
             console.error(err);
             alert((file.name||'文件')+' 上传失败：'+(err && err.message ? err.message : err));
           }
         }
+        targetNode.model.data=data;
+        targetNode.data=data;
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(targetNode.id);
+        markDirty();
+        requestAnimationFrame(updateHandlePosition);
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -2471,22 +2649,14 @@ if ($view === 'map_edit') {
           meta:{source:'text'}
         });
       }
-      function handleDroppedFiles(files, parent, event){
-        if(!files || !files.length || !parent) return;
-        commitInlineEditing();
-        const accepted=sanitizeAttachmentFiles(files);
-        if(!accepted.length) return;
-        let createAsChild=true;
-        if(!parent.isroot){
-          createAsChild=confirm('将附件创建为子级节点？点击“确定”为子级，“取消”为同级。');
-          if(!createAsChild && !parent.parent){
-            alert('无法为根节点创建同级节点，已改为子级。');
-            createAsChild=true;
-          }
+      async function handleDroppedFiles(files, targetNode){
+        if(!files || !files.length) return;
+        if(!targetNode){
+          alert('请将文件拖放到具体的节点上以附加到该节点。');
+          return;
         }
-        const target=(createAsChild || !parent.parent) ? parent : parent.parent;
-        const basePoint=event ? eventToSvgPoint(event) : null;
-        createAttachmentNodes(target, accepted, basePoint, createAsChild?'child':'sibling');
+        commitInlineEditing();
+        await attachFilesToNode(targetNode, files);
       }
       function addSiblingNode(){
         const node=ensureNode();
@@ -2535,12 +2705,16 @@ if ($view === 'map_edit') {
         if(!cleaned) return;
         if(!isProbablyUrl(cleaned) && !confirm('该内容看起来不像链接，仍要创建吗？')) return;
         const title=prompt('请输入链接标题', cleaned) || cleaned;
-        executeCreateNodeCommand({
-          parentId:node.id,
-          topic:(title||'').trim()||cleaned,
-          data:{url:cleaned},
-          meta:{source:'link'}
-        });
+        const data=ensureNodeDataObject(node);
+        data.url=cleaned;
+        data.linkTitle=(title||'').trim()||cleaned;
+        node.model.data=data;
+        node.data=data;
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(node.id);
+        markDirty();
+        requestAnimationFrame(updateHandlePosition);
       }
       if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
       if(addChildButton) addChildButton.onclick=addChildNode;
@@ -2555,11 +2729,25 @@ if ($view === 'map_edit') {
           const targetId=attachInput.dataset.targetId;
           const node=targetId ? jm.get_node(targetId) : ensureNode();
           if(!node){ alert('请先选择一个节点'); return; }
-          const accepted=sanitizeAttachmentFiles(files);
-          if(!accepted.length) return;
-          await createAttachmentNodes(node, accepted, null, 'child');
+          await attachFilesToNode(node, files);
         });
       }
+      function setSidebar(open){
+        document.body.classList.toggle('sidebar-open', !!open);
+        if(sidebarToggle){ sidebarToggle.setAttribute('aria-expanded', open?'true':'false'); }
+        if(sidebarBackdrop){ sidebarBackdrop.hidden=!open; }
+      }
+      if(sidebarToggle){
+        sidebarToggle.addEventListener('click',()=>{
+          const willOpen=!document.body.classList.contains('sidebar-open');
+          setSidebar(willOpen);
+        });
+      }
+      if(sidebarBackdrop){ sidebarBackdrop.addEventListener('click',()=>setSidebar(false)); }
+      const sidebarMedia=window.matchMedia('(max-width: 1024px)');
+      const handleSidebarMedia=(evt)=>{ if(!evt.matches){ setSidebar(false); } };
+      sidebarMedia.addEventListener('change',handleSidebarMedia);
+      setSidebar(false);
       if(mobileToolbar){
         mobileToolbar.addEventListener('click',e=>{
           const btn=e.target.closest('button');
@@ -2612,25 +2800,40 @@ if ($view === 'map_edit') {
       document.getElementById('btn-collapse').onclick=()=>{
         const node=ensureNode(); if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
       };
+      let dropHoverNode=null;
+      function clearDropHover(){
+        if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
+      }
       jmContainer.addEventListener('dragenter',e=>{
         e.preventDefault();
         jmContainer.classList.add('dragover');
       });
       jmContainer.addEventListener('dragleave',e=>{
-        if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); }
+        if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); clearDropHover(); }
       });
       jmContainer.addEventListener('dragover',e=>{
         e.preventDefault();
-        e.dataTransfer.dropEffect='copy';
+        const nodeEl=findNodeElementByEvent(e);
+        if(dropHoverNode!==nodeEl){
+          clearDropHover();
+          if(nodeEl){ nodeEl.classList.add('drop-target'); dropHoverNode=nodeEl; }
+        }
+        const types=Array.from(e.dataTransfer?.types || []);
+        const isFileDrag=types.includes('Files');
+        if(isFileDrag && !nodeEl){ e.dataTransfer.dropEffect='none'; }
+        else{ e.dataTransfer.dropEffect='copy'; }
       });
       jmContainer.addEventListener('drop',e=>{
         e.preventDefault();
         jmContainer.classList.remove('dragover');
+        clearDropHover();
         syncOverlaySize();
-        const parent=resolveDropParent(e);
+        const nodeEl=findNodeElementByEvent(e);
+        const target=nodeEl ? jm.get_node(nodeEl.getAttribute('nodeid')) : null;
+        const parent=target || resolveDropParent(e);
         const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
         if(files.length){
-          handleDroppedFiles(files, parent, e);
+          handleDroppedFiles(files, target).catch(err=>console.error(err));
           return;
         }
         const uri=e.dataTransfer.getData('text/uri-list');
