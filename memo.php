@@ -1377,19 +1377,45 @@ if ($view === 'map_edit') {
       .map-error strong{font-size:20px;color:#f8fafc}
       .mind-viewport{position:absolute;inset:0;transform-origin:0 0;will-change:transform;}
       .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
-      .mind-links path{fill:none;stroke:rgba(148,163,184,.65);stroke-width:2;stroke-linecap:round}
+      .mind-links path{fill:none;stroke:rgba(148,163,184,.55);stroke-width:2;stroke-linecap:round;transition:stroke .2s ease}
+      .mind-links path[data-type="idea"]{stroke:#38bdf8}
+      .mind-links path[data-type="task"]{stroke:#f59e0b}
+      .mind-links path[data-type="document"]{stroke:#60a5fa}
+      .mind-links path[data-type="media"]{stroke:#f472b6}
+      .mind-links path[data-type="decision"]{stroke:#34d399}
       .mind-nodes{position:absolute;inset:0}
-      .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:14px;background:#f8fafc;color:#0f172a;box-shadow:0 18px 32px rgba(15,23,42,.2);border:1px solid rgba(148,163,184,.35);min-width:140px;max-width:260px;text-align:center;font-weight:700;font-size:14px;line-height:1.4;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
-      .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 22px 38px rgba(37,99,235,.22)}
-      .jsmind-node.selected{border:2px solid #2563eb;box-shadow:0 30px 48px rgba(37,99,235,.3)}
+      .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:16px;color:#0f172a;text-align:center;font-weight:700;font-size:14px;line-height:1.45;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease,color .15s ease;min-width:140px;max-width:280px;--node-bg:#f8fafc;--node-border:rgba(148,163,184,.35);--node-shadow:0 18px 32px rgba(15,23,42,.18);--node-accent:#2563eb;background:var(--node-bg);border:1.5px solid var(--node-border);box-shadow:var(--node-shadow)}
+      .jsmind-node::before{content:attr(data-icon);font-size:22px;line-height:1;height:22px}
+      .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 24px 38px rgba(37,99,235,.18)}
+      .jsmind-node.selected{border:2px solid var(--node-accent);box-shadow:0 32px 52px rgba(37,99,235,.26)}
       .jsmind-node[data-direction="left"]{text-align:right;align-items:flex-end}
       .jsmind-node[data-direction="right"]{align-items:flex-start}
       .jsmind-node.editing{border:2px solid #60a5fa;box-shadow:0 26px 48px rgba(59,130,246,.35);background:#f8fafc;color:#0f172a;cursor:text}
-      .jsmind-node.has-attachment{background:#eef2ff;border-color:rgba(99,102,241,.4)}
-      .jsmind-node.has-link{box-shadow:0 22px 40px rgba(16,185,129,.24)}
+      .jsmind-node.has-attachment{--node-border:rgba(99,102,241,.45)}
+      .jsmind-node.has-link{--node-shadow:0 26px 46px rgba(16,185,129,.22)}
+      .jsmind-node[data-depth="0"]{--node-shadow:0 34px 58px rgba(15,23,42,.22)}
+      .jsmind-node[data-depth="1"]{--node-shadow:0 24px 40px rgba(37,99,235,.16)}
+      .jsmind-node[data-depth="2"]{--node-shadow:0 18px 30px rgba(37,99,235,.12)}
+      .jsmind-node[data-depth="3"],.jsmind-node[data-depth="4"],.jsmind-node[data-depth="5"]{--node-shadow:0 14px 26px rgba(15,23,42,.12)}
+      .jsmind-node[data-type="idea"]{--node-bg:#f0f9ff;--node-border:#38bdf8;--node-accent:#0284c7;color:#0f172a}
+      .jsmind-node[data-type="task"]{--node-bg:#fefce8;--node-border:#facc15;--node-accent:#ca8a04}
+      .jsmind-node[data-type="document"]{--node-bg:#f8fafc;--node-border:#94a3b8;--node-accent:#1d4ed8}
+      .jsmind-node[data-type="media"]{--node-bg:#fdf2f8;--node-border:#f472b6;--node-accent:#db2777}
+      .jsmind-node[data-type="decision"]{--node-bg:#ecfdf5;--node-border:#34d399;--node-accent:#059669}
+      .jsmind-node[data-status="done"] .node-topic{text-decoration:line-through;color:#0f172a;opacity:.85}
+      .jsmind-node[data-status="doing"]{--node-border:#60a5fa}
+      .jsmind-node[data-priority="high"]{--node-shadow:0 32px 52px rgba(220,38,38,.25);--node-border:#f87171}
       .jsmind-node.drop-target{border:2px dashed rgba(59,130,246,.85);background:rgba(37,99,235,.15)}
       .jsmind-node .node-topic{display:block;word-break:break-word;white-space:pre-wrap;cursor:inherit}
       .jsmind-node .node-topic[contenteditable="true"]{outline:none;cursor:text}
+      .jsmind-node .node-flair{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;font-size:12px;font-weight:600}
+      .jsmind-node .node-flair .pill{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;background:rgba(15,23,42,.08);color:#0f172a}
+      .jsmind-node[data-status="doing"] .node-flair .pill.status{background:rgba(37,99,235,.18);color:#1d4ed8}
+      .jsmind-node[data-status="done"] .node-flair .pill.status{background:rgba(16,185,129,.2);color:#047857}
+      .jsmind-node[data-priority="high"] .node-flair .pill.priority{background:rgba(248,113,113,.25);color:#b91c1c}
+      .jsmind-node[data-priority="low"] .node-flair .pill.priority{background:rgba(148,163,184,.25);color:#475569}
+      .jsmind-node .node-tags{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+      .jsmind-node .node-tag{font-size:11px;font-weight:600;padding:3px 6px;border-radius:999px;background:rgba(15,23,42,.06);color:#475569}
       .jsmind-node .node-affordances{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
       .jsmind-node .node-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;font-weight:600;font-size:12px;line-height:1.2;background:rgba(37,99,235,.08);color:#1d4ed8;border:0;cursor:pointer;transition:background .15s ease,color .15s ease;white-space:nowrap}
       .jsmind-node .node-badge:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
@@ -1397,6 +1423,14 @@ if ($view === 'map_edit') {
       .jsmind-node .node-badge.link{background:rgba(16,185,129,.12);color:#047857}
       .jsmind-node .node-badge.link:hover{background:rgba(16,185,129,.18);color:#0f766e}
       .jsmind-node .node-badge:disabled{opacity:.55;cursor:not-allowed}
+      .inspector{border-top:1px solid var(--border);padding-top:16px;margin-top:8px;display:flex;flex-direction:column;gap:12px}
+      .inspector h2{margin:0;font-size:14px;font-weight:800;color:#0f172a}
+      .inspector .field{display:flex;flex-direction:column;gap:6px}
+      .inspector select,.inspector input[type="text"]{padding:9px 10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:#fff}
+      .inspector .chips-preview{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
+      .inspector .chips-preview span{padding:4px 8px;border-radius:999px;background:rgba(15,23,42,.08);color:#475569}
+      .inspector .empty{color:#94a3b8;font-size:12px}
+      .inspector.disabled{opacity:.55;pointer-events:none}
       .mind-background{position:absolute;inset:-400px;background:radial-gradient(circle,#1e293b 0%,rgba(15,23,42,0) 70%);pointer-events:none}
       .sidebar-toggle{position:absolute;top:16px;left:16px;padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.7);color:#f8fafc;font-weight:600;display:none;z-index:50}
       @media (max-width:1024px){
@@ -1458,6 +1492,44 @@ if ($view === 'map_edit') {
           <button id="btn-attach-link">🔗 新增链接</button>
           <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
         </div>
+        <section class="inspector" id="node-inspector">
+          <h2>节点信息</h2>
+          <div class="field">
+            <label for="node-type">类型</label>
+            <select id="node-type">
+              <option value="idea">💡 创意</option>
+              <option value="task">✅ 任务</option>
+              <option value="document">📄 文档</option>
+              <option value="media">🖼 媒体</option>
+              <option value="decision">🧭 决策</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="node-status">状态</label>
+            <select id="node-status">
+              <option value="backlog">待计划</option>
+              <option value="doing">进行中</option>
+              <option value="done">已完成</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="node-priority">优先级</label>
+            <select id="node-priority">
+              <option value="normal">普通</option>
+              <option value="high">高</option>
+              <option value="low">低</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="node-owner">负责人</label>
+            <input id="node-owner" type="text" placeholder="输入姓名或团队">
+          </div>
+          <div class="field">
+            <label for="node-tags">标签</label>
+            <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
+            <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
+          </div>
+        </section>
         <div class="toolbar">
           <button id="btn-fit">🧭 自适应视图</button>
           <button id="btn-center">◎ 居中</button>
@@ -1503,6 +1575,25 @@ if ($view === 'map_edit') {
     <script>
       (function(){
       const DOUBLE_TAP_WINDOW=320;
+      const NODE_TYPES=[
+        {value:'idea',label:'创意',icon:'💡',accent:'#0284c7'},
+        {value:'task',label:'任务',icon:'✅',accent:'#ca8a04'},
+        {value:'document',label:'文档',icon:'📄',accent:'#1d4ed8'},
+        {value:'media',label:'媒体',icon:'🖼',accent:'#db2777'},
+        {value:'decision',label:'决策',icon:'🧭',accent:'#059669'},
+      ];
+      const NODE_STATUS=[
+        {value:'backlog',label:'待计划',icon:'⏳'},
+        {value:'doing',label:'进行中',icon:'🛠'},
+        {value:'done',label:'已完成',icon:'✅'},
+      ];
+      const NODE_PRIORITY=[
+        {value:'high',label:'高',icon:'⚡'},
+        {value:'normal',label:'普通',icon:'•'},
+        {value:'low',label:'低',icon:'⬇️'},
+      ];
+      const TYPE_ICON_MAP=NODE_TYPES.reduce((acc,item)=>{acc[item.value]=item.icon;return acc;},{});
+      const TYPE_ACCENT_MAP=NODE_TYPES.reduce((acc,item)=>{acc[item.value]=item.accent;return acc;},{});
       const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
       let lastTapInfo={id:null,time:0};
       function normalizeNodeData(value){
@@ -1517,6 +1608,21 @@ if ($view === 'map_edit') {
         }
         if(data.attachments.length){ data.attachment=data.attachments[0]; }
         else if('attachment' in data){ delete data.attachment; }
+        const allowedTypes=NODE_TYPES.map(item=>item.value);
+        const allowedStatus=NODE_STATUS.map(item=>item.value);
+        const allowedPriority=NODE_PRIORITY.map(item=>item.value);
+        if(!allowedTypes.includes(data.type)){ data.type='idea'; }
+        if(!allowedStatus.includes(data.status)){ data.status='backlog'; }
+        if(!allowedPriority.includes(data.priority)){ data.priority='normal'; }
+        if(typeof data.owner!=='string'){ data.owner=''; }
+        else{ data.owner=data.owner.trim(); }
+        if(Array.isArray(data.tags)){
+          data.tags=data.tags.map(tag=>String(tag||'').trim()).filter(Boolean);
+        }else if(typeof data.tags==='string'){
+          data.tags=data.tags.split(/[;,，\s]+/).map(tag=>tag.trim()).filter(Boolean);
+        }else{
+          data.tags=[];
+        }
         return data;
       }
       function gatherAttachments(data){
@@ -1564,6 +1670,8 @@ if ($view === 'map_edit') {
             document.body.appendChild(this.measureHost);
           }
           this.dragState=null;
+          this.linkRegistry=new Map();
+          this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
         }
         setupPan(){
@@ -1628,6 +1736,7 @@ if ($view === 'map_edit') {
           const build=(item,parent)=>{
             const normalizedData=normalizeNodeData(item && item.data ? item.data : {});
             item.data=normalizedData;
+            const depth=parent ? (parent.depth||0)+1 : 0;
             const node={
               id:item.id || ('node-'+Math.random().toString(36).slice(2,9)),
               topic:item.topic || '',
@@ -1640,6 +1749,7 @@ if ($view === 'map_edit') {
               style:item.style || null,
               meta:item.meta || null,
               model:item,
+              depth:depth,
             };
             node.model.data=normalizedData;
             if(node.isroot){ node.direction='center'; }
@@ -1701,6 +1811,7 @@ if ($view === 'map_edit') {
             style:model.style || null,
             meta:model.meta || null,
             model:model,
+            depth:(parent.depth||0)+1,
           };
           parent.children.push(node);
           this.nodes.set(newId,node);
@@ -1903,9 +2014,54 @@ if ($view === 'map_edit') {
           span.textContent=node.topic || '';
           el.appendChild(span);
           const data=node.data || {};
+          const type=(data.type && TYPE_ICON_MAP[data.type])?data.type:'idea';
+          el.dataset.type=type;
+          el.dataset.icon=TYPE_ICON_MAP[type] || '🧠';
+          el.dataset.depth=String(node.depth||0);
+          if(TYPE_ACCENT_MAP[type]){ el.style.setProperty('--node-accent', TYPE_ACCENT_MAP[type]); }
+          if(data.status){ el.dataset.status=data.status; } else{ el.dataset.status='backlog'; }
+          if(data.priority){ el.dataset.priority=data.priority; } else{ el.dataset.priority='normal'; }
           const attachments=gatherAttachments(data);
           if(attachments.length){ el.classList.add('has-attachment'); }
           if(data.url){ el.classList.add('has-link'); }
+          const flairElements=[];
+          const statusInfo=NODE_STATUS.find(item=>item.value===data.status);
+          if(statusInfo){
+            const badge=document.createElement('span');
+            badge.className='pill status';
+            badge.textContent=`${statusInfo.icon||''} ${statusInfo.label}`.trim();
+            flairElements.push(badge);
+          }
+          const priorityInfo=NODE_PRIORITY.find(item=>item.value===data.priority);
+          if(priorityInfo && data.priority!=='normal'){
+            const badge=document.createElement('span');
+            badge.className='pill priority';
+            badge.textContent=`${priorityInfo.icon||''} ${priorityInfo.label}`.trim();
+            flairElements.push(badge);
+          }
+          if(data.owner){
+            const badge=document.createElement('span');
+            badge.className='pill owner';
+            badge.textContent=`👤 ${data.owner}`;
+            flairElements.push(badge);
+          }
+          if(flairElements.length){
+            const wrap=document.createElement('div');
+            wrap.className='node-flair';
+            flairElements.forEach(item=>wrap.appendChild(item));
+            el.appendChild(wrap);
+          }
+          if(data.tags && data.tags.length){
+            const tagWrap=document.createElement('div');
+            tagWrap.className='node-tags';
+            data.tags.slice(0,6).forEach(tag=>{
+              const chip=document.createElement('span');
+              chip.className='node-tag';
+              chip.textContent=tag;
+              tagWrap.appendChild(chip);
+            });
+            el.appendChild(tagWrap);
+          }
           const badges=[];
           if(attachments.length){
             attachments.forEach(att=>{
@@ -1963,6 +2119,8 @@ if ($view === 'map_edit') {
         render(){
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          if(this.resizeObserver){ this.resizeObserver.disconnect(); }
+          this.linkRegistry.clear();
           if(!this.root) return;
           const walk=(node)=>{
             node.el=this.buildNodeElement(node,{forMeasure:false});
@@ -1974,31 +2132,83 @@ if ($view === 'map_edit') {
             node.width=node.el.offsetWidth;
             node.height=node.el.offsetHeight;
             this.sizeCache.set(node.id,{width:node.width,height:node.height});
-            node.el.style.left=`${node.absX - node.width/2}px`;
-            node.el.style.top=`${node.absY - node.height/2}px`;
+            this.updateNodePosition(node);
+            this.updateAnchors(node);
             if(node.parent){
               const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-              const parentLeft=node.parent.absX - node.parent.width/2;
-              const parentRight=node.parent.absX + node.parent.width/2;
-              const childLeft=node.absX - node.width/2;
-              const childRight=node.absX + node.width/2;
-              const orientation=(node.dir===-1 || node.direction==='left') ? 'left' : ((node.dir===1 || node.direction==='right') ? 'right' : (childRight<=node.parent.absX ? 'left' : 'right'));
-              const isLeftSide=orientation==='left';
-              const startX=isLeftSide?parentLeft:parentRight;
-              const startY=node.parent.absY;
-              const endX=isLeftSide?childRight:childLeft;
-              const endY=node.absY;
-              const offset=Math.abs(endX-startX)*0.35;
-              const midX=startX + (isLeftSide?-offset:offset);
-              path.setAttribute('d',`M${startX} ${startY} C ${midX} ${startY} ${midX} ${endY} ${endX} ${endY}`);
+              path.setAttribute('data-from', node.parent.id);
+              path.setAttribute('data-to', node.id);
+              path.setAttribute('data-type', node.data && node.data.type ? node.data.type : 'idea');
               this.linkLayer.appendChild(path);
+              node.linkPath=path;
+              this.linkRegistry.set(node.id,path);
+              this.updateLinkPath(node);
             }
+            if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
             if(node.expanded){
               node.children.forEach(child=>walk(child));
             }
           };
           walk(this.root);
           this.applyTransform(true);
+        }
+        updateNodePosition(node){
+          if(!node || !node.el) return;
+          const width=node.width || node.el.offsetWidth || 0;
+          const height=node.height || node.el.offsetHeight || 0;
+          node.el.style.left=`${node.absX - width/2}px`;
+          node.el.style.top=`${node.absY - height/2}px`;
+        }
+        updateAnchors(node){
+          if(!node) return;
+          const width=node.width || (node.el?node.el.offsetWidth:0) || 0;
+          const height=node.height || (node.el?node.el.offsetHeight:0) || 0;
+          node.anchors={
+            center:{x:node.absX,y:node.absY},
+            left:{x:node.absX - width/2,y:node.absY},
+            right:{x:node.absX + width/2,y:node.absY},
+            top:{x:node.absX,y:node.absY - height/2},
+            bottom:{x:node.absX,y:node.absY + height/2},
+          };
+        }
+        updateLinkPath(node){
+          if(!node || !node.parent || !node.linkPath) return;
+          if(!node.anchors) this.updateAnchors(node);
+          if(!node.parent.anchors) this.updateAnchors(node.parent);
+          const parent=node.parent;
+          const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
+          const start=isLeft ? parent.anchors.left : parent.anchors.right;
+          const end=isLeft ? node.anchors.right : node.anchors.left;
+          const horizontalGap=Math.max(60, Math.abs(end.x-start.x)*0.35);
+          const controlX=start.x + (isLeft?-horizontalGap:horizontalGap);
+          const controlY1=start.y;
+          const controlY2=end.y;
+          node.linkPath.setAttribute('d', `M${start.x} ${start.y} C ${controlX} ${controlY1} ${controlX} ${controlY2} ${end.x} ${end.y}`);
+        }
+        handleNodeResize(entries){
+          if(!entries || !entries.length) return;
+          const impacted=new Set();
+          entries.forEach(entry=>{
+            const target=entry.target;
+            if(!target) return;
+            const nodeId=target.getAttribute('nodeid');
+            if(!nodeId) return;
+            const node=this.nodes.get(nodeId);
+            if(!node) return;
+            const rect=entry.contentRect;
+            node.width=rect.width;
+            node.height=rect.height;
+            this.updateNodePosition(node);
+            this.updateAnchors(node);
+            impacted.add(node);
+          });
+          if(!impacted.size) return;
+          impacted.forEach(node=>{
+            this.updateLinkPath(node);
+            if(node.children && node.children.length){
+              node.children.forEach(child=>this.updateLinkPath(child));
+            }
+          });
         }
         applyTransform(initial){
           if(!this.bounds){ return; }
@@ -2300,6 +2510,7 @@ if ($view === 'map_edit') {
       if(!jm.get_selected_node() && initialData && initialData.data){
         jm.select_node(initialData.data.id);
       }
+      refreshInspector(jm.get_selected_node());
       function syncOverlaySize(){
         const rect=jmContainer.getBoundingClientRect();
         const width=Math.max(rect.width,1);
@@ -2429,6 +2640,13 @@ if ($view === 'map_edit') {
       const attachInput=document.getElementById('attach-file-input');
       const attachFileBtn=document.getElementById('btn-attach-file');
       const attachLinkBtn=document.getElementById('btn-attach-link');
+      const inspector=document.getElementById('node-inspector');
+      const nodeTypeSelect=document.getElementById('node-type');
+      const nodeStatusSelect=document.getElementById('node-status');
+      const nodePrioritySelect=document.getElementById('node-priority');
+      const nodeOwnerInput=document.getElementById('node-owner');
+      const nodeTagsInput=document.getElementById('node-tags');
+      const nodeTagsPreview=document.getElementById('node-tags-preview');
       const mobileToolbar=document.getElementById('mobile-toolbar');
       const sidebarToggle=document.getElementById('sidebar-toggle');
       const sidebarBackdrop=document.getElementById('sidebar-backdrop');
@@ -2483,6 +2701,73 @@ if ($view === 'map_edit') {
           }
         },1500);
       }
+      const inspectorFields=[nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput].filter(Boolean);
+      let inspectorSyncing=false;
+      function parseTagsString(value){
+        if(!value) return [];
+        return value.split(/[;,，\s]+/).map(tag=>tag.trim()).filter(Boolean).slice(0,12);
+      }
+      function setInspectorEnabled(enabled){
+        inspectorFields.forEach(el=>{ el.disabled=!enabled; });
+        if(inspector){ inspector.classList.toggle('disabled', !enabled); }
+      }
+      function renderTagPreview(tags){
+        if(!nodeTagsPreview) return;
+        nodeTagsPreview.innerHTML='';
+        if(!tags || !tags.length){
+          const span=document.createElement('span');
+          span.className='empty';
+          span.textContent='暂无标签';
+          nodeTagsPreview.appendChild(span);
+          return;
+        }
+        tags.slice(0,12).forEach(tag=>{
+          const span=document.createElement('span');
+          span.textContent=tag;
+          nodeTagsPreview.appendChild(span);
+        });
+      }
+      function refreshInspector(node){
+        inspectorSyncing=true;
+        if(!node){
+          setInspectorEnabled(false);
+          if(nodeTypeSelect) nodeTypeSelect.value='idea';
+          if(nodeStatusSelect) nodeStatusSelect.value='backlog';
+          if(nodePrioritySelect) nodePrioritySelect.value='normal';
+          if(nodeOwnerInput) nodeOwnerInput.value='';
+          if(nodeTagsInput) nodeTagsInput.value='';
+          renderTagPreview([]);
+          inspectorSyncing=false;
+          return;
+        }
+        setInspectorEnabled(true);
+        const data=normalizeNodeData(deepClone(node.data||{}));
+        if(nodeTypeSelect) nodeTypeSelect.value=data.type||'idea';
+        if(nodeStatusSelect) nodeStatusSelect.value=data.status||'backlog';
+        if(nodePrioritySelect) nodePrioritySelect.value=data.priority||'normal';
+        if(nodeOwnerInput) nodeOwnerInput.value=data.owner||'';
+        if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
+        renderTagPreview(data.tags||[]);
+        inspectorSyncing=false;
+      }
+      function applyInspectorChange(mutator){
+        if(typeof mutator!=='function') return;
+        const node=ensureNode();
+        if(!node) return;
+        commitInlineEditing();
+        const data=ensureNodeDataObject(node);
+        mutator(data,node);
+        node.model.data=data;
+        node.data=data;
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(node.id);
+        markDirty();
+        requestAnimationFrame(()=>{
+          updateHandlePosition();
+          refreshInspector(jm.get_node(node.id));
+        });
+      }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
       function ensureNode(){
         let node=jm.get_selected_node();
@@ -2506,7 +2791,8 @@ if ($view === 'map_edit') {
         const parent=jm.get_node(input.parentId);
         if(!parent) return null;
         const nodeId=input.id || randomId();
-        const payloadData=deepClone(input.data);
+        const payloadData=deepClone(input.data)||{};
+        if(!payloadData.type && parent && parent.data && parent.data.type){ payloadData.type=parent.data.type; }
         const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
         const style=deepClone(input.style);
         if(style && (style.background || style.foreground)){
@@ -2532,6 +2818,7 @@ if ($view === 'map_edit') {
         jm.select_node(newNode.id);
         markDirty();
         requestAnimationFrame(updateHandlePosition);
+        refreshInspector(jm.get_node(newNode.id));
         return newNode;
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
@@ -2631,6 +2918,7 @@ if ($view === 'map_edit') {
         jm.select_node(targetNode.id);
         markDirty();
         requestAnimationFrame(updateHandlePosition);
+        refreshInspector(jm.get_node(targetNode.id));
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -2676,6 +2964,7 @@ if ($view === 'map_edit') {
         commitInlineEditing();
         jm.remove_node(node.id); markDirty();
         requestAnimationFrame(updateHandlePosition);
+        requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
       }
       function renameSelectedNode(){
         const node=ensureNode();
@@ -2715,6 +3004,7 @@ if ($view === 'map_edit') {
         jm.select_node(node.id);
         markDirty();
         requestAnimationFrame(updateHandlePosition);
+        refreshInspector(jm.get_node(node.id));
       }
       if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
       if(addChildButton) addChildButton.onclick=addChildNode;
@@ -2730,7 +3020,51 @@ if ($view === 'map_edit') {
           const node=targetId ? jm.get_node(targetId) : ensureNode();
           if(!node){ alert('请先选择一个节点'); return; }
           await attachFilesToNode(node, files);
+          refreshInspector(jm.get_node(node.id));
         });
+      }
+      if(nodeTypeSelect){
+        nodeTypeSelect.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const value=nodeTypeSelect.value;
+          applyInspectorChange(data=>{ data.type=value; });
+        });
+      }
+      if(nodeStatusSelect){
+        nodeStatusSelect.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const value=nodeStatusSelect.value;
+          applyInspectorChange(data=>{ data.status=value; });
+        });
+      }
+      if(nodePrioritySelect){
+        nodePrioritySelect.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const value=nodePrioritySelect.value;
+          applyInspectorChange(data=>{ data.priority=value; });
+        });
+      }
+      if(nodeOwnerInput){
+        const commit=()=>{
+          if(inspectorSyncing) return;
+          const value=nodeOwnerInput.value.trim();
+          applyInspectorChange(data=>{ data.owner=value; });
+        };
+        nodeOwnerInput.addEventListener('change',commit);
+        nodeOwnerInput.addEventListener('blur',commit);
+      }
+      if(nodeTagsInput){
+        nodeTagsInput.addEventListener('input',()=>{
+          if(inspectorSyncing) return;
+          renderTagPreview(parseTagsString(nodeTagsInput.value));
+        });
+        const commitTags=()=>{
+          if(inspectorSyncing) return;
+          const tags=parseTagsString(nodeTagsInput.value);
+          applyInspectorChange(data=>{ data.tags=tags; });
+        };
+        nodeTagsInput.addEventListener('change',commitTags);
+        nodeTagsInput.addEventListener('blur',commitTags);
       }
       function setSidebar(open){
         document.body.classList.toggle('sidebar-open', !!open);
@@ -2855,6 +3189,7 @@ if ($view === 'map_edit') {
           }
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             requestAnimationFrame(updateHandlePosition);
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
