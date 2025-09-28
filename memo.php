@@ -1375,8 +1375,9 @@ if ($view === 'map_edit') {
       .map-toolbar button{padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.65);color:#fff;font-size:12px;cursor:pointer}
       .map-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e2e8f0;text-align:center;padding:40px 24px;font-size:16px;gap:8px}
       .map-error strong{font-size:20px;color:#f8fafc}
-      .mind-viewport{position:absolute;inset:0;transform-origin:0 0;will-change:transform;}
-      .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
+      .mind-viewport{position:absolute;inset:0;overflow:visible;}
+      .mind-stage{position:absolute;inset:0;transform-origin:0 0;will-change:transform;}
+      .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
       .mind-links path{fill:none;stroke:rgba(148,163,184,.55);stroke-width:2;stroke-linecap:round;transition:stroke .2s ease}
       .mind-links path[data-type="idea"]{stroke:#38bdf8}
       .mind-links path[data-type="task"]{stroke:#f59e0b}
@@ -1650,17 +1651,20 @@ if ($view === 'map_edit') {
           this.background=document.createElement('div');
           this.background.className='mind-background';
           this.container.appendChild(this.background);
+          this.viewport=document.createElement('div');
+          this.viewport.className='mind-viewport';
+          this.stage=document.createElement('div');
+          this.stage.className='mind-stage';
+          this.viewport.appendChild(this.stage);
+          this.container.appendChild(this.viewport);
           this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.linkLayer.classList.add('mind-links');
           this.linkLayer.setAttribute('width','100%');
           this.linkLayer.setAttribute('height','100%');
-          this.container.appendChild(this.linkLayer);
-          this.viewport=document.createElement('div');
-          this.viewport.className='mind-viewport';
+          this.stage.appendChild(this.linkLayer);
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
-          this.viewport.appendChild(this.nodeLayer);
-          this.container.appendChild(this.viewport);
+          this.stage.appendChild(this.nodeLayer);
           this.sizeCache=new Map();
           this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
           if(!this.measureHost.classList.contains('mind-measure')){
@@ -1991,8 +1995,14 @@ if ($view === 'map_edit') {
           this.linkLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
           this.linkLayer.setAttribute('width',`${this.bounds.width}`);
           this.linkLayer.setAttribute('height',`${this.bounds.height}`);
-          this.nodeLayer.style.width=`${this.bounds.width}px`;
-          this.nodeLayer.style.height=`${this.bounds.height}px`;
+          this.linkLayer.style.width='100%';
+          this.linkLayer.style.height='100%';
+          if(this.stage){
+            this.stage.style.width=`${this.bounds.width}px`;
+            this.stage.style.height=`${this.bounds.height}px`;
+          }
+          this.nodeLayer.style.width='100%';
+          this.nodeLayer.style.height='100%';
         }
         buildNodeElement(node,{forMeasure=false}={}){
           const el=document.createElement('div');
@@ -2161,15 +2171,36 @@ if ($view === 'map_edit') {
         }
         updateAnchors(node){
           if(!node) return;
-          const width=node.width || (node.el?node.el.offsetWidth:0) || 0;
-          const height=node.height || (node.el?node.el.offsetHeight:0) || 0;
+          let width=node.width || 0;
+          let height=node.height || 0;
+          let centerX=node.absX;
+          let centerY=node.absY;
+          const el=node.el;
+          const scale=this.scale || 1;
+          if(el && this.container){
+            const rect=el.getBoundingClientRect();
+            const containerRect=this.container.getBoundingClientRect();
+            const localLeft=rect.left - containerRect.left;
+            const localTop=rect.top - containerRect.top;
+            width=rect.width/scale;
+            height=rect.height/scale;
+            centerX=(localLeft - this.offsetX)/scale + width/2;
+            centerY=(localTop - this.offsetY)/scale + height/2;
+            node.absX=centerX;
+            node.absY=centerY;
+          }else{
+            if(!width && el){ width=el.offsetWidth || 0; }
+            if(!height && el){ height=el.offsetHeight || 0; }
+          }
           node.anchors={
-            center:{x:node.absX,y:node.absY},
-            left:{x:node.absX - width/2,y:node.absY},
-            right:{x:node.absX + width/2,y:node.absY},
-            top:{x:node.absX,y:node.absY - height/2},
-            bottom:{x:node.absX,y:node.absY + height/2},
+            center:{x:centerX,y:centerY},
+            left:{x:centerX - width/2,y:centerY},
+            right:{x:centerX + width/2,y:centerY},
+            top:{x:centerX,y:centerY - height/2},
+            bottom:{x:centerX,y:centerY + height/2},
           };
+          node.width=width;
+          node.height=height;
         }
         updateLinkPath(node){
           if(!node || !node.parent || !node.linkPath) return;
@@ -2214,8 +2245,7 @@ if ($view === 'map_edit') {
           if(!this.bounds){ return; }
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
-          this.viewport.style.transform=transform;
-          this.linkLayer.style.transform=transform;
+          if(this.stage){ this.stage.style.transform=transform; }
         }
         zoom(step){
           const prev=this.scale;
