@@ -1094,6 +1094,8 @@ if ($view === 'map_edit') {
       #jsmind-container{position:relative;width:100%;height:100vh;overflow:hidden}
       .map-toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px;flex-wrap:wrap}
       .map-toolbar button{padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.65);color:#fff;font-size:12px;cursor:pointer}
+      .map-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e2e8f0;text-align:center;padding:40px 24px;font-size:16px;gap:8px}
+      .map-error strong{font-size:20px;color:#f8fafc}
       .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#475569;font:12px/1 ui-monospace}
       .save-tip{font-size:12px;color:var(--ok);display:none}
       .save-tip.show{display:inline}
@@ -1179,12 +1181,20 @@ if ($view === 'map_edit') {
         </div>
       </main>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/es6/jsmind.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/jsmind.min.js"></script>
     <script>
+      (function(){
       const defaultData = <?php echo json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
     const jmContainer=document.getElementById('jsmind-container');
+    if(!window.jsMind){
+      if(jmContainer){
+        jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请检查网络后重试。</span></div>';
+      }
+      console.error('jsMind library failed to load.');
+      return;
+    }
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
     overlay.id='drag-overlay';
     overlay.setAttribute('width','100%');
@@ -1720,6 +1730,7 @@ if ($view === 'map_edit') {
         }
       }
       window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
+      })();
     </script>
   </body>
   </html>
