@@ -1326,7 +1326,16 @@ if ($view === 'map_edit') {
       showToast(reason);
     }
     function resolveJsMind(){
-      const candidates=[window.jsMind, window.jsmind, window.jsMind && window.jsMind.jsMind, window.jsmind && window.jsmind.jsMind];
+      const candidates=[
+        window.jsMind,
+        window.jsmind,
+        window.jsMind && window.jsMind.default,
+        window.jsmind && window.jsmind.default,
+        window.jsMind && window.jsMind.jsMind,
+        window.jsmind && window.jsmind.jsMind,
+        window.jsMind && window.jsMind.default && window.jsMind.default.jsMind,
+        window.jsmind && window.jsmind.default && window.jsmind.default.jsMind,
+      ];
       for(let i=0;i<candidates.length;i++){
         const candidate=candidates[i];
         if(typeof candidate==='function'){ return candidate; }
