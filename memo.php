@@ -1447,8 +1447,8 @@ if ($view === 'map_edit') {
       .save-tip.show{display:inline}
       .save-tip.dirty{color:#f97316}
       #jsmind-container.dragover{outline:2px dashed rgba(96,165,250,.85)}
-      #node-handle{position:absolute;width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;box-shadow:0 10px 20px rgba(37,99,235,.35);pointer-events:auto;opacity:0;transform:scale(.8);transition:opacity .15s ease, transform .15s ease;z-index:50;touch-action:none}
-      #node-handle.show{opacity:1;transform:scale(1);pointer-events:auto}
+      #node-handle{position:absolute;top:50%;left:100%;margin-left:12px;width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;box-shadow:0 10px 20px rgba(37,99,235,.35);pointer-events:auto;opacity:0;transform:translateY(-50%) scale(.8);transition:opacity .15s ease, transform .15s ease;z-index:50;touch-action:none}
+      #node-handle.show{opacity:1;transform:translateY(-50%) scale(1);pointer-events:auto}
       #node-handle.dragging{opacity:.85}
       #drag-overlay{position:absolute;inset:0;pointer-events:none}
       #drag-overlay line{stroke:rgba(148,163,184,.7);stroke-width:2;stroke-dasharray:6 6;stroke-linecap:round}
@@ -2609,10 +2609,15 @@ if ($view === 'map_edit') {
       const dragHandle=document.createElement('div');
       dragHandle.id='node-handle';
       dragHandle.textContent='+';
-      document.body.appendChild(dragHandle);
       let handleSource=null;
       let pointerDragState=null;
-      function hideHandle(){ dragHandle.classList.remove('show','dragging'); handleSource=null; hideGhost(); pointerDragState=null; }
+      function hideHandle(){
+        dragHandle.classList.remove('show','dragging');
+        if(dragHandle.parentElement){ dragHandle.remove(); }
+        handleSource=null;
+        hideGhost();
+        pointerDragState=null;
+      }
       function updateHandlePosition(){
         const node=jm.get_selected_node();
         if(!node){ hideHandle(); return; }
@@ -2620,9 +2625,12 @@ if ($view === 'map_edit') {
         if(editingId && editingId===node.id){ hideHandle(); return; }
         const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
         if(!el){ hideHandle(); return; }
-        const rect=el.getBoundingClientRect();
-        dragHandle.style.left=`${rect.right + 8 + window.scrollX}px`;
-        dragHandle.style.top=`${rect.top + rect.height/2 - 14 + window.scrollY}px`;
+        if(dragHandle.parentElement!==el){
+          if(dragHandle.parentElement){ dragHandle.remove(); }
+          el.appendChild(dragHandle);
+        }
+        dragHandle.style.left='';
+        dragHandle.style.top='';
         dragHandle.classList.add('show');
         handleSource=node;
         syncOverlaySize();
