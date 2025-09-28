@@ -824,12 +824,11 @@ if ($view === 'new') {
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.18);opacity:.65;pointer-events:none}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));border:1px solid rgba(201,168,106,.28);border-radius:var(--r-lg);padding:24px;box-shadow:var(--shadow-1);backdrop-filter:blur(14px)}
       .card::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-lg) - 4px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;opacity:.9}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 0 0 0 rgba(227,198,139,0);overflow:hidden}
-      .btn::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(227,198,139,.18),transparent);transform:translateX(-100%);animation:scanline 2.8s linear infinite;opacity:.8}
-      @keyframes scanline{to{transform:translateX(100%)}}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.16);border-color:rgba(227,198,139,.65)}
+      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn::after{content:none}
+      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
       .btn:active{transform:translateY(0);background:rgba(21,26,30,.94);border-color:var(--gold-700)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 16px 32px rgba(0,0,0,.55)}
+      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));color:var(--gold-400);box-shadow:none}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
       .row{display:grid;grid-template-columns:2fr 1fr auto;gap:16px;margin-bottom:20px;align-items:center}
       .row input,.row select{padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 15px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
@@ -1200,13 +1199,12 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       h1,h2,h3,h4{font-family:'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:-0.5px;text-transform:uppercase}
       .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;position:relative;z-index:0}
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.2);opacity:.6;pointer-events:none}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-      .btn::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(227,198,139,.18),transparent);transform:translateX(-100%);animation:scanline 2.8s linear infinite;opacity:.8}
-      @keyframes scanline{to{transform:translateX(100%)}}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.16);border-color:rgba(227,198,139,.65)}
+      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn::after{content:none}
+      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
       .btn:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.94)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));box-shadow:0 0 0 1px rgba(227,198,139,.25),0 16px 32px rgba(0,0,0,.55)}
-      .btn.danger{color:#F8E6E6;border-color:rgba(209,75,75,.55);box-shadow:0 0 24px rgba(209,75,75,.32)}
+      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));box-shadow:none}
+      .btn.danger{color:#F8E6E6;border-color:rgba(209,75,75,.55);box-shadow:none}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));border:1px solid rgba(201,168,106,.32);border-radius:24px;padding:28px;box-shadow:var(--shadow-1);backdrop-filter:blur(16px)}
       .card::before{content:"";position:absolute;inset:12px;border-radius:calc(24px - 6px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 40px rgba(227,198,139,.1);pointer-events:none}
@@ -1652,15 +1650,14 @@ if ($view === 'map_edit') {
       .sidebar input,.sidebar select{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.76);color:var(--text-strong);font:500 15px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
       .sidebar input:focus,.sidebar select:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
       .actions,.toolbar{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
-      .sidebar button,.map-toolbar button,.mobile-toolbar button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-      .sidebar button::after,.map-toolbar button::after,.mobile-toolbar button::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(227,198,139,.18),transparent);transform:translateX(-100%);animation:scanline 2.8s linear infinite;opacity:.75}
-      @keyframes scanline{to{transform:translateX(100%)}}
-      .sidebar button:hover,.map-toolbar button:hover,.mobile-toolbar button:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.16);border-color:rgba(227,198,139,.65)}
+      .sidebar button,.map-toolbar button,.mobile-toolbar button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .sidebar button::after,.map-toolbar button::after,.mobile-toolbar button::after{content:none}
+      .sidebar button:hover,.map-toolbar button:hover,.mobile-toolbar button:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
       .sidebar button:active,.map-toolbar button:active,.mobile-toolbar button:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.92)}
-      .sidebar button.acc,.mobile-toolbar button.primary{background:linear-gradient(135deg,rgba(201,168,106,.2),rgba(170,140,84,.28));color:var(--bg-void);box-shadow:0 0 0 1px rgba(227,198,139,.28),0 18px 34px rgba(0,0,0,.55)}
-      .sidebar button.danger,.mobile-toolbar button.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;box-shadow:0 0 24px rgba(209,75,75,.32)}
+      .sidebar button.acc,.mobile-toolbar button.primary{background:linear-gradient(135deg,rgba(201,168,106,.2),rgba(170,140,84,.28));color:var(--bg-void);box-shadow:none}
+      .sidebar button.danger,.mobile-toolbar button.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;box-shadow:none}
       .btn-like{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:12px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(12,16,18,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:all var(--transition)}
-      .btn-like.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;background:rgba(35,10,14,.86);box-shadow:0 20px 38px rgba(209,75,75,.32)}
+      .btn-like.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;background:rgba(35,10,14,.86);box-shadow:none}
       .inspector{margin-top:8px;padding:18px;border-radius:var(--r-md);border:1px solid rgba(201,168,106,.3);background:rgba(15,19,22,.82);box-shadow:var(--shadow-1);display:grid;gap:16px}
       .inspector h2{margin:0 0 6px;font:600 16px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-transform:uppercase}
       .field{display:grid;gap:8px}
@@ -1671,7 +1668,7 @@ if ($view === 'map_edit') {
       .tips strong{color:var(--gold-500);letter-spacing:.08em}
       .tips code{padding:2px 6px;border-radius:6px;background:rgba(21,26,30,.9);border:1px solid rgba(201,168,106,.26);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif}
       .editor-pane{position:relative;background:rgba(6,10,12,.35)}
-      #jsmind-container{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:linear-gradient(160deg,rgba(21,26,30,.82),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6)}
+      #jsmind-container{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:linear-gradient(160deg,rgba(21,26,30,.82),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6);touch-action:none}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:none;filter:drop-shadow(0 0 8px rgba(227,198,139,.25))}
@@ -1682,6 +1679,10 @@ if ($view === 'map_edit') {
       @keyframes fiberPulse{0%{stroke-dashoffset:0;opacity:.9}100%{stroke-dashoffset:-320;opacity:1}}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
+      @media (max-width:600px){
+        .mobile-toolbar{bottom:16px;padding:10px;gap:6px;border-radius:16px}
+        .mobile-toolbar button{padding:9px 10px}
+      }
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.22);opacity:.7;pointer-events:none;animation:nodeGlow 9s ease-in-out infinite}
       .jsmind-node::after{content:"";position:absolute;inset:-14px;border-radius:calc(var(--r-md) + 10px);border:1px dashed rgba(201,168,106,.22);opacity:0;pointer-events:none}
       @keyframes nodeGlow{0%,100%{opacity:.4}50%{opacity:.85}}
@@ -1700,8 +1701,8 @@ if ($view === 'map_edit') {
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
       .map-toolbar{position:absolute;top:24px;right:24px;display:flex;gap:12px;z-index:60}
       .map-toolbar button{padding:10px 14px}
-      .mobile-toolbar{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;gap:10px;background:rgba(12,16,18,.88);border:1px solid rgba(201,168,106,.28);border-radius:999px;padding:10px 16px;box-shadow:0 28px 60px rgba(0,0,0,.55);backdrop-filter:blur(16px);z-index:80}
-      .mobile-toolbar button{min-width:70px;padding:10px 16px}
+      .mobile-toolbar{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);width:min(640px,calc(100% - 32px));display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;background:rgba(12,16,18,.88);border:1px solid rgba(201,168,106,.28);border-radius:20px;padding:12px;box-shadow:0 18px 36px rgba(0,0,0,.5);backdrop-filter:blur(16px);z-index:80}
+      .mobile-toolbar button{min-width:0;padding:10px 12px;width:100%}
       @media (max-width:820px){.map-toolbar{display:none}}
       .mobile-save-status{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.34);background:rgba(21,26,30,.9);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;box-shadow:0 18px 44px rgba(0,0,0,.55);backdrop-filter:blur(14px);opacity:0;pointer-events:none;transition:opacity var(--t) ease;z-index:85}
       .mobile-save-status.show{opacity:1}
@@ -1920,6 +1921,10 @@ if ($view === 'map_edit') {
           this.selectedId=null;
           this.container.innerHTML='';
           this.container.classList.add('mind-container');
+          this.container.style.touchAction='none';
+          this.container.addEventListener('gesturestart',evt=>evt.preventDefault());
+          this.container.addEventListener('gesturechange',evt=>evt.preventDefault());
+          this.container.addEventListener('gestureend',evt=>evt.preventDefault());
           this.background=document.createElement('div');
           this.background.className='mind-background';
           this.container.appendChild(this.background);
@@ -1978,6 +1983,9 @@ if ($view === 'map_edit') {
               return;
             }
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+            if(isTouch && (this.activePointers.size>=2 || !onNode)){
+              evt.preventDefault();
+            }
             if(this.activePointers.size>=2){
               for(const id of this.activePointers.keys()){
                 try{ this.container.setPointerCapture(id); }catch(_){ }
@@ -2016,6 +2024,9 @@ if ($view === 'map_edit') {
                 this.offsetY=centerY - pinch.originY*this.scale;
                 this.applyTransform();
                 return;
+              }
+              if(this.dragState && this.dragState.pointerId===evt.pointerId){
+                evt.preventDefault();
               }
             }
             if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
@@ -3743,12 +3754,11 @@ if ($view === 'maps') {
       .header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:24px}
       .header h1{margin:0;font:600 28px/1.2 'Cinzel','Noto Serif SC',serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400);text-shadow:0 0 26px rgba(227,198,139,.28)}
       .header .meta{color:var(--text-muted);font:14px/1.7 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
-      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(201,168,106,.38);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 0 0 0 rgba(227,198,139,0);overflow:hidden}
-      .btn::after{content:"";position:absolute;inset:2px;border-radius:12px;border:1px solid rgba(201,168,106,.22);opacity:.85;pointer-events:none;transition:opacity var(--transition)}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.18);border-color:rgba(227,198,139,.6)}
-      .btn:hover::after{opacity:1}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.26));color:var(--bg-void);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 22px 48px rgba(0,0,0,.6)}
-      .btn.danger{border-color:rgba(209,75,75,.55);color:#F6D6D6;box-shadow:0 0 24px rgba(209,75,75,.28)}
+      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(201,168,106,.38);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn::after{content:none}
+      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.26));color:var(--bg-void);box-shadow:none}
+      .btn.danger{border-color:rgba(209,75,75,.55);color:#F6D6D6;box-shadow:none}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px}
       .search{margin-top:20px;display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:linear-gradient(135deg,rgba(21,26,30,.82),rgba(15,19,22,.92));box-shadow:inset 0 0 22px rgba(0,0,0,.5);max-width:480px}
       .search input{all:unset;flex:1;color:var(--text-strong);font-size:15px;letter-spacing:.06em}
@@ -3923,13 +3933,13 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);animation:breathe 6s ease-in-out infinite}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
-  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 0 0 0 rgba(227,198,139,0);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-  .btn::after{content:"";position:absolute;inset:2px;border-radius:12px;border:1px solid rgba(201,168,106,.24);opacity:.85;transition:opacity var(--transition);pointer-events:none}
-  .btn:hover{transform:translateY(-2px);box-shadow:0 18px 34px rgba(0,0,0,.55),0 0 20px rgba(227,198,139,.18);border-color:rgba(227,198,139,.6)}
-  .btn:hover::after{opacity:1}
-  .btn:active{transform:translateY(0);box-shadow:0 0 12px rgba(227,198,139,.22)}
-  .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.22),rgba(170,140,84,.3));color:var(--bg-void);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 20px 40px rgba(0,0,0,.6)}
-  .btn.danger{color:var(--danger);border-color:rgba(255,93,125,.45);box-shadow:inset 0 0 16px rgba(255,93,125,.15)}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:none;transition:transform var(--transition),border-color var(--transition);overflow:hidden}
+  .btn::after{content:none}
+  .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+  .btn:hover::after{content:none}
+  .btn:active{transform:translateY(0)}
+  .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.22),rgba(170,140,84,.3));color:var(--bg-void);box-shadow:none}
+  .btn.danger{color:var(--danger);border-color:rgba(255,93,125,.45);box-shadow:none}
   .btn.small{padding:8px 12px;border-radius:12px;font-size:11px}
   .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 3px rgba(201,168,106,.25)}
   .section-title{font:600 12px/1 'Cinzel','Noto Serif SC',serif;text-transform:uppercase;letter-spacing:.24em;color:var(--gold-400);margin:14px 0 8px;text-shadow:0 0 14px rgba(227,198,139,.24)}
@@ -3939,7 +3949,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .cat:hover{transform:translateX(4px);border-color:rgba(201,168,106,.45);box-shadow:0 10px 22px rgba(0,0,0,.6)}
   .cat:hover::before{opacity:1}
   .cat.active{border-color:var(--glow);box-shadow:0 0 18px rgba(201,168,106,.3)}
-  .cat .name{font-weight:600;color:var(--text-strong);text-shadow:0 0 8px rgba(201,168,106,.18)}
+  .cat .name{flex:1;display:block;font-weight:600;color:var(--text-strong);text-shadow:0 0 8px rgba(201,168,106,.18)}
   .cat .count{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
   .footer{margin-top:18px;color:var(--text-dim);font-size:12px;line-height:1.8;text-shadow:0 0 10px rgba(201,168,106,.15)}
   .main{padding:24px 20px;background:linear-gradient(160deg,rgba(12,14,18,.82),rgba(10,12,14,.85));backdrop-filter:blur(14px) saturate(160%);position:relative}
@@ -4024,13 +4034,13 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     <div class="section-title">分类 · Categories</div>
     <div class="cat-list" id="cat-list">
       <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
-        <div class="name">全部 · All</div><div class="count"><?php echo $all_total; ?></div>
+        <span class="name">全部 · All</span><span class="count"><?php echo $all_total; ?></span>
       </a>
       <?php foreach ($cats as $c): ?>
-      <div class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>">
-        <a href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>" style="flex:1" class="name"><?php echo h($c['name']); ?></a>
-        <div class="count"><?php echo (int)($counts[$c['id']] ?? 0); ?></div>
-      </div>
+      <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>">
+        <span class="name"><?php echo h($c['name']); ?></span>
+        <span class="count"><?php echo (int)($counts[$c['id']] ?? 0); ?></span>
+      </a>
       <?php endforeach; ?>
     </div>
     <div class="footer">
@@ -4220,14 +4230,15 @@ function refreshSidebarCats(cats, counts, total){
   const all=document.createElement('a');
   all.className='cat'+(urlCat==='all'?' active':'');
   all.href='?cat=all&q='+encodeURIComponent(qParam);
-  all.innerHTML='<div class="name">全部 · All</div><div class="count">'+(total??0)+'</div>';
+  all.innerHTML='<span class="name">全部 · All</span><span class="count">'+(total??0)+'</span>';
   list.appendChild(all);
   cats.forEach(c=>{
-    const div=document.createElement('div');
-    div.className='cat'+(String(urlCat)===String(c.id)?' active':'');
-    div.dataset.id=c.id;
-    div.innerHTML=`<a href="?cat=${c.id}&q=${encodeURIComponent(qParam)}" style="flex:1" class="name">${escapeHtml(c.name)}</a><div class="count">${counts[c.id]||0}</div>`;
-    list.appendChild(div);
+    const link=document.createElement('a');
+    link.className='cat'+(String(urlCat)===String(c.id)?' active':'');
+    link.dataset.id=c.id;
+    link.href='?cat='+c.id+'&q='+encodeURIComponent(qParam);
+    link.innerHTML=`<span class="name">${escapeHtml(c.name)}</span><span class="count">${counts[c.id]||0}</span>`;
+    list.appendChild(link);
   });
 }
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
