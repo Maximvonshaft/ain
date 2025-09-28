@@ -1457,6 +1457,7 @@ if ($view === 'map_edit') {
       @media (max-width:1100px){
         .mobile-toolbar{position:fixed;left:50%;transform:translateX(-50%);bottom:72px;width:calc(100% - 48px);max-width:520px;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;background:rgba(15,23,42,.82);backdrop-filter:blur(14px);padding:12px;border-radius:20px;z-index:60;box-shadow:0 24px 48px rgba(15,23,42,.38)}
         .mobile-toolbar button{padding:12px 0;border:0;border-radius:12px;background:rgba(255,255,255,.14);color:#f8fafc;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer}
+        .mobile-toolbar button.accent{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
         .mobile-toolbar button.danger{background:rgba(248,113,113,.25);color:#fee2e2}
         .jsmind-node{min-width:120px;max-width:220px;font-size:13px;padding:9px 12px}
       }
@@ -1563,6 +1564,7 @@ if ($view === 'map_edit') {
           <button id="btn-fit-floating">自适应视图</button>
         </div>
         <div class="mobile-toolbar" id="mobile-toolbar">
+          <button data-action="save" class="accent">💾 保存</button>
           <button data-action="add-sibling">同级</button>
           <button data-action="add-child">子级</button>
           <button data-action="attach-file">附件</button>
@@ -1641,6 +1643,8 @@ if ($view === 'map_edit') {
           this.scale=1;
           this.offsetX=0;
           this.offsetY=0;
+          this.activePointers=new Map();
+          this.pinchState=null;
           this.mind=null;
           this.nodes=new Map();
           this.root=null;
@@ -1674,12 +1678,54 @@ if ($view === 'map_edit') {
         }
         setupPan(){
           const startPan=(evt)=>{
+            if(evt.pointerType==='touch'){
+              this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+              if(this.activePointers.size===2){
+                if(this.dragState){
+                  try{ this.container.releasePointerCapture(this.dragState.pointerId); }catch(_){ }
+                }
+                const points=[...this.activePointers.values()];
+                const dx=points[0].x-points[1].x;
+                const dy=points[0].y-points[1].y;
+                const dist=Math.hypot(dx,dy)||1;
+                const centerX=(points[0].x+points[1].x)/2;
+                const centerY=(points[0].y+points[1].y)/2;
+                const rect=this.container.getBoundingClientRect();
+                const originX=(centerX-rect.left-this.offsetX)/this.scale;
+                const originY=(centerY-rect.top-this.offsetY)/this.scale;
+                this.pinchState={initialDistance:dist,baseScale:this.scale,originX,originY};
+                this.dragState=null;
+                return;
+              }
+            }
+            if(this.pinchState) return;
             if(evt.button!==0 && evt.pointerType!=='touch') return;
             if(evt.target.closest('.jsmind-node')) return;
             this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
-            this.container.setPointerCapture(evt.pointerId);
+            try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
           };
           const movePan=(evt)=>{
+            if(evt.pointerType==='touch' && this.activePointers.has(evt.pointerId)){
+              this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+              if(this.pinchState && this.activePointers.size>=2){
+                const points=[...this.activePointers.values()].slice(0,2);
+                const dx=points[0].x-points[1].x;
+                const dy=points[0].y-points[1].y;
+                const dist=Math.max(Math.hypot(dx,dy),1);
+                const ratio=dist/this.pinchState.initialDistance;
+                const nextScale=Math.max(0.3, Math.min(2.5, this.pinchState.baseScale*ratio));
+                const rect=this.container.getBoundingClientRect();
+                const centerX=(points[0].x+points[1].x)/2;
+                const centerY=(points[0].y+points[1].y)/2;
+                this.scale=nextScale;
+                this.offsetX=centerX-rect.left-this.pinchState.originX*this.scale;
+                this.offsetY=centerY-rect.top-this.pinchState.originY*this.scale;
+                this.applyTransform();
+                evt.preventDefault();
+                return;
+              }
+            }
+            if(this.pinchState) return;
             if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
             const dx=evt.clientX-this.dragState.startX;
             const dy=evt.clientY-this.dragState.startY;
@@ -1688,9 +1734,23 @@ if ($view === 'map_edit') {
             this.applyTransform();
           };
           const endPan=(evt)=>{
-            if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
-            this.dragState=null;
-            try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
+            if(evt.pointerType==='touch'){
+              this.activePointers.delete(evt.pointerId);
+              if(this.pinchState){
+                if(this.activePointers.size>=2) return;
+                this.pinchState=null;
+                const remaining=this.activePointers.entries().next();
+                if(!remaining.done){
+                  const [remainId, point]=remaining.value;
+                  this.dragState={pointerId:remainId,startX:point.x,startY:point.y,baseX:this.offsetX,baseY:this.offsetY};
+                  try{ this.container.setPointerCapture(remainId); }catch(_){ }
+                }
+              }
+            }
+            if(this.dragState && evt.pointerId===this.dragState.pointerId){
+              this.dragState=null;
+              try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
+            }
           };
           this.container.addEventListener('pointerdown',startPan);
           this.container.addEventListener('pointermove',movePan);
@@ -2648,6 +2708,7 @@ if ($view === 'map_edit') {
       const nodeTagsInput=document.getElementById('node-tags');
       const nodeTagsPreview=document.getElementById('node-tags-preview');
       const mobileToolbar=document.getElementById('mobile-toolbar');
+      const mobileSaveButton=mobileToolbar ? mobileToolbar.querySelector('button[data-action="save"]') : null;
       const sidebarToggle=document.getElementById('sidebar-toggle');
       const sidebarBackdrop=document.getElementById('sidebar-backdrop');
       const saveButton=document.getElementById('btn-save');
@@ -2658,7 +2719,10 @@ if ($view === 'map_edit') {
       const deleteButton=document.getElementById('btn-delete');
       let saveButtonDefault=saveButton ? saveButton.textContent : '保存';
       if(saveButton){ saveButton.dataset.defaultLabel=saveButtonDefault; }
+      const mobileSaveDefault=mobileSaveButton ? mobileSaveButton.textContent : '保存';
+      if(mobileSaveButton){ mobileSaveButton.dataset.defaultLabel=mobileSaveDefault; }
       let dirty=false;
+      let saving=false;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
       const ATTACH_MAX_BYTES=15*1024*1024;
@@ -2670,23 +2734,61 @@ if ($view === 'map_edit') {
         if(typeof text==='string'){ saveButton.textContent=text; }
         if(typeof disabled==='boolean'){ saveButton.disabled=disabled; }
       }
-      function markDirty(){
+      function setMobileSaveState(state){
+        if(!mobileSaveButton) return;
+        const defaultLabel=mobileSaveButton.dataset.defaultLabel || mobileSaveDefault;
+        switch(state){
+          case 'saving':
+            mobileSaveButton.textContent='保存中...';
+            mobileSaveButton.disabled=true;
+            mobileSaveButton.dataset.state='saving';
+            break;
+          case 'saved':
+            mobileSaveButton.textContent='已保存';
+            mobileSaveButton.disabled=false;
+            mobileSaveButton.dataset.state='saved';
+            setTimeout(()=>{
+              if(!dirty && !saving){
+                setMobileSaveState('idle');
+              }
+            },1500);
+            break;
+          case 'error':
+            mobileSaveButton.textContent='重试保存';
+            mobileSaveButton.disabled=false;
+            mobileSaveButton.dataset.state='error';
+            break;
+          default:
+            mobileSaveButton.textContent=defaultLabel;
+            mobileSaveButton.disabled=false;
+            mobileSaveButton.dataset.state='idle';
+        }
+      }
+      if(mobileSaveButton){ setMobileSaveState('idle'); }
+      function markDirty(options={}){
+        const preserveMobile = !!options.preserveMobile;
         dirty=true;
         if(saveState){
           saveState.textContent='未保存';
           saveState.classList.add('show','dirty');
         }
         setSaveButtonState(saveButtonDefault,false);
+        if(!saving && !preserveMobile){
+          setMobileSaveState('idle');
+        }
       }
       function showSaving(){
+        saving=true;
         if(saveState){
           saveState.textContent='保存中...';
           saveState.classList.add('show');
           saveState.classList.remove('dirty');
         }
         setSaveButtonState('⏳ 保存中...', true);
+        setMobileSaveState('saving');
       }
       function markSaved(){
+        saving=false;
         dirty=false;
         if(saveState){
           saveState.textContent='保存成功';
@@ -2694,6 +2796,7 @@ if ($view === 'map_edit') {
           saveState.classList.remove('dirty');
         }
         setSaveButtonState('✅ 保存成功', false);
+        setMobileSaveState('saved');
         setTimeout(()=>{
           if(!dirty){
             if(saveState) saveState.classList.remove('show');
@@ -3088,6 +3191,7 @@ if ($view === 'map_edit') {
           const btn=e.target.closest('button');
           if(!btn) return;
           switch(btn.dataset.action){
+            case 'save': saveMindmap(); break;
             case 'add-sibling': addSiblingNode(); break;
             case 'add-child': addChildNode(); break;
             case 'attach-file': openAttachmentDialog(); break;
@@ -3259,7 +3363,9 @@ if ($view === 'map_edit') {
           markSaved();
         }catch(err){
           alert(err.message||'保存失败');
-          markDirty();
+          saving=false;
+          setMobileSaveState('error');
+          markDirty({preserveMobile:true});
         }
       }
       window.addEventListener('beforeunload',e=>{
