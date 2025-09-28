@@ -1104,7 +1104,9 @@ if ($view === 'map_edit') {
       .jsmind-node.selected{border:2px solid #2563eb;box-shadow:0 30px 48px rgba(37,99,235,.3)}
       .jsmind-node[data-direction="left"]{text-align:right;justify-content:flex-end}
       .jsmind-node[data-direction="right"]{justify-content:flex-start}
-      .jsmind-node .node-topic{display:block;word-break:break-word}
+      .jsmind-node.editing{border:2px solid #60a5fa;box-shadow:0 26px 48px rgba(59,130,246,.35);background:#f8fafc;color:#0f172a;cursor:text}
+      .jsmind-node .node-topic{display:block;word-break:break-word;white-space:pre-wrap;cursor:inherit}
+      .jsmind-node .node-topic[contenteditable="true"]{outline:none;cursor:text}
       .mind-background{position:absolute;inset:-400px;background:radial-gradient(circle,#172038 0%,rgba(15,23,42,0) 70%);pointer-events:none}
       .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#475569;font:12px/1 ui-monospace}
       .save-tip{font-size:12px;color:var(--ok);display:none}
@@ -1122,6 +1124,10 @@ if ($view === 'map_edit') {
         .mobile-toolbar{position:fixed;left:16px;right:16px;bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;background:rgba(15,23,42,.82);backdrop-filter:blur(12px);padding:10px;border-radius:16px;z-index:60;box-shadow:0 18px 38px rgba(15,23,42,.35)}
         .mobile-toolbar button{padding:12px 0;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#f8fafc;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer}
         .mobile-toolbar button.danger{background:rgba(248,113,113,.25);color:#fee2e2}
+        .jsmind-node{min-width:120px;max-width:200px;font-size:13px;padding:9px 12px}
+      }
+      @media (max-width:700px){
+        .jsmind-node{min-width:110px;max-width:180px;padding:8px 10px;font-size:12px}
       }
     </style>
   </head>
@@ -1193,6 +1199,9 @@ if ($view === 'map_edit') {
     </div>
     <script>
       (function(){
+      const DOUBLE_TAP_WINDOW=320;
+      const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
+      let lastTapInfo={id:null,time:0};
       class SimpleMind {
         constructor(options){
           this.options=options||{};
@@ -1472,13 +1481,31 @@ if ($view === 'map_edit') {
             if(node.selected){ el.classList.add('selected'); }
             el.dataset.nodeid=node.id;
             el.setAttribute('nodeid', node.id);
-            if(node.direction==='left'){ el.dataset.direction='left'; }
-            else if(node.direction==='right'){ el.dataset.direction='right'; }
+            let orientation=null;
+            if(node.direction==='left' || node.dir===-1) orientation='left';
+            else if(node.direction==='right' || node.dir===1) orientation='right';
+            else if(node.parent){
+              if(node.absX < node.parent.absX) orientation='left';
+              else if(node.absX > node.parent.absX) orientation='right';
+            }
+            if(orientation){ el.dataset.direction=orientation; }
+            else{ el.removeAttribute('data-direction'); }
             const span=document.createElement('span');
             span.className='node-topic';
             span.textContent=node.topic || '';
             el.appendChild(span);
-            el.addEventListener('click',()=>{ this.select_node(node.id); });
+            el.addEventListener('click',(evt)=>{
+              const wasSelected=!!node.selected;
+              this.select_node(node.id);
+              if(isCompactViewport()){
+                const now=Date.now();
+                if(wasSelected && lastTapInfo.id===node.id && (now-lastTapInfo.time)<=DOUBLE_TAP_WINDOW){
+                  evt.preventDefault();
+                  this.promptRename(node);
+                }
+                lastTapInfo={id:node.id,time:now};
+              }
+            });
             el.addEventListener('dblclick',()=>{ this.promptRename(node); });
             return el;
           };
@@ -1495,13 +1522,18 @@ if ($view === 'map_edit') {
             node.el.style.top=`${node.absY - node.height/2}px`;
             if(node.parent){
               const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-              const parentEdge=node.parent.absX + (node.parent.direction==='left' ? -node.parent.width/2 : node.parent.width/2);
-              const startX=parentEdge;
+              const parentLeft=node.parent.absX - node.parent.width/2;
+              const parentRight=node.parent.absX + node.parent.width/2;
+              const childLeft=node.absX - node.width/2;
+              const childRight=node.absX + node.width/2;
+              const orientation=(node.dir===-1 || node.direction==='left') ? 'left' : ((node.dir===1 || node.direction==='right') ? 'right' : (childRight<=node.parent.absX ? 'left' : 'right'));
+              const isLeftSide=orientation==='left';
+              const startX=isLeftSide?parentLeft:parentRight;
               const startY=node.parent.absY;
-              const childEdge=node.absX + (node.direction==='left' ? node.width/2 : -node.width/2);
-              const endX=childEdge;
+              const endX=isLeftSide?childRight:childLeft;
               const endY=node.absY;
-              const midX=(startX+endX)/2;
+              const offset=Math.abs(endX-startX)*0.35;
+              const midX=startX + (isLeftSide?-offset:offset);
               path.setAttribute('d',`M${startX} ${startY} C ${midX} ${startY} ${midX} ${endY} ${endX} ${endY}`);
               this.linkLayer.appendChild(path);
             }
@@ -1578,6 +1610,10 @@ if ($view === 'map_edit') {
         }
         promptRename(node){
           if(!node) return;
+          if(typeof this.options.onInlineEdit==='function'){
+            this.options.onInlineEdit(node, this);
+            return;
+          }
           const text=prompt('请输入节点标题', node.topic || '');
           if(text===null) return;
           const cleaned=text.trim();
@@ -1622,6 +1658,107 @@ if ($view === 'map_edit') {
         support_html:true,
         mode:'full',
       });
+      let inlineEditState=null;
+      function finishInlineEditing(commit){
+        if(!inlineEditState) return;
+        const {span,nodeId,initialText,onBlur,onKeydown,onPaste}=inlineEditState;
+        inlineEditState=null;
+        span.removeEventListener('blur', onBlur);
+        span.removeEventListener('keydown', onKeydown);
+        span.removeEventListener('paste', onPaste);
+        span.contentEditable='false';
+        span.removeAttribute('data-editing');
+        if(span.parentElement){ span.parentElement.classList.remove('editing'); }
+        if(!commit){
+          span.textContent=initialText;
+          requestAnimationFrame(updateHandlePosition);
+          return;
+        }
+        let value=span.textContent || '';
+        value=value.replace(/\r/g,'');
+        value=value.split('\n').map(line=>line.trim()).join('\n').trim();
+        if(!value){
+          span.textContent=initialText;
+          requestAnimationFrame(updateHandlePosition);
+          return;
+        }
+        if(value!==initialText){
+          if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
+          markDirty();
+        }
+        requestAnimationFrame(updateHandlePosition);
+      }
+      function startInlineEditing(node){
+        if(!node || !node.el) return;
+        if(inlineEditState && inlineEditState.nodeId===node.id) return;
+        finishInlineEditing(true);
+        const el=node.el;
+        const span=el.querySelector('.node-topic');
+        if(!span) return;
+        const initialText=node.topic || '';
+        const onBlur=()=>finishInlineEditing(true);
+        const onKeydown=(e)=>{
+          if(e.key==='Enter' && !e.shiftKey){
+            e.preventDefault();
+            span.blur();
+          }else if(e.key==='Escape'){
+            e.preventDefault();
+            finishInlineEditing(false);
+            span.blur();
+          }
+        };
+        const onPaste=(e)=>{
+          if(!e.clipboardData) return;
+          e.preventDefault();
+          const text=e.clipboardData.getData('text/plain');
+          if(!text) return;
+          const selection=window.getSelection();
+          if(selection && selection.rangeCount){
+            selection.deleteFromDocument();
+            const range=selection.getRangeAt(0);
+            const node=document.createTextNode(text);
+            range.insertNode(node);
+            range.setStartAfter(node);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }else{
+            span.textContent+=text;
+            const sel=window.getSelection();
+            if(sel){
+              const range=document.createRange();
+              range.selectNodeContents(span);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          }
+          span.normalize();
+        };
+        inlineEditState={nodeId:node.id, span, initialText, onBlur, onKeydown, onPaste};
+        el.classList.add('editing');
+        span.contentEditable='true';
+        span.spellcheck=false;
+        span.dataset.editing='1';
+        span.addEventListener('blur', onBlur);
+        span.addEventListener('keydown', onKeydown);
+        span.addEventListener('paste', onPaste);
+        hideHandle();
+        requestAnimationFrame(()=>{
+          try{ span.focus({preventScroll:true}); }
+          catch(_){ span.focus(); }
+          const selection=window.getSelection();
+          if(selection){
+            const range=document.createRange();
+            range.selectNodeContents(span);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        });
+      }
+      function commitInlineEditing(){ finishInlineEditing(true); }
+      function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
+      jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
       jmContainer.appendChild(overlay);
       syncOverlaySize();
@@ -1647,6 +1784,8 @@ if ($view === 'map_edit') {
       function updateHandlePosition(){
         const node=jm.get_selected_node();
         if(!node){ hideHandle(); return; }
+        const editingId=currentEditingId();
+        if(editingId && editingId===node.id){ hideHandle(); return; }
         const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
         if(!el){ hideHandle(); return; }
         const rect=el.getBoundingClientRect();
@@ -1817,6 +1956,7 @@ if ($view === 'map_edit') {
         return node;
       }
       function executeCreateNodeCommand(input){
+        commitInlineEditing();
         if(!input || !input.parentId) return null;
         const parent=jm.get_node(input.parentId);
         if(!parent) return null;
@@ -1929,6 +2069,7 @@ if ($view === 'map_edit') {
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
+        commitInlineEditing();
         const cleaned=text.trim();
         if(!cleaned) return;
         const firstLine=cleaned.split(/\r?\n/)[0].slice(0,100) || '新节点';
@@ -1945,6 +2086,7 @@ if ($view === 'map_edit') {
       }
       function handleDroppedFiles(files, parent, event){
         if(!files || !files.length || !parent) return;
+        commitInlineEditing();
         const accepted=sanitizeAttachmentFiles(files);
         if(!accepted.length) return;
         let createAsChild=true;
@@ -1962,33 +2104,33 @@ if ($view === 'map_edit') {
       function addSiblingNode(){
         const node=ensureNode();
         if(!node || node.isroot || !node.parent) return;
+        commitInlineEditing();
         executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' });
       }
       function addChildNode(){
         const node=ensureNode();
-        if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
+        if(node){
+          commitInlineEditing();
+          executeCreateNodeCommand({ parentId:node.id, topic:'子节点' });
+        }
       }
       function deleteSelectedNode(){
         const node=ensureNode(); if(!node || node.isroot) return;
+        commitInlineEditing();
         jm.remove_node(node.id); markDirty();
         requestAnimationFrame(updateHandlePosition);
       }
       function renameSelectedNode(){
         const node=ensureNode();
         if(!node) return;
-        const text=prompt('请输入节点标题', node.topic || '');
-        if(text===null) return;
-        const cleaned=text.trim();
-        if(!cleaned) return;
-        if(typeof jm.update_node === 'function'){ jm.update_node(node.id, cleaned); }
-        markDirty();
-        requestAnimationFrame(updateHandlePosition);
+        startInlineEditing(node);
       }
       function focusParentNode(){
         const node=ensureNode();
         if(node && node.parent){ jm.select_node(node.parent.id); requestAnimationFrame(updateHandlePosition); }
       }
       function openAttachmentDialog(){
+        commitInlineEditing();
         const node=ensureNode();
         if(!node){ alert('请先选择一个节点'); return; }
         if(!attachInput) return;
@@ -1997,6 +2139,7 @@ if ($view === 'map_edit') {
         attachInput.click();
       }
       function openLinkPrompt(){
+        commitInlineEditing();
         const node=ensureNode();
         if(!node){ alert('请先选择一个节点'); return; }
         const raw=prompt('请输入链接地址');
@@ -2044,8 +2187,12 @@ if ($view === 'map_edit') {
         });
       }
       document.addEventListener('keydown',e=>{
-        const activeTag=(document.activeElement && document.activeElement.tagName) || '';
-        if(/input|textarea|select/i.test(activeTag)) return;
+        const activeEl=document.activeElement;
+        if(activeEl){
+          const tag=activeEl.tagName || '';
+          if(activeEl.isContentEditable || /input|textarea|select/i.test(tag)) return;
+        }
+        if(currentEditingId()) return;
         if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); addSiblingNode(); }
         else if(e.key==='Tab' && e.shiftKey){ e.preventDefault(); focusParentNode(); }
         else if(e.key==='Tab'){ e.preventDefault(); addChildNode(); }
@@ -2109,6 +2256,13 @@ if ($view === 'map_edit') {
       titleInput.addEventListener('input', markDirty);
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
+          if(type===jsMind.event_type.select){
+            const selected=jm.get_selected_node();
+            const editingId=currentEditingId();
+            if(editingId && (!selected || selected.id!==editingId)){
+              commitInlineEditing();
+            }
+          }
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             requestAnimationFrame(updateHandlePosition);
           }
@@ -2132,7 +2286,12 @@ if ($view === 'map_edit') {
         reader.onload=evt=>{
           try{
             const json=JSON.parse(evt.target.result);
-            if(json && json.data){ jm.show(json); initialData=JSON.parse(JSON.stringify(json)); markDirty(); }
+            if(json && json.data){
+              commitInlineEditing();
+              jm.show(json);
+              initialData=JSON.parse(JSON.stringify(json));
+              markDirty();
+            }
             else alert('文件格式不兼容');
           }catch(err){ alert('无法解析 JSON：'+err.message); }
         };
@@ -2140,6 +2299,7 @@ if ($view === 'map_edit') {
       });
       if(saveButton) saveButton.onclick=saveMindmap;
       async function saveMindmap(){
+        commitInlineEditing();
         const title=titleInput.value.trim()||'未命名导图';
         const payload=JSON.stringify(jm.get_data('node_tree'));
         const fd=new FormData();
@@ -2162,7 +2322,10 @@ if ($view === 'map_edit') {
           markDirty();
         }
       }
-      window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
+      window.addEventListener('beforeunload',e=>{
+        commitInlineEditing();
+        if(dirty){ e.preventDefault(); e.returnValue=''; }
+      });
       })();
     </script>
   </body>
