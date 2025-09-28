@@ -49,7 +49,7 @@ const DEFAULT_MINDMAP = [
       [
         'id' => 'view-outline',
         'topic' => '📋 大纲视图',
-        'direction' => 'left',
+        'direction' => 'right',
         'expanded' => true,
         'children' => [
           ['id' => 'view-outline-focus', 'topic' => '聚焦中心主题', 'children' => []],
@@ -82,7 +82,7 @@ const DEFAULT_MINDMAP = [
       [
         'id' => 'view-resources',
         'topic' => '📎 资料与附件',
-        'direction' => 'left',
+        'direction' => 'right',
         'expanded' => true,
         'children' => [
           ['id' => 'view-resources-attach', 'topic' => '上传附件（≤15MB 图片/PDF/ZIP/文本/视频）', 'children' => []],
@@ -95,6 +95,26 @@ const DEFAULT_MINDMAP = [
 
 function default_mindmap_payload(): string {
   return json_encode(DEFAULT_MINDMAP, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+}
+
+function mindmap_force_right_orientation(&$node, int $depth = 0): void {
+  if (!is_array($node)) {
+    return;
+  }
+  $node['direction'] = $depth === 0 ? 'center' : 'right';
+  if (!isset($node['children']) || !is_array($node['children'])) {
+    $node['children'] = [];
+    return;
+  }
+  $normalized = [];
+  foreach ($node['children'] as $child) {
+    if (!is_array($child)) {
+      continue;
+    }
+    mindmap_force_right_orientation($child, $depth + 1);
+    $normalized[] = $child;
+  }
+  $node['children'] = $normalized;
 }
 
 // —— 基础辅助函数 ——
@@ -378,8 +398,9 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
   $asset_refs=[];
   if(!isset($payload['data']) || !is_array($payload['data'])) return;
   $payload['format']='node_tree';
-  $sanitize=function (&$node) use (&$sanitize,&$asset_refs,$map_id,$session_key){
+  $sanitize=function (&$node, int $depth = 0) use (&$sanitize,&$asset_refs,$map_id,$session_key){
     if(!is_array($node)) return;
+    $node['direction']=$depth===0?'center':'right';
     if(empty($node['id']) || !is_string($node['id'])){
       $node['id']='node-'.bin2hex(random_bytes(4));
     }
@@ -428,12 +449,19 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
       }
     }
     if(isset($node['children']) && is_array($node['children'])){
-      foreach($node['children'] as &$child){ $sanitize($child); }
-      unset($child);
+      $normalized=[];
+      foreach($node['children'] as $child){
+        if(!is_array($child)) continue;
+        $sanitize($child,$depth+1);
+        $normalized[]=$child;
+      }
+      $node['children']=$normalized;
+    } else {
+      $node['children']=[];
     }
   };
-  $sanitize($payload['data']);
-}
+  $sanitize($payload['data'],0);
+} 
 
 function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key): void {
   $pdo=db();
@@ -1330,9 +1358,15 @@ if ($view === 'map_edit') {
   }
   $initialPayload = $mind['content'] ?: default_mindmap_payload();
   $defaultData = json_decode(default_mindmap_payload(), true);
+  if (isset($defaultData['data'])) {
+    mindmap_force_right_orientation($defaultData['data']);
+  }
   $initialDataDecoded = json_decode($initialPayload, true);
   if (!is_array($initialDataDecoded) || empty($initialDataDecoded['data'])) {
     $initialDataDecoded = $defaultData;
+  }
+  if (isset($initialDataDecoded['data'])) {
+    mindmap_force_right_orientation($initialDataDecoded['data']);
   }
   ?>
   <!doctype html>
@@ -1637,6 +1671,16 @@ if ($view === 'map_edit') {
         }
         return data;
       }
+      function enforceRightOrientation(node, depth=0){
+        if(!node || typeof node!=='object') return;
+        node.direction=depth===0?'center':'right';
+        if(Array.isArray(node.children)){
+          node.children=node.children.filter(child=>child && typeof child==='object');
+          node.children.forEach(child=>enforceRightOrientation(child, depth+1));
+        }else{
+          node.children=[];
+        }
+      }
       function gatherAttachments(data){
         if(!data) return [];
         if(Array.isArray(data.attachments)){ return data.attachments.map(att=>att && typeof att==='object'?att:null).filter(Boolean); }
@@ -1827,7 +1871,7 @@ if ($view === 'map_edit') {
               data:normalizedData,
               parent:parent,
               children:[],
-              direction:item.direction || (parent?parent.direction:'right'),
+              direction:parent ? 'right' : 'center',
               expanded:item.expanded!==false,
               isroot:!parent,
               style:item.style || null,
@@ -1836,12 +1880,15 @@ if ($view === 'map_edit') {
               depth:depth,
             };
             node.model.data=normalizedData;
-            if(node.isroot){ node.direction='center'; }
+            node.model.direction=node.direction;
             this.nodes.set(node.id,node);
             if(parent){ parent.children.push(node); node.model.parentId=parent.id; }
             else this.root=node;
             if(Array.isArray(item.children)){
+              item.children=item.children.filter(child=>child && typeof child==='object');
               node.children=item.children.map(child=>build(child,node));
+            }else{
+              item.children=[];
             }
             return node;
           };
@@ -1880,7 +1927,7 @@ if ($view === 'map_edit') {
           if(!parent) return null;
           if(!newId) newId='node-'+Math.random().toString(36).slice(2,10);
           const normalized=normalizeNodeData(data||{});
-          const model={id:newId,topic:topic||'新节点',data:normalized,children:[]};
+          const model={id:newId,topic:topic||'新节点',data:normalized,children:[],direction:'right',expanded:true};
           const children=this.ensureModelChildren(parent);
           children.push(model);
           const node={
@@ -1889,7 +1936,7 @@ if ($view === 'map_edit') {
             data:model.data,
             parent:parent,
             children:[],
-            direction:model.direction || parent.direction,
+            direction:'right',
             expanded:true,
             isroot:false,
             style:model.style || null,
@@ -1897,6 +1944,7 @@ if ($view === 'map_edit') {
             model:model,
             depth:(parent.depth||0)+1,
           };
+          node.model.direction='right';
           parent.children.push(node);
           this.nodes.set(newId,node);
           this.computeLayout();
@@ -2013,26 +2061,28 @@ if ($view === 'map_edit') {
             }
             return total;
           };
-          const left=this.root.children.filter(child=>(child.direction||'right')==='left');
-          const right=this.root.children.filter(child=>child.direction==='right'||child.direction==='center'||child.direction===undefined||child.direction===null||child.direction==='');
-          const leftHeight=subtreeHeight(left);
+          const right=this.root.children.filter(Boolean);
           const rightHeight=subtreeHeight(right);
           const rootHeight=getNodeHeight(this.root);
-          const canvasHeight=Math.max(rootHeight, leftHeight, rightHeight);
+          const canvasHeight=Math.max(rootHeight, rightHeight);
           this.root.x=0;
           this.root.y=canvasHeight/2;
-          const assign=(node,depth,dir,startTop)=>{
+          this.root.dir=0;
+          this.root.direction='center';
+          if(this.root.model){ this.root.model.direction='center'; }
+          const assign=(node,depth,startTop)=>{
             const height=measure(node);
-            node.x=(dir===0?0:dir*depth*H_SPACING);
+            node.x=this.root.x + depth*H_SPACING;
             node.y=startTop+height/2;
-            node.dir=dir;
+            node.dir=depth===0?0:1;
+            node.direction=depth===0?'center':'right';
+            if(node.model){ node.model.direction=node.direction; }
             if(!node.expanded || !node.children.length) return height;
             let cursor=startTop;
             const children=node.children.filter(Boolean);
             for(let i=0;i<children.length;i++){
               const child=children[i];
-              const childDir = child.direction==='left'? -1 : (child.direction==='right'? 1 : (dir===0?1:dir));
-              const childHeight=assign(child, depth+1, childDir, cursor);
+              const childHeight=assign(child, depth+1, cursor);
               cursor+=childHeight;
               if(i<children.length-1){
                 const nextHeight=measure(children[i+1]);
@@ -2041,17 +2091,10 @@ if ($view === 'map_edit') {
             }
             return height;
           };
-          let leftTop=this.root.y - leftHeight/2;
-          for(let i=0;i<left.length;i++){
-            const child=left[i];
-            const h=assign(child,1,-1,leftTop);
-            leftTop+=h;
-            if(i<left.length-1){ leftTop+=gapBetween(h, measure(left[i+1])); }
-          }
           let rightTop=this.root.y - rightHeight/2;
           for(let i=0;i<right.length;i++){
             const child=right[i];
-            const h=assign(child,1,1,rightTop);
+            const h=assign(child,1,rightTop);
             rightTop+=h;
             if(i<right.length-1){ rightTop+=gapBetween(h, measure(right[i+1])); }
           }
@@ -2386,6 +2429,8 @@ if ($view === 'map_edit') {
       const defaultData = <?php echo json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
+      if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
+      if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
     const jmContainer=document.getElementById('jsmind-container');
     let currentMapId=0;
     if(jmContainer){
@@ -3334,6 +3379,7 @@ if ($view === 'map_edit') {
       if(exportButton){
         exportButton.addEventListener('click',()=>{
           const data=jm.get_data('node_tree');
+          if(data && data.data){ enforceRightOrientation(data.data); }
           const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
           const url=URL.createObjectURL(blob);
           const a=document.createElement('a');
@@ -3357,8 +3403,10 @@ if ($view === 'map_edit') {
               const json=JSON.parse(evt.target.result);
               if(json && json.data){
                 commitInlineEditing();
+                enforceRightOrientation(json.data);
                 jm.show(json);
                 initialData=JSON.parse(JSON.stringify(json));
+                if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
                 markDirty();
               }
               else alert('文件格式不兼容');
@@ -3371,7 +3419,9 @@ if ($view === 'map_edit') {
       async function saveMindmap(){
         commitInlineEditing();
         const title=titleInput.value.trim()||'未命名导图';
-        const payload=JSON.stringify(jm.get_data('node_tree'));
+        const currentData=jm.get_data('node_tree');
+        if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
+        const payload=JSON.stringify(currentData);
         const fd=new FormData();
         fd.append('action','save_mindmap');
         fd.append('id', String(currentMapId||0));
@@ -3387,6 +3437,7 @@ if ($view === 'map_edit') {
           document.getElementById('jsmind-container').dataset.mapId=currentMapId;
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
+          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
           markSaved();
         }catch(err){
           alert(err.message||'保存失败');
