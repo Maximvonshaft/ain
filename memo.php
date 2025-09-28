@@ -1650,7 +1650,7 @@ if ($view === 'map_edit') {
       .sidebar input,.sidebar select{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.76);color:var(--text-strong);font:500 15px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
       .sidebar input:focus,.sidebar select:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
       .actions,.toolbar{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
-      .sidebar button,.map-toolbar button,.mobile-toolbar button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .sidebar button,.map-toolbar button,.mobile-toolbar button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden;touch-action:manipulation}
       .sidebar button::after,.map-toolbar button::after,.mobile-toolbar button::after{content:none}
       .sidebar button:hover,.map-toolbar button:hover,.mobile-toolbar button:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
       .sidebar button:active,.map-toolbar button:active,.mobile-toolbar button:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.92)}
@@ -1951,6 +1951,7 @@ if ($view === 'map_edit') {
           this.linkRegistry=new Map();
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
+          this.setupTouchGuards();
         }
         setupPan(){
           const updatePinchBaseline=()=>{
@@ -2199,6 +2200,60 @@ if ($view === 'map_edit') {
           this.render();
           this.select_node(parent.id);
           this.emit(SimpleMind.event_type.update);
+        }
+        setupTouchGuards(){
+          let lastTapTime=0;
+          let lastTapX=0;
+          let lastTapY=0;
+          let tapTimer=null;
+          const DOUBLE_TAP_DELAY=320;
+          const DOUBLE_TAP_DISTANCE=26;
+          const reset=()=>{
+            if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+            lastTapTime=0;
+          };
+          const isEditableTarget=(target)=>{
+            if(!target || !target.tagName) return false;
+            const tag=target.tagName.toLowerCase();
+            return tag==='input' || tag==='textarea' || tag==='select' || target.isContentEditable===true;
+          };
+          this.container.addEventListener('touchstart',(evt)=>{
+            if(evt.touches.length>1){ reset(); return; }
+            const target=evt.target;
+            if(isEditableTarget(target)){ reset(); return; }
+            const touch=evt.touches[0];
+            const now=performance.now();
+            if(lastTapTime){
+              const delta=now-lastTapTime;
+              const dx=touch.clientX-lastTapX;
+              const dy=touch.clientY-lastTapY;
+              if(delta>0 && delta<=DOUBLE_TAP_DELAY && (dx*dx + dy*dy) <= (DOUBLE_TAP_DISTANCE*DOUBLE_TAP_DISTANCE)){
+                evt.preventDefault();
+                const dblTarget=target || this.container;
+                const dblEvt=new MouseEvent('dblclick',{
+                  bubbles:true,
+                  cancelable:true,
+                  clientX:touch.clientX,
+                  clientY:touch.clientY,
+                });
+                dblTarget.dispatchEvent(dblEvt);
+                reset();
+                return;
+              }
+            }
+            lastTapTime=now;
+            lastTapX=touch.clientX;
+            lastTapY=touch.clientY;
+            if(tapTimer){ clearTimeout(tapTimer); }
+            tapTimer=setTimeout(reset, DOUBLE_TAP_DELAY+60);
+          },{passive:false});
+          this.container.addEventListener('touchend',(evt)=>{
+            if(evt.touches && evt.touches.length>0) return;
+            if(isEditableTarget(evt.target)){ reset(); return; }
+            if(tapTimer){ clearTimeout(tapTimer); }
+            tapTimer=setTimeout(reset, DOUBLE_TAP_DELAY);
+          });
+          this.container.addEventListener('touchcancel', reset);
         }
         toggle_node(id){
           const node=this.nodes.get(id);
@@ -3075,7 +3130,7 @@ if ($view === 'map_edit') {
           saveState.textContent='未保存';
           saveState.classList.add('show','dirty');
         }
-        setSaveButtonState(null,false);
+        setSaveButtonState('未保存',false);
         setMobileSaveStatus('未保存','dirty');
       }
       function showSaving(){
