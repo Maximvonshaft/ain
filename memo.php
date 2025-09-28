@@ -1375,15 +1375,15 @@ if ($view === 'map_edit') {
       .map-toolbar button{padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.65);color:#fff;font-size:12px;cursor:pointer}
       .map-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e2e8f0;text-align:center;padding:40px 24px;font-size:16px;gap:8px}
       .map-error strong{font-size:20px;color:#f8fafc}
-      .mind-viewport{position:absolute;inset:0;transform-origin:0 0;will-change:transform;}
-      .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
+      .mind-viewport{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+      .mind-links{position:absolute;top:0;left:0;pointer-events:none;transform-origin:0 0;}
       .mind-links path{fill:none;stroke:rgba(148,163,184,.55);stroke-width:2;stroke-linecap:round;transition:stroke .2s ease}
       .mind-links path[data-type="idea"]{stroke:#38bdf8}
       .mind-links path[data-type="task"]{stroke:#f59e0b}
       .mind-links path[data-type="document"]{stroke:#60a5fa}
       .mind-links path[data-type="media"]{stroke:#f472b6}
       .mind-links path[data-type="decision"]{stroke:#34d399}
-      .mind-nodes{position:absolute;inset:0}
+      .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:16px;color:#0f172a;text-align:center;font-weight:700;font-size:14px;line-height:1.45;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease,color .15s ease;min-width:140px;max-width:280px;--node-bg:#f8fafc;--node-border:rgba(148,163,184,.35);--node-shadow:0 18px 32px rgba(15,23,42,.18);--node-accent:#2563eb;background:var(--node-bg);border:1.5px solid var(--node-border);box-shadow:var(--node-shadow)}
       .jsmind-node::before{content:attr(data-icon);font-size:22px;line-height:1;height:22px}
       .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 24px 38px rgba(37,99,235,.18)}
@@ -1650,13 +1650,11 @@ if ($view === 'map_edit') {
           this.background=document.createElement('div');
           this.background.className='mind-background';
           this.container.appendChild(this.background);
-          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
-          this.linkLayer.classList.add('mind-links');
-          this.linkLayer.setAttribute('width','100%');
-          this.linkLayer.setAttribute('height','100%');
-          this.container.appendChild(this.linkLayer);
           this.viewport=document.createElement('div');
           this.viewport.className='mind-viewport';
+          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.linkLayer.classList.add('mind-links');
+          this.viewport.appendChild(this.linkLayer);
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
@@ -1991,8 +1989,12 @@ if ($view === 'map_edit') {
           this.linkLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
           this.linkLayer.setAttribute('width',`${this.bounds.width}`);
           this.linkLayer.setAttribute('height',`${this.bounds.height}`);
+          this.linkLayer.style.width=`${this.bounds.width}px`;
+          this.linkLayer.style.height=`${this.bounds.height}px`;
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
+          this.viewport.style.width=`${this.bounds.width}px`;
+          this.viewport.style.height=`${this.bounds.height}px`;
         }
         buildNodeElement(node,{forMeasure=false}={}){
           const el=document.createElement('div');
@@ -2215,7 +2217,6 @@ if ($view === 'map_edit') {
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
           this.viewport.style.transform=transform;
-          this.linkLayer.style.transform=transform;
         }
         zoom(step){
           const prev=this.scale;
@@ -3131,9 +3132,13 @@ if ($view === 'map_edit') {
       if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
       const zoomOutButton=document.getElementById('btn-zoom-out');
       if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
-      document.getElementById('btn-collapse').onclick=()=>{
-        const node=ensureNode(); if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
-      };
+      const collapseButton=document.getElementById('btn-collapse');
+      if(collapseButton){
+        collapseButton.addEventListener('click',()=>{
+          const node=ensureNode();
+          if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
+        });
+      }
       let dropHoverNode=null;
       function clearDropHover(){
         if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
@@ -3177,7 +3182,7 @@ if ($view === 'map_edit') {
           handleDroppedText(text, parent, e);
         }
       });
-      titleInput.addEventListener('input', markDirty);
+      if(titleInput){ titleInput.addEventListener('input', markDirty); }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
           if(type===jsMind.event_type.select){
@@ -3194,34 +3199,43 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
-      document.getElementById('btn-export-json').onclick=()=>{
-        const data=jm.get_data('node_tree');
-        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;
-        a.download=(titleInput.value.trim()||'mindmap')+'.json';
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(url), 1000);
-      };
-      document.getElementById('btn-import-json').onclick=()=>importInput.click();
-      importInput.addEventListener('change', e=>{
-        const file=e.target.files[0]; if(!file) return;
-        const reader=new FileReader();
-        reader.onload=evt=>{
-          try{
-            const json=JSON.parse(evt.target.result);
-            if(json && json.data){
-              commitInlineEditing();
-              jm.show(json);
-              initialData=JSON.parse(JSON.stringify(json));
-              markDirty();
-            }
-            else alert('文件格式不兼容');
-          }catch(err){ alert('无法解析 JSON：'+err.message); }
-        };
-        reader.readAsText(file,'utf-8');
-      });
+      const exportButton=document.getElementById('btn-export-json');
+      if(exportButton){
+        exportButton.addEventListener('click',()=>{
+          const data=jm.get_data('node_tree');
+          const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.href=url;
+          const titleValue=titleInput ? titleInput.value.trim() : '';
+          a.download=(titleValue || 'mindmap')+'.json';
+          a.click();
+          setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        });
+      }
+      const importButton=document.getElementById('btn-import-json');
+      if(importButton && importInput){
+        importButton.addEventListener('click',()=>importInput.click());
+      }
+      if(importInput){
+        importInput.addEventListener('change', e=>{
+          const file=e.target.files[0]; if(!file) return;
+          const reader=new FileReader();
+          reader.onload=evt=>{
+            try{
+              const json=JSON.parse(evt.target.result);
+              if(json && json.data){
+                commitInlineEditing();
+                jm.show(json);
+                initialData=JSON.parse(JSON.stringify(json));
+                markDirty();
+              }
+              else alert('文件格式不兼容');
+            }catch(err){ alert('无法解析 JSON：'+err.message); }
+          };
+          reader.readAsText(file,'utf-8');
+        });
+      }
       if(saveButton) saveButton.onclick=saveMindmap;
       async function saveMindmap(){
         commitInlineEditing();
