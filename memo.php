@@ -2511,7 +2511,6 @@ if ($view === 'map_edit') {
       if(!jm.get_selected_node() && initialData && initialData.data){
         jm.select_node(initialData.data.id);
       }
-      refreshInspector(jm.get_selected_node());
       function syncOverlaySize(){
         const rect=jmContainer.getBoundingClientRect();
         const width=Math.max(rect.width,1);
@@ -2751,6 +2750,7 @@ if ($view === 'map_edit') {
         renderTagPreview(data.tags||[]);
         inspectorSyncing=false;
       }
+      refreshInspector(jm.get_selected_node());
       function applyInspectorChange(mutator){
         if(typeof mutator!=='function') return;
         const node=ensureNode();
