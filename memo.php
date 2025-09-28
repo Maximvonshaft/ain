@@ -1285,7 +1285,7 @@ if ($view === 'map_edit') {
       </main>
     </div>
     <div id="global-toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/es6/jsmind.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/jsmind.js"></script>
     <script>
       const defaultData = <?php echo json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
@@ -1303,7 +1303,37 @@ if ($view === 'map_edit') {
     const attachFileBtn=document.getElementById('btn-attach-file');
     const attachLinkBtn=document.getElementById('btn-attach-link');
     const toastEl=document.getElementById('global-toast');
-    const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    const desktopSaveBtn=document.getElementById('btn-save');
+    const saveState=document.getElementById('save-state');
+    const importInput=document.getElementById('import-input');
+    const controlButtons=[desktopSaveBtn,mobileSaveBtn,document.getElementById('btn-export-json'),document.getElementById('btn-import-json'),document.getElementById('btn-add-sibling'),document.getElementById('btn-add-child'),document.getElementById('btn-delete'),document.getElementById('btn-fit'),document.getElementById('btn-center'),document.getElementById('btn-zoom-in'),document.getElementById('btn-zoom-out'),document.getElementById('btn-collapse'),attachFileBtn,attachLinkBtn];
+    const toastState={timer:null};
+    function showToast(message){
+      if(!toastEl) return;
+      toastEl.textContent=message;
+      toastEl.classList.add('show');
+      if(toastState.timer) clearTimeout(toastState.timer);
+      toastState.timer=setTimeout(()=>toastEl.classList.remove('show'),2200);
+    }
+    function disableMindmapUI(reason){
+      if(jmContainer){
+        jmContainer.innerHTML=`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-weight:600">${reason}</div>`;
+      }
+      controlButtons.forEach(btn=>{ if(btn){ btn.disabled=true; btn.classList.remove('is-loading','is-success','is-dirty'); btn.textContent=(btn.dataset && btn.dataset.baseLabel) ? btn.dataset.baseLabel : (btn.textContent||'已禁用'); } });
+      if(importInput) importInput.disabled=true;
+      if(attachFileInput) attachFileInput.disabled=true;
+      if(saveState){ saveState.textContent=reason; saveState.classList.add('show'); saveState.classList.remove('dirty'); }
+      showToast(reason);
+    }
+    function resolveJsMind(){
+      const candidates=[window.jsMind, window.jsmind, window.jsMind && window.jsMind.jsMind, window.jsmind && window.jsmind.jsMind];
+      for(let i=0;i<candidates.length;i++){
+        const candidate=candidates[i];
+        if(typeof candidate==='function'){ return candidate; }
+      }
+      return null;
+    }
+    const JsMindCtor=resolveJsMind();
     function openMobileSidebar(){
       if(!sidebar || !mobileMedia.matches) return;
       sidebar.classList.add('show-mobile');
@@ -1335,570 +1365,565 @@ if ($view === 'map_edit') {
     if(mobileMedia.addEventListener) mobileMedia.addEventListener('change',handleMediaChange);
     else if(mobileMedia.addListener) mobileMedia.addListener(handleMediaChange);
     document.addEventListener('keydown',evt=>{ if(evt.key==='Escape') closeMobileSidebar(true); });
-    overlay.id='drag-overlay';
-    overlay.setAttribute('width','100%');
-    overlay.setAttribute('height','100%');
-    overlay.setAttribute('viewBox','0 0 100 100');
-    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ghostLine.setAttribute('opacity','0');
-    const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    ghostRing.setAttribute('opacity','0');
-    overlay.appendChild(ghostLine);
-    overlay.appendChild(ghostRing);
-    const jm=new jsMind({
-      container:'jsmind-container',
-      editable:true,
-        theme:'fresh-blue',
-        support_html:true,
-        mode:'full',
-      });
-      jm.show(initialData);
-      jmContainer.appendChild(overlay);
-      syncOverlaySize();
-      if(!jm.get_selected_node() && initialData && initialData.data){
-        jm.select_node(initialData.data.id);
-      }
-      function syncOverlaySize(){
-        const rect=jmContainer.getBoundingClientRect();
-        const width=Math.max(rect.width,1);
-        const height=Math.max(rect.height,1);
-        overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
-      }
-      syncOverlaySize();
-      window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
-      document.addEventListener('scroll',()=>requestAnimationFrame(syncOverlaySize), true);
-      const dragHandle=document.createElement('div');
-      dragHandle.id='node-handle';
-      dragHandle.textContent='+';
-      document.body.appendChild(dragHandle);
-      let handleSource=null;
-      let pointerDragState=null;
-      function hideHandle(){ dragHandle.classList.remove('show','dragging'); handleSource=null; hideGhost(); pointerDragState=null; }
-      function updateHandlePosition(){
-        const node=jm.get_selected_node();
-        if(!node){ hideHandle(); return; }
-        const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
-        if(!el){ hideHandle(); return; }
-        const rect=el.getBoundingClientRect();
-        dragHandle.style.left=`${rect.right + 8 + window.scrollX}px`;
-        dragHandle.style.top=`${rect.top + rect.height/2 - 14 + window.scrollY}px`;
-        dragHandle.classList.add('show');
-        handleSource=node;
+    if(!JsMindCtor){
+      disableMindmapUI('思维导图引擎加载失败，请稍后重试');
+    } else {
+      const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      overlay.id='drag-overlay';
+      overlay.setAttribute('width','100%');
+      overlay.setAttribute('height','100%');
+      overlay.setAttribute('viewBox','0 0 100 100');
+      const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+      ghostLine.setAttribute('opacity','0');
+      const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ghostRing.setAttribute('opacity','0');
+      overlay.appendChild(ghostLine);
+      overlay.appendChild(ghostRing);
+      const jm=new JsMindCtor({
+        container:'jsmind-container',
+        editable:true,
+          theme:'fresh-blue',
+          support_html:true,
+          mode:'full',
+        });
+        jm.show(initialData);
+        jmContainer.appendChild(overlay);
         syncOverlaySize();
-      }
-      function svgPointFromClient(x,y){
-        const matrix=overlay.getScreenCTM();
-        if(!matrix){ return {x,y}; }
-        const pt=overlay.createSVGPoint();
-        pt.x=x;
-        pt.y=y;
-        const result=pt.matrixTransform(matrix.inverse());
-        return {x:result.x, y:result.y};
-      }
-      function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
-      function nodeCenterSvg(nodeId){
-        if(!nodeId) return null;
-        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
-        if(!el) return null;
-        const rect=el.getBoundingClientRect();
-        return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
-      }
-      function showGhost(start,end){
-        if(!start || !end){ hideGhost(); return; }
-        ghostLine.setAttribute('x1', start.x);
-        ghostLine.setAttribute('y1', start.y);
-        ghostLine.setAttribute('x2', end.x);
-        ghostLine.setAttribute('y2', end.y);
-        ghostLine.setAttribute('opacity','1');
-        ghostRing.setAttribute('cx', end.x);
-        ghostRing.setAttribute('cy', end.y);
-        ghostRing.setAttribute('r', 16);
-        ghostRing.setAttribute('opacity','1');
-      }
-      function hideGhost(){
-        ghostLine.setAttribute('opacity','0');
-        ghostRing.setAttribute('opacity','0');
-      }
-      dragHandle.addEventListener('pointerdown',e=>{
-        if(!handleSource){ return; }
-        e.preventDefault();
-        const origin=nodeCenterSvg(handleSource.id);
-        if(!origin){ return; }
-        syncOverlaySize();
-        dragHandle.setPointerCapture(e.pointerId);
-        dragHandle.classList.add('dragging');
-        const initialPoint=eventToSvgPoint(e);
-        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
-        showGhost(origin, initialPoint);
-      });
-      function finishPointerDrag(evt, cancelled){
-        if(!pointerDragState || evt.pointerId!==pointerDragState.pointerId) return;
-        const state=pointerDragState;
-        pointerDragState=null;
-        dragHandle.classList.remove('dragging');
-        hideGhost();
-        try{ dragHandle.releasePointerCapture(evt.pointerId); }catch(_){ }
-        if(cancelled){ return; }
-        const source=jm.get_node(state.sourceId);
-        if(!source) return;
-        const hovered=document.elementFromPoint(evt.clientX, evt.clientY);
-        const targetEl=hovered ? hovered.closest('.jsmind-node') : null;
-        if(targetEl){
-          const targetId=targetEl.getAttribute('nodeid');
-          const targetNode=targetId ? jm.get_node(targetId) : null;
-          if(targetNode && targetNode.id!==source.id){
-            executeCreateNodeCommand({
-              parentId:source.id,
-              topic:'🔗 '+targetNode.topic,
-              data:{link:targetNode.id},
-              meta:{relation:true,source:'handle'}
-            });
-            return;
-          }
+        if(!jm.get_selected_node() && initialData && initialData.data){
+          jm.select_node(initialData.data.id);
         }
-        const dropPoint=eventToSvgPoint(evt);
-        executeCreateNodeCommand({ parentId:source.id, topic:'子节点', position:dropPoint, meta:{source:'handle'} });
-      }
-      window.addEventListener('pointermove',e=>{
-        if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
-        const hovered=document.elementFromPoint(e.clientX, e.clientY);
-        let ringPoint=eventToSvgPoint(e);
-        if(hovered){
-          const targetEl=hovered.closest('.jsmind-node');
+        function syncOverlaySize(){
+          const rect=jmContainer.getBoundingClientRect();
+          const width=Math.max(rect.width,1);
+          const height=Math.max(rect.height,1);
+          overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
+        }
+        syncOverlaySize();
+        window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
+        document.addEventListener('scroll',()=>requestAnimationFrame(syncOverlaySize), true);
+        const dragHandle=document.createElement('div');
+        dragHandle.id='node-handle';
+        dragHandle.textContent='+';
+        document.body.appendChild(dragHandle);
+        let handleSource=null;
+        let pointerDragState=null;
+        function hideHandle(){ dragHandle.classList.remove('show','dragging'); handleSource=null; hideGhost(); pointerDragState=null; }
+        function updateHandlePosition(){
+          const node=jm.get_selected_node();
+          if(!node){ hideHandle(); return; }
+          const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+          if(!el){ hideHandle(); return; }
+          const rect=el.getBoundingClientRect();
+          dragHandle.style.left=`${rect.right + 8 + window.scrollX}px`;
+          dragHandle.style.top=`${rect.top + rect.height/2 - 14 + window.scrollY}px`;
+          dragHandle.classList.add('show');
+          handleSource=node;
+          syncOverlaySize();
+        }
+        function svgPointFromClient(x,y){
+          const matrix=overlay.getScreenCTM();
+          if(!matrix){ return {x,y}; }
+          const pt=overlay.createSVGPoint();
+          pt.x=x;
+          pt.y=y;
+          const result=pt.matrixTransform(matrix.inverse());
+          return {x:result.x, y:result.y};
+        }
+        function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
+        function nodeCenterSvg(nodeId){
+          if(!nodeId) return null;
+          const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+          if(!el) return null;
+          const rect=el.getBoundingClientRect();
+          return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
+        }
+        function showGhost(start,end){
+          if(!start || !end){ hideGhost(); return; }
+          ghostLine.setAttribute('x1', start.x);
+          ghostLine.setAttribute('y1', start.y);
+          ghostLine.setAttribute('x2', end.x);
+          ghostLine.setAttribute('y2', end.y);
+          ghostLine.setAttribute('opacity','1');
+          ghostRing.setAttribute('cx', end.x);
+          ghostRing.setAttribute('cy', end.y);
+          ghostRing.setAttribute('r', 16);
+          ghostRing.setAttribute('opacity','1');
+        }
+        function hideGhost(){
+          ghostLine.setAttribute('opacity','0');
+          ghostRing.setAttribute('opacity','0');
+        }
+        dragHandle.addEventListener('pointerdown',e=>{
+          if(!handleSource){ return; }
+          e.preventDefault();
+          const origin=nodeCenterSvg(handleSource.id);
+          if(!origin){ return; }
+          syncOverlaySize();
+          dragHandle.setPointerCapture(e.pointerId);
+          dragHandle.classList.add('dragging');
+          const initialPoint=eventToSvgPoint(e);
+          pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
+          showGhost(origin, initialPoint);
+        });
+        function finishPointerDrag(evt, cancelled){
+          if(!pointerDragState || evt.pointerId!==pointerDragState.pointerId) return;
+          const state=pointerDragState;
+          pointerDragState=null;
+          dragHandle.classList.remove('dragging');
+          hideGhost();
+          try{ dragHandle.releasePointerCapture(evt.pointerId); }catch(_){ }
+          if(cancelled){ return; }
+          const source=jm.get_node(state.sourceId);
+          if(!source) return;
+          const hovered=document.elementFromPoint(evt.clientX, evt.clientY);
+          const targetEl=hovered ? hovered.closest('.jsmind-node') : null;
           if(targetEl){
             const targetId=targetEl.getAttribute('nodeid');
-            const center=nodeCenterSvg(targetId);
-            if(center) ringPoint=center;
+            const targetNode=targetId ? jm.get_node(targetId) : null;
+            if(targetNode && targetNode.id!==source.id){
+              executeCreateNodeCommand({
+                parentId:source.id,
+                topic:'🔗 '+targetNode.topic,
+                data:{link:targetNode.id},
+                meta:{relation:true,source:'handle'}
+              });
+              return;
+            }
           }
+          const dropPoint=eventToSvgPoint(evt);
+          executeCreateNodeCommand({ parentId:source.id, topic:'子节点', position:dropPoint, meta:{source:'handle'} });
         }
-        pointerDragState.lastPoint=ringPoint;
-        showGhost(pointerDragState.origin, ringPoint);
-      });
-      window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
-      window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
-      window.addEventListener('resize',()=>requestAnimationFrame(updateHandlePosition));
-      document.addEventListener('scroll',()=>requestAnimationFrame(updateHandlePosition), true);
-      requestAnimationFrame(updateHandlePosition);
-      const titleInput=document.getElementById('map-title');
-      const desktopSaveBtn=document.getElementById('btn-save');
-      const saveState=document.getElementById('save-state');
-      const importInput=document.getElementById('import-input');
-      let dirty=false;
-      const commandLog=[];
-      window.__mindmapCommands=commandLog;
-      const saveButtons=[desktopSaveBtn,mobileSaveBtn];
-      let saveButtonTimer=null;
-      let revertSaveBtnTimer=null;
-      function updateMobileTitle(){ if(mobileTitleText){ mobileTitleText.textContent=(titleInput.value.trim()||'未命名导图'); } }
-      function updateMobileSelected(){
-        if(!mobileSelectedTopic) return;
-        const node=jm.get_selected_node();
-        if(node){
-          const raw=typeof node.topic==='string' ? node.topic : '';
-          const text=raw.replace(/<[^>]*>/g,'').trim() || '未命名';
-          mobileSelectedTopic.textContent='选中：'+text;
-        }
-        else { mobileSelectedTopic.textContent='未选中节点'; }
-      }
-      function setSaveButtonsState(state){
-        const disableMap={idle:true, dirty:false, saving:true, saved:true};
-        saveButtons.forEach(btn=>{
-          if(!btn) return;
-          if(!btn.dataset.baseLabel){ btn.dataset.baseLabel=(btn.textContent||'保存').trim() || '保存'; }
-          btn.classList.remove('is-loading','is-success','is-dirty');
-          if(state in disableMap){ btn.disabled=disableMap[state]; }
-          if(state==='saving'){
-            btn.classList.add('is-loading');
-            btn.innerHTML='<span class="btn-spinner" aria-hidden="true"></span><span style="margin-left:6px">保存中…</span>';
-          } else if(state==='saved'){
-            btn.classList.add('is-success');
-            btn.textContent='保存成功';
-          } else if(state==='dirty'){
-            btn.classList.add('is-dirty');
-            btn.textContent=btn.dataset.baseLabel+'*';
-          } else {
-            btn.textContent=btn.dataset.baseLabel;
+        window.addEventListener('pointermove',e=>{
+          if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
+          const hovered=document.elementFromPoint(e.clientX, e.clientY);
+          let ringPoint=eventToSvgPoint(e);
+          if(hovered){
+            const targetEl=hovered.closest('.jsmind-node');
+            if(targetEl){
+              const targetId=targetEl.getAttribute('nodeid');
+              const center=nodeCenterSvg(targetId);
+              if(center) ringPoint=center;
+            }
           }
+          pointerDragState.lastPoint=ringPoint;
+          showGhost(pointerDragState.origin, ringPoint);
         });
-      }
-      let toastTimer=null;
-      function showToast(message){
-        if(!toastEl) return;
-        toastEl.textContent=message;
-        toastEl.classList.add('show');
-        if(toastTimer) clearTimeout(toastTimer);
-        toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2200);
-      }
-      function markDirty(){
-        dirty=true;
-        saveState.textContent='未保存';
-        saveState.classList.add('show','dirty');
-        if(revertSaveBtnTimer){ clearTimeout(revertSaveBtnTimer); revertSaveBtnTimer=null; }
-        setSaveButtonsState('dirty');
-      }
-      function markSaved(){
-        dirty=false;
-        saveState.textContent='保存成功';
-        saveState.classList.add('show');
-        saveState.classList.remove('dirty');
-        if(saveButtonTimer) clearTimeout(saveButtonTimer);
-        saveButtonTimer=setTimeout(()=>saveState.classList.remove('show'),1500);
-        setSaveButtonsState('saved');
-        if(revertSaveBtnTimer) clearTimeout(revertSaveBtnTimer);
-        revertSaveBtnTimer=setTimeout(()=>{ setSaveButtonsState('idle'); revertSaveBtnTimer=null; },1700);
-        showToast('保存成功');
-      }
-      function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
-      function ensureNode(){
-        let node=jm.get_selected_node();
-        if(node) return node;
-        if(typeof jm.get_root === 'function'){ node=jm.get_root(); }
-        if(!node && initialData && initialData.data){ jm.select_node(initialData.data.id); node=jm.get_selected_node(); }
-        if(node && !node.selected){ jm.select_node(node.id); node=jm.get_selected_node(); }
-        return node;
-      }
-      function executeCreateNodeCommand(input){
-        if(!input || !input.parentId) return null;
-        const parent=jm.get_node(input.parentId);
-        if(!parent) return null;
-        const nodeId=input.id || randomId();
-        const payloadData=deepClone(input.data);
-        const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
-        const style=deepClone(input.style);
-        if(style && (style.background || style.foreground)){
-          jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
-        }
-        if(input.position){
-          newNode.data = newNode.data || {};
-          newNode.data.position = {x:input.position.x, y:input.position.y};
-        }
-        const command={
-          type:'createNode',
-          id:newNode.id,
-          parentId:parent.id,
-          topic:input.topic || '新节点',
-          data:deepClone(input.data),
-          style:deepClone(input.style),
-          position:input.position ? {x:input.position.x, y:input.position.y} : null,
-          timestamp:Date.now(),
-          meta:deepClone(input.meta)
-        };
-        commandLog.push(command);
-        window.__mindmapCommands=commandLog;
-        jm.select_node(newNode.id);
-        updateMobileSelected();
-        markDirty();
+        window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
+        window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
+        window.addEventListener('resize',()=>requestAnimationFrame(updateHandlePosition));
+        document.addEventListener('scroll',()=>requestAnimationFrame(updateHandlePosition), true);
         requestAnimationFrame(updateHandlePosition);
-        return newNode;
-      }
-      function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
-      function isProbablyUrl(text){
-        const value=(text||'').trim();
-        return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
-      }
-      function findNodeElementByEvent(event){
-        if(!event || !event.target) return null;
-        return event.target.closest ? event.target.closest('.jsmind-node') : null;
-      }
-      function resolveDropParent(event){
-        const el=findNodeElementByEvent(event);
-        if(el){
-          const nodeId=el.getAttribute('nodeid');
-          if(nodeId){ const node=jm.get_node(nodeId); if(node) return node; }
-        }
-        const selected=jm.get_selected_node();
-        if(selected) return selected;
-        return jm.get_root();
-      }
-      function isAllowedAttachment(file){
-        if(!file) return false;
-        const type=(file.type||'').toLowerCase();
-        const name=(file.name||'').toLowerCase();
-        const typeRules=[/^image\//,/^video\//,/^text\//];
-        const exactTypes=['application/pdf','application/zip','application/x-zip-compressed'];
-        const extAllow=['.pdf','.zip','.txt','.md','.markdown','.csv','.log'];
-        if(exactTypes.includes(type)) return true;
-        if(typeRules.some(rule=>rule.test(type))) return true;
-        return extAllow.some(ext=>name.endsWith(ext));
-      }
-      function stripTopicText(topic){
-        return (typeof topic==='string'?topic:'').replace(/<[^>]*>/g,'').trim();
-      }
-      function determineAttachmentPlacement(anchor){
-        let node=anchor || ensureNode();
-        if(!node) node = jm.get_root();
-        if(!node) return null;
-        if(!node.parent || node.isroot){
-          return {parent:node, mode:'child'};
-        }
-        const label=stripTopicText(node.topic)||'当前节点';
-        const chooseSibling=window.confirm(`将内容作为「${label}」的同级节点？\n确定：同级 · 取消：子级`);
-        if(chooseSibling && node.parent){
-          return {parent:node.parent, mode:'sibling'};
-        }
-        return {parent:node, mode:'child'};
-      }
-      function handleDroppedText(text, parent, event){
-        if(!text || !parent) return;
-        const cleaned=text.trim();
-        if(!cleaned) return;
-        const firstLine=cleaned.split(/\r?\n/)[0].slice(0,100) || '新节点';
-        const data={};
-        if(isProbablyUrl(cleaned)) data.url=cleaned;
-        if(cleaned.includes('\n')) data.note=cleaned;
-        executeCreateNodeCommand({
-          parentId:parent.id,
-          topic:firstLine,
-          data:Object.keys(data).length?data:null,
-          position:event ? eventToSvgPoint(event) : null,
-          meta:{source:'text'}
-        });
-      }
-      function handleDroppedFiles(files, baseNode, event, placementOverride){
-        if(!files || !files.length) return;
-        const list=Array.from(files).slice(0,5);
-        const invalid=[];
-        const oversize=[];
-        const valid=[];
-        list.forEach(file=>{
-          if(!isAllowedAttachment(file)){ invalid.push(file.name); return; }
-          if(file.size>15*1024*1024){ oversize.push(file.name); return; }
-          valid.push(file);
-        });
-        if(invalid.length){ alert('不支持上传文件：'+invalid.join('、')); }
-        if(oversize.length){ alert('以下文件超过 15MB：'+oversize.join('、')); }
-        if(!valid.length) return;
-        const placement=placementOverride || determineAttachmentPlacement(baseNode);
-        if(!placement || !placement.parent) return;
-        const basePoint=event ? eventToSvgPoint(event) : null;
-        valid.forEach((file,idx)=>{
-          const reader=new FileReader();
-          reader.onload=evt=>{
-            const dataUrl=evt.target.result;
-            const data={
-              attachment:{
-                name:file.name,
-                size:file.size,
-                type=file.type || 'application/octet-stream',
-                content:dataUrl,
-              }
-            };
-            const offset=basePoint ? {x:basePoint.x + idx*18, y:basePoint.y + idx*18} : null;
-            executeCreateNodeCommand({
-              parentId:placement.parent.id,
-              topic:'📎 '+file.name,
-              data:data,
-              position:offset,
-              meta:{source:'file', placement:placement.mode}
-            });
-          };
-          reader.readAsDataURL(file);
-        });
-      }
-      function addSiblingNode(){
-        const node=ensureNode(); if(!node || node.isroot) return;
-        if(node.parent){ executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' }); }
-      }
-      function addChildNode(){
-        const node=ensureNode();
-        if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
-      }
-      function deleteSelectedNode(){
-        const node=ensureNode(); if(!node || node.isroot) return;
-        jm.remove_node(node.id);
-        markDirty();
-        requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
-      }
-      function callView(method, ...args){
-        if(jm.view && typeof jm.view[method] === 'function'){
-          try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
-        }
-        return false;
-      }
-      function fitView(){
-        if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-          callView('set_zoom', 1);
-          if(!callView('move_to_center')) callView('center_root');
-        }
-      }
-      function centerView(){ if(!callView('move_to_center')) callView('center_root'); }
-      function zoomIn(){ if(!callView('zoomIn')) callView('zoom_in'); }
-      function zoomOut(){ if(!callView('zoomOut')) callView('zoom_out'); }
-      function collapseSelected(){
-        const node=ensureNode();
-        if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); }); }
-      }
-      document.getElementById('btn-add-sibling').onclick=addSiblingNode;
-      document.getElementById('btn-add-child').onclick=addChildNode;
-      document.getElementById('btn-delete').onclick=deleteSelectedNode;
-      document.getElementById('btn-fit').onclick=fitView;
-      document.getElementById('btn-center').onclick=centerView;
-      document.getElementById('btn-zoom-in').onclick=zoomIn;
-      document.getElementById('btn-zoom-out').onclick=zoomOut;
-      document.getElementById('btn-collapse').onclick=collapseSelected;
-      if(attachFileBtn && attachFileInput){
-        attachFileBtn.addEventListener('click',()=>{
-          attachFileInput.value='';
-          attachFileInput.click();
-          if(mobileMedia.matches) closeMobileSidebar();
-        });
-        attachFileInput.addEventListener('change',e=>{
-          const file=e.target.files && e.target.files[0];
-          if(!file){ e.target.value=''; return; }
-          if(!isAllowedAttachment(file)){
-            alert('不支持上传文件：'+file.name);
-            e.target.value='';
-            return;
+        const titleInput=document.getElementById('map-title');
+        let dirty=false;
+        const commandLog=[];
+        window.__mindmapCommands=commandLog;
+        const saveButtons=[desktopSaveBtn,mobileSaveBtn];
+        let saveButtonTimer=null;
+        let revertSaveBtnTimer=null;
+        function updateMobileTitle(){ if(mobileTitleText){ mobileTitleText.textContent=(titleInput.value.trim()||'未命名导图'); } }
+        function updateMobileSelected(){
+          if(!mobileSelectedTopic) return;
+          const node=jm.get_selected_node();
+          if(node){
+            const raw=typeof node.topic==='string' ? node.topic : '';
+            const text=raw.replace(/<[^>]*>/g,'').trim() || '未命名';
+            mobileSelectedTopic.textContent='选中：'+text;
           }
-          if(file.size>15*1024*1024){
-            alert(file.name+' 超过 15MB，已取消。');
-            e.target.value='';
-            return;
-          }
-          const placement=determineAttachmentPlacement(ensureNode());
-          if(!placement || !placement.parent){ e.target.value=''; return; }
-          handleDroppedFiles([file], placement.parent, null, placement);
-          e.target.value='';
-        });
-      }
-      function promptLinkAttachment(){
-        const anchor=ensureNode() || jm.get_root();
-        if(!anchor) return;
-        const raw=window.prompt('请输入链接地址（支持 http/https/mailto/ftp）：');
-        if(!raw) return;
-        const trimmed=raw.trim();
-        if(!trimmed) return;
-        let normalized='';
-        if(/^(https?:\/\/|mailto:|ftp:\/\/)/i.test(trimmed)) normalized=trimmed;
-        else if(trimmed.toLowerCase().startsWith('www.')) normalized='https://'+trimmed;
-        if(!normalized){ alert('请输入有效的链接地址'); return; }
-        let hostnameHint='链接';
-        try{
-          const urlObj=new URL(normalized);
-          hostnameHint=(urlObj.hostname||hostnameHint).replace(/^www\./i,'');
-        }catch(_){ hostnameHint=trimmed; }
-        const title=window.prompt('请输入链接标题（可选）', hostnameHint) || '';
-        const label=(title.trim() || hostnameHint || '链接').slice(0,40);
-        const placement=determineAttachmentPlacement(anchor);
-        if(!placement || !placement.parent) return;
-        executeCreateNodeCommand({
-          parentId:placement.parent.id,
-          topic:'🔗 '+label,
-          data:{url:normalized},
-          meta:{source:'link', placement:placement.mode}
-        });
-        if(mobileMedia.matches) closeMobileSidebar();
-      }
-      if(attachLinkBtn){ attachLinkBtn.addEventListener('click', promptLinkAttachment); }
-      if(mobileCommandBar){
-        const mobileActions={
-          sibling:addSiblingNode,
-          child:addChildNode,
-          collapse:collapseSelected,
-          center:centerView,
-          fit:fitView,
-          delete:deleteSelectedNode,
-          'attach-file':()=>{ if(attachFileBtn){ attachFileBtn.click(); } },
-          'attach-link':promptLinkAttachment,
-        };
-        mobileCommandBar.addEventListener('click',evt=>{
-          const btn=evt.target.closest('button[data-action]');
-          if(!btn) return;
-          const action=(btn.dataset.action||'').toLowerCase();
-          if(mobileActions[action]) mobileActions[action]();
-        });
-      }
-      if(jmContainer){ jmContainer.addEventListener('pointerdown',()=>closeMobileSidebar()); }
-      jmContainer.addEventListener('dragenter',e=>{
-        e.preventDefault();
-        jmContainer.classList.add('dragover');
-      });
-      jmContainer.addEventListener('dragleave',e=>{
-        if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); }
-      });
-      jmContainer.addEventListener('dragover',e=>{
-        e.preventDefault();
-        e.dataTransfer.dropEffect='copy';
-      });
-      jmContainer.addEventListener('drop',e=>{
-        e.preventDefault();
-        jmContainer.classList.remove('dragover');
-        syncOverlaySize();
-        const parent=resolveDropParent(e);
-        const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
-        if(files.length){
-          handleDroppedFiles(files, parent, e);
-          return;
+          else { mobileSelectedTopic.textContent='未选中节点'; }
         }
-        const uri=e.dataTransfer.getData('text/uri-list');
-        let text='';
-        if(uri){ text=uri; } else { text=e.dataTransfer.getData('text/plain') || ''; }
-        if(text){
-          handleDroppedText(text, parent, e);
+        function setSaveButtonsState(state){
+          const disableMap={idle:true, dirty:false, saving:true, saved:true};
+          saveButtons.forEach(btn=>{
+            if(!btn) return;
+            if(!btn.dataset.baseLabel){ btn.dataset.baseLabel=(btn.textContent||'保存').trim() || '保存'; }
+            btn.classList.remove('is-loading','is-success','is-dirty');
+            if(state in disableMap){ btn.disabled=disableMap[state]; }
+            if(state==='saving'){
+              btn.classList.add('is-loading');
+              btn.innerHTML='<span class="btn-spinner" aria-hidden="true"></span><span style="margin-left:6px">保存中…</span>';
+            } else if(state==='saved'){
+              btn.classList.add('is-success');
+              btn.textContent='保存成功';
+            } else if(state==='dirty'){
+              btn.classList.add('is-dirty');
+              btn.textContent=btn.dataset.baseLabel+'*';
+            } else {
+              btn.textContent=btn.dataset.baseLabel;
+            }
+          });
         }
-      });
-      titleInput.addEventListener('input',()=>{ markDirty(); updateMobileTitle(); });
-      updateMobileTitle();
-      updateMobileSelected();
-      setSaveButtonsState('idle');
-      if(window.jsMind && jsMind.event_type){
-        jm.add_event_listener(type=>{
-          if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
-            requestAnimationFrame(updateHandlePosition);
-          }
-          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
-          requestAnimationFrame(updateMobileSelected);
-        });
-      }
-      document.getElementById('btn-export-json').onclick=()=>{
-        const data=jm.get_data('node_tree');
-        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;
-        a.download=(titleInput.value.trim()||'mindmap')+'.json';
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(url), 1000);
-      };
-      document.getElementById('btn-import-json').onclick=()=>importInput.click();
-      importInput.addEventListener('change', e=>{
-        const file=e.target.files[0]; if(!file) return;
-        const reader=new FileReader();
-        reader.onload=evt=>{
-          try{
-            const json=JSON.parse(evt.target.result);
-            if(json && json.data){ jm.show(json); initialData=JSON.parse(JSON.stringify(json)); markDirty(); }
-            else alert('文件格式不兼容');
-          }catch(err){ alert('无法解析 JSON：'+err.message); }
-        };
-        reader.readAsText(file,'utf-8');
-      });
-      document.getElementById('btn-save').onclick=saveMindmap;
-      if(mobileSaveBtn){ mobileSaveBtn.addEventListener('click', saveMindmap); }
-      async function saveMindmap(){
-        const title=titleInput.value.trim()||'未命名导图';
-        const payload=JSON.stringify(jm.get_data('node_tree'));
-        const fd=new FormData();
-        fd.append('action','save_mindmap');
-        fd.append('id', document.getElementById('jsmind-container').dataset.mapId || '0');
-        fd.append('title', title);
-        fd.append('content', payload);
-        try{
-          setSaveButtonsState('saving');
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('网络异常');
-          const json=await res.json();
-          if(!json.ok) throw new Error(json.error||'保存失败');
-          document.getElementById('jsmind-container').dataset.mapId=json.id;
-          history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
-          initialData=JSON.parse(payload);
-          markSaved();
-        }catch(err){
-          alert(err.message||'保存失败');
+        function markDirty(){
+          dirty=true;
+          saveState.textContent='未保存';
+          saveState.classList.add('show','dirty');
+          if(revertSaveBtnTimer){ clearTimeout(revertSaveBtnTimer); revertSaveBtnTimer=null; }
           setSaveButtonsState('dirty');
         }
-      }
-      window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
+        function markSaved(){
+          dirty=false;
+          saveState.textContent='保存成功';
+          saveState.classList.add('show');
+          saveState.classList.remove('dirty');
+          if(saveButtonTimer) clearTimeout(saveButtonTimer);
+          saveButtonTimer=setTimeout(()=>saveState.classList.remove('show'),1500);
+          setSaveButtonsState('saved');
+          if(revertSaveBtnTimer) clearTimeout(revertSaveBtnTimer);
+          revertSaveBtnTimer=setTimeout(()=>{ setSaveButtonsState('idle'); revertSaveBtnTimer=null; },1700);
+          showToast('保存成功');
+        }
+        function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
+        function ensureNode(){
+          let node=jm.get_selected_node();
+          if(node) return node;
+          if(typeof jm.get_root === 'function'){ node=jm.get_root(); }
+          if(!node && initialData && initialData.data){ jm.select_node(initialData.data.id); node=jm.get_selected_node(); }
+          if(node && !node.selected){ jm.select_node(node.id); node=jm.get_selected_node(); }
+          return node;
+        }
+        function executeCreateNodeCommand(input){
+          if(!input || !input.parentId) return null;
+          const parent=jm.get_node(input.parentId);
+          if(!parent) return null;
+          const nodeId=input.id || randomId();
+          const payloadData=deepClone(input.data);
+          const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
+          const style=deepClone(input.style);
+          if(style && (style.background || style.foreground)){
+            jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
+          }
+          if(input.position){
+            newNode.data = newNode.data || {};
+            newNode.data.position = {x:input.position.x, y:input.position.y};
+          }
+          const command={
+            type:'createNode',
+            id:newNode.id,
+            parentId:parent.id,
+            topic:input.topic || '新节点',
+            data:deepClone(input.data),
+            style:deepClone(input.style),
+            position:input.position ? {x:input.position.x, y:input.position.y} : null,
+            timestamp:Date.now(),
+            meta:deepClone(input.meta)
+          };
+          commandLog.push(command);
+          window.__mindmapCommands=commandLog;
+          jm.select_node(newNode.id);
+          updateMobileSelected();
+          markDirty();
+          requestAnimationFrame(updateHandlePosition);
+          return newNode;
+        }
+        function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
+        function isProbablyUrl(text){
+          const value=(text||'').trim();
+          return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
+        }
+        function findNodeElementByEvent(event){
+          if(!event || !event.target) return null;
+          return event.target.closest ? event.target.closest('.jsmind-node') : null;
+        }
+        function resolveDropParent(event){
+          const el=findNodeElementByEvent(event);
+          if(el){
+            const nodeId=el.getAttribute('nodeid');
+            if(nodeId){ const node=jm.get_node(nodeId); if(node) return node; }
+          }
+          const selected=jm.get_selected_node();
+          if(selected) return selected;
+          return jm.get_root();
+        }
+        function isAllowedAttachment(file){
+          if(!file) return false;
+          const type=(file.type||'').toLowerCase();
+          const name=(file.name||'').toLowerCase();
+          const typeRules=[/^image\//,/^video\//,/^text\//];
+          const exactTypes=['application/pdf','application/zip','application/x-zip-compressed'];
+          const extAllow=['.pdf','.zip','.txt','.md','.markdown','.csv','.log'];
+          if(exactTypes.includes(type)) return true;
+          if(typeRules.some(rule=>rule.test(type))) return true;
+          return extAllow.some(ext=>name.endsWith(ext));
+        }
+        function stripTopicText(topic){
+          return (typeof topic==='string'?topic:'').replace(/<[^>]*>/g,'').trim();
+        }
+        function determineAttachmentPlacement(anchor){
+          let node=anchor || ensureNode();
+          if(!node) node = jm.get_root();
+          if(!node) return null;
+          if(!node.parent || node.isroot){
+            return {parent:node, mode:'child'};
+          }
+          const label=stripTopicText(node.topic)||'当前节点';
+          const chooseSibling=window.confirm(`将内容作为「${label}」的同级节点？\n确定：同级 · 取消：子级`);
+          if(chooseSibling && node.parent){
+            return {parent:node.parent, mode:'sibling'};
+          }
+          return {parent:node, mode:'child'};
+        }
+        function handleDroppedText(text, parent, event){
+          if(!text || !parent) return;
+          const cleaned=text.trim();
+          if(!cleaned) return;
+          const firstLine=cleaned.split(/\r?\n/)[0].slice(0,100) || '新节点';
+          const data={};
+          if(isProbablyUrl(cleaned)) data.url=cleaned;
+          if(cleaned.includes('\n')) data.note=cleaned;
+          executeCreateNodeCommand({
+            parentId:parent.id,
+            topic:firstLine,
+            data:Object.keys(data).length?data:null,
+            position:event ? eventToSvgPoint(event) : null,
+            meta:{source:'text'}
+          });
+        }
+        function handleDroppedFiles(files, baseNode, event, placementOverride){
+          if(!files || !files.length) return;
+          const list=Array.from(files).slice(0,5);
+          const invalid=[];
+          const oversize=[];
+          const valid=[];
+          list.forEach(file=>{
+            if(!isAllowedAttachment(file)){ invalid.push(file.name); return; }
+            if(file.size>15*1024*1024){ oversize.push(file.name); return; }
+            valid.push(file);
+          });
+          if(invalid.length){ alert('不支持上传文件：'+invalid.join('、')); }
+          if(oversize.length){ alert('以下文件超过 15MB：'+oversize.join('、')); }
+          if(!valid.length) return;
+          const placement=placementOverride || determineAttachmentPlacement(baseNode);
+          if(!placement || !placement.parent) return;
+          const basePoint=event ? eventToSvgPoint(event) : null;
+          valid.forEach((file,idx)=>{
+            const reader=new FileReader();
+            reader.onload=evt=>{
+              const dataUrl=evt.target.result;
+              const data={
+                attachment:{
+                  name:file.name,
+                  size:file.size,
+                  type=file.type || 'application/octet-stream',
+                  content:dataUrl,
+                }
+              };
+              const offset=basePoint ? {x:basePoint.x + idx*18, y:basePoint.y + idx*18} : null;
+              executeCreateNodeCommand({
+                parentId:placement.parent.id,
+                topic:'📎 '+file.name,
+                data:data,
+                position:offset,
+                meta:{source:'file', placement:placement.mode}
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+        function addSiblingNode(){
+          const node=ensureNode(); if(!node || node.isroot) return;
+          if(node.parent){ executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' }); }
+        }
+        function addChildNode(){
+          const node=ensureNode();
+          if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
+        }
+        function deleteSelectedNode(){
+          const node=ensureNode(); if(!node || node.isroot) return;
+          jm.remove_node(node.id);
+          markDirty();
+          requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
+        }
+        function callView(method, ...args){
+          if(jm.view && typeof jm.view[method] === 'function'){
+            try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
+          }
+          return false;
+        }
+        function fitView(){
+          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
+            callView('set_zoom', 1);
+            if(!callView('move_to_center')) callView('center_root');
+          }
+        }
+        function centerView(){ if(!callView('move_to_center')) callView('center_root'); }
+        function zoomIn(){ if(!callView('zoomIn')) callView('zoom_in'); }
+        function zoomOut(){ if(!callView('zoomOut')) callView('zoom_out'); }
+        function collapseSelected(){
+          const node=ensureNode();
+          if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); }); }
+        }
+        document.getElementById('btn-add-sibling').onclick=addSiblingNode;
+        document.getElementById('btn-add-child').onclick=addChildNode;
+        document.getElementById('btn-delete').onclick=deleteSelectedNode;
+        document.getElementById('btn-fit').onclick=fitView;
+        document.getElementById('btn-center').onclick=centerView;
+        document.getElementById('btn-zoom-in').onclick=zoomIn;
+        document.getElementById('btn-zoom-out').onclick=zoomOut;
+        document.getElementById('btn-collapse').onclick=collapseSelected;
+        if(attachFileBtn && attachFileInput){
+          attachFileBtn.addEventListener('click',()=>{
+            attachFileInput.value='';
+            attachFileInput.click();
+            if(mobileMedia.matches) closeMobileSidebar();
+          });
+          attachFileInput.addEventListener('change',e=>{
+            const file=e.target.files && e.target.files[0];
+            if(!file){ e.target.value=''; return; }
+            if(!isAllowedAttachment(file)){
+              alert('不支持上传文件：'+file.name);
+              e.target.value='';
+              return;
+            }
+            if(file.size>15*1024*1024){
+              alert(file.name+' 超过 15MB，已取消。');
+              e.target.value='';
+              return;
+            }
+            const placement=determineAttachmentPlacement(ensureNode());
+            if(!placement || !placement.parent){ e.target.value=''; return; }
+            handleDroppedFiles([file], placement.parent, null, placement);
+            e.target.value='';
+          });
+        }
+        function promptLinkAttachment(){
+          const anchor=ensureNode() || jm.get_root();
+          if(!anchor) return;
+          const raw=window.prompt('请输入链接地址（支持 http/https/mailto/ftp）：');
+          if(!raw) return;
+          const trimmed=raw.trim();
+          if(!trimmed) return;
+          let normalized='';
+          if(/^(https?:\/\/|mailto:|ftp:\/\/)/i.test(trimmed)) normalized=trimmed;
+          else if(trimmed.toLowerCase().startsWith('www.')) normalized='https://'+trimmed;
+          if(!normalized){ alert('请输入有效的链接地址'); return; }
+          let hostnameHint='链接';
+          try{
+            const urlObj=new URL(normalized);
+            hostnameHint=(urlObj.hostname||hostnameHint).replace(/^www\./i,'');
+          }catch(_){ hostnameHint=trimmed; }
+          const title=window.prompt('请输入链接标题（可选）', hostnameHint) || '';
+          const label=(title.trim() || hostnameHint || '链接').slice(0,40);
+          const placement=determineAttachmentPlacement(anchor);
+          if(!placement || !placement.parent) return;
+          executeCreateNodeCommand({
+            parentId:placement.parent.id,
+            topic:'🔗 '+label,
+            data:{url:normalized},
+            meta:{source:'link', placement:placement.mode}
+          });
+          if(mobileMedia.matches) closeMobileSidebar();
+        }
+        if(attachLinkBtn){ attachLinkBtn.addEventListener('click', promptLinkAttachment); }
+        if(mobileCommandBar){
+          const mobileActions={
+            sibling:addSiblingNode,
+            child:addChildNode,
+            collapse:collapseSelected,
+            center:centerView,
+            fit:fitView,
+            delete:deleteSelectedNode,
+            'attach-file':()=>{ if(attachFileBtn){ attachFileBtn.click(); } },
+            'attach-link':promptLinkAttachment,
+          };
+          mobileCommandBar.addEventListener('click',evt=>{
+            const btn=evt.target.closest('button[data-action]');
+            if(!btn) return;
+            const action=(btn.dataset.action||'').toLowerCase();
+            if(mobileActions[action]) mobileActions[action]();
+          });
+        }
+        if(jmContainer){ jmContainer.addEventListener('pointerdown',()=>closeMobileSidebar()); }
+        jmContainer.addEventListener('dragenter',e=>{
+          e.preventDefault();
+          jmContainer.classList.add('dragover');
+        });
+        jmContainer.addEventListener('dragleave',e=>{
+          if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); }
+        });
+        jmContainer.addEventListener('dragover',e=>{
+          e.preventDefault();
+          e.dataTransfer.dropEffect='copy';
+        });
+        jmContainer.addEventListener('drop',e=>{
+          e.preventDefault();
+          jmContainer.classList.remove('dragover');
+          syncOverlaySize();
+          const parent=resolveDropParent(e);
+          const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
+          if(files.length){
+            handleDroppedFiles(files, parent, e);
+            return;
+          }
+          const uri=e.dataTransfer.getData('text/uri-list');
+          let text='';
+          if(uri){ text=uri; } else { text=e.dataTransfer.getData('text/plain') || ''; }
+          if(text){
+            handleDroppedText(text, parent, e);
+          }
+        });
+        titleInput.addEventListener('input',()=>{ markDirty(); updateMobileTitle(); });
+        updateMobileTitle();
+        updateMobileSelected();
+        setSaveButtonsState('idle');
+        const jsMindEvents=(JsMindCtor && JsMindCtor.event_type) || (window.jsMind && window.jsMind.event_type) || (window.jsmind && window.jsmind.event_type) || null;
+        if(jsMindEvents){
+          jm.add_event_listener(type=>{
+            if(type===jsMindEvents.select || type===jsMindEvents.refresh || type===jsMindEvents.after_edit || type===jsMindEvents.show){
+              requestAnimationFrame(updateHandlePosition);
+            }
+            if(type===jsMindEvents.edit || type===jsMindEvents.after_edit || type===jsMindEvents.update){ markDirty(); }
+            requestAnimationFrame(updateMobileSelected);
+          });
+        }
+        document.getElementById('btn-export-json').onclick=()=>{
+          const data=jm.get_data('node_tree');
+          const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.href=url;
+          a.download=(titleInput.value.trim()||'mindmap')+'.json';
+          a.click();
+          setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        };
+        document.getElementById('btn-import-json').onclick=()=>importInput.click();
+        importInput.addEventListener('change', e=>{
+          const file=e.target.files[0]; if(!file) return;
+          const reader=new FileReader();
+          reader.onload=evt=>{
+            try{
+              const json=JSON.parse(evt.target.result);
+              if(json && json.data){ jm.show(json); initialData=JSON.parse(JSON.stringify(json)); markDirty(); }
+              else alert('文件格式不兼容');
+            }catch(err){ alert('无法解析 JSON：'+err.message); }
+          };
+          reader.readAsText(file,'utf-8');
+        });
+        document.getElementById('btn-save').onclick=saveMindmap;
+        if(mobileSaveBtn){ mobileSaveBtn.addEventListener('click', saveMindmap); }
+        async function saveMindmap(){
+          const title=titleInput.value.trim()||'未命名导图';
+          const payload=JSON.stringify(jm.get_data('node_tree'));
+          const fd=new FormData();
+          fd.append('action','save_mindmap');
+          fd.append('id', document.getElementById('jsmind-container').dataset.mapId || '0');
+          fd.append('title', title);
+          fd.append('content', payload);
+          try{
+            setSaveButtonsState('saving');
+            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            if(!res.ok) throw new Error('网络异常');
+            const json=await res.json();
+            if(!json.ok) throw new Error(json.error||'保存失败');
+            document.getElementById('jsmind-container').dataset.mapId=json.id;
+            history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+            initialData=JSON.parse(payload);
+            markSaved();
+          }catch(err){
+            alert(err.message||'保存失败');
+            setSaveButtonsState('dirty');
+          }
+        }
+        window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
+    }
     </script>
   </body>
   </html>
