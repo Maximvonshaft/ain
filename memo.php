@@ -1375,15 +1375,15 @@ if ($view === 'map_edit') {
       .map-toolbar button{padding:8px 10px;border-radius:10px;border:0;background:rgba(15,23,42,.65);color:#fff;font-size:12px;cursor:pointer}
       .map-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e2e8f0;text-align:center;padding:40px 24px;font-size:16px;gap:8px}
       .map-error strong{font-size:20px;color:#f8fafc}
-      .mind-viewport{position:absolute;inset:0;transform-origin:0 0;will-change:transform;}
-      .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
+      .mind-viewport{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+      .mind-links{position:absolute;top:0;left:0;pointer-events:none;transform-origin:0 0;}
       .mind-links path{fill:none;stroke:rgba(148,163,184,.55);stroke-width:2;stroke-linecap:round;transition:stroke .2s ease}
       .mind-links path[data-type="idea"]{stroke:#38bdf8}
       .mind-links path[data-type="task"]{stroke:#f59e0b}
       .mind-links path[data-type="document"]{stroke:#60a5fa}
       .mind-links path[data-type="media"]{stroke:#f472b6}
       .mind-links path[data-type="decision"]{stroke:#34d399}
-      .mind-nodes{position:absolute;inset:0}
+      .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:16px;color:#0f172a;text-align:center;font-weight:700;font-size:14px;line-height:1.45;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease,color .15s ease;min-width:140px;max-width:280px;--node-bg:#f8fafc;--node-border:rgba(148,163,184,.35);--node-shadow:0 18px 32px rgba(15,23,42,.18);--node-accent:#2563eb;background:var(--node-bg);border:1.5px solid var(--node-border);box-shadow:var(--node-shadow)}
       .jsmind-node::before{content:attr(data-icon);font-size:22px;line-height:1;height:22px}
       .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 24px 38px rgba(37,99,235,.18)}
@@ -1457,11 +1457,21 @@ if ($view === 'map_edit') {
       @media (max-width:1100px){
         .mobile-toolbar{position:fixed;left:50%;transform:translateX(-50%);bottom:72px;width:calc(100% - 48px);max-width:520px;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;background:rgba(15,23,42,.82);backdrop-filter:blur(14px);padding:12px;border-radius:20px;z-index:60;box-shadow:0 24px 48px rgba(15,23,42,.38)}
         .mobile-toolbar button{padding:12px 0;border:0;border-radius:12px;background:rgba(255,255,255,.14);color:#f8fafc;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer}
+        .mobile-toolbar button.primary{background:linear-gradient(135deg,rgba(37,99,235,.9),rgba(96,165,250,.9));color:#fff}
         .mobile-toolbar button.danger{background:rgba(248,113,113,.25);color:#fee2e2}
+        .mobile-toolbar button:disabled{opacity:.55;cursor:not-allowed}
         .jsmind-node{min-width:120px;max-width:220px;font-size:13px;padding:9px 12px}
       }
       @media (max-width:700px){
         .jsmind-node{min-width:108px;max-width:180px;padding:8px 10px;font-size:12px}
+      }
+      .mobile-save-status{display:none;margin:12px auto 0;max-width:520px;padding:12px 16px;border-radius:16px;font-size:13px;font-weight:600;text-align:center;color:#f8fafc;background:rgba(15,23,42,.75);backdrop-filter:blur(12px);transition:opacity .2s ease}
+      @media (max-width:1100px){
+        .mobile-save-status.show{display:block}
+        .mobile-save-status.state-dirty{background:rgba(248,113,113,.38);color:#fee2e2}
+        .mobile-save-status.state-saving{background:rgba(59,130,246,.4);color:#bfdbfe}
+        .mobile-save-status.state-success{background:rgba(34,197,94,.42);color:#dcfce7}
+        .mobile-save-status.state-error{background:rgba(248,113,113,.5);color:#fee2e2}
       }
       .mind-measure{position:absolute;left:-9999px;top:-9999px;pointer-events:none;visibility:hidden;z-index:-1}
     </style>
@@ -1563,12 +1573,14 @@ if ($view === 'map_edit') {
           <button id="btn-fit-floating">自适应视图</button>
         </div>
         <div class="mobile-toolbar" id="mobile-toolbar">
+          <button data-action="save" class="primary">保存</button>
           <button data-action="add-sibling">同级</button>
           <button data-action="add-child">子级</button>
           <button data-action="attach-file">附件</button>
           <button data-action="attach-link">链接</button>
           <button data-action="delete" class="danger">删除</button>
         </div>
+        <div class="mobile-save-status" id="mobile-save-status" role="status" aria-live="polite"></div>
       </main>
     </div>
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
@@ -1650,13 +1662,11 @@ if ($view === 'map_edit') {
           this.background=document.createElement('div');
           this.background.className='mind-background';
           this.container.appendChild(this.background);
-          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
-          this.linkLayer.classList.add('mind-links');
-          this.linkLayer.setAttribute('width','100%');
-          this.linkLayer.setAttribute('height','100%');
-          this.container.appendChild(this.linkLayer);
           this.viewport=document.createElement('div');
           this.viewport.className='mind-viewport';
+          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.linkLayer.classList.add('mind-links');
+          this.viewport.appendChild(this.linkLayer);
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
@@ -1670,18 +1680,83 @@ if ($view === 'map_edit') {
             document.body.appendChild(this.measureHost);
           }
           this.dragState=null;
+          this.activePointers=new Map();
+          this.pinchState=null;
           this.linkRegistry=new Map();
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
         }
         setupPan(){
+          const updatePinchBaseline=()=>{
+            if(this.activePointers.size<2){ this.pinchState=null; return; }
+            const pointers=Array.from(this.activePointers.values());
+            if(pointers.length<2){ this.pinchState=null; return; }
+            const [a,b]=pointers;
+            const distance=Math.hypot(b.x-a.x, b.y-a.y) || 1;
+            const rect=this.container.getBoundingClientRect();
+            const centerX=((a.x+b.x)/2)-rect.left;
+            const centerY=((a.y+b.y)/2)-rect.top;
+            const originX=(centerX - this.offsetX)/this.scale;
+            const originY=(centerY - this.offsetY)/this.scale;
+            this.pinchState={
+              initialDistance:distance,
+              baseScale:this.scale,
+              originX,
+              originY,
+            };
+          };
           const startPan=(evt)=>{
-            if(evt.button!==0 && evt.pointerType!=='touch') return;
-            if(evt.target.closest('.jsmind-node')) return;
-            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
-            this.container.setPointerCapture(evt.pointerId);
+            const isTouch=evt.pointerType==='touch';
+            const onNode=!!evt.target.closest('.jsmind-node');
+            if(!isTouch){
+              if(evt.button!==0) return;
+              if(onNode) return;
+              this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+              return;
+            }
+            this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+            if(this.activePointers.size>=2){
+              for(const id of this.activePointers.keys()){
+                try{ this.container.setPointerCapture(id); }catch(_){ }
+              }
+              this.dragState=null;
+              updatePinchBaseline();
+              return;
+            }
+            if(!onNode){
+              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+            }else{
+              this.dragState=null;
+            }
           };
           const movePan=(evt)=>{
+            if(!this.activePointers.has(evt.pointerId)) return;
+            const isTouch=evt.pointerType==='touch';
+            if(isTouch){
+              this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+              if(this.activePointers.size>=2){
+                evt.preventDefault();
+                if(!this.pinchState){ updatePinchBaseline(); }
+                const pinch=this.pinchState;
+                if(!pinch) return;
+                const pointers=Array.from(this.activePointers.values());
+                if(pointers.length<2) return;
+                const [a,b]=pointers;
+                const distance=Math.hypot(b.x-a.x, b.y-a.y) || 1;
+                const rect=this.container.getBoundingClientRect();
+                const centerX=((a.x+b.x)/2)-rect.left;
+                const centerY=((a.y+b.y)/2)-rect.top;
+                const nextScale=Math.max(0.3, Math.min(2.5, pinch.baseScale * (distance / pinch.initialDistance)));
+                this.scale=nextScale;
+                this.offsetX=centerX - pinch.originX*this.scale;
+                this.offsetY=centerY - pinch.originY*this.scale;
+                this.applyTransform();
+                return;
+              }
+            }
             if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
             const dx=evt.clientX-this.dragState.startX;
             const dy=evt.clientY-this.dragState.startY;
@@ -1690,8 +1765,17 @@ if ($view === 'map_edit') {
             this.applyTransform();
           };
           const endPan=(evt)=>{
-            if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
-            this.dragState=null;
+            if(this.activePointers.has(evt.pointerId)){
+              this.activePointers.delete(evt.pointerId);
+            }
+            if(this.dragState && evt.pointerId===this.dragState.pointerId){
+              this.dragState=null;
+            }
+            if(this.activePointers.size<2){
+              this.pinchState=null;
+            }else{
+              updatePinchBaseline();
+            }
             try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
           };
           this.container.addEventListener('pointerdown',startPan);
@@ -1991,8 +2075,12 @@ if ($view === 'map_edit') {
           this.linkLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
           this.linkLayer.setAttribute('width',`${this.bounds.width}`);
           this.linkLayer.setAttribute('height',`${this.bounds.height}`);
+          this.linkLayer.style.width=`${this.bounds.width}px`;
+          this.linkLayer.style.height=`${this.bounds.height}px`;
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
+          this.viewport.style.width=`${this.bounds.width}px`;
+          this.viewport.style.height=`${this.bounds.height}px`;
         }
         buildNodeElement(node,{forMeasure=false}={}){
           const el=document.createElement('div');
@@ -2215,7 +2303,6 @@ if ($view === 'map_edit') {
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
           this.viewport.style.transform=transform;
-          this.linkLayer.style.transform=transform;
         }
         zoom(step){
           const prev=this.scale;
@@ -2510,7 +2597,6 @@ if ($view === 'map_edit') {
       if(!jm.get_selected_node() && initialData && initialData.data){
         jm.select_node(initialData.data.id);
       }
-      refreshInspector(jm.get_selected_node());
       function syncOverlaySize(){
         const rect=jmContainer.getBoundingClientRect();
         const width=Math.max(rect.width,1);
@@ -2648,6 +2734,8 @@ if ($view === 'map_edit') {
       const nodeTagsInput=document.getElementById('node-tags');
       const nodeTagsPreview=document.getElementById('node-tags-preview');
       const mobileToolbar=document.getElementById('mobile-toolbar');
+      const mobileSaveButton=mobileToolbar ? mobileToolbar.querySelector('button[data-action="save"]') : null;
+      const mobileSaveStatus=document.getElementById('mobile-save-status');
       const sidebarToggle=document.getElementById('sidebar-toggle');
       const sidebarBackdrop=document.getElementById('sidebar-backdrop');
       const saveButton=document.getElementById('btn-save');
@@ -2658,17 +2746,47 @@ if ($view === 'map_edit') {
       const deleteButton=document.getElementById('btn-delete');
       let saveButtonDefault=saveButton ? saveButton.textContent : '保存';
       if(saveButton){ saveButton.dataset.defaultLabel=saveButtonDefault; }
+      let mobileSaveDefault=mobileSaveButton ? mobileSaveButton.textContent : '保存';
+      if(mobileSaveButton){ mobileSaveButton.dataset.defaultLabel=mobileSaveDefault; }
       let dirty=false;
+      let mobileStatusTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
       const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v'];
+      function setMobileSaveStatus(text, state, opts={}){
+        if(!mobileSaveStatus) return;
+        if(mobileStatusTimer){ clearTimeout(mobileStatusTimer); mobileStatusTimer=null; }
+        if(!text){
+          mobileSaveStatus.textContent='';
+          mobileSaveStatus.className='mobile-save-status';
+          return;
+        }
+        mobileSaveStatus.textContent=text;
+        mobileSaveStatus.className='mobile-save-status show';
+        if(state){ mobileSaveStatus.classList.add(`state-${state}`); }
+        if(opts.autoHide){
+          const duration=typeof opts.duration==='number' && isFinite(opts.duration)?opts.duration:1800;
+          mobileStatusTimer=setTimeout(()=>{
+            mobileStatusTimer=null;
+            if(!dirty){ setMobileSaveStatus('', null); }
+          }, duration);
+        }
+      }
       function setSaveButtonState(text, disabled){
-        if(!saveButton) return;
-        if(typeof text==='string'){ saveButton.textContent=text; }
-        if(typeof disabled==='boolean'){ saveButton.disabled=disabled; }
+        if(typeof text==='string'){
+          if(saveButton) saveButton.textContent=text;
+          if(mobileSaveButton) mobileSaveButton.textContent=text;
+        }else if(text===null){
+          if(saveButton) saveButton.textContent=saveButtonDefault;
+          if(mobileSaveButton) mobileSaveButton.textContent=mobileSaveDefault;
+        }
+        if(typeof disabled==='boolean'){
+          if(saveButton) saveButton.disabled=disabled;
+          if(mobileSaveButton) mobileSaveButton.disabled=disabled;
+        }
       }
       function markDirty(){
         dirty=true;
@@ -2676,7 +2794,8 @@ if ($view === 'map_edit') {
           saveState.textContent='未保存';
           saveState.classList.add('show','dirty');
         }
-        setSaveButtonState(saveButtonDefault,false);
+        setSaveButtonState(null,false);
+        setMobileSaveStatus('未保存','dirty');
       }
       function showSaving(){
         if(saveState){
@@ -2685,6 +2804,7 @@ if ($view === 'map_edit') {
           saveState.classList.remove('dirty');
         }
         setSaveButtonState('⏳ 保存中...', true);
+        setMobileSaveStatus('保存中...','saving');
       }
       function markSaved(){
         dirty=false;
@@ -2694,10 +2814,12 @@ if ($view === 'map_edit') {
           saveState.classList.remove('dirty');
         }
         setSaveButtonState('✅ 保存成功', false);
+        setMobileSaveStatus('保存成功','success',{autoHide:true});
         setTimeout(()=>{
           if(!dirty){
             if(saveState) saveState.classList.remove('show');
-            setSaveButtonState(saveButtonDefault,false);
+            setSaveButtonState(null,false);
+            setMobileSaveStatus('', null);
           }
         },1500);
       }
@@ -2750,6 +2872,7 @@ if ($view === 'map_edit') {
         renderTagPreview(data.tags||[]);
         inspectorSyncing=false;
       }
+      refreshInspector(jm.get_selected_node());
       function applyInspectorChange(mutator){
         if(typeof mutator!=='function') return;
         const node=ensureNode();
@@ -3087,6 +3210,7 @@ if ($view === 'map_edit') {
           const btn=e.target.closest('button');
           if(!btn) return;
           switch(btn.dataset.action){
+            case 'save': saveMindmap(); break;
             case 'add-sibling': addSiblingNode(); break;
             case 'add-child': addChildNode(); break;
             case 'attach-file': openAttachmentDialog(); break;
@@ -3131,9 +3255,13 @@ if ($view === 'map_edit') {
       if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
       const zoomOutButton=document.getElementById('btn-zoom-out');
       if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
-      document.getElementById('btn-collapse').onclick=()=>{
-        const node=ensureNode(); if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
-      };
+      const collapseButton=document.getElementById('btn-collapse');
+      if(collapseButton){
+        collapseButton.addEventListener('click',()=>{
+          const node=ensureNode();
+          if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
+        });
+      }
       let dropHoverNode=null;
       function clearDropHover(){
         if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
@@ -3177,7 +3305,7 @@ if ($view === 'map_edit') {
           handleDroppedText(text, parent, e);
         }
       });
-      titleInput.addEventListener('input', markDirty);
+      if(titleInput){ titleInput.addEventListener('input', markDirty); }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
           if(type===jsMind.event_type.select){
@@ -3194,34 +3322,43 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
-      document.getElementById('btn-export-json').onclick=()=>{
-        const data=jm.get_data('node_tree');
-        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;
-        a.download=(titleInput.value.trim()||'mindmap')+'.json';
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(url), 1000);
-      };
-      document.getElementById('btn-import-json').onclick=()=>importInput.click();
-      importInput.addEventListener('change', e=>{
-        const file=e.target.files[0]; if(!file) return;
-        const reader=new FileReader();
-        reader.onload=evt=>{
-          try{
-            const json=JSON.parse(evt.target.result);
-            if(json && json.data){
-              commitInlineEditing();
-              jm.show(json);
-              initialData=JSON.parse(JSON.stringify(json));
-              markDirty();
-            }
-            else alert('文件格式不兼容');
-          }catch(err){ alert('无法解析 JSON：'+err.message); }
-        };
-        reader.readAsText(file,'utf-8');
-      });
+      const exportButton=document.getElementById('btn-export-json');
+      if(exportButton){
+        exportButton.addEventListener('click',()=>{
+          const data=jm.get_data('node_tree');
+          const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.href=url;
+          const titleValue=titleInput ? titleInput.value.trim() : '';
+          a.download=(titleValue || 'mindmap')+'.json';
+          a.click();
+          setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        });
+      }
+      const importButton=document.getElementById('btn-import-json');
+      if(importButton && importInput){
+        importButton.addEventListener('click',()=>importInput.click());
+      }
+      if(importInput){
+        importInput.addEventListener('change', e=>{
+          const file=e.target.files[0]; if(!file) return;
+          const reader=new FileReader();
+          reader.onload=evt=>{
+            try{
+              const json=JSON.parse(evt.target.result);
+              if(json && json.data){
+                commitInlineEditing();
+                jm.show(json);
+                initialData=JSON.parse(JSON.stringify(json));
+                markDirty();
+              }
+              else alert('文件格式不兼容');
+            }catch(err){ alert('无法解析 JSON：'+err.message); }
+          };
+          reader.readAsText(file,'utf-8');
+        });
+      }
       if(saveButton) saveButton.onclick=saveMindmap;
       async function saveMindmap(){
         commitInlineEditing();
@@ -3246,6 +3383,7 @@ if ($view === 'map_edit') {
         }catch(err){
           alert(err.message||'保存失败');
           markDirty();
+          setMobileSaveStatus(err && err.message ? err.message : '保存失败','error');
         }
       }
       window.addEventListener('beforeunload',e=>{
