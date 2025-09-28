@@ -32,39 +32,55 @@ const DEFAULT_MINDMAP = [
   'meta' => [
     'name' => 'memo-mindmap',
     'author' => 'memo.php',
-    'version' => '0.2'
+    'version' => '0.3'
   ],
   'format' => 'node_tree',
   'data' => [
     'id' => 'root',
-    'topic' => '项目思维导图',
+    'topic' => '未命名导图',
     'expanded' => true,
     'children' => [
       [
-        'id' => 'collect',
-        'topic' => '信息收集',
+        'id' => 'view-outline',
+        'topic' => '📋 大纲视图',
         'direction' => 'left',
+        'expanded' => true,
         'children' => [
-          ['id' => 'collect-inbox', 'topic' => '快速捕捉', 'children' => []],
-          ['id' => 'collect-audio', 'topic' => '语音/附件', 'children' => []],
+          ['id' => 'view-outline-focus', 'topic' => '聚焦中心主题', 'children' => []],
+          ['id' => 'view-outline-ideas', 'topic' => '层级梳理想法', 'children' => []],
+          ['id' => 'view-outline-next', 'topic' => '下一步行动', 'children' => []],
         ],
       ],
       [
-        'id' => 'organize',
-        'topic' => '分类整理',
+        'id' => 'view-kanban',
+        'topic' => '🗂 看板视图',
         'direction' => 'right',
+        'expanded' => true,
         'children' => [
-          ['id' => 'organize-kanban', 'topic' => '看板状态', 'children' => []],
-          ['id' => 'organize-timeline', 'topic' => '时间线', 'children' => []],
+          ['id' => 'view-kanban-todo', 'topic' => '待处理', 'children' => []],
+          ['id' => 'view-kanban-doing', 'topic' => '进行中', 'children' => []],
+          ['id' => 'view-kanban-done', 'topic' => '已完成', 'children' => []],
         ],
       ],
       [
-        'id' => 'execute',
-        'topic' => '执行跟进',
+        'id' => 'view-timeline',
+        'topic' => '🕒 时间线视图',
         'direction' => 'right',
+        'expanded' => true,
         'children' => [
-          ['id' => 'execute-steps', 'topic' => '拆分子任务', 'children' => []],
-          ['id' => 'execute-review', 'topic' => '复盘改进', 'children' => []],
+          ['id' => 'view-timeline-upcoming', 'topic' => '近期计划', 'children' => []],
+          ['id' => 'view-timeline-milestone', 'topic' => '关键里程碑', 'children' => []],
+          ['id' => 'view-timeline-review', 'topic' => '复盘总结', 'children' => []],
+        ],
+      ],
+      [
+        'id' => 'view-resources',
+        'topic' => '📎 资料与附件',
+        'direction' => 'left',
+        'expanded' => true,
+        'children' => [
+          ['id' => 'view-resources-attach', 'topic' => '上传附件（≤15MB 图片/PDF/ZIP/文本/视频）', 'children' => []],
+          ['id' => 'view-resources-link', 'topic' => '新增链接素材', 'children' => []],
         ],
       ],
     ],
@@ -152,8 +168,14 @@ function db(): PDO {
   $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
   if ($hasMap === 0) {
     $nowTs = now();
+    $defaultPayload = default_mindmap_payload();
+    $decoded = json_decode($defaultPayload, true);
+    if (is_array($decoded) && isset($decoded['data']) && is_array($decoded['data'])) {
+      $decoded['data']['topic'] = '默认导图';
+      $defaultPayload = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
     $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
-        ->execute(['默认导图', default_mindmap_payload(), $nowTs, $nowTs]);
+        ->execute(['默认导图', $defaultPayload, $nowTs, $nowTs]);
   }
   // 创建上传目录
   if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
@@ -519,6 +541,7 @@ if ($view === 'new') {
       .ts{color:#64748b;font:12px/1 ui-monospace;margin-left:6px}
       details summary{cursor:pointer;color:#64748b}
       .save-tip{color:#16a34a;font-size:12px;display:none;margin-left:8px}
+      .save-tip.show{display:inline}
     </style>
   </head>
   <body>
@@ -536,7 +559,7 @@ if ($view === 'new') {
             </select>
             <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
               <button class="btn acc" type="submit">保存</button>
-              <span id="save-tip" class="save-tip">已保存</span>
+              <span id="save-tip" class="save-tip">保存成功</span>
             </div>
           </div>
           <div class="split" id="split">
@@ -573,6 +596,8 @@ if ($view === 'new') {
     <script>
       const state = { id: 0 };
       const saveTip = document.getElementById('save-tip');
+      const saveButtonEl = document.querySelector('#new-form button[type="submit"]');
+      const saveBtnDefault = saveButtonEl ? saveButtonEl.textContent : '保存';
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
@@ -596,8 +621,22 @@ if ($view === 'new') {
         fd.append('title',$('#title').value.trim()||'未命名');
         fd.append('category_id',$('#cat').value);
         fd.append('description', mde.value());
-        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        if(r.ok){ saveTip.style.display='inline'; setTimeout(()=>saveTip.style.display='none',1000); }
+        if(saveButtonEl){ saveButtonEl.disabled=true; saveButtonEl.textContent='⏳ 保存中...'; }
+        if(saveTip){ saveTip.textContent='保存中...'; saveTip.classList.add('show'); }
+        try{
+          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!r.ok) throw new Error('保存失败');
+          if(saveTip){ saveTip.textContent='保存成功'; }
+          if(saveButtonEl){ saveButtonEl.textContent='✅ 保存成功'; }
+          setTimeout(()=>{
+            if(saveButtonEl){ saveButtonEl.textContent=saveBtnDefault; saveButtonEl.disabled=false; }
+            if(saveTip){ saveTip.classList.remove('show'); }
+          },1200);
+        }catch(err){
+          alert(err.message||'保存失败');
+          if(saveButtonEl){ saveButtonEl.textContent=saveBtnDefault; saveButtonEl.disabled=false; }
+          if(saveTip){ saveTip.textContent='未保存'; saveTip.classList.add('show'); }
+        }
         return false;
       }
       $('#btn-insert-att-item').addEventListener('click',()=>$('#att-file-item').click());
@@ -764,6 +803,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .ts{color:#64748b;font:12px/1 ui-monospace;margin-left:6px}
       .badge{display:inline-block;font:12px/1 ui-monospace,Menlo;padding:4px 6px;border-radius:999px;border:1px solid var(--border);background:#fff;color:#64748b}
       .save-tip{color:#16a34a;font-size:12px;display:none;margin-left:8px}
+      .save-tip.show{display:inline}
       .done-view .title, .done-view #md-view, .done-view .timeline { text-decoration:line-through; opacity:.8 }
     </style>
   </head>
@@ -797,7 +837,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                   <?php endforeach; ?>
                 </select>
                 <div style="display:flex;gap:8px;align-items:center">
-                  <button class="btn acc" type="submit">保存</button><span id="save-tip" class="save-tip">已保存</span>
+                  <button class="btn acc" type="submit">保存</button><span id="save-tip" class="save-tip">保存成功</span>
                 </div>
               </div>
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
@@ -905,8 +945,25 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       async function saveItemAJAX(ev, form){
         ev.preventDefault();
         const fd = new FormData(form);
-        const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        const tip=document.getElementById('save-tip'); tip.style.display = res.ok ? 'inline' : 'none'; if(res.ok) setTimeout(()=>tip.style.display='none',1000);
+        const tip=document.getElementById('save-tip');
+        const btn=form.querySelector('button[type="submit"]');
+        const defaultLabel=btn ? (btn.dataset.defaultLabel || btn.textContent) : '保存';
+        if(btn){ btn.dataset.defaultLabel=defaultLabel; btn.disabled=true; btn.textContent='⏳ 保存中...'; }
+        if(tip){ tip.textContent='保存中...'; tip.classList.add('show'); }
+        try{
+          const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('保存失败');
+          if(tip){ tip.textContent='保存成功'; }
+          if(btn){ btn.textContent='✅ 保存成功'; }
+          setTimeout(()=>{
+            if(btn){ btn.textContent=btn.dataset.defaultLabel||defaultLabel; btn.disabled=false; }
+            if(tip){ tip.classList.remove('show'); }
+          },1200);
+        }catch(err){
+          alert(err.message||'保存失败');
+          if(btn){ btn.textContent=btn.dataset.defaultLabel||defaultLabel; btn.disabled=false; }
+          if(tip){ tip.textContent='未保存'; tip.classList.add('show'); }
+        }
         return false;
       }
       document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
@@ -1041,10 +1098,6 @@ if ($view === 'map_edit') {
       .save-tip{font-size:12px;color:var(--ok);display:none}
       .save-tip.show{display:inline}
       .save-tip.dirty{color:#f97316}
-      .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
-      .palette-item{padding:10px 12px;border-radius:10px;border:1px dashed var(--border);background:#fff;color:#0f172a;font-size:13px;font-weight:600;cursor:grab;display:flex;align-items:center;gap:8px;justify-content:flex-start;transition:transform .15s ease, box-shadow .15s ease}
-      .palette-item:hover{transform:translateY(-2px);box-shadow:0 6px 12px rgba(15,23,42,.08)}
-      .palette-item:active{cursor:grabbing}
       #jsmind-container.dragover{outline:2px dashed rgba(96,165,250,.85)}
       #node-handle{position:absolute;width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;box-shadow:0 10px 20px rgba(37,99,235,.35);pointer-events:auto;opacity:0;transform:scale(.8);transition:opacity .15s ease, transform .15s ease;z-index:50;touch-action:none}
       #node-handle.show{opacity:1;transform:scale(1);pointer-events:auto}
@@ -1052,6 +1105,12 @@ if ($view === 'map_edit') {
       #drag-overlay{position:absolute;inset:0;pointer-events:none}
       #drag-overlay line{stroke:rgba(148,163,184,.7);stroke-width:2;stroke-dasharray:6 6;stroke-linecap:round}
       #drag-overlay circle{fill:rgba(96,165,250,.3);stroke:rgba(59,130,246,.9);stroke-width:2}
+      .mobile-toolbar{display:none}
+      @media (max-width:1100px){
+        .mobile-toolbar{position:fixed;left:16px;right:16px;bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;background:rgba(15,23,42,.82);backdrop-filter:blur(12px);padding:10px;border-radius:16px;z-index:60;box-shadow:0 18px 38px rgba(15,23,42,.35)}
+        .mobile-toolbar button{padding:12px 0;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#f8fafc;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer}
+        .mobile-toolbar button.danger{background:rgba(248,113,113,.25);color:#fee2e2}
+      }
     </style>
   </head>
   <body>
@@ -1076,33 +1135,27 @@ if ($view === 'map_edit') {
           <button id="btn-delete" class="danger">🗑 删除节点 (Del)</button>
         </div>
         <div class="toolbar">
+          <button id="btn-attach-file">📎 上传附件</button>
+          <button id="btn-attach-link">🔗 新增链接</button>
+          <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+        </div>
+        <div class="toolbar">
           <button id="btn-fit">🧭 自适应视图</button>
           <button id="btn-center">◎ 居中</button>
           <button id="btn-zoom-in">＋ 放大</button>
           <button id="btn-zoom-out">－ 缩小</button>
-          <button id="btn-theme">🎨 切换主题</button>
-        </div>
-        <div>
-          <label style="display:block;margin-bottom:6px;font-weight:700;color:#0f172a;font-size:13px">拖拽节点库</label>
-          <div class="palette" id="node-palette">
-            <div class="palette-item" draggable="true" data-topic="💡 灵感" data-bg="#fef3c7" data-color="#92400e">💡 灵感节点</div>
-            <div class="palette-item" draggable="true" data-topic="✅ 待办" data-bg="#dcfce7" data-color="#166534" data-note="使用右侧步骤跟踪任务状态">✅ 待办事项</div>
-            <div class="palette-item" draggable="true" data-topic="🔗 链接" data-bg="#dbeafe" data-color="#1d4ed8" data-note="拖入外部链接可自动解析">🔗 参考链接</div>
-            <div class="palette-item" draggable="true" data-topic="📝 备注" data-bg="#ede9fe" data-color="#5b21b6" data-note="补充更多上下文与结论">📝 结构化备注</div>
-          </div>
-          <div class="meta" style="margin-top:6px">拖拽或点击以上节点即可在当前选中节点下创建内容块。</div>
         </div>
         <div class="tips">
           <strong>快捷键</strong><br>
           <code>Enter</code> 同级 · <code>Tab</code> 子级 · <code>Shift+Tab</code> 升级 · <code>Del</code> 删除 · <code>F2</code> 重命名 · <code>Ctrl/Cmd+Z</code> 撤销<br>
           鼠标中键/空格拖拽 · 滚轮缩放 · 按住 <code>Alt</code> 拖动可复制节点。<br>
-          从左侧节点库或外部文本/URL/文件拖入画布，可自动生成节点与附件。
+          可从外部拖入图片、PDF、ZIP、文本或视频至画布，系统会引导选择创建同级或子级节点。
         </div>
         <div>
           <span class="badge">提示</span>
           <div class="meta" style="margin-top:6px">保存数据存入 SQLite，可多端共享；导出 JSON 可用于备份或导入其他工具（如 FreeMind、XMind）。</div>
         </div>
-        <div class="save-tip" id="save-state">已保存</div>
+        <div class="save-tip" id="save-state">保存成功</div>
         <?php if ($mind['id']): ?>
           <form method="post" onsubmit="return confirm('确认删除该导图？');" style="margin-top:auto">
             <input type="hidden" name="action" value="delete_mindmap">
@@ -1115,7 +1168,14 @@ if ($view === 'map_edit') {
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
         <div class="map-toolbar">
           <button id="btn-collapse">折叠/展开节点</button>
-          <button id="btn-reset">恢复默认主题</button>
+          <button id="btn-fit-floating">自适应视图</button>
+        </div>
+        <div class="mobile-toolbar" id="mobile-toolbar">
+          <button data-action="add-sibling">同级</button>
+          <button data-action="add-child">子级</button>
+          <button data-action="attach-file">附件</button>
+          <button data-action="attach-link">链接</button>
+          <button data-action="delete" class="danger">删除</button>
         </div>
       </main>
     </div>
@@ -1125,7 +1185,6 @@ if ($view === 'map_edit') {
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
     const jmContainer=document.getElementById('jsmind-container');
-    const paletteItems=document.querySelectorAll('.palette-item');
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
     overlay.id='drag-overlay';
     overlay.setAttribute('width','100%');
@@ -1274,13 +1333,61 @@ if ($view === 'map_edit') {
       const titleInput=document.getElementById('map-title');
       const saveState=document.getElementById('save-state');
       const importInput=document.getElementById('import-input');
+      const attachInput=document.getElementById('attach-file-input');
+      const attachFileBtn=document.getElementById('btn-attach-file');
+      const attachLinkBtn=document.getElementById('btn-attach-link');
+      const mobileToolbar=document.getElementById('mobile-toolbar');
+      const saveButton=document.getElementById('btn-save');
+      const fitButton=document.getElementById('btn-fit');
+      const fitFloatingButton=document.getElementById('btn-fit-floating');
+      const addSiblingButton=document.getElementById('btn-add-sibling');
+      const addChildButton=document.getElementById('btn-add-child');
+      const deleteButton=document.getElementById('btn-delete');
+      let saveButtonDefault=saveButton ? saveButton.textContent : '保存';
+      if(saveButton){ saveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
-      const layouts=['fresh-blue','fresh-red','fresh-green','fresh-blue','nephrite','greensea','pink'];
-      let themeIndex=0;
-      function markDirty(){ dirty=true; saveState.textContent='未保存'; saveState.classList.add('show','dirty'); }
-      function markSaved(){ dirty=false; saveState.textContent='已保存'; saveState.classList.add('show'); saveState.classList.remove('dirty'); setTimeout(()=>saveState.classList.remove('show'),1200); }
+      const ATTACH_MAX_BYTES=15*1024*1024;
+      const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
+      const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
+      const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v'];
+      function setSaveButtonState(text, disabled){
+        if(!saveButton) return;
+        if(typeof text==='string'){ saveButton.textContent=text; }
+        if(typeof disabled==='boolean'){ saveButton.disabled=disabled; }
+      }
+      function markDirty(){
+        dirty=true;
+        if(saveState){
+          saveState.textContent='未保存';
+          saveState.classList.add('show','dirty');
+        }
+        setSaveButtonState(saveButtonDefault,false);
+      }
+      function showSaving(){
+        if(saveState){
+          saveState.textContent='保存中...';
+          saveState.classList.add('show');
+          saveState.classList.remove('dirty');
+        }
+        setSaveButtonState('⏳ 保存中...', true);
+      }
+      function markSaved(){
+        dirty=false;
+        if(saveState){
+          saveState.textContent='保存成功';
+          saveState.classList.add('show');
+          saveState.classList.remove('dirty');
+        }
+        setSaveButtonState('✅ 保存成功', false);
+        setTimeout(()=>{
+          if(!dirty){
+            if(saveState) saveState.classList.remove('show');
+            setSaveButtonState(saveButtonDefault,false);
+          }
+        },1500);
+      }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
       function ensureNode(){
         let node=jm.get_selected_node();
@@ -1324,34 +1431,6 @@ if ($view === 'map_edit') {
         return newNode;
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
-      function buildTemplateFromDataset(el){
-        const template={
-          topic:el.dataset.topic || '新节点',
-          data:{},
-          style:{
-            background:el.dataset.bg || null,
-            foreground:el.dataset.color || null,
-          }
-        };
-        if(el.dataset.note){ template.data.note=el.dataset.note; }
-        if(Object.keys(template.data).length===0) delete template.data;
-        return template;
-      }
-      function applyTemplateToParent(template, parentNode, position){
-        if(!parentNode) return null;
-        return executeCreateNodeCommand({
-          parentId:parentNode.id,
-          topic:template.topic || '新节点',
-          data:deepClone(template.data),
-          style:deepClone(template.style),
-          position:position || null,
-          meta:{template:true}
-        });
-      }
-      function safeParse(json, fallback=null){
-        try{ return JSON.parse(json); }
-        catch(_){ return fallback; }
-      }
       function isProbablyUrl(text){
         const value=(text||'').trim();
         return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
@@ -1369,6 +1448,65 @@ if ($view === 'map_edit') {
         const selected=jm.get_selected_node();
         if(selected) return selected;
         return jm.get_root();
+      }
+      function fileExtension(name){
+        if(!name) return '';
+        const idx=name.lastIndexOf('.');
+        return idx>=0 ? name.slice(idx).toLowerCase() : '';
+      }
+      function isAllowedAttachment(file){
+        const type=(file.type||'').toLowerCase();
+        if(type.startsWith('image/')) return true;
+        if(type.startsWith('video/')) return true;
+        if(type.startsWith('text/')) return true;
+        if(type==='application/pdf' || type==='application/zip' || type==='application/x-zip-compressed' || type==='application/json') return true;
+        const ext=fileExtension(file.name);
+        if(!ext) return false;
+        if(imageExts.includes(ext) || textExts.includes(ext) || videoExts.includes(ext)) return true;
+        return ext==='.pdf' || ext==='.zip';
+      }
+      function sanitizeAttachmentFiles(files){
+        const limit=Math.min(files.length,5);
+        const accepted=[];
+        for(let i=0;i<limit;i++){
+          const file=files[i];
+          if(file.size>ATTACH_MAX_BYTES){
+            alert(file.name+' 超过 15MB，已跳过。');
+            continue;
+          }
+          if(!isAllowedAttachment(file)){
+            alert(file.name+' 类型不支持，仅可上传图片、PDF、ZIP、文本或视频文件。');
+            continue;
+          }
+          accepted.push(file);
+        }
+        return accepted;
+      }
+      function createAttachmentNodes(parentNode, files, basePoint, placement){
+        if(!parentNode || !files || !files.length) return;
+        files.forEach((file,index)=>{
+          const reader=new FileReader();
+          reader.onload=evt=>{
+            const dataUrl=evt.target.result;
+            const data={
+              attachment:{
+                name:file.name,
+                size=file.size,
+                type:file.type || 'application/octet-stream',
+                content:dataUrl,
+              }
+            };
+            const offset=basePoint ? {x:basePoint.x + index*18, y:basePoint.y + index*18} : null;
+            executeCreateNodeCommand({
+              parentId:parentNode.id,
+              topic:'📎 '+file.name,
+              data:data,
+              position:offset,
+              meta:{source:'file', placement:placement||'child'}
+            });
+          };
+          reader.readAsDataURL(file);
+        });
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -1388,92 +1526,114 @@ if ($view === 'map_edit') {
       }
       function handleDroppedFiles(files, parent, event){
         if(!files || !files.length || !parent) return;
-        const limit=Math.min(files.length,5);
-        const basePoint=event ? eventToSvgPoint(event) : null;
-        for(let i=0;i<limit;i++){
-          const file=files[i];
-          if(file.size>5*1024*1024){
-            alert(file.name+' 超过 5MB，已跳过。');
-            continue;
+        const accepted=sanitizeAttachmentFiles(files);
+        if(!accepted.length) return;
+        let createAsChild=true;
+        if(!parent.isroot){
+          createAsChild=confirm('将附件创建为子级节点？点击“确定”为子级，“取消”为同级。');
+          if(!createAsChild && !parent.parent){
+            alert('无法为根节点创建同级节点，已改为子级。');
+            createAsChild=true;
           }
-          const reader=new FileReader();
-          reader.onload=evt=>{
-            const dataUrl=evt.target.result;
-            const data={
-              attachment:{
-                name:file.name,
-                size:file.size,
-                type:file.type || 'application/octet-stream',
-                content:dataUrl,
-              }
-            };
-            const offset=basePoint ? {x:basePoint.x + i*18, y:basePoint.y + i*18} : null;
-            executeCreateNodeCommand({
-              parentId:parent.id,
-              topic:'📎 '+file.name,
-              data:data,
-              position:offset,
-              meta:{source:'file'}
-            });
-          };
-          reader.readAsDataURL(file);
         }
+        const target=(createAsChild || !parent.parent) ? parent : parent.parent;
+        const basePoint=event ? eventToSvgPoint(event) : null;
+        createAttachmentNodes(target, accepted, basePoint, createAsChild?'child':'sibling');
       }
-      paletteItems.forEach(item=>{
-        item.addEventListener('dragstart',e=>{
-          const template=buildTemplateFromDataset(item);
-          const payload=JSON.stringify(template);
-          e.dataTransfer.setData('application/x-mm-template', payload);
-          e.dataTransfer.setData('application/x-mind-node', payload);
-          e.dataTransfer.effectAllowed='copy';
-        });
-        item.addEventListener('click',()=>{
-          const template=buildTemplateFromDataset(item);
-          const parentNode=ensureNode() || jm.get_root();
-          if(parentNode) applyTemplateToParent(template, parentNode, null);
-        });
-      });
-      document.getElementById('btn-add-sibling').onclick=()=>{
-        const node=ensureNode(); if(!node || node.isroot) return;
-        if(node.parent){
-          executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' });
-        }
-      };
-      document.getElementById('btn-add-child').onclick=()=>{
+      function addSiblingNode(){
+        const node=ensureNode();
+        if(!node || node.isroot || !node.parent) return;
+        executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' });
+      }
+      function addChildNode(){
         const node=ensureNode();
         if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
-      };
-      document.getElementById('btn-delete').onclick=()=>{
+      }
+      function deleteSelectedNode(){
         const node=ensureNode(); if(!node || node.isroot) return;
         jm.remove_node(node.id); markDirty();
         requestAnimationFrame(updateHandlePosition);
-      };
+      }
+      function openAttachmentDialog(){
+        const node=ensureNode();
+        if(!node){ alert('请先选择一个节点'); return; }
+        if(!attachInput) return;
+        attachInput.dataset.targetId=node.id;
+        attachInput.value='';
+        attachInput.click();
+      }
+      function openLinkPrompt(){
+        const node=ensureNode();
+        if(!node){ alert('请先选择一个节点'); return; }
+        const raw=prompt('请输入链接地址');
+        if(!raw) return;
+        const cleaned=raw.trim();
+        if(!cleaned) return;
+        if(!isProbablyUrl(cleaned) && !confirm('该内容看起来不像链接，仍要创建吗？')) return;
+        const title=prompt('请输入链接标题', cleaned) || cleaned;
+        executeCreateNodeCommand({
+          parentId:node.id,
+          topic:(title||'').trim()||cleaned,
+          data:{url:cleaned},
+          meta:{source:'link'}
+        });
+      }
+      if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
+      if(addChildButton) addChildButton.onclick=addChildNode;
+      if(deleteButton) deleteButton.onclick=deleteSelectedNode;
+      if(attachFileBtn) attachFileBtn.onclick=openAttachmentDialog;
+      if(attachLinkBtn) attachLinkBtn.onclick=openLinkPrompt;
+      if(attachInput){
+        attachInput.addEventListener('change',e=>{
+          const files=Array.from(e.target.files||[]);
+          attachInput.value='';
+          if(!files.length) return;
+          const targetId=attachInput.dataset.targetId;
+          const node=targetId ? jm.get_node(targetId) : ensureNode();
+          if(!node){ alert('请先选择一个节点'); return; }
+          const accepted=sanitizeAttachmentFiles(files);
+          if(!accepted.length) return;
+          createAttachmentNodes(node, accepted, null, 'child');
+        });
+      }
+      if(mobileToolbar){
+        mobileToolbar.addEventListener('click',e=>{
+          const btn=e.target.closest('button');
+          if(!btn) return;
+          switch(btn.dataset.action){
+            case 'add-sibling': addSiblingNode(); break;
+            case 'add-child': addChildNode(); break;
+            case 'attach-file': openAttachmentDialog(); break;
+            case 'attach-link': openLinkPrompt(); break;
+            case 'delete': deleteSelectedNode(); break;
+          }
+        });
+      }
       function callView(method, ...args){
         if(jm.view && typeof jm.view[method] === 'function'){
           try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
         }
         return false;
       }
-      document.getElementById('btn-fit').onclick=()=>{
-        if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-          callView('set_zoom', 1);
-          if(!callView('move_to_center')) callView('center_root');
-        }
-      };
-      document.getElementById('btn-center').onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); };
-      document.getElementById('btn-zoom-in').onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); };
-      document.getElementById('btn-zoom-out').onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); };
+      if(fitButton){
+        fitButton.onclick=()=>{
+          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
+            callView('set_zoom', 1);
+            if(!callView('move_to_center')) callView('center_root');
+          }
+        };
+      }
+      if(fitFloatingButton && fitButton){
+        fitFloatingButton.onclick=()=>fitButton.click();
+      }
+      const centerButton=document.getElementById('btn-center');
+      if(centerButton){ centerButton.onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); }; }
+      const zoomInButton=document.getElementById('btn-zoom-in');
+      if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
+      const zoomOutButton=document.getElementById('btn-zoom-out');
+      if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
       document.getElementById('btn-collapse').onclick=()=>{
         const node=ensureNode(); if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
-      };
-      document.getElementById('btn-reset').onclick=()=>{
-        const snapshot=JSON.parse(JSON.stringify(initialData));
-        jm.show(snapshot); markDirty();
-        requestAnimationFrame(updateHandlePosition);
-      };
-      document.getElementById('btn-theme').onclick=()=>{
-        themeIndex=(themeIndex+1)%layouts.length;
-        jm.set_theme(layouts[themeIndex]);
       };
       jmContainer.addEventListener('dragenter',e=>{
         e.preventDefault();
@@ -1491,13 +1651,6 @@ if ($view === 'map_edit') {
         jmContainer.classList.remove('dragover');
         syncOverlaySize();
         const parent=resolveDropParent(e);
-        const dropPoint=eventToSvgPoint(e);
-        const templateStr=e.dataTransfer.getData('application/x-mm-template') || e.dataTransfer.getData('application/x-mind-node');
-        if(templateStr){
-          const template=safeParse(templateStr, null);
-          if(template && parent){ applyTemplateToParent(template, parent, dropPoint); }
-          return;
-        }
         const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
         if(files.length){
           handleDroppedFiles(files, parent, e);
@@ -1542,7 +1695,7 @@ if ($view === 'map_edit') {
         };
         reader.readAsText(file,'utf-8');
       });
-      document.getElementById('btn-save').onclick=saveMindmap;
+      if(saveButton) saveButton.onclick=saveMindmap;
       async function saveMindmap(){
         const title=titleInput.value.trim()||'未命名导图';
         const payload=JSON.stringify(jm.get_data('node_tree'));
@@ -1552,6 +1705,7 @@ if ($view === 'map_edit') {
         fd.append('title', title);
         fd.append('content', payload);
         try{
+          showSaving();
           const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!res.ok) throw new Error('网络异常');
           const json=await res.json();
@@ -1560,7 +1714,10 @@ if ($view === 'map_edit') {
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
           markSaved();
-        }catch(err){ alert(err.message||'保存失败'); }
+        }catch(err){
+          alert(err.message||'保存失败');
+          markDirty();
+        }
       }
       window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
     </script>
