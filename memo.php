@@ -518,14 +518,7 @@ if ($view === 'new') {
       .drag{cursor:grab;color:#94a3b8;user-select:none}
       .ts{color:#64748b;font:12px/1 ui-monospace;margin-left:6px}
       details summary{cursor:pointer;color:#64748b}
-      .save-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-      .save-btn.is-loading{cursor:progress;opacity:.85}
-      .save-btn.is-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border-color:transparent}
-      .save-btn.is-dirty{box-shadow:0 0 0 2px rgba(37,99,235,.18)}
-      .btn-spinner{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.6);border-top-color:#fff;animation:spin .9s linear infinite}
-      @keyframes spin{to{transform:rotate(360deg)}}
-      .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,40px);background:rgba(15,23,42,.92);color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 20px 40px rgba(15,23,42,.25);opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:200;font-size:14px;font-weight:600}
-      .toast.show{opacity:1;transform:translate(-50%,0)}
+      .save-tip{color:#16a34a;font-size:12px;display:none;margin-left:8px}
     </style>
   </head>
   <body>
@@ -542,7 +535,8 @@ if ($view === 'new') {
               <?php foreach ($cats as $c): ?><option value="<?php echo $c['id']; ?>"><?php echo h($c['name']); ?></option><?php endforeach; ?>
             </select>
             <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
-              <button class="btn acc save-btn" type="submit" id="new-save-btn">保存</button>
+              <button class="btn acc" type="submit">保存</button>
+              <span id="save-tip" class="save-tip">已保存</span>
             </div>
           </div>
           <div class="split" id="split">
@@ -578,47 +572,10 @@ if ($view === 'new') {
     <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const state = { id: 0 };
+      const saveTip = document.getElementById('save-tip');
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
-      const toastEl=document.getElementById('global-toast');
-      const saveButton=document.getElementById('new-save-btn');
-      let toastTimer=null;
-      let saveRevertTimer=null;
-      function setSaveButtonState(state){
-        if(!saveButton) return;
-        if(!saveButton.dataset.baseLabel){ saveButton.dataset.baseLabel=(saveButton.textContent||'保存').trim()||'保存'; }
-        saveButton.classList.remove('is-loading','is-success','is-dirty');
-        if(state==='saving'){
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); saveRevertTimer=null; }
-          saveButton.disabled=true;
-          saveButton.classList.add('is-loading');
-          saveButton.innerHTML='<span class="btn-spinner" aria-hidden="true"></span><span style="margin-left:6px">保存中…</span>';
-        }else if(state==='saved'){
-          saveButton.disabled=true;
-          saveButton.classList.add('is-success');
-          saveButton.textContent='保存成功';
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); }
-          saveRevertTimer=setTimeout(()=>{ setSaveButtonState('idle'); saveRevertTimer=null; },1800);
-        }else if(state==='dirty'){
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); saveRevertTimer=null; }
-          saveButton.disabled=false;
-          saveButton.classList.add('is-dirty');
-          saveButton.textContent=saveButton.dataset.baseLabel+'*';
-        }else{
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); saveRevertTimer=null; }
-          saveButton.disabled=false;
-          saveButton.textContent=saveButton.dataset.baseLabel;
-        }
-      }
-      function showToast(message){
-        if(!toastEl) return;
-        toastEl.textContent=message;
-        toastEl.classList.add('show');
-        if(toastTimer) clearTimeout(toastTimer);
-        toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2200);
-      }
-      function markDirty(){ setSaveButtonState('dirty'); }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       function renderMD(){ $('#md-view').innerHTML = safeHTML(mde.value()); }
       const mde = new EasyMDE({
@@ -626,7 +583,7 @@ if ($view === 'new') {
         spellChecker:false, status:false,
         toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
       });
-      mde.codemirror.on('change', ()=>{ renderMD(); markDirty(); }); renderMD();
+      mde.codemirror.on('change', renderMD); renderMD();
       (async function bootstrap(){
         const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
         const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
@@ -639,16 +596,8 @@ if ($view === 'new') {
         fd.append('title',$('#title').value.trim()||'未命名');
         fd.append('category_id',$('#cat').value);
         fd.append('description', mde.value());
-        try{
-          setSaveButtonState('saving');
-          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!r.ok) throw new Error('保存失败');
-          setSaveButtonState('saved');
-          showToast('保存成功');
-        }catch(err){
-          alert(err.message||'保存失败');
-          setSaveButtonState('dirty');
-        }
+        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(r.ok){ saveTip.style.display='inline'; setTimeout(()=>saveTip.style.display='none',1000); }
         return false;
       }
       $('#btn-insert-att-item').addEventListener('click',()=>$('#att-file-item').click());
@@ -661,11 +610,6 @@ if ($view === 'new') {
         if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
         e.target.value='';
       });
-      ['#title','#cat'].forEach(sel=>{
-        const el=$(sel);
-        if(el){ el.addEventListener('input', markDirty); el.addEventListener('change', markDirty); }
-      });
-      setSaveButtonState('idle');
       $('#btn-preview-toggle').onclick=()=>{ const split=$('#split'); split.insertBefore(split.lastElementChild,split.firstElementChild); };
       function escapeHTML(s){ return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
       function stepNodeHTML(s){
@@ -766,7 +710,6 @@ if ($view === 'new') {
         });
       })();
     </script>
-    <div id="global-toast" class="toast" role="status" aria-live="polite"></div>
   </body>
   </html>
   <?php
@@ -820,14 +763,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .drag{cursor:grab;color:#94a3b8;user-select:none}
       .ts{color:#64748b;font:12px/1 ui-monospace;margin-left:6px}
       .badge{display:inline-block;font:12px/1 ui-monospace,Menlo;padding:4px 6px;border-radius:999px;border:1px solid var(--border);background:#fff;color:#64748b}
-      .save-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-      .save-btn.is-loading{cursor:progress;opacity:.85}
-      .save-btn.is-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border-color:transparent}
-      .save-btn.is-dirty{box-shadow:0 0 0 2px rgba(37,99,235,.18)}
-      .btn-spinner{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.6);border-top-color:#fff;animation:spin .9s linear infinite}
-      @keyframes spin{to{transform:rotate(360deg)}}
-      .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,40px);background:rgba(15,23,42,.92);color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 20px 40px rgba(15,23,42,.25);opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:200;font-size:14px;font-weight:600}
-      .toast.show{opacity:1;transform:translate(-50%,0)}
+      .save-tip{color:#16a34a;font-size:12px;display:none;margin-left:8px}
       .done-view .title, .done-view #md-view, .done-view .timeline { text-decoration:line-through; opacity:.8 }
     </style>
   </head>
@@ -861,7 +797,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                   <?php endforeach; ?>
                 </select>
                 <div style="display:flex;gap:8px;align-items:center">
-                  <button class="btn acc save-btn" type="submit" id="item-save-btn">保存</button>
+                  <button class="btn acc" type="submit">保存</button><span id="save-tip" class="save-tip">已保存</span>
                 </div>
               </div>
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
@@ -956,44 +892,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <script>
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
-      const toastEl=document.getElementById('global-toast');
-      const saveButton=document.getElementById('item-save-btn');
-      let toastTimer=null;
-      let saveRevertTimer=null;
-      function setSaveButtonState(state){
-        if(!saveButton) return;
-        if(!saveButton.dataset.baseLabel){ saveButton.dataset.baseLabel=(saveButton.textContent||'保存').trim()||'保存'; }
-        saveButton.classList.remove('is-loading','is-success','is-dirty');
-        if(state==='saving'){
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); saveRevertTimer=null; }
-          saveButton.disabled=true;
-          saveButton.classList.add('is-loading');
-          saveButton.innerHTML='<span class="btn-spinner" aria-hidden="true"></span><span style="margin-left:6px">保存中…</span>';
-        }else if(state==='saved'){
-          saveButton.disabled=true;
-          saveButton.classList.add('is-success');
-          saveButton.textContent='保存成功';
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); }
-          saveRevertTimer=setTimeout(()=>{ setSaveButtonState('idle'); saveRevertTimer=null; },1800);
-        }else if(state==='dirty'){
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); saveRevertTimer=null; }
-          saveButton.disabled=false;
-          saveButton.classList.add('is-dirty');
-          saveButton.textContent=saveButton.dataset.baseLabel+'*';
-        }else{
-          if(saveRevertTimer){ clearTimeout(saveRevertTimer); saveRevertTimer=null; }
-          saveButton.disabled=false;
-          saveButton.textContent=saveButton.dataset.baseLabel;
-        }
-      }
-      function showToast(message){
-        if(!toastEl) return;
-        toastEl.textContent=message;
-        toastEl.classList.add('show');
-        if(toastTimer) clearTimeout(toastTimer);
-        toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2200);
-      }
-      function markDirty(){ setSaveButtonState('dirty'); }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       function renderMDTo(id, md){ const el=document.getElementById(id); if(el) el.innerHTML=safeHTML(md); }
       const mde = new EasyMDE({
@@ -1003,20 +901,12 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
       });
       renderMDTo('md-view', mde.value());
-      mde.codemirror.on('change', ()=>{ renderMDTo('md-view', mde.value()); markDirty(); });
+      mde.codemirror.on('change', ()=> renderMDTo('md-view', mde.value()));
       async function saveItemAJAX(ev, form){
         ev.preventDefault();
         const fd = new FormData(form);
-        try{
-          setSaveButtonState('saving');
-          const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('保存失败');
-          setSaveButtonState('saved');
-          showToast('保存成功');
-        }catch(err){
-          alert(err.message||'保存失败');
-          setSaveButtonState('dirty');
-        }
+        const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        const tip=document.getElementById('save-tip'); tip.style.display = res.ok ? 'inline' : 'none'; if(res.ok) setTimeout(()=>tip.style.display='none',1000);
         return false;
       }
       document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
@@ -1029,14 +919,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
         e.target.value='';
       });
-      const itemForm=document.getElementById('item-form');
-      if(itemForm){
-        itemForm.querySelectorAll('input[name="title"], select[name="category_id"]').forEach(el=>{
-          el.addEventListener('input', markDirty);
-          el.addEventListener('change', markDirty);
-        });
-      }
-      setSaveButtonState('idle');
       const stepMDE={};
       async function saveStepTitleAJAX(ev, stepId, form){
         ev.preventDefault(); const fd=new FormData(form);
@@ -1091,7 +973,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         renderMDTo('step-md-view-<?php echo $s['id']; ?>', <?php echo json_encode((string)($s['notes'] ?? ''), JSON_UNESCAPED_UNICODE); ?>);
       <?php endforeach; ?>
     </script>
-    <div id="global-toast" class="toast" role="status" aria-live="polite"></div>
   </body>
   </html>
   <?php
@@ -1150,15 +1031,7 @@ if ($view === 'map_edit') {
       .toolbar button.acc{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:0}
       .toolbar button.danger{color:var(--bad);border-color:#fecaca;background:#fff0f0}
       .toolbar button:disabled{opacity:.5;cursor:not-allowed}
-      .attach-toolbar{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
       .actions{display:flex;flex-wrap:wrap;gap:8px}
-      .save-btn{position:relative;overflow:hidden}
-      .save-btn.is-loading{cursor:progress;opacity:.9}
-      .save-btn.is-success{background:linear-gradient(135deg,#22c55e,#16a34a);border:0;color:#fff}
-      .save-btn.is-dirty{box-shadow:0 0 0 2px rgba(37,99,235,.18)}
-      .btn-spinner{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.6);border-top-color:#fff;animation:spin .9s linear infinite}
-      .save-btn:not(.acc) .btn-spinner{border-color:rgba(255,255,255,.4);border-top-color:#fff}
-      @keyframes spin{to{transform:rotate(360deg)}}
       .tips{background:#e0f2fe;border:1px solid #bae6fd;color:#0c4a6e;padding:12px;border-radius:12px;font-size:13px;line-height:1.6}
       .tips strong{font-weight:700}
       .tips code{background:rgba(15,23,42,.08);padding:2px 5px;border-radius:6px;font-size:12px}
@@ -1170,6 +1043,10 @@ if ($view === 'map_edit') {
       .save-tip{font-size:12px;color:var(--ok);display:none}
       .save-tip.show{display:inline}
       .save-tip.dirty{color:#f97316}
+      .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+      .palette-item{padding:10px 12px;border-radius:10px;border:1px dashed var(--border);background:#fff;color:#0f172a;font-size:13px;font-weight:600;cursor:grab;display:flex;align-items:center;gap:8px;justify-content:flex-start;transition:transform .15s ease, box-shadow .15s ease}
+      .palette-item:hover{transform:translateY(-2px);box-shadow:0 6px 12px rgba(15,23,42,.08)}
+      .palette-item:active{cursor:grabbing}
       #jsmind-container.dragover{outline:2px dashed rgba(96,165,250,.85)}
       #node-handle{position:absolute;width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;box-shadow:0 10px 20px rgba(37,99,235,.35);pointer-events:auto;opacity:0;transform:scale(.8);transition:opacity .15s ease, transform .15s ease;z-index:50;touch-action:none}
       #node-handle.show{opacity:1;transform:scale(1);pointer-events:auto}
@@ -1197,14 +1074,12 @@ if ($view === 'map_edit') {
         .editor-pane{order:2;min-height:calc(100vh - 60px);padding-bottom:100px}
         #jsmind-container{height:calc(100vh - 60px)}
         .map-toolbar{display:none}
-        #mobile-command-bar{display:flex;flex-wrap:wrap;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;gap:8px;padding:10px 12px;background:rgba(15,23,42,.92);border-radius:22px;box-shadow:0 20px 40px rgba(15,23,42,.35);z-index:145;backdrop-filter:blur(12px)}
+        #mobile-command-bar{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;gap:8px;padding:10px 12px;background:rgba(15,23,42,.92);border-radius:22px;box-shadow:0 20px 40px rgba(15,23,42,.35);z-index:145;backdrop-filter:blur(12px)}
         #mobile-command-bar button{border:0;background:rgba(255,255,255,.12);color:#fff;padding:10px 12px;border-radius:14px;font-size:13px;font-weight:600;min-width:64px}
         #mobile-command-bar button.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
         #mobile-command-bar button:active{transform:scale(.97)}
         #node-handle{width:42px;height:42px;font-size:24px}
       }
-      .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,40px);background:rgba(15,23,42,.92);color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 20px 40px rgba(15,23,42,.35);opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:200;font-size:14px;font-weight:600}
-      .toast.show{opacity:1;transform:translate(-50%,0)}
     </style>
   </head>
   <body>
@@ -1216,7 +1091,7 @@ if ($view === 'map_edit') {
           <h2 id="mobile-title-text"><?php echo h($mind['title']); ?></h2>
           <div class="subtitle" id="mobile-selected-topic">未选中节点</div>
         </div>
-        <button id="mobile-save" type="button" class="save-btn" disabled>保存</button>
+        <button id="mobile-save" type="button" disabled>保存</button>
       </header>
       <aside class="sidebar">
         <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
@@ -1227,7 +1102,7 @@ if ($view === 'map_edit') {
         <label for="map-title">导图标题</label>
         <input id="map-title" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
         <div class="actions">
-          <button id="btn-save" class="acc save-btn">💾 保存</button>
+          <button id="btn-save" class="acc">💾 保存</button>
           <button id="btn-export-json">⬇️ 导出 JSON</button>
           <button id="btn-import-json">⬆️ 导入 JSON</button>
           <input id="import-input" type="file" accept="application/json" style="display:none">
@@ -1242,17 +1117,23 @@ if ($view === 'map_edit') {
           <button id="btn-center">◎ 居中</button>
           <button id="btn-zoom-in">＋ 放大</button>
           <button id="btn-zoom-out">－ 缩小</button>
+          <button id="btn-theme">🎨 切换主题</button>
         </div>
-        <div class="toolbar attach-toolbar">
-          <input type="file" id="attach-file-input" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,video/*" style="display:none">
-          <button id="btn-attach-file">📎 上传附件</button>
-          <button id="btn-attach-link">🔗 新增链接</button>
+        <div>
+          <label style="display:block;margin-bottom:6px;font-weight:700;color:#0f172a;font-size:13px">拖拽节点库</label>
+          <div class="palette" id="node-palette">
+            <div class="palette-item" draggable="true" data-topic="💡 灵感" data-bg="#fef3c7" data-color="#92400e">💡 灵感节点</div>
+            <div class="palette-item" draggable="true" data-topic="✅ 待办" data-bg="#dcfce7" data-color="#166534" data-note="使用右侧步骤跟踪任务状态">✅ 待办事项</div>
+            <div class="palette-item" draggable="true" data-topic="🔗 链接" data-bg="#dbeafe" data-color="#1d4ed8" data-note="拖入外部链接可自动解析">🔗 参考链接</div>
+            <div class="palette-item" draggable="true" data-topic="📝 备注" data-bg="#ede9fe" data-color="#5b21b6" data-note="补充更多上下文与结论">📝 结构化备注</div>
+          </div>
+          <div class="meta" style="margin-top:6px">拖拽或点击以上节点即可在当前选中节点下创建内容块。</div>
         </div>
         <div class="tips">
           <strong>快捷键</strong><br>
           <code>Enter</code> 同级 · <code>Tab</code> 子级 · <code>Shift+Tab</code> 升级 · <code>Del</code> 删除 · <code>F2</code> 重命名 · <code>Ctrl/Cmd+Z</code> 撤销<br>
           鼠标中键/空格拖拽 · 滚轮缩放 · 按住 <code>Alt</code> 拖动可复制节点。<br>
-          拖入图片、PDF、ZIP、文本或视频（≤15MB），可快速为当前节点生成附件节点。
+          从左侧节点库或外部文本/URL/文件拖入画布，可自动生成节点与附件。
         </div>
         <div>
           <span class="badge">提示</span>
@@ -1271,6 +1152,7 @@ if ($view === 'map_edit') {
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
         <div class="map-toolbar">
           <button id="btn-collapse">折叠/展开节点</button>
+          <button id="btn-reset">恢复默认主题</button>
         </div>
         <div id="mobile-command-bar" role="toolbar">
           <button data-action="sibling" type="button">同级</button>
@@ -1278,19 +1160,17 @@ if ($view === 'map_edit') {
           <button data-action="collapse" type="button">折叠</button>
           <button data-action="center" type="button">居中</button>
           <button data-action="fit" type="button">适配</button>
-          <button data-action="delete" type="button">删除</button>
-          <button data-action="attach-file" type="button">附件</button>
-          <button data-action="attach-link" type="button">链接</button>
+          <button data-action="theme" type="button">主题</button>
         </div>
       </main>
     </div>
-    <div id="global-toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/jsmind.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.5.7/es6/jsmind.js"></script>
     <script>
       const defaultData = <?php echo json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
     const jmContainer=document.getElementById('jsmind-container');
+    const paletteItems=document.querySelectorAll('.palette-item');
     const sidebar=document.querySelector('.sidebar');
     const sidebarMask=document.getElementById('sidebar-mask');
     const mobileMenuToggle=document.getElementById('mobile-menu-toggle');
@@ -1299,50 +1179,7 @@ if ($view === 'map_edit') {
     const mobileSelectedTopic=document.getElementById('mobile-selected-topic');
     const mobileSaveBtn=document.getElementById('mobile-save');
     const mobileCommandBar=document.getElementById('mobile-command-bar');
-    const attachFileInput=document.getElementById('attach-file-input');
-    const attachFileBtn=document.getElementById('btn-attach-file');
-    const attachLinkBtn=document.getElementById('btn-attach-link');
-    const toastEl=document.getElementById('global-toast');
-    const desktopSaveBtn=document.getElementById('btn-save');
-    const saveState=document.getElementById('save-state');
-    const importInput=document.getElementById('import-input');
-    const controlButtons=[desktopSaveBtn,mobileSaveBtn,document.getElementById('btn-export-json'),document.getElementById('btn-import-json'),document.getElementById('btn-add-sibling'),document.getElementById('btn-add-child'),document.getElementById('btn-delete'),document.getElementById('btn-fit'),document.getElementById('btn-center'),document.getElementById('btn-zoom-in'),document.getElementById('btn-zoom-out'),document.getElementById('btn-collapse'),attachFileBtn,attachLinkBtn];
-    const toastState={timer:null};
-    function showToast(message){
-      if(!toastEl) return;
-      toastEl.textContent=message;
-      toastEl.classList.add('show');
-      if(toastState.timer) clearTimeout(toastState.timer);
-      toastState.timer=setTimeout(()=>toastEl.classList.remove('show'),2200);
-    }
-    function disableMindmapUI(reason){
-      if(jmContainer){
-        jmContainer.innerHTML=`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-weight:600">${reason}</div>`;
-      }
-      controlButtons.forEach(btn=>{ if(btn){ btn.disabled=true; btn.classList.remove('is-loading','is-success','is-dirty'); btn.textContent=(btn.dataset && btn.dataset.baseLabel) ? btn.dataset.baseLabel : (btn.textContent||'已禁用'); } });
-      if(importInput) importInput.disabled=true;
-      if(attachFileInput) attachFileInput.disabled=true;
-      if(saveState){ saveState.textContent=reason; saveState.classList.add('show'); saveState.classList.remove('dirty'); }
-      showToast(reason);
-    }
-    function resolveJsMind(){
-      const candidates=[
-        window.jsMind,
-        window.jsmind,
-        window.jsMind && window.jsMind.default,
-        window.jsmind && window.jsmind.default,
-        window.jsMind && window.jsMind.jsMind,
-        window.jsmind && window.jsmind.jsMind,
-        window.jsMind && window.jsMind.default && window.jsMind.default.jsMind,
-        window.jsmind && window.jsmind.default && window.jsmind.default.jsMind,
-      ];
-      for(let i=0;i<candidates.length;i++){
-        const candidate=candidates[i];
-        if(typeof candidate==='function'){ return candidate; }
-      }
-      return null;
-    }
-    const JsMindCtor=resolveJsMind();
+    const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
     function openMobileSidebar(){
       if(!sidebar || !mobileMedia.matches) return;
       sidebar.classList.add('show-mobile');
@@ -1374,565 +1211,508 @@ if ($view === 'map_edit') {
     if(mobileMedia.addEventListener) mobileMedia.addEventListener('change',handleMediaChange);
     else if(mobileMedia.addListener) mobileMedia.addListener(handleMediaChange);
     document.addEventListener('keydown',evt=>{ if(evt.key==='Escape') closeMobileSidebar(true); });
-    if(!JsMindCtor){
-      disableMindmapUI('思维导图引擎加载失败，请稍后重试');
-    } else {
-      const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
-      overlay.id='drag-overlay';
-      overlay.setAttribute('width','100%');
-      overlay.setAttribute('height','100%');
-      overlay.setAttribute('viewBox','0 0 100 100');
-      const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
-      ghostLine.setAttribute('opacity','0');
-      const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
-      ghostRing.setAttribute('opacity','0');
-      overlay.appendChild(ghostLine);
-      overlay.appendChild(ghostRing);
-      const jm=new JsMindCtor({
-        container:'jsmind-container',
-        editable:true,
-          theme:'fresh-blue',
-          support_html:true,
-          mode:'full',
-        });
-        jm.show(initialData);
-        jmContainer.appendChild(overlay);
+    overlay.id='drag-overlay';
+    overlay.setAttribute('width','100%');
+    overlay.setAttribute('height','100%');
+    overlay.setAttribute('viewBox','0 0 100 100');
+    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostLine.setAttribute('opacity','0');
+    const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ghostRing.setAttribute('opacity','0');
+    overlay.appendChild(ghostLine);
+    overlay.appendChild(ghostRing);
+    const jm=new jsMind({
+      container:'jsmind-container',
+      editable:true,
+        theme:'fresh-blue',
+        support_html:true,
+        mode:'full',
+      });
+      jm.show(initialData);
+      jmContainer.appendChild(overlay);
+      syncOverlaySize();
+      if(!jm.get_selected_node() && initialData && initialData.data){
+        jm.select_node(initialData.data.id);
+      }
+      function syncOverlaySize(){
+        const rect=jmContainer.getBoundingClientRect();
+        const width=Math.max(rect.width,1);
+        const height=Math.max(rect.height,1);
+        overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
+      }
+      syncOverlaySize();
+      window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
+      document.addEventListener('scroll',()=>requestAnimationFrame(syncOverlaySize), true);
+      const dragHandle=document.createElement('div');
+      dragHandle.id='node-handle';
+      dragHandle.textContent='+';
+      document.body.appendChild(dragHandle);
+      let handleSource=null;
+      let pointerDragState=null;
+      function hideHandle(){ dragHandle.classList.remove('show','dragging'); handleSource=null; hideGhost(); pointerDragState=null; }
+      function updateHandlePosition(){
+        const node=jm.get_selected_node();
+        if(!node){ hideHandle(); return; }
+        const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+        if(!el){ hideHandle(); return; }
+        const rect=el.getBoundingClientRect();
+        dragHandle.style.left=`${rect.right + 8 + window.scrollX}px`;
+        dragHandle.style.top=`${rect.top + rect.height/2 - 14 + window.scrollY}px`;
+        dragHandle.classList.add('show');
+        handleSource=node;
         syncOverlaySize();
-        if(!jm.get_selected_node() && initialData && initialData.data){
-          jm.select_node(initialData.data.id);
-        }
-        function syncOverlaySize(){
-          const rect=jmContainer.getBoundingClientRect();
-          const width=Math.max(rect.width,1);
-          const height=Math.max(rect.height,1);
-          overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
-        }
+      }
+      function svgPointFromClient(x,y){
+        const matrix=overlay.getScreenCTM();
+        if(!matrix){ return {x,y}; }
+        const pt=overlay.createSVGPoint();
+        pt.x=x;
+        pt.y=y;
+        const result=pt.matrixTransform(matrix.inverse());
+        return {x:result.x, y:result.y};
+      }
+      function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
+      function nodeCenterSvg(nodeId){
+        if(!nodeId) return null;
+        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+        if(!el) return null;
+        const rect=el.getBoundingClientRect();
+        return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
+      }
+      function showGhost(start,end){
+        if(!start || !end){ hideGhost(); return; }
+        ghostLine.setAttribute('x1', start.x);
+        ghostLine.setAttribute('y1', start.y);
+        ghostLine.setAttribute('x2', end.x);
+        ghostLine.setAttribute('y2', end.y);
+        ghostLine.setAttribute('opacity','1');
+        ghostRing.setAttribute('cx', end.x);
+        ghostRing.setAttribute('cy', end.y);
+        ghostRing.setAttribute('r', 16);
+        ghostRing.setAttribute('opacity','1');
+      }
+      function hideGhost(){
+        ghostLine.setAttribute('opacity','0');
+        ghostRing.setAttribute('opacity','0');
+      }
+      dragHandle.addEventListener('pointerdown',e=>{
+        if(!handleSource){ return; }
+        e.preventDefault();
+        const origin=nodeCenterSvg(handleSource.id);
+        if(!origin){ return; }
         syncOverlaySize();
-        window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
-        document.addEventListener('scroll',()=>requestAnimationFrame(syncOverlaySize), true);
-        const dragHandle=document.createElement('div');
-        dragHandle.id='node-handle';
-        dragHandle.textContent='+';
-        document.body.appendChild(dragHandle);
-        let handleSource=null;
-        let pointerDragState=null;
-        function hideHandle(){ dragHandle.classList.remove('show','dragging'); handleSource=null; hideGhost(); pointerDragState=null; }
-        function updateHandlePosition(){
-          const node=jm.get_selected_node();
-          if(!node){ hideHandle(); return; }
-          const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
-          if(!el){ hideHandle(); return; }
-          const rect=el.getBoundingClientRect();
-          dragHandle.style.left=`${rect.right + 8 + window.scrollX}px`;
-          dragHandle.style.top=`${rect.top + rect.height/2 - 14 + window.scrollY}px`;
-          dragHandle.classList.add('show');
-          handleSource=node;
-          syncOverlaySize();
-        }
-        function svgPointFromClient(x,y){
-          const matrix=overlay.getScreenCTM();
-          if(!matrix){ return {x,y}; }
-          const pt=overlay.createSVGPoint();
-          pt.x=x;
-          pt.y=y;
-          const result=pt.matrixTransform(matrix.inverse());
-          return {x:result.x, y:result.y};
-        }
-        function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
-        function nodeCenterSvg(nodeId){
-          if(!nodeId) return null;
-          const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
-          if(!el) return null;
-          const rect=el.getBoundingClientRect();
-          return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
-        }
-        function showGhost(start,end){
-          if(!start || !end){ hideGhost(); return; }
-          ghostLine.setAttribute('x1', start.x);
-          ghostLine.setAttribute('y1', start.y);
-          ghostLine.setAttribute('x2', end.x);
-          ghostLine.setAttribute('y2', end.y);
-          ghostLine.setAttribute('opacity','1');
-          ghostRing.setAttribute('cx', end.x);
-          ghostRing.setAttribute('cy', end.y);
-          ghostRing.setAttribute('r', 16);
-          ghostRing.setAttribute('opacity','1');
-        }
-        function hideGhost(){
-          ghostLine.setAttribute('opacity','0');
-          ghostRing.setAttribute('opacity','0');
-        }
-        dragHandle.addEventListener('pointerdown',e=>{
-          if(!handleSource){ return; }
-          e.preventDefault();
-          const origin=nodeCenterSvg(handleSource.id);
-          if(!origin){ return; }
-          syncOverlaySize();
-          dragHandle.setPointerCapture(e.pointerId);
-          dragHandle.classList.add('dragging');
-          const initialPoint=eventToSvgPoint(e);
-          pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
-          showGhost(origin, initialPoint);
-        });
-        function finishPointerDrag(evt, cancelled){
-          if(!pointerDragState || evt.pointerId!==pointerDragState.pointerId) return;
-          const state=pointerDragState;
-          pointerDragState=null;
-          dragHandle.classList.remove('dragging');
-          hideGhost();
-          try{ dragHandle.releasePointerCapture(evt.pointerId); }catch(_){ }
-          if(cancelled){ return; }
-          const source=jm.get_node(state.sourceId);
-          if(!source) return;
-          const hovered=document.elementFromPoint(evt.clientX, evt.clientY);
-          const targetEl=hovered ? hovered.closest('.jsmind-node') : null;
-          if(targetEl){
-            const targetId=targetEl.getAttribute('nodeid');
-            const targetNode=targetId ? jm.get_node(targetId) : null;
-            if(targetNode && targetNode.id!==source.id){
-              executeCreateNodeCommand({
-                parentId:source.id,
-                topic:'🔗 '+targetNode.topic,
-                data:{link:targetNode.id},
-                meta:{relation:true,source:'handle'}
-              });
-              return;
-            }
-          }
-          const dropPoint=eventToSvgPoint(evt);
-          executeCreateNodeCommand({ parentId:source.id, topic:'子节点', position:dropPoint, meta:{source:'handle'} });
-        }
-        window.addEventListener('pointermove',e=>{
-          if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
-          const hovered=document.elementFromPoint(e.clientX, e.clientY);
-          let ringPoint=eventToSvgPoint(e);
-          if(hovered){
-            const targetEl=hovered.closest('.jsmind-node');
-            if(targetEl){
-              const targetId=targetEl.getAttribute('nodeid');
-              const center=nodeCenterSvg(targetId);
-              if(center) ringPoint=center;
-            }
-          }
-          pointerDragState.lastPoint=ringPoint;
-          showGhost(pointerDragState.origin, ringPoint);
-        });
-        window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
-        window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
-        window.addEventListener('resize',()=>requestAnimationFrame(updateHandlePosition));
-        document.addEventListener('scroll',()=>requestAnimationFrame(updateHandlePosition), true);
-        requestAnimationFrame(updateHandlePosition);
-        const titleInput=document.getElementById('map-title');
-        let dirty=false;
-        const commandLog=[];
-        window.__mindmapCommands=commandLog;
-        const saveButtons=[desktopSaveBtn,mobileSaveBtn];
-        let saveButtonTimer=null;
-        let revertSaveBtnTimer=null;
-        function updateMobileTitle(){ if(mobileTitleText){ mobileTitleText.textContent=(titleInput.value.trim()||'未命名导图'); } }
-        function updateMobileSelected(){
-          if(!mobileSelectedTopic) return;
-          const node=jm.get_selected_node();
-          if(node){
-            const raw=typeof node.topic==='string' ? node.topic : '';
-            const text=raw.replace(/<[^>]*>/g,'').trim() || '未命名';
-            mobileSelectedTopic.textContent='选中：'+text;
-          }
-          else { mobileSelectedTopic.textContent='未选中节点'; }
-        }
-        function setSaveButtonsState(state){
-          const disableMap={idle:true, dirty:false, saving:true, saved:true};
-          saveButtons.forEach(btn=>{
-            if(!btn) return;
-            if(!btn.dataset.baseLabel){ btn.dataset.baseLabel=(btn.textContent||'保存').trim() || '保存'; }
-            btn.classList.remove('is-loading','is-success','is-dirty');
-            if(state in disableMap){ btn.disabled=disableMap[state]; }
-            if(state==='saving'){
-              btn.classList.add('is-loading');
-              btn.innerHTML='<span class="btn-spinner" aria-hidden="true"></span><span style="margin-left:6px">保存中…</span>';
-            } else if(state==='saved'){
-              btn.classList.add('is-success');
-              btn.textContent='保存成功';
-            } else if(state==='dirty'){
-              btn.classList.add('is-dirty');
-              btn.textContent=btn.dataset.baseLabel+'*';
-            } else {
-              btn.textContent=btn.dataset.baseLabel;
-            }
-          });
-        }
-        function markDirty(){
-          dirty=true;
-          saveState.textContent='未保存';
-          saveState.classList.add('show','dirty');
-          if(revertSaveBtnTimer){ clearTimeout(revertSaveBtnTimer); revertSaveBtnTimer=null; }
-          setSaveButtonsState('dirty');
-        }
-        function markSaved(){
-          dirty=false;
-          saveState.textContent='保存成功';
-          saveState.classList.add('show');
-          saveState.classList.remove('dirty');
-          if(saveButtonTimer) clearTimeout(saveButtonTimer);
-          saveButtonTimer=setTimeout(()=>saveState.classList.remove('show'),1500);
-          setSaveButtonsState('saved');
-          if(revertSaveBtnTimer) clearTimeout(revertSaveBtnTimer);
-          revertSaveBtnTimer=setTimeout(()=>{ setSaveButtonsState('idle'); revertSaveBtnTimer=null; },1700);
-          showToast('保存成功');
-        }
-        function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
-        function ensureNode(){
-          let node=jm.get_selected_node();
-          if(node) return node;
-          if(typeof jm.get_root === 'function'){ node=jm.get_root(); }
-          if(!node && initialData && initialData.data){ jm.select_node(initialData.data.id); node=jm.get_selected_node(); }
-          if(node && !node.selected){ jm.select_node(node.id); node=jm.get_selected_node(); }
-          return node;
-        }
-        function executeCreateNodeCommand(input){
-          if(!input || !input.parentId) return null;
-          const parent=jm.get_node(input.parentId);
-          if(!parent) return null;
-          const nodeId=input.id || randomId();
-          const payloadData=deepClone(input.data);
-          const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
-          const style=deepClone(input.style);
-          if(style && (style.background || style.foreground)){
-            jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
-          }
-          if(input.position){
-            newNode.data = newNode.data || {};
-            newNode.data.position = {x:input.position.x, y:input.position.y};
-          }
-          const command={
-            type:'createNode',
-            id:newNode.id,
-            parentId:parent.id,
-            topic:input.topic || '新节点',
-            data:deepClone(input.data),
-            style:deepClone(input.style),
-            position:input.position ? {x:input.position.x, y:input.position.y} : null,
-            timestamp:Date.now(),
-            meta:deepClone(input.meta)
-          };
-          commandLog.push(command);
-          window.__mindmapCommands=commandLog;
-          jm.select_node(newNode.id);
-          updateMobileSelected();
-          markDirty();
-          requestAnimationFrame(updateHandlePosition);
-          return newNode;
-        }
-        function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
-        function isProbablyUrl(text){
-          const value=(text||'').trim();
-          return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
-        }
-        function findNodeElementByEvent(event){
-          if(!event || !event.target) return null;
-          return event.target.closest ? event.target.closest('.jsmind-node') : null;
-        }
-        function resolveDropParent(event){
-          const el=findNodeElementByEvent(event);
-          if(el){
-            const nodeId=el.getAttribute('nodeid');
-            if(nodeId){ const node=jm.get_node(nodeId); if(node) return node; }
-          }
-          const selected=jm.get_selected_node();
-          if(selected) return selected;
-          return jm.get_root();
-        }
-        function isAllowedAttachment(file){
-          if(!file) return false;
-          const type=(file.type||'').toLowerCase();
-          const name=(file.name||'').toLowerCase();
-          const typeRules=[/^image\//,/^video\//,/^text\//];
-          const exactTypes=['application/pdf','application/zip','application/x-zip-compressed'];
-          const extAllow=['.pdf','.zip','.txt','.md','.markdown','.csv','.log'];
-          if(exactTypes.includes(type)) return true;
-          if(typeRules.some(rule=>rule.test(type))) return true;
-          return extAllow.some(ext=>name.endsWith(ext));
-        }
-        function stripTopicText(topic){
-          return (typeof topic==='string'?topic:'').replace(/<[^>]*>/g,'').trim();
-        }
-        function determineAttachmentPlacement(anchor){
-          let node=anchor || ensureNode();
-          if(!node) node = jm.get_root();
-          if(!node) return null;
-          if(!node.parent || node.isroot){
-            return {parent:node, mode:'child'};
-          }
-          const label=stripTopicText(node.topic)||'当前节点';
-          const chooseSibling=window.confirm(`将内容作为「${label}」的同级节点？\n确定：同级 · 取消：子级`);
-          if(chooseSibling && node.parent){
-            return {parent:node.parent, mode:'sibling'};
-          }
-          return {parent:node, mode:'child'};
-        }
-        function handleDroppedText(text, parent, event){
-          if(!text || !parent) return;
-          const cleaned=text.trim();
-          if(!cleaned) return;
-          const firstLine=cleaned.split(/\r?\n/)[0].slice(0,100) || '新节点';
-          const data={};
-          if(isProbablyUrl(cleaned)) data.url=cleaned;
-          if(cleaned.includes('\n')) data.note=cleaned;
-          executeCreateNodeCommand({
-            parentId:parent.id,
-            topic:firstLine,
-            data:Object.keys(data).length?data:null,
-            position:event ? eventToSvgPoint(event) : null,
-            meta:{source:'text'}
-          });
-        }
-        function handleDroppedFiles(files, baseNode, event, placementOverride){
-          if(!files || !files.length) return;
-          const list=Array.from(files).slice(0,5);
-          const invalid=[];
-          const oversize=[];
-          const valid=[];
-          list.forEach(file=>{
-            if(!isAllowedAttachment(file)){ invalid.push(file.name); return; }
-            if(file.size>15*1024*1024){ oversize.push(file.name); return; }
-            valid.push(file);
-          });
-          if(invalid.length){ alert('不支持上传文件：'+invalid.join('、')); }
-          if(oversize.length){ alert('以下文件超过 15MB：'+oversize.join('、')); }
-          if(!valid.length) return;
-          const placement=placementOverride || determineAttachmentPlacement(baseNode);
-          if(!placement || !placement.parent) return;
-          const basePoint=event ? eventToSvgPoint(event) : null;
-          valid.forEach((file,idx)=>{
-            const reader=new FileReader();
-            reader.onload=evt=>{
-              const dataUrl=evt.target.result;
-              const data={
-                attachment:{
-                  name:file.name,
-                  size:file.size,
-                  type=file.type || 'application/octet-stream',
-                  content:dataUrl,
-                }
-              };
-              const offset=basePoint ? {x:basePoint.x + idx*18, y:basePoint.y + idx*18} : null;
-              executeCreateNodeCommand({
-                parentId:placement.parent.id,
-                topic:'📎 '+file.name,
-                data:data,
-                position:offset,
-                meta:{source:'file', placement:placement.mode}
-              });
-            };
-            reader.readAsDataURL(file);
-          });
-        }
-        function addSiblingNode(){
-          const node=ensureNode(); if(!node || node.isroot) return;
-          if(node.parent){ executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' }); }
-        }
-        function addChildNode(){
-          const node=ensureNode();
-          if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
-        }
-        function deleteSelectedNode(){
-          const node=ensureNode(); if(!node || node.isroot) return;
-          jm.remove_node(node.id);
-          markDirty();
-          requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
-        }
-        function callView(method, ...args){
-          if(jm.view && typeof jm.view[method] === 'function'){
-            try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
-          }
-          return false;
-        }
-        function fitView(){
-          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-            callView('set_zoom', 1);
-            if(!callView('move_to_center')) callView('center_root');
-          }
-        }
-        function centerView(){ if(!callView('move_to_center')) callView('center_root'); }
-        function zoomIn(){ if(!callView('zoomIn')) callView('zoom_in'); }
-        function zoomOut(){ if(!callView('zoomOut')) callView('zoom_out'); }
-        function collapseSelected(){
-          const node=ensureNode();
-          if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); }); }
-        }
-        document.getElementById('btn-add-sibling').onclick=addSiblingNode;
-        document.getElementById('btn-add-child').onclick=addChildNode;
-        document.getElementById('btn-delete').onclick=deleteSelectedNode;
-        document.getElementById('btn-fit').onclick=fitView;
-        document.getElementById('btn-center').onclick=centerView;
-        document.getElementById('btn-zoom-in').onclick=zoomIn;
-        document.getElementById('btn-zoom-out').onclick=zoomOut;
-        document.getElementById('btn-collapse').onclick=collapseSelected;
-        if(attachFileBtn && attachFileInput){
-          attachFileBtn.addEventListener('click',()=>{
-            attachFileInput.value='';
-            attachFileInput.click();
-            if(mobileMedia.matches) closeMobileSidebar();
-          });
-          attachFileInput.addEventListener('change',e=>{
-            const file=e.target.files && e.target.files[0];
-            if(!file){ e.target.value=''; return; }
-            if(!isAllowedAttachment(file)){
-              alert('不支持上传文件：'+file.name);
-              e.target.value='';
-              return;
-            }
-            if(file.size>15*1024*1024){
-              alert(file.name+' 超过 15MB，已取消。');
-              e.target.value='';
-              return;
-            }
-            const placement=determineAttachmentPlacement(ensureNode());
-            if(!placement || !placement.parent){ e.target.value=''; return; }
-            handleDroppedFiles([file], placement.parent, null, placement);
-            e.target.value='';
-          });
-        }
-        function promptLinkAttachment(){
-          const anchor=ensureNode() || jm.get_root();
-          if(!anchor) return;
-          const raw=window.prompt('请输入链接地址（支持 http/https/mailto/ftp）：');
-          if(!raw) return;
-          const trimmed=raw.trim();
-          if(!trimmed) return;
-          let normalized='';
-          if(/^(https?:\/\/|mailto:|ftp:\/\/)/i.test(trimmed)) normalized=trimmed;
-          else if(trimmed.toLowerCase().startsWith('www.')) normalized='https://'+trimmed;
-          if(!normalized){ alert('请输入有效的链接地址'); return; }
-          let hostnameHint='链接';
-          try{
-            const urlObj=new URL(normalized);
-            hostnameHint=(urlObj.hostname||hostnameHint).replace(/^www\./i,'');
-          }catch(_){ hostnameHint=trimmed; }
-          const title=window.prompt('请输入链接标题（可选）', hostnameHint) || '';
-          const label=(title.trim() || hostnameHint || '链接').slice(0,40);
-          const placement=determineAttachmentPlacement(anchor);
-          if(!placement || !placement.parent) return;
-          executeCreateNodeCommand({
-            parentId:placement.parent.id,
-            topic:'🔗 '+label,
-            data:{url:normalized},
-            meta:{source:'link', placement:placement.mode}
-          });
-          if(mobileMedia.matches) closeMobileSidebar();
-        }
-        if(attachLinkBtn){ attachLinkBtn.addEventListener('click', promptLinkAttachment); }
-        if(mobileCommandBar){
-          const mobileActions={
-            sibling:addSiblingNode,
-            child:addChildNode,
-            collapse:collapseSelected,
-            center:centerView,
-            fit:fitView,
-            delete:deleteSelectedNode,
-            'attach-file':()=>{ if(attachFileBtn){ attachFileBtn.click(); } },
-            'attach-link':promptLinkAttachment,
-          };
-          mobileCommandBar.addEventListener('click',evt=>{
-            const btn=evt.target.closest('button[data-action]');
-            if(!btn) return;
-            const action=(btn.dataset.action||'').toLowerCase();
-            if(mobileActions[action]) mobileActions[action]();
-          });
-        }
-        if(jmContainer){ jmContainer.addEventListener('pointerdown',()=>closeMobileSidebar()); }
-        jmContainer.addEventListener('dragenter',e=>{
-          e.preventDefault();
-          jmContainer.classList.add('dragover');
-        });
-        jmContainer.addEventListener('dragleave',e=>{
-          if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); }
-        });
-        jmContainer.addEventListener('dragover',e=>{
-          e.preventDefault();
-          e.dataTransfer.dropEffect='copy';
-        });
-        jmContainer.addEventListener('drop',e=>{
-          e.preventDefault();
-          jmContainer.classList.remove('dragover');
-          syncOverlaySize();
-          const parent=resolveDropParent(e);
-          const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
-          if(files.length){
-            handleDroppedFiles(files, parent, e);
+        dragHandle.setPointerCapture(e.pointerId);
+        dragHandle.classList.add('dragging');
+        const initialPoint=eventToSvgPoint(e);
+        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
+        showGhost(origin, initialPoint);
+      });
+      function finishPointerDrag(evt, cancelled){
+        if(!pointerDragState || evt.pointerId!==pointerDragState.pointerId) return;
+        const state=pointerDragState;
+        pointerDragState=null;
+        dragHandle.classList.remove('dragging');
+        hideGhost();
+        try{ dragHandle.releasePointerCapture(evt.pointerId); }catch(_){ }
+        if(cancelled){ return; }
+        const source=jm.get_node(state.sourceId);
+        if(!source) return;
+        const hovered=document.elementFromPoint(evt.clientX, evt.clientY);
+        const targetEl=hovered ? hovered.closest('.jsmind-node') : null;
+        if(targetEl){
+          const targetId=targetEl.getAttribute('nodeid');
+          const targetNode=targetId ? jm.get_node(targetId) : null;
+          if(targetNode && targetNode.id!==source.id){
+            executeCreateNodeCommand({
+              parentId:source.id,
+              topic:'🔗 '+targetNode.topic,
+              data:{link:targetNode.id},
+              meta:{relation:true,source:'handle'}
+            });
             return;
           }
-          const uri=e.dataTransfer.getData('text/uri-list');
-          let text='';
-          if(uri){ text=uri; } else { text=e.dataTransfer.getData('text/plain') || ''; }
-          if(text){
-            handleDroppedText(text, parent, e);
-          }
-        });
-        titleInput.addEventListener('input',()=>{ markDirty(); updateMobileTitle(); });
-        updateMobileTitle();
-        updateMobileSelected();
-        setSaveButtonsState('idle');
-        const jsMindEvents=(JsMindCtor && JsMindCtor.event_type) || (window.jsMind && window.jsMind.event_type) || (window.jsmind && window.jsmind.event_type) || null;
-        if(jsMindEvents){
-          jm.add_event_listener(type=>{
-            if(type===jsMindEvents.select || type===jsMindEvents.refresh || type===jsMindEvents.after_edit || type===jsMindEvents.show){
-              requestAnimationFrame(updateHandlePosition);
-            }
-            if(type===jsMindEvents.edit || type===jsMindEvents.after_edit || type===jsMindEvents.update){ markDirty(); }
-            requestAnimationFrame(updateMobileSelected);
-          });
         }
-        document.getElementById('btn-export-json').onclick=()=>{
-          const data=jm.get_data('node_tree');
-          const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement('a');
-          a.href=url;
-          a.download=(titleInput.value.trim()||'mindmap')+'.json';
-          a.click();
-          setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        const dropPoint=eventToSvgPoint(evt);
+        executeCreateNodeCommand({ parentId:source.id, topic:'子节点', position:dropPoint, meta:{source:'handle'} });
+      }
+      window.addEventListener('pointermove',e=>{
+        if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
+        const hovered=document.elementFromPoint(e.clientX, e.clientY);
+        let ringPoint=eventToSvgPoint(e);
+        if(hovered){
+          const targetEl=hovered.closest('.jsmind-node');
+          if(targetEl){
+            const targetId=targetEl.getAttribute('nodeid');
+            const center=nodeCenterSvg(targetId);
+            if(center) ringPoint=center;
+          }
+        }
+        pointerDragState.lastPoint=ringPoint;
+        showGhost(pointerDragState.origin, ringPoint);
+      });
+      window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
+      window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
+      window.addEventListener('resize',()=>requestAnimationFrame(updateHandlePosition));
+      document.addEventListener('scroll',()=>requestAnimationFrame(updateHandlePosition), true);
+      requestAnimationFrame(updateHandlePosition);
+      const titleInput=document.getElementById('map-title');
+      const saveState=document.getElementById('save-state');
+      const importInput=document.getElementById('import-input');
+      let dirty=false;
+      const commandLog=[];
+      window.__mindmapCommands=commandLog;
+      const layouts=['fresh-blue','fresh-red','fresh-green','fresh-blue','nephrite','greensea','pink'];
+      let themeIndex=0;
+      function updateMobileTitle(){ if(mobileTitleText){ mobileTitleText.textContent=(titleInput.value.trim()||'未命名导图'); } }
+      function updateMobileSelected(){
+        if(!mobileSelectedTopic) return;
+        const node=jm.get_selected_node();
+        if(node){
+          const raw=typeof node.topic==='string' ? node.topic : '';
+          const text=raw.replace(/<[^>]*>/g,'').trim() || '未命名';
+          mobileSelectedTopic.textContent='选中：'+text;
+        }
+        else { mobileSelectedTopic.textContent='未选中节点'; }
+      }
+      function markDirty(){
+        dirty=true;
+        saveState.textContent='未保存';
+        saveState.classList.add('show','dirty');
+        if(mobileSaveBtn){
+          mobileSaveBtn.disabled=false;
+          mobileSaveBtn.classList.add('dirty');
+          mobileSaveBtn.textContent='保存*';
+        }
+      }
+      function markSaved(){
+        dirty=false;
+        saveState.textContent='已保存';
+        saveState.classList.add('show');
+        saveState.classList.remove('dirty');
+        setTimeout(()=>saveState.classList.remove('show'),1200);
+        if(mobileSaveBtn){
+          mobileSaveBtn.disabled=true;
+          mobileSaveBtn.classList.remove('dirty');
+          mobileSaveBtn.textContent='保存';
+        }
+      }
+      function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
+      function ensureNode(){
+        let node=jm.get_selected_node();
+        if(node) return node;
+        if(typeof jm.get_root === 'function'){ node=jm.get_root(); }
+        if(!node && initialData && initialData.data){ jm.select_node(initialData.data.id); node=jm.get_selected_node(); }
+        if(node && !node.selected){ jm.select_node(node.id); node=jm.get_selected_node(); }
+        return node;
+      }
+      function executeCreateNodeCommand(input){
+        if(!input || !input.parentId) return null;
+        const parent=jm.get_node(input.parentId);
+        if(!parent) return null;
+        const nodeId=input.id || randomId();
+        const payloadData=deepClone(input.data);
+        const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
+        const style=deepClone(input.style);
+        if(style && (style.background || style.foreground)){
+          jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
+        }
+        if(input.position){
+          newNode.data = newNode.data || {};
+          newNode.data.position = {x:input.position.x, y:input.position.y};
+        }
+        const command={
+          type:'createNode',
+          id:newNode.id,
+          parentId:parent.id,
+          topic:input.topic || '新节点',
+          data:deepClone(input.data),
+          style:deepClone(input.style),
+          position:input.position ? {x:input.position.x, y:input.position.y} : null,
+          timestamp:Date.now(),
+          meta:deepClone(input.meta)
         };
-        document.getElementById('btn-import-json').onclick=()=>importInput.click();
-        importInput.addEventListener('change', e=>{
-          const file=e.target.files[0]; if(!file) return;
+        commandLog.push(command);
+        window.__mindmapCommands=commandLog;
+        jm.select_node(newNode.id);
+        updateMobileSelected();
+        markDirty();
+        requestAnimationFrame(updateHandlePosition);
+        return newNode;
+      }
+      function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
+      function buildTemplateFromDataset(el){
+        const template={
+          topic:el.dataset.topic || '新节点',
+          data:{},
+          style:{
+            background:el.dataset.bg || null,
+            foreground:el.dataset.color || null,
+          }
+        };
+        if(el.dataset.note){ template.data.note=el.dataset.note; }
+        if(Object.keys(template.data).length===0) delete template.data;
+        return template;
+      }
+      function applyTemplateToParent(template, parentNode, position){
+        if(!parentNode) return null;
+        return executeCreateNodeCommand({
+          parentId:parentNode.id,
+          topic:template.topic || '新节点',
+          data:deepClone(template.data),
+          style:deepClone(template.style),
+          position:position || null,
+          meta:{template:true}
+        });
+      }
+      function safeParse(json, fallback=null){
+        try{ return JSON.parse(json); }
+        catch(_){ return fallback; }
+      }
+      function isProbablyUrl(text){
+        const value=(text||'').trim();
+        return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
+      }
+      function findNodeElementByEvent(event){
+        if(!event || !event.target) return null;
+        return event.target.closest ? event.target.closest('.jsmind-node') : null;
+      }
+      function resolveDropParent(event){
+        const el=findNodeElementByEvent(event);
+        if(el){
+          const nodeId=el.getAttribute('nodeid');
+          if(nodeId){ const node=jm.get_node(nodeId); if(node) return node; }
+        }
+        const selected=jm.get_selected_node();
+        if(selected) return selected;
+        return jm.get_root();
+      }
+      function handleDroppedText(text, parent, event){
+        if(!text || !parent) return;
+        const cleaned=text.trim();
+        if(!cleaned) return;
+        const firstLine=cleaned.split(/\r?\n/)[0].slice(0,100) || '新节点';
+        const data={};
+        if(isProbablyUrl(cleaned)) data.url=cleaned;
+        if(cleaned.includes('\n')) data.note=cleaned;
+        executeCreateNodeCommand({
+          parentId:parent.id,
+          topic:firstLine,
+          data:Object.keys(data).length?data:null,
+          position:event ? eventToSvgPoint(event) : null,
+          meta:{source:'text'}
+        });
+      }
+      function handleDroppedFiles(files, parent, event){
+        if(!files || !files.length || !parent) return;
+        const limit=Math.min(files.length,5);
+        const basePoint=event ? eventToSvgPoint(event) : null;
+        for(let i=0;i<limit;i++){
+          const file=files[i];
+          if(file.size>5*1024*1024){
+            alert(file.name+' 超过 5MB，已跳过。');
+            continue;
+          }
           const reader=new FileReader();
           reader.onload=evt=>{
-            try{
-              const json=JSON.parse(evt.target.result);
-              if(json && json.data){ jm.show(json); initialData=JSON.parse(JSON.stringify(json)); markDirty(); }
-              else alert('文件格式不兼容');
-            }catch(err){ alert('无法解析 JSON：'+err.message); }
+            const dataUrl=evt.target.result;
+            const data={
+              attachment:{
+                name:file.name,
+                size:file.size,
+                type:file.type || 'application/octet-stream',
+                content:dataUrl,
+              }
+            };
+            const offset=basePoint ? {x:basePoint.x + i*18, y:basePoint.y + i*18} : null;
+            executeCreateNodeCommand({
+              parentId:parent.id,
+              topic:'📎 '+file.name,
+              data:data,
+              position:offset,
+              meta:{source:'file'}
+            });
           };
-          reader.readAsText(file,'utf-8');
-        });
-        document.getElementById('btn-save').onclick=saveMindmap;
-        if(mobileSaveBtn){ mobileSaveBtn.addEventListener('click', saveMindmap); }
-        async function saveMindmap(){
-          const title=titleInput.value.trim()||'未命名导图';
-          const payload=JSON.stringify(jm.get_data('node_tree'));
-          const fd=new FormData();
-          fd.append('action','save_mindmap');
-          fd.append('id', document.getElementById('jsmind-container').dataset.mapId || '0');
-          fd.append('title', title);
-          fd.append('content', payload);
-          try{
-            setSaveButtonsState('saving');
-            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-            if(!res.ok) throw new Error('网络异常');
-            const json=await res.json();
-            if(!json.ok) throw new Error(json.error||'保存失败');
-            document.getElementById('jsmind-container').dataset.mapId=json.id;
-            history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
-            initialData=JSON.parse(payload);
-            markSaved();
-          }catch(err){
-            alert(err.message||'保存失败');
-            setSaveButtonsState('dirty');
-          }
+          reader.readAsDataURL(file);
         }
-        window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
-    }
+      }
+      paletteItems.forEach(item=>{
+        item.addEventListener('dragstart',e=>{
+          const template=buildTemplateFromDataset(item);
+          const payload=JSON.stringify(template);
+          e.dataTransfer.setData('application/x-mm-template', payload);
+          e.dataTransfer.setData('application/x-mind-node', payload);
+          e.dataTransfer.effectAllowed='copy';
+        });
+        item.addEventListener('click',()=>{
+          const template=buildTemplateFromDataset(item);
+          const parentNode=ensureNode() || jm.get_root();
+          if(parentNode) applyTemplateToParent(template, parentNode, null);
+          if(mobileMedia.matches) closeMobileSidebar();
+        });
+      });
+      function addSiblingNode(){
+        const node=ensureNode(); if(!node || node.isroot) return;
+        if(node.parent){ executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' }); }
+      }
+      function addChildNode(){
+        const node=ensureNode();
+        if(node){ executeCreateNodeCommand({ parentId:node.id, topic:'子节点' }); }
+      }
+      function deleteSelectedNode(){
+        const node=ensureNode(); if(!node || node.isroot) return;
+        jm.remove_node(node.id);
+        markDirty();
+        requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
+      }
+      function callView(method, ...args){
+        if(jm.view && typeof jm.view[method] === 'function'){
+          try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
+        }
+        return false;
+      }
+      function fitView(){
+        if(!callView('zoomToFit') && !callView('zoom_to_fit')){
+          callView('set_zoom', 1);
+          if(!callView('move_to_center')) callView('center_root');
+        }
+      }
+      function centerView(){ if(!callView('move_to_center')) callView('center_root'); }
+      function zoomIn(){ if(!callView('zoomIn')) callView('zoom_in'); }
+      function zoomOut(){ if(!callView('zoomOut')) callView('zoom_out'); }
+      function collapseSelected(){
+        const node=ensureNode();
+        if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); }); }
+      }
+      function resetTheme(){
+        const snapshot=JSON.parse(JSON.stringify(initialData));
+        jm.show(snapshot);
+        markDirty();
+        requestAnimationFrame(()=>{ updateHandlePosition(); updateMobileSelected(); });
+      }
+      function nextTheme(){ themeIndex=(themeIndex+1)%layouts.length; jm.set_theme(layouts[themeIndex]); }
+      document.getElementById('btn-add-sibling').onclick=addSiblingNode;
+      document.getElementById('btn-add-child').onclick=addChildNode;
+      document.getElementById('btn-delete').onclick=deleteSelectedNode;
+      document.getElementById('btn-fit').onclick=fitView;
+      document.getElementById('btn-center').onclick=centerView;
+      document.getElementById('btn-zoom-in').onclick=zoomIn;
+      document.getElementById('btn-zoom-out').onclick=zoomOut;
+      document.getElementById('btn-collapse').onclick=collapseSelected;
+      document.getElementById('btn-reset').onclick=resetTheme;
+      document.getElementById('btn-theme').onclick=nextTheme;
+      if(mobileCommandBar){
+        const mobileActions={
+          sibling:addSiblingNode,
+          child:addChildNode,
+          collapse:collapseSelected,
+          center:centerView,
+          fit:fitView,
+          theme:nextTheme,
+          delete:deleteSelectedNode,
+          zoomin:zoomIn,
+          zoomout:zoomOut,
+        };
+        mobileCommandBar.addEventListener('click',evt=>{
+          const btn=evt.target.closest('button[data-action]');
+          if(!btn) return;
+          const action=(btn.dataset.action||'').toLowerCase();
+          if(mobileActions[action]) mobileActions[action]();
+        });
+      }
+      if(jmContainer){ jmContainer.addEventListener('pointerdown',()=>closeMobileSidebar()); }
+      jmContainer.addEventListener('dragenter',e=>{
+        e.preventDefault();
+        jmContainer.classList.add('dragover');
+      });
+      jmContainer.addEventListener('dragleave',e=>{
+        if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); }
+      });
+      jmContainer.addEventListener('dragover',e=>{
+        e.preventDefault();
+        e.dataTransfer.dropEffect='copy';
+      });
+      jmContainer.addEventListener('drop',e=>{
+        e.preventDefault();
+        jmContainer.classList.remove('dragover');
+        syncOverlaySize();
+        const parent=resolveDropParent(e);
+        const dropPoint=eventToSvgPoint(e);
+        const templateStr=e.dataTransfer.getData('application/x-mm-template') || e.dataTransfer.getData('application/x-mind-node');
+        if(templateStr){
+          const template=safeParse(templateStr, null);
+          if(template && parent){ applyTemplateToParent(template, parent, dropPoint); }
+          return;
+        }
+        const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
+        if(files.length){
+          handleDroppedFiles(files, parent, e);
+          return;
+        }
+        const uri=e.dataTransfer.getData('text/uri-list');
+        let text='';
+        if(uri){ text=uri; } else { text=e.dataTransfer.getData('text/plain') || ''; }
+        if(text){
+          handleDroppedText(text, parent, e);
+        }
+      });
+      titleInput.addEventListener('input',()=>{ markDirty(); updateMobileTitle(); });
+      updateMobileTitle();
+      updateMobileSelected();
+      if(mobileSaveBtn){ mobileSaveBtn.disabled=true; }
+      if(window.jsMind && jsMind.event_type){
+        jm.add_event_listener(type=>{
+          if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
+            requestAnimationFrame(updateHandlePosition);
+          }
+          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
+          requestAnimationFrame(updateMobileSelected);
+        });
+      }
+      document.getElementById('btn-export-json').onclick=()=>{
+        const data=jm.get_data('node_tree');
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=(titleInput.value.trim()||'mindmap')+'.json';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      };
+      document.getElementById('btn-import-json').onclick=()=>importInput.click();
+      importInput.addEventListener('change', e=>{
+        const file=e.target.files[0]; if(!file) return;
+        const reader=new FileReader();
+        reader.onload=evt=>{
+          try{
+            const json=JSON.parse(evt.target.result);
+            if(json && json.data){ jm.show(json); initialData=JSON.parse(JSON.stringify(json)); markDirty(); }
+            else alert('文件格式不兼容');
+          }catch(err){ alert('无法解析 JSON：'+err.message); }
+        };
+        reader.readAsText(file,'utf-8');
+      });
+      document.getElementById('btn-save').onclick=saveMindmap;
+      if(mobileSaveBtn){ mobileSaveBtn.addEventListener('click', saveMindmap); }
+      async function saveMindmap(){
+        const title=titleInput.value.trim()||'未命名导图';
+        const payload=JSON.stringify(jm.get_data('node_tree'));
+        const fd=new FormData();
+        fd.append('action','save_mindmap');
+        fd.append('id', document.getElementById('jsmind-container').dataset.mapId || '0');
+        fd.append('title', title);
+        fd.append('content', payload);
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('网络异常');
+          const json=await res.json();
+          if(!json.ok) throw new Error(json.error||'保存失败');
+          document.getElementById('jsmind-container').dataset.mapId=json.id;
+          history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+          initialData=JSON.parse(payload);
+          markSaved();
+        }catch(err){ alert(err.message||'保存失败'); }
+      }
+      window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; }});
     </script>
   </body>
   </html>
