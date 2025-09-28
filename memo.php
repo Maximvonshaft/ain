@@ -24,7 +24,13 @@ header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 's
 // —— 配置 ——
 const DB_FILE = __DIR__ . '/memo.sqlite';
 const UPLOAD_DIR = __DIR__ . '/uploads';
-const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
+const ALLOWED_UPLOAD_MIME_MAP = [
+  'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
+  'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip',
+  'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','text/csv'=>'csv','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
+  'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg',
+];
 date_default_timezone_set('Asia/Shanghai');
 
 // —— 思维导图默认内容 ——
@@ -165,6 +171,20 @@ function db(): PDO {
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );');
+  $pdo->exec('CREATE TABLE IF NOT EXISTS mindmap_assets(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mindmap_id INTEGER,
+    node_uid TEXT,
+    session_key TEXT,
+    orig_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
+  );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
   $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
   if ($hasMap === 0) {
     $nowTs = now();
@@ -224,6 +244,61 @@ function attachments_for_item(int $item_id): array {
   $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
 }
 
+function get_mindmap_asset(int $id): ?array {
+  $pdo=db();
+  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE id=? LIMIT 1');
+  $st->execute([$id]);
+  return $st->fetch() ?: null;
+}
+
+function mindmap_assets_for_map(int $map_id): array {
+  $pdo=db();
+  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE mindmap_id=?');
+  $st->execute([$map_id]);
+  return $st->fetchAll();
+}
+
+function delete_mindmap_asset(int $id): void {
+  $asset=get_mindmap_asset($id);
+  if(!$asset) return;
+  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name'];
+  if(is_file($path)) @unlink($path);
+  $pdo=db();
+  $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
+}
+
+function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name, string $stored_name, string $mime, int $size, string $session_key): array {
+  $pdo=db();
+  $pdo->prepare('INSERT INTO mindmap_assets(mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    ->execute([
+      $map_id>0?$map_id:null,
+      $node_uid,
+      $map_id>0?null:$session_key,
+      $orig_name,
+      $stored_name,
+      $mime,
+      $size,
+      now()
+    ]);
+  $id=(int)$pdo->lastInsertId();
+  return get_mindmap_asset($id) ?? ['id'=>$id,'mindmap_id'=>$map_id,'node_uid'=>$node_uid,'session_key'=>$session_key,'orig_name'=>$orig_name,'stored_name'=>$stored_name,'mime'=>$mime,'size'=>$size,'created_at'=>now()];
+}
+
+function prune_mindmap_assets(int $map_id, array $keep_ids): void {
+  $pdo=db();
+  $ids=array_values(array_unique(array_map('intval',$keep_ids)));
+  $placeholders=$ids?implode(',',array_fill(0,count($ids),'?')):'';
+  $params=$ids;
+  array_unshift($params,$map_id);
+  $sql=$ids?
+    "SELECT id FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
+    "SELECT id FROM mindmap_assets WHERE mindmap_id=?";
+  $st=$pdo->prepare($sql);
+  $st->execute($params);
+  $rows=$st->fetchAll();
+  foreach($rows as $row){ delete_mindmap_asset((int)$row['id']); }
+}
+
 // —— 思维导图 ——
 function get_mindmaps(): array {
   $pdo=db();
@@ -256,6 +331,8 @@ function update_mindmap(int $id, string $title, string $content): array {
 
 function delete_mindmap(int $id): void {
   $pdo=db();
+  $assets=mindmap_assets_for_map($id);
+  foreach($assets as $asset){ delete_mindmap_asset((int)$asset['id']); }
   $pdo->prepare('DELETE FROM mindmaps WHERE id=?')->execute([$id]);
 }
 
@@ -280,6 +357,109 @@ function mindmap_outline_preview(string $json, int $limit = 8): string {
   return implode("\n", $lines);
 }
 
+function create_mindmap_asset_from_dataurl(string $data_url, string $name, ?int $map_id, string $node_uid, string $session_key): ?array {
+  if(!preg_match('#^data:(.*?);base64,(.*)$#',$data_url,$m)) return null;
+  $mime=strtolower(trim($m[1] !== '' ? $m[1] : 'application/octet-stream'));
+  $binary=base64_decode(strtr($m[2],' ','+'), true);
+  if($binary===false) return null;
+  $size=strlen($binary);
+  if($size>MAX_UPLOAD_BYTES) throw new RuntimeException('附件超过 15MB 上限，无法保存。');
+  $ext=ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
+  if(!$ext) return null;
+  if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
+  $stored=bin2hex(random_bytes(8)).'.'.$ext;
+  $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored;
+  if(file_put_contents($dest,$binary)===false) return null;
+  $safeName=$name !== '' ? $name : ('附件.'.$ext);
+  return create_mindmap_asset($map_id,$node_uid,$safeName,$stored,$mime,$size,$session_key);
+}
+
+function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map_id, string $session_key): void {
+  $asset_refs=[];
+  if(!isset($payload['data']) || !is_array($payload['data'])) return;
+  $payload['format']='node_tree';
+  $sanitize=function (&$node) use (&$sanitize,&$asset_refs,$map_id,$session_key){
+    if(!is_array($node)) return;
+    if(empty($node['id']) || !is_string($node['id'])){
+      $node['id']='node-'.bin2hex(random_bytes(4));
+    }
+    if(isset($node['data']) && is_array($node['data'])){
+      if(isset($node['data']['attachment']) && is_array($node['data']['attachment'])){
+        $attachment=&$node['data']['attachment'];
+        if(isset($attachment['content']) && is_string($attachment['content']) && str_starts_with($attachment['content'],'data:')){
+          $asset=create_mindmap_asset_from_dataurl($attachment['content'],$attachment['name'] ?? ($node['topic'] ?? '附件'),$map_id,$node['id'],$session_key);
+          if($asset){
+            $asset_id=(int)$asset['id'];
+            $attachment=[
+              'assetId'=>$asset_id,
+              'name'=>$asset['orig_name'],
+              'size'=>(int)$asset['size'],
+              'mime'=>$asset['mime'],
+              'url'=>'?mindmap_asset='.$asset_id,
+            ];
+            $asset_refs[$asset_id]=$node['id'];
+          } else {
+            unset($node['data']['attachment']);
+          }
+        } else {
+          $asset_id=(int)($attachment['assetId'] ?? ($attachment['id'] ?? 0));
+          if($asset_id>0){
+            $attachment['assetId']=$asset_id;
+            $attachment['name']=$attachment['name'] ?? ($node['topic'] ?? '附件');
+            $attachment['url']=$attachment['url'] ?? ('?mindmap_asset='.$asset_id);
+            $asset_refs[$asset_id]=$node['id'];
+          } else {
+            unset($node['data']['attachment']);
+          }
+        }
+        if(isset($node['data']['attachment'])){
+          unset($node['data']['attachment']['content'],$node['data']['attachment']['id']);
+          if(isset($node['data']['attachment']['type']) && !isset($node['data']['attachment']['mime'])){
+            $node['data']['attachment']['mime']=$node['data']['attachment']['type'];
+          }
+          unset($node['data']['attachment']['type']);
+        }
+      }
+      if(isset($node['data']['url']) && !is_string($node['data']['url'])){
+        unset($node['data']['url']);
+      }
+      if(isset($node['data']) && is_array($node['data']) && count(array_filter($node['data'],fn($v)=>$v!==null && $v!=='' && $v!==[] && $v!==false))===0){
+        unset($node['data']);
+      }
+    }
+    if(isset($node['children']) && is_array($node['children'])){
+      foreach($node['children'] as &$child){ $sanitize($child); }
+      unset($child);
+    }
+  };
+  $sanitize($payload['data']);
+}
+
+function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key): void {
+  $pdo=db();
+  $keep_ids=[];
+  foreach($asset_refs as $asset_id=>$node_uid){
+    $aid=(int)$asset_id;
+    if($aid<=0) continue;
+    $keep_ids[]=$aid;
+    $pdo->prepare('UPDATE mindmap_assets SET mindmap_id=?, node_uid=?, session_key=NULL WHERE id=?')
+      ->execute([$map_id,$node_uid,$aid]);
+  }
+  prune_mindmap_assets($map_id,$keep_ids);
+  if($session_key!==''){
+    $ids=array_values(array_unique($keep_ids));
+    $placeholders=$ids?implode(',',array_fill(0,count($ids),'?')):'';
+    $params=$ids;
+    array_unshift($params,$session_key);
+    $sql=$ids?
+      "SELECT id FROM mindmap_assets WHERE session_key=? AND id NOT IN ($placeholders)" :
+      "SELECT id FROM mindmap_assets WHERE session_key=?";
+    $st=$pdo->prepare($sql);
+    $st->execute($params);
+    foreach($st->fetchAll() as $row){ delete_mindmap_asset((int)$row['id']); }
+  }
+}
+
 // —— JSON 帮助：返回分类 ——
 function json_cats(): void {
   [$cats,$counts] = get_categories();
@@ -300,6 +480,18 @@ if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   header('Content-Length: '.$att['size']); header('X-Content-Type-Options: nosniff');
   if($isImage){ header('Content-Type: '.$mime); header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
   else { header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
+  readfile($path); exit;
+}
+
+if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])) {
+  $asset=get_mindmap_asset((int)$_GET['mindmap_asset']); if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
+  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
+  $mime=$asset['mime'];
+  $filename=$asset['orig_name'];
+  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
+  header('Content-Length: '.$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
+  if($inline){ header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
+  else { header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
   readfile($path); exit;
 }
 
@@ -431,11 +623,11 @@ if (is_post()) {
       case 'upload_attachment': {
         if(empty($_FILES['file']) || ($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new RuntimeException('上传失败');
         $kind=$_POST['target'] ?? ''; $targetId=(int)($_POST['target_id'] ?? 0); if(!in_array($kind,['item','step'],true)||$targetId<=0) throw new RuntimeException('目标无效');
-        $f=$_FILES['file']; if($f['size']>MAX_UPLOAD_BYTES) throw new RuntimeException('文件过大，最大 20MB');
+        $f=$_FILES['file']; if($f['size']>MAX_UPLOAD_BYTES) throw new RuntimeException('文件过大，最大 15MB');
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
-        $allowed=['image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','application/zip'=>'zip','application/x-zip-compressed'=>'zip'];
-        if(!isset($allowed[$mime])) throw new RuntimeException('仅允许图片与 zip');
-        $stored=bin2hex(random_bytes(8)).'.'.$allowed[$mime]; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
+        $ext = ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
+        if(!$ext) throw new RuntimeException('仅允许图片、PDF、ZIP、文本或视频文件');
+        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $orig=$f['name']; $itemIdForTouch=null;
         if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
         else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
@@ -443,6 +635,23 @@ if (is_post()) {
         if(is_ajax()){
           $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
           header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$mime,'markdown'=>$md,'size'=>$f['size']]); exit;
+        }
+        break;
+      }
+      case 'upload_mindmap_asset': {
+        if(empty($_FILES['file']) || ($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new RuntimeException('上传失败');
+        $f=$_FILES['file']; if($f['size']>MAX_UPLOAD_BYTES) throw new RuntimeException('文件过大，最大 15MB');
+        $mapId=(int)($_POST['map_id'] ?? 0);
+        $nodeUid=trim((string)($_POST['node_id'] ?? ''));
+        if($nodeUid==='') throw new RuntimeException('节点信息缺失');
+        $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
+        $ext = ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
+        if(!$ext) throw new RuntimeException('仅允许图片、PDF、ZIP、文本或视频文件');
+        if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
+        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
+        $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
+        if(is_ajax()){
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id']]); exit;
         }
         break;
       }
@@ -472,9 +681,14 @@ if (is_post()) {
         if($contentRaw==='') throw new RuntimeException('思维导图内容不能为空');
         $decoded=json_decode($contentRaw, true);
         if($decoded===null) throw new RuntimeException('思维导图数据格式不正确');
+        $mapIdHint=(int)($_POST['id'] ?? 0);
+        $assetRefs=[];
+        sanitize_mindmap_payload($decoded,$assetRefs,$mapIdHint>0?$mapIdHint:null,session_id());
         $normalized=json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $id=(int)($_POST['id'] ?? 0);
         $res = $id>0 ? update_mindmap($id,$title,$normalized) : create_mindmap($title,$normalized);
+        $finalId=(int)$res['id'];
+        sync_mindmap_assets($finalId,$assetRefs,session_id());
         if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$res['id'],'updated_at'=>$res['updated_at']]); exit; }
         redirect('?view=map_edit&id='.$res['id']);
         break;
@@ -1099,14 +1313,21 @@ if ($view === 'map_edit') {
       .mind-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:0 0;}
       .mind-links path{fill:none;stroke:rgba(148,163,184,.65);stroke-width:2;stroke-linecap:round}
       .mind-nodes{position:absolute;inset:0}
-      .jsmind-node{position:absolute;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;background:#f8fafc;color:#0f172a;box-shadow:0 18px 32px rgba(15,23,42,.2);border:1px solid rgba(148,163,184,.35);min-width:140px;max-width:240px;text-align:center;font-weight:700;font-size:14px;line-height:1.4;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+      .jsmind-node{position:absolute;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:14px;background:#f8fafc;color:#0f172a;box-shadow:0 18px 32px rgba(15,23,42,.2);border:1px solid rgba(148,163,184,.35);min-width:140px;max-width:240px;text-align:center;font-weight:700;font-size:14px;line-height:1.4;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
       .jsmind-node:hover{transform:translateY(-2px);box-shadow:0 22px 38px rgba(37,99,235,.22)}
       .jsmind-node.selected{border:2px solid #2563eb;box-shadow:0 30px 48px rgba(37,99,235,.3)}
-      .jsmind-node[data-direction="left"]{text-align:right;justify-content:flex-end}
-      .jsmind-node[data-direction="right"]{justify-content:flex-start}
+      .jsmind-node[data-direction="left"]{text-align:right;align-items:flex-end}
+      .jsmind-node[data-direction="right"]{align-items:flex-start}
       .jsmind-node.editing{border:2px solid #60a5fa;box-shadow:0 26px 48px rgba(59,130,246,.35);background:#f8fafc;color:#0f172a;cursor:text}
       .jsmind-node .node-topic{display:block;word-break:break-word;white-space:pre-wrap;cursor:inherit}
       .jsmind-node .node-topic[contenteditable="true"]{outline:none;cursor:text}
+      .jsmind-node .node-affordances{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+      .jsmind-node .node-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;font-weight:600;font-size:12px;line-height:1.2;background:rgba(37,99,235,.08);color:#1d4ed8;border:0;cursor:pointer;transition:background .15s ease,color .15s ease;white-space:nowrap}
+      .jsmind-node .node-badge:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
+      .jsmind-node .node-badge:hover{background:rgba(37,99,235,.14);color:#1d4ed8}
+      .jsmind-node .node-badge.link{background:rgba(16,185,129,.12);color:#047857}
+      .jsmind-node .node-badge.link:hover{background:rgba(16,185,129,.18);color:#0f766e}
+      .jsmind-node .node-badge:disabled{opacity:.55;cursor:not-allowed}
       .mind-background{position:absolute;inset:-400px;background:radial-gradient(circle,#172038 0%,rgba(15,23,42,0) 70%);pointer-events:none}
       .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#475569;font:12px/1 ui-monospace}
       .save-tip{font-size:12px;color:var(--ok);display:none}
@@ -1494,6 +1715,33 @@ if ($view === 'map_edit') {
             span.className='node-topic';
             span.textContent=node.topic || '';
             el.appendChild(span);
+            const data=node.data || {};
+            const badges=[];
+            if(data.attachment){
+              const badge=document.createElement('button');
+              badge.type='button';
+              badge.className='node-badge attachment';
+              const label=attachmentLabel(data.attachment);
+              badge.textContent='📎 '+label;
+              badge.title=`打开附件：${label}`;
+              badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(data.attachment); });
+              badges.push(badge);
+            }
+            if(data.url){
+              const badge=document.createElement('button');
+              badge.type='button';
+              badge.className='node-badge link';
+              badge.textContent='🔗 打开链接';
+              badge.title='打开链接';
+              badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapLink(data.url); });
+              badges.push(badge);
+            }
+            if(badges.length){
+              const wrap=document.createElement('div');
+              wrap.className='node-affordances';
+              badges.forEach(btn=>wrap.appendChild(btn));
+              el.appendChild(wrap);
+            }
             el.addEventListener('click',(evt)=>{
               const wasSelected=!!node.selected;
               this.select_node(node.id);
@@ -1634,6 +1882,11 @@ if ($view === 'map_edit') {
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
     const jmContainer=document.getElementById('jsmind-container');
+    let currentMapId=0;
+    if(jmContainer){
+      const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
+      currentMapId=Number.isFinite(parsed)?parsed:0;
+    }
     if(!window.jsMind){
       if(jmContainer){
         jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
@@ -1658,6 +1911,76 @@ if ($view === 'map_edit') {
         support_html:true,
         mode:'full',
       });
+      const blobUrlRegistry=new Set();
+      function dataUrlToBlob(dataUrl){
+        if(typeof dataUrl!=='string') return null;
+        const match=dataUrl.match(/^data:(.*?);base64,(.*)$/);
+        if(!match) return null;
+        const mime=match[1]||'application/octet-stream';
+        const binary=atob(match[2].replace(/\s+/g,''));
+        const len=binary.length;
+        const bytes=new Uint8Array(len);
+        for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); }
+        return new Blob([bytes],{type:mime});
+      }
+      function openMindmapAttachment(descriptor){
+        if(!descriptor) return;
+        if(descriptor.assetId && descriptor.url){
+          const win=window.open(descriptor.url,'_blank','noopener');
+          if(!win){ window.location.href=descriptor.url; }
+          return;
+        }
+        if(descriptor.content){
+          const blob=dataUrlToBlob(descriptor.content);
+          if(!blob){ alert('附件不可用'); return; }
+          const url=URL.createObjectURL(blob);
+          blobUrlRegistry.add(url);
+          const a=document.createElement('a');
+          a.href=url;
+          a.download=descriptor.name || 'attachment';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(()=>{
+            if(blobUrlRegistry.has(url)){ URL.revokeObjectURL(url); blobUrlRegistry.delete(url); }
+          },1500);
+          return;
+        }
+        if(descriptor.url){
+          const win=window.open(descriptor.url,'_blank','noopener');
+          if(!win){ window.location.href=descriptor.url; }
+        }
+      }
+      function openMindmapLink(raw){
+        if(!raw) return;
+        const value=String(raw).trim();
+        if(!value) return;
+        if(/^javascript:/i.test(value) || /^data:/i.test(value) || /^vbscript:/i.test(value)){
+          alert('该链接格式不受支持');
+          return;
+        }
+        const target=/^https?:/i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) ? value : (value.startsWith('//') ? 'https:'+value : (/^[a-z]+:/i.test(value)?value:`https://${value}`));
+        const win=window.open(target,'_blank','noopener');
+        if(!win){ window.location.href=target; }
+      }
+      function attachmentLabel(descriptor){
+        if(!descriptor) return '附件';
+        if(descriptor.name) return descriptor.name;
+        if(descriptor.assetId) return `附件 #${descriptor.assetId}`;
+        return '附件';
+      }
+      async function uploadMindmapFile(file, nodeId){
+        const fd=new FormData();
+        fd.append('action','upload_mindmap_asset');
+        fd.append('map_id', String(currentMapId||0));
+        fd.append('node_id', nodeId);
+        fd.append('file', file);
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(!res.ok) throw new Error('网络异常');
+        const json=await res.json();
+        if(!json.ok) throw new Error(json.error||'上传失败');
+        return json;
+      }
       let inlineEditState=null;
       function finishInlineEditing(commit){
         if(!inlineEditState) return;
@@ -2041,31 +2364,36 @@ if ($view === 'map_edit') {
         }
         return accepted;
       }
-      function createAttachmentNodes(parentNode, files, basePoint, placement){
+      async function createAttachmentNodes(parentNode, files, basePoint, placement){
         if(!parentNode || !files || !files.length) return;
-        files.forEach((file,index)=>{
-          const reader=new FileReader();
-          reader.onload=evt=>{
-            const dataUrl=evt.target.result;
+        for(let index=0; index<files.length; index++){
+          const file=files[index];
+          const nodeId=randomId();
+          try{
+            const uploaded=await uploadMindmapFile(file, nodeId);
             const data={
               attachment:{
-                name:file.name,
-                size:file.size,
-                type:file.type || 'application/octet-stream',
-                content:dataUrl,
+                assetId:uploaded.id,
+                name:uploaded.name || file.name,
+                size:uploaded.size ?? file.size,
+                mime:uploaded.mime || file.type || 'application/octet-stream',
+                url:uploaded.url,
               }
             };
             const offset=basePoint ? {x:basePoint.x + index*18, y:basePoint.y + index*18} : null;
             executeCreateNodeCommand({
+              id:nodeId,
               parentId:parentNode.id,
-              topic:'📎 '+file.name,
+              topic:'📎 '+(uploaded.name || file.name),
               data:data,
               position:offset,
               meta:{source:'file', placement:placement||'child'}
             });
-          };
-          reader.readAsDataURL(file);
-        });
+          }catch(err){
+            console.error(err);
+            alert((file.name||'文件')+' 上传失败：'+(err && err.message ? err.message : err));
+          }
+        }
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -2161,7 +2489,7 @@ if ($view === 'map_edit') {
       if(attachFileBtn) attachFileBtn.onclick=openAttachmentDialog;
       if(attachLinkBtn) attachLinkBtn.onclick=openLinkPrompt;
       if(attachInput){
-        attachInput.addEventListener('change',e=>{
+        attachInput.addEventListener('change',async e=>{
           const files=Array.from(e.target.files||[]);
           attachInput.value='';
           if(!files.length) return;
@@ -2170,7 +2498,7 @@ if ($view === 'map_edit') {
           if(!node){ alert('请先选择一个节点'); return; }
           const accepted=sanitizeAttachmentFiles(files);
           if(!accepted.length) return;
-          createAttachmentNodes(node, accepted, null, 'child');
+          await createAttachmentNodes(node, accepted, null, 'child');
         });
       }
       if(mobileToolbar){
@@ -2304,7 +2632,7 @@ if ($view === 'map_edit') {
         const payload=JSON.stringify(jm.get_data('node_tree'));
         const fd=new FormData();
         fd.append('action','save_mindmap');
-        fd.append('id', document.getElementById('jsmind-container').dataset.mapId || '0');
+        fd.append('id', String(currentMapId||0));
         fd.append('title', title);
         fd.append('content', payload);
         try{
@@ -2313,7 +2641,8 @@ if ($view === 'map_edit') {
           if(!res.ok) throw new Error('网络异常');
           const json=await res.json();
           if(!json.ok) throw new Error(json.error||'保存失败');
-          document.getElementById('jsmind-container').dataset.mapId=json.id;
+          currentMapId=parseInt(json.id,10)||0;
+          document.getElementById('jsmind-container').dataset.mapId=currentMapId;
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
           markSaved();
@@ -2324,6 +2653,10 @@ if ($view === 'map_edit') {
       }
       window.addEventListener('beforeunload',e=>{
         commitInlineEditing();
+        if(blobUrlRegistry.size){
+          blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
+          blobUrlRegistry.clear();
+        }
         if(dirty){ e.preventDefault(); e.returnValue=''; }
       });
       })();
