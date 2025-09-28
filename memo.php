@@ -31,6 +31,7 @@ const ALLOWED_UPLOAD_MIME_MAP = [
   'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','text/csv'=>'csv','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
   'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg',
 ];
+const ATTACH_ACCEPT_ATTR = 'image/*,video/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,text/json,text/yaml,application/yaml,text/x-yaml,text/tab-separated-values,text/x-log';
 date_default_timezone_set('Asia/Shanghai');
 
 // —— 思维导图默认内容 ——
@@ -781,9 +782,9 @@ if ($view === 'new') {
               <textarea id="md-editor" name="description" placeholder="描述 · 支持 Markdown"></textarea>
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
                 <div>
-                  <input id="att-file-item" type="file" accept=".zip,image/*" style="display:none">
+                  <input id="att-file-item" type="file" accept="<?= h(ATTACH_ACCEPT_ATTR); ?>" style="display:none">
                   <button class="btn" type="button" id="btn-insert-att-item">插入附件到备注</button>
-                  <span class="att-meta">图片/zip ≤ 20MB</span>
+                  <span class="att-meta">图片/PDF/ZIP/文本/视频 ≤ 15MB</span>
                 </div>
                 <button class="btn" type="button" id="btn-preview-toggle">预览置顶/置底</button>
               </div>
@@ -815,6 +816,28 @@ if ($view === 'new') {
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      const MEMO_MAX_BYTES=15*1024*1024;
+      const memoStrictMimes=['application/pdf','application/zip','application/x-zip-compressed','application/json','text/plain','text/markdown','text/csv','text/json','text/yaml','application/yaml','text/x-yaml','text/tab-separated-values','text/x-log'];
+      const memoAllowedExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.ico','.avif','.heic','.heif','.pdf','.zip','.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log','.tsv','.mkv','.mp4','.mov','.avi','.webm','.m4v'];
+      const fileExt=name=>{ if(!name) return ''; const idx=name.lastIndexOf('.'); return idx>=0 ? name.slice(idx).toLowerCase() : ''; };
+      const memoFileAllowed=file=>{
+        const type=(file.type||'').toLowerCase();
+        if(type.startsWith('image/') || type.startsWith('video/')) return true;
+        if(memoStrictMimes.includes(type)) return true;
+        return memoAllowedExts.includes(fileExt(file.name));
+      };
+      const validateMemoAttachment=file=>{
+        if(!file) return false;
+        if(file.size>MEMO_MAX_BYTES){
+          alert(`${file.name||'文件'} 超过 15MB，已取消上传。`);
+          return false;
+        }
+        if(!memoFileAllowed(file)){
+          alert(`${file.name||'文件'} 类型不支持，仅允许图片、PDF、ZIP、文本或视频文件。`);
+          return false;
+        }
+        return true;
+      };
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       function renderMD(){ $('#md-view').innerHTML = safeHTML(mde.value()); }
       const mde = new EasyMDE({
@@ -835,27 +858,52 @@ if ($view === 'new') {
         fd.append('title',$('#title').value.trim()||'未命名');
         fd.append('category_id',$('#cat').value);
         fd.append('description', mde.value());
-        if(saveButtonEl){ saveButtonEl.disabled=true; saveButtonEl.textContent='⏳ 保存中...'; }
-        if(saveTip){ saveTip.textContent='保存中...'; saveTip.classList.add('show'); }
+        if(saveButtonEl){
+          saveButtonEl.disabled=true;
+          saveButtonEl.textContent='⏳ 保存中...';
+        }
+        if(saveTip){
+          saveTip.textContent='保存中...';
+          saveTip.classList.remove('dirty');
+          saveTip.classList.add('show');
+        }
         try{
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!r.ok) throw new Error('保存失败');
-          if(saveTip){ saveTip.textContent='保存成功'; }
-          if(saveButtonEl){ saveButtonEl.textContent='✅ 保存成功'; }
+          if(saveTip){
+            saveTip.textContent='保存成功';
+            saveTip.classList.remove('dirty');
+            saveTip.classList.add('show');
+          }
+          if(saveButtonEl){
+            saveButtonEl.textContent='✅ 保存成功';
+            saveButtonEl.disabled=false;
+          }
           setTimeout(()=>{
-            if(saveButtonEl){ saveButtonEl.textContent=saveBtnDefault; saveButtonEl.disabled=false; }
-            if(saveTip){ saveTip.classList.remove('show'); }
-          },1200);
+            if(saveButtonEl){
+              saveButtonEl.textContent=saveBtnDefault;
+            }
+            if(saveTip && !saveTip.classList.contains('dirty')){
+              saveTip.classList.remove('show');
+            }
+          },1500);
         }catch(err){
           alert(err.message||'保存失败');
-          if(saveButtonEl){ saveButtonEl.textContent=saveBtnDefault; saveButtonEl.disabled=false; }
-          if(saveTip){ saveTip.textContent='未保存'; saveTip.classList.add('show'); }
+          if(saveButtonEl){
+            saveButtonEl.textContent=saveBtnDefault;
+            saveButtonEl.disabled=false;
+          }
+          if(saveTip){
+            saveTip.textContent='未保存';
+            saveTip.classList.add('show','dirty');
+          }
         }
         return false;
       }
       $('#btn-insert-att-item').addEventListener('click',()=>$('#att-file-item').click());
       $('#att-file-item').addEventListener('change', async (e)=>{
         const f=e.target.files[0]; if(!f) return;
+        if(!validateMemoAttachment(f)){ e.target.value=''; return; }
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -893,9 +941,9 @@ if ($view === 'new') {
                     <textarea id="md-step-${s.id}" name="notes" style="min-height:120px">${escapeHTML(s.notes||'')}</textarea>\
                     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">\
                       <div>\
-                        <input id="att-file-step-${s.id}" type="file" accept=".zip,image/*" style="display:none">\
+                        <input id="att-file-step-${s.id}" type="file" accept="<?= h(ATTACH_ACCEPT_ATTR); ?>" style="display:none">\
                         <button class="btn" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
-                        <span class="att-meta">图片/zip ≤ 20MB</span>\
+                        <span class="att-meta">图片/PDF/ZIP/文本/视频 ≤ 15MB</span>\
                       </div>\
                       <button class="btn acc" type="submit">保存备注</button>\
                     </div>\
@@ -936,6 +984,7 @@ if ($view === 'new') {
         const inp=$('#att-file-step-'+stepId);
         inp.onchange=async e=>{
           const f=e.target.files[0]; if(!f) return;
+          if(!validateMemoAttachment(f)){ e.target.value=''; return; }
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           const j=await r.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -1057,9 +1106,9 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap">
                 <div>
-                  <input id="att-file-item" type="file" accept=".zip,image/*" style="display:none">
+                  <input id="att-file-item" type="file" accept="<?= h(ATTACH_ACCEPT_ATTR); ?>" style="display:none">
                   <button class="btn" type="button" id="btn-insert-att-item">插入附件到备注</button>
-                  <span class="att-meta">图片/zip ≤ 20MB</span>
+                  <span class="att-meta">图片/PDF/ZIP/文本/视频 ≤ 15MB</span>
                 </div>
               </div>
             </form>
@@ -1073,7 +1122,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                     <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
                   <?php else: ?>
                     <div style="display:flex;gap:8px;align-items:center;padding:8px">
-                      <a class="btn" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
+                      <a class="btn" href="?download=<?php echo $a['id']; ?>">下载附件</a>
                       <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
                     </div>
                   <?php endif; ?>
@@ -1124,9 +1173,9 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                       <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
                       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
                         <div>
-                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept=".zip,image/*" style="display:none">
+                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="<?= h(ATTACH_ACCEPT_ATTR); ?>" style="display:none">
                           <button class="btn" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
-                          <span class="att-meta">图片/zip ≤ 20MB</span>
+                          <span class="att-meta">图片/PDF/ZIP/文本/视频 ≤ 15MB</span>
                         </div>
                         <button class="btn acc" type="submit">保存备注</button>
                       </div>
@@ -1148,6 +1197,28 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       function renderMDTo(id, md){ const el=document.getElementById(id); if(el) el.innerHTML=safeHTML(md); }
+      const MEMO_MAX_BYTES=15*1024*1024;
+      const memoStrictMimes=['application/pdf','application/zip','application/x-zip-compressed','application/json','text/plain','text/markdown','text/csv','text/json','text/yaml','application/yaml','text/x-yaml','text/tab-separated-values','text/x-log'];
+      const memoAllowedExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.ico','.avif','.heic','.heif','.pdf','.zip','.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log','.tsv','.mkv','.mp4','.mov','.avi','.webm','.m4v'];
+      const fileExt=name=>{ if(!name) return ''; const idx=name.lastIndexOf('.'); return idx>=0 ? name.slice(idx).toLowerCase() : ''; };
+      const memoFileAllowed=file=>{
+        const type=(file.type||'').toLowerCase();
+        if(type.startsWith('image/') || type.startsWith('video/')) return true;
+        if(memoStrictMimes.includes(type)) return true;
+        return memoAllowedExts.includes(fileExt(file.name));
+      };
+      const validateMemoAttachment=file=>{
+        if(!file) return false;
+        if(file.size>MEMO_MAX_BYTES){
+          alert(`${file.name||'文件'} 超过 15MB，已取消上传。`);
+          return false;
+        }
+        if(!memoFileAllowed(file)){
+          alert(`${file.name||'文件'} 类型不支持，仅允许图片、PDF、ZIP、文本或视频文件。`);
+          return false;
+        }
+        return true;
+      };
       const mde = new EasyMDE({
         element: document.getElementById('md-editor'),
         spellChecker:false, status:false,
@@ -1162,27 +1233,49 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const tip=document.getElementById('save-tip');
         const btn=form.querySelector('button[type="submit"]');
         const defaultLabel=btn ? (btn.dataset.defaultLabel || btn.textContent) : '保存';
-        if(btn){ btn.dataset.defaultLabel=defaultLabel; btn.disabled=true; btn.textContent='⏳ 保存中...'; }
-        if(tip){ tip.textContent='保存中...'; tip.classList.add('show'); }
+        if(btn){
+          btn.dataset.defaultLabel=defaultLabel;
+          btn.disabled=true;
+          btn.textContent='⏳ 保存中...';
+        }
+        if(tip){
+          tip.textContent='保存中...';
+          tip.classList.remove('dirty');
+          tip.classList.add('show');
+        }
         try{
           const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!res.ok) throw new Error('保存失败');
-          if(tip){ tip.textContent='保存成功'; }
-          if(btn){ btn.textContent='✅ 保存成功'; }
+          if(tip){
+            tip.textContent='保存成功';
+            tip.classList.remove('dirty');
+            tip.classList.add('show');
+          }
+          if(btn){
+            btn.textContent='✅ 保存成功';
+            btn.disabled=false;
+          }
           setTimeout(()=>{
-            if(btn){ btn.textContent=btn.dataset.defaultLabel||defaultLabel; btn.disabled=false; }
-            if(tip){ tip.classList.remove('show'); }
-          },1200);
+            if(btn){ btn.textContent=btn.dataset.defaultLabel||defaultLabel; }
+            if(tip && !tip.classList.contains('dirty')){ tip.classList.remove('show'); }
+          },1500);
         }catch(err){
           alert(err.message||'保存失败');
-          if(btn){ btn.textContent=btn.dataset.defaultLabel||defaultLabel; btn.disabled=false; }
-          if(tip){ tip.textContent='未保存'; tip.classList.add('show'); }
+          if(btn){
+            btn.textContent=btn.dataset.defaultLabel||defaultLabel;
+            btn.disabled=false;
+          }
+          if(tip){
+            tip.textContent='未保存';
+            tip.classList.add('show','dirty');
+          }
         }
         return false;
       }
       document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
       document.getElementById('att-file-item').addEventListener('change', async (e)=>{
         const f=e.target.files[0]; if(!f) return;
+        if(!validateMemoAttachment(f)){ e.target.value=''; return; }
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
         const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
         if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -1207,6 +1300,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const input=document.getElementById('att-file-step-'+stepId);
         input.onchange = async (e)=>{
           const f=e.target.files[0]; if(!f) return;
+          if(!validateMemoAttachment(f)){ e.target.value=''; return; }
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
