@@ -2481,12 +2481,13 @@ if ($view === 'map_edit') {
           if(!this.root || !this.measureHost) return;
           this.sizeCache.clear();
           this.measureHost.innerHTML='';
+          const VISUAL_MARGIN_Y=24;
           const measureNode=(node)=>{
             if(!node) return;
             const el=this.buildNodeElement(node,{forMeasure:true});
             this.measureHost.appendChild(el);
             const rect=el.getBoundingClientRect();
-            this.sizeCache.set(node.id,{width:rect.width,height:rect.height});
+            this.sizeCache.set(node.id,{width:rect.width,height:rect.height+VISUAL_MARGIN_Y});
             el.remove();
             if(node.expanded!==false && node.children && node.children.length){ node.children.forEach(child=>measureNode(child)); }
           };
@@ -2495,9 +2496,13 @@ if ($view === 'map_edit') {
         computeLayout(){
           if(!this.root) return;
           this.collectNodeSizes();
-          const H_SPACING=220;
-          const MIN_SPACING=40;
-          const MIN_HEIGHT=60;
+          const MIN_HEIGHT=88;
+          const clamp=(v,min,max)=>Math.max(min, Math.min(max,v));
+          const scale=Math.max(0.3, Number.isFinite(this.scale)?this.scale:1);
+          const vSpaceBase=(depth)=>clamp(72+depth*6,56,120);
+          const hSpaceBase=(depth)=>clamp(180+depth*12,160,260);
+          const effectiveVSpace=(depth)=>vSpaceBase(depth)/scale;
+          const effectiveHSpace=(depth)=>hSpaceBase(depth)/scale;
           const heightMap=new Map();
           const getNodeHeight=(node)=>{
             if(!node) return MIN_HEIGHT;
@@ -2505,37 +2510,46 @@ if ($view === 'map_edit') {
             if(cached && cached.height){ return Math.max(MIN_HEIGHT, cached.height); }
             return MIN_HEIGHT;
           };
-          const gapBetween=(a,b)=>Math.max(MIN_SPACING, Math.min(160,(a+b)*0.25));
-          const measure=(node)=>{
+          const getNodeWidth=(node)=>{
+            if(!node) return 0;
+            const cached=this.sizeCache.get(node.id);
+            return cached && cached.width ? cached.width : 0;
+          };
+          const gapBetween=(a,b,depth)=>Math.max(effectiveVSpace(depth), (a+b)*0.3);
+          const measure=(node,depth=0)=>{
             if(!node) return MIN_HEIGHT;
             if(heightMap.has(node.id)) return heightMap.get(node.id);
             const base=getNodeHeight(node);
-            if(!node.expanded || !node.children.length){ heightMap.set(node.id, base); return base; }
+            if(!node.expanded || !node.children.length){
+              const collapsedHeight=node.expanded===false?Math.max(base, MIN_HEIGHT):base;
+              heightMap.set(node.id, collapsedHeight);
+              return collapsedHeight;
+            }
             const visible=node.children.filter(Boolean);
             if(!visible.length){ heightMap.set(node.id, base); return base; }
-            const childHeights=visible.map(child=>measure(child));
+            const childHeights=visible.map(child=>measure(child, depth+1));
             let total=0;
             for(let i=0;i<childHeights.length;i++){
               total+=childHeights[i];
-              if(i<childHeights.length-1){ total+=gapBetween(childHeights[i], childHeights[i+1]); }
+              if(i<childHeights.length-1){ total+=gapBetween(childHeights[i], childHeights[i+1], depth+1); }
             }
             const result=Math.max(base,total);
             heightMap.set(node.id,result);
             return result;
           };
-          const subtreeHeight=(nodes)=>{
+          const subtreeHeight=(nodes,depth)=>{
             if(!nodes || !nodes.length) return 0;
             let total=0;
             for(let i=0;i<nodes.length;i++){
               const node=nodes[i];
-              const h=measure(node);
+              const h=measure(node, depth);
               total+=h;
-              if(i<nodes.length-1){ total+=gapBetween(h, measure(nodes[i+1])); }
+              if(i<nodes.length-1){ total+=gapBetween(h, measure(nodes[i+1], depth), depth); }
             }
             return total;
           };
           const right=this.root.children.filter(Boolean);
-          const rightHeight=subtreeHeight(right);
+          const rightHeight=subtreeHeight(right,1);
           const rootHeight=getNodeHeight(this.root);
           const canvasHeight=Math.max(rootHeight, rightHeight);
           this.root.x=0;
@@ -2544,8 +2558,16 @@ if ($view === 'map_edit') {
           this.root.direction='center';
           if(this.root.model){ this.root.model.direction='center'; }
           const assign=(node,depth,startTop)=>{
-            const height=measure(node);
-            node.x=this.root.x + depth*H_SPACING;
+            const height=measure(node, depth);
+            if(depth===0){ node.x=this.root.x; }
+            else{
+              const parent=node.parent;
+              const parentX=parent?parent.x:this.root.x;
+              const baseOffset=effectiveHSpace(depth);
+              const parentWidth=getNodeWidth(parent);
+              const preferred=parentWidth?Math.max(baseOffset, (parentWidth*0.75+140)/scale):baseOffset;
+              node.x=parentX+preferred;
+            }
             node.y=startTop+height/2;
             node.dir=depth===0?0:1;
             node.direction=depth===0?'center':'right';
@@ -2558,8 +2580,8 @@ if ($view === 'map_edit') {
               const childHeight=assign(child, depth+1, cursor);
               cursor+=childHeight;
               if(i<children.length-1){
-                const nextHeight=measure(children[i+1]);
-                cursor+=gapBetween(childHeight, nextHeight);
+                const nextHeight=measure(children[i+1], depth+1);
+                cursor+=gapBetween(childHeight, nextHeight, depth+1);
               }
             }
             return height;
@@ -2569,8 +2591,48 @@ if ($view === 'map_edit') {
             const child=right[i];
             const h=assign(child,1,rightTop);
             rightTop+=h;
-            if(i<right.length-1){ rightTop+=gapBetween(h, measure(right[i+1])); }
+            if(i<right.length-1){ rightTop+=gapBetween(h, measure(right[i+1],1),1); }
           }
+          const shiftSubtree=(node,delta)=>{
+            if(!node || !isFinite(delta) || Math.abs(delta)<0.001) return;
+            node.y+=delta;
+            if(node.children && node.children.length){ node.children.filter(Boolean).forEach(child=>shiftSubtree(child,delta)); }
+          };
+          const resolveLayer=(nodes,depth)=>{
+            const children=(nodes||[]).filter(Boolean);
+            if(!children.length) return;
+            let prevBottom=-Infinity;
+            let prevHeight=null;
+            for(const child of children){
+              const childHeight=measure(child, depth);
+              const minGap=prevHeight===null?0:gapBetween(prevHeight, childHeight, depth);
+              let top=child.y-childHeight/2;
+              const requiredTop=prevBottom + minGap;
+              if(top<requiredTop){
+                const shift=requiredTop-top;
+                shiftSubtree(child, shift);
+                top+=shift;
+              }
+              prevBottom=top+childHeight;
+              prevHeight=childHeight;
+              if(child.expanded!==false && child.children && child.children.length){ resolveLayer(child.children, depth+1); }
+            }
+          };
+          resolveLayer(right,1);
+          const recenter=(node,depth=0)=>{
+            if(!node || !node.children || !node.children.length || node.expanded===false) return;
+            const children=node.children.filter(Boolean);
+            if(!children.length) return;
+            const first=children[0];
+            const last=children[children.length-1];
+            const firstHeight=measure(first, depth+1);
+            const lastHeight=measure(last, depth+1);
+            const top=first.y-firstHeight/2;
+            const bottom=last.y+lastHeight/2;
+            node.y=(top+bottom)/2;
+            children.forEach(child=>recenter(child, depth+1));
+          };
+          recenter(this.root);
           this.bounds={minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity};
           for(const node of this.nodes.values()){
             if(node.y<this.bounds.minY) this.bounds.minY=node.y;
