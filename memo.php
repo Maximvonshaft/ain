@@ -1639,22 +1639,28 @@ if ($view === 'map_edit') {
       .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
       @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
       a{color:inherit;text-decoration:none}
-      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:28px 24px 140px}
-      @media (max-width:900px){.mind-shell{padding:18px 14px 150px;gap:14px}}
-      .mind-header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;z-index:10}
-      .mind-title-group{display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:420px}
-      .map-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
-      .map-meta a{color:var(--gold-400);text-decoration:none}
-      .map-title-input{padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:0;padding:0 24px 140px}
+      @media (max-width:900px){.mind-shell{padding:0 12px 150px}}
+      .mind-header{position:fixed;top:24px;left:24px;display:flex;align-items:center;gap:16px;padding:12px 18px;max-width:min(520px,calc(100% - 48px));border-radius:20px;border:1px solid rgba(201,168,106,.28);background:linear-gradient(145deg,rgba(21,26,30,.9),rgba(12,16,18,.82));box-shadow:0 18px 38px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.14);backdrop-filter:blur(18px);z-index:30;pointer-events:auto}
+      .mind-back{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;border:1px solid rgba(201,168,106,.4);background:rgba(201,168,106,.08);color:var(--gold-400);font-size:18px;line-height:1;transition:transform var(--transition),border-color var(--transition),background-color var(--transition)}
+      .mind-back:hover{transform:translateY(-2px);border-color:var(--gold-500);background:rgba(201,168,106,.16)}
+      .mind-back:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .mind-title-group{flex:1 1 auto;min-width:220px;max-width:420px;display:flex;flex-direction:column;gap:8px}
+      .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+      .map-meta span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.22);background:rgba(12,16,18,.62)}
+      .map-title-input{width:100%;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.32);background:rgba(8,10,12,.72);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
-      .save-state{align-self:flex-start;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+      .save-state{margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);white-space:nowrap;opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .save-state.show{opacity:1;transform:translateY(0)}
       .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
-      .mind-header-actions{display:flex;flex-direction:column;gap:14px;align-items:flex-end;margin-left:auto}
-      .mind-view-controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
-      .view-btn{min-width:0;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);touch-action:manipulation}
-      .view-btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
-      .view-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      @media (max-width:768px){
+        .mind-header{top:12px;left:12px;right:12px;max-width:none;padding:8px 12px;border-radius:16px;gap:10px;display:grid;grid-template-columns:auto 1fr auto;align-items:center}
+        .mind-title-group{min-width:0;max-width:none;gap:4px}
+        .map-title-input{padding:8px 12px;font-size:16px;letter-spacing:.06em}
+        .map-meta{display:none}
+        .save-state{padding:4px 10px;font-size:11px;letter-spacing:.12em}
+        .mind-back{width:40px;height:40px;font-size:20px}
+      }
       .mind-stage{position:relative;flex:1;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
@@ -1688,6 +1694,16 @@ if ($view === 'map_edit') {
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
+      .jsmind-node.priority-high{border-color:rgba(209,75,75,.5);box-shadow:0 0 32px rgba(209,75,75,.22)}
+      .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.5)}
+      .jsmind-node.is-collapsed .node-topic{color:var(--gold-500)}
+      .node-markers{position:absolute;right:16px;bottom:14px;display:flex;gap:6px;align-items:center;pointer-events:none}
+      .node-markers .marker{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.72);box-shadow:0 6px 16px rgba(0,0,0,.35);color:var(--gold-400);font-size:14px;letter-spacing:0}
+      .node-markers .marker-icon{display:inline-flex;align-items:center;justify-content:center;width:100%;height:100%}
+      .node-markers .marker[data-kind="priority"]{background:transparent;border:none;box-shadow:none;width:18px;height:18px}
+      .node-markers .marker .priority-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#F85C5C;box-shadow:0 0 10px rgba(248,92,92,.7)}
+      .node-markers .marker[data-count]::after{content:attr(data-count);position:absolute;top:-7px;right:-7px;min-width:16px;height:16px;border-radius:8px;background:rgba(227,198,139,.9);color:#0A0C0E;font:700 10px/16px 'Inter','Noto Sans SC',sans-serif;text-align:center}
+      @media (max-width:768px){.node-markers{right:12px;bottom:10px}}
       .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
       .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative}
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation}
@@ -1726,6 +1742,17 @@ if ($view === 'map_edit') {
       .node-popover .chips-preview{display:flex;flex-wrap:wrap;gap:8px;min-height:26px}
       .node-popover .chips-preview span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
       .node-popover .chips-preview .empty{color:var(--text-muted);border-style:dashed}
+      .node-popover .fold-field{padding:12px;border-radius:16px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.6);gap:12px}
+      .node-popover .fold-field .fold-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+      .node-popover .fold-caption{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+      .node-popover .fold-switch{display:inline-flex;align-items:center;gap:10px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;color:var(--text-strong);cursor:pointer}
+      .node-popover .fold-switch input{position:absolute;opacity:0;pointer-events:none}
+      .node-popover .fold-track{position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:999px;background:rgba(201,168,106,.18);border:1px solid rgba(201,168,106,.32);transition:background var(--transition),border-color var(--transition)}
+      .node-popover .fold-thumb{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--gold-400);left:2px;transition:transform var(--transition),background var(--transition)}
+      .node-popover .fold-switch input:checked + .fold-track{background:var(--gold-500);border-color:var(--gold-500)}
+      .node-popover .fold-switch input:checked + .fold-track .fold-thumb{transform:translateX(22px);background:var(--bg-void)}
+      .node-popover .fold-state{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-400)}
+      .node-popover .field-hint{margin:0;font:500 12px/1.5 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
       .node-popover .popover-actions{display:flex;justify-content:flex-end;gap:10px}
       .node-popover .popover-actions button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition)}
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
@@ -1765,26 +1792,20 @@ if ($view === 'map_edit') {
       </defs>
     </svg>
     <div class="mind-shell" data-fisheye="on">
-      <header class="mind-header">
+      <header class="mind-header" role="banner">
+        <a class="mind-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">
+          <span aria-hidden="true">←</span>
+          <span class="sr-only">返回导图库</span>
+        </a>
         <div class="mind-title-group">
           <div class="map-meta">
             <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
             <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
-            <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">← 返回导图库</a>
           </div>
           <label class="sr-only" for="map-title">导图标题</label>
           <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
-          <div class="save-state" id="save-state">保存成功</div>
         </div>
-        <div class="mind-header-actions">
-          <div class="mind-view-controls" role="group" aria-label="视图控制">
-            <button type="button" class="view-btn" id="btn-fit" title="自适应视图">🧭 自适应</button>
-            <button type="button" class="view-btn" id="btn-center" title="居中">◎ 居中</button>
-            <button type="button" class="view-btn" id="btn-zoom-in" title="放大">＋ 放大</button>
-            <button type="button" class="view-btn" id="btn-zoom-out" title="缩小">－ 缩小</button>
-            <button type="button" class="view-btn" id="btn-collapse" title="折叠/展开当前节点">折叠/展开</button>
-          </div>
-        </div>
+        <div class="save-state" id="save-state">保存成功</div>
       </header>
       <div class="mind-stage">
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
@@ -1833,8 +1854,11 @@ if ($view === 'map_edit') {
               <li role="menuitem" data-action="details">节点属性</li>
               <li role="menuitem" data-action="import">导入 JSON</li>
               <li role="menuitem" data-action="export">导出 JSON</li>
-              <li role="menuitem" data-action="toggle-fold">折叠/展开节点</li>
-              <li role="menuitem" data-action="fit-view">适应视图</li>
+              <li role="menuitem" data-action="fit-view">自适应视图</li>
+              <li role="menuitem" data-action="center-view">居中</li>
+              <li role="menuitem" data-action="zoom-in">放大</li>
+              <li role="menuitem" data-action="zoom-out">缩小</li>
+              <li role="menuitem" data-action="toggle-all-fold">折叠/展开全部</li>
               <li role="menuitem" data-action="settings">设置</li>
               <?php if ($mind['id']): ?>
               <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
@@ -1888,6 +1912,17 @@ if ($view === 'map_edit') {
           <label for="node-tags">标签</label>
           <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
           <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
+        </div>
+        <div class="field fold-field" id="node-fold-field" hidden>
+          <div class="fold-row">
+            <span class="fold-caption">折叠子节点</span>
+            <label class="fold-switch" for="node-fold-toggle">
+              <input id="node-fold-toggle" type="checkbox">
+              <span class="fold-track" aria-hidden="true"><span class="fold-thumb"></span></span>
+              <span class="fold-state" id="node-fold-state">已展开</span>
+            </label>
+          </div>
+          <p class="field-hint">关闭后子节点将暂时隐藏，并在画布上显示折叠标记。</p>
         </div>
         <div class="popover-actions">
           <button type="button" data-pop-close>取消</button>
@@ -2036,6 +2071,13 @@ if ($view === 'map_edit') {
           data.tags=data.tags.split(/[;,，\s]+/).map(tag=>tag.trim()).filter(Boolean);
         }else{
           data.tags=[];
+        }
+        if(typeof data.note==='string'){
+          data.note=data.note.trim();
+          if(!data.note.length) delete data.note;
+        }else if(data.note!=null){
+          const note=String(data.note||'').trim();
+          if(note.length) data.note=note; else delete data.note;
         }
         return data;
       }
@@ -2585,9 +2627,16 @@ if ($view === 'map_edit') {
           if(TYPE_ACCENT_MAP[type]){ el.style.setProperty('--node-accent', TYPE_ACCENT_MAP[type]); }
           if(data.status){ el.dataset.status=data.status; } else{ el.dataset.status='backlog'; }
           if(data.priority){ el.dataset.priority=data.priority; } else{ el.dataset.priority='normal'; }
+          const hasChildren=Array.isArray(node.children) && node.children.length>0;
+          if(hasChildren){ el.classList.add('has-children'); }
+          const isCollapsed=hasChildren && node.expanded===false;
+          if(isCollapsed){ el.classList.add('is-collapsed'); }
+          el.dataset.expanded=isCollapsed?'false':'true';
           const attachments=gatherAttachments(data);
           if(attachments.length){ el.classList.add('has-attachment'); }
           if(data.url){ el.classList.add('has-link'); }
+          if(data.note){ el.classList.add('has-note'); }
+          if(data.priority==='high'){ el.classList.add('priority-high'); }
           const flairElements=[];
           const statusInfo=NODE_STATUS.find(item=>item.value===data.status);
           if(statusInfo){
@@ -2662,6 +2711,40 @@ if ($view === 'map_edit') {
             wrap.className='node-affordances';
             badges.forEach(btn=>wrap.appendChild(btn));
             el.appendChild(wrap);
+          }
+          const markers=[];
+          if(isCollapsed){
+            markers.push({kind:'fold', icon:'⤵', label:'已折叠子节点'});
+          }
+          if(attachments.length){
+            markers.push({kind:'attachment', icon:'📎', label:`包含 ${attachments.length} 个附件`, count:attachments.length});
+          }
+          if(data.note){
+            markers.push({kind:'note', icon:'📝', label:'包含备注'});
+          }
+          if(data.priority==='high'){
+            markers.push({kind:'priority', icon:'', label:'高优先级'});
+          }
+          if(markers.length){
+            const markerWrap=document.createElement('div');
+            markerWrap.className='node-markers';
+            markers.forEach(info=>{
+              const marker=document.createElement('span');
+              marker.className='marker';
+              marker.dataset.kind=info.kind;
+              if(info.count && info.count>1){ marker.dataset.count=String(info.count); }
+              const iconEl=document.createElement('span');
+              iconEl.className='marker-icon';
+              if(info.kind==='priority'){ iconEl.classList.add('priority-dot'); }
+              else{ iconEl.textContent=info.icon || ''; }
+              marker.appendChild(iconEl);
+              const sr=document.createElement('span');
+              sr.className='sr-only';
+              sr.textContent=info.label;
+              marker.appendChild(sr);
+              markerWrap.appendChild(marker);
+            });
+            el.appendChild(markerWrap);
           }
           if(!forMeasure){
             el.addEventListener('click',(evt)=>{
@@ -3255,6 +3338,9 @@ if ($view === 'map_edit') {
       const nodeOwnerInput=document.getElementById('node-owner');
       const nodeTagsInput=document.getElementById('node-tags');
       const nodeTagsPreview=document.getElementById('node-tags-preview');
+      const foldField=document.getElementById('node-fold-field');
+      const foldToggle=document.getElementById('node-fold-toggle');
+      const foldStateLabel=document.getElementById('node-fold-state');
       const mindShell=document.querySelector('.mind-shell');
       const dock=document.getElementById('mind-dock');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
@@ -3289,8 +3375,6 @@ if ($view === 'map_edit') {
         else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const deleteMapForm=document.getElementById('delete-map-form');
-      const fitButton=document.getElementById('btn-fit');
-      const fitFloatingButton=null;
       const addSiblingButton=null;
       const addChildButton=null;
       const deleteButton=null;
@@ -3368,6 +3452,7 @@ if ($view === 'map_edit') {
       function setInspectorEnabled(enabled){
         inspectorFields.forEach(el=>{ el.disabled=!enabled; });
         if(inspector){ inspector.classList.toggle('disabled', !enabled); }
+        if(foldToggle){ foldToggle.disabled=!enabled; }
       }
       function renderTagPreview(tags){
         if(!nodeTagsPreview) return;
@@ -3384,6 +3469,9 @@ if ($view === 'map_edit') {
           span.textContent=tag;
           nodeTagsPreview.appendChild(span);
         });
+      }
+      function syncFoldStateLabel(isExpanded){
+        if(foldStateLabel){ foldStateLabel.textContent=isExpanded?'已展开':'已折叠'; }
       }
       let popoverOpen=false;
       const popoverMedia=window.matchMedia('(max-width: 768px)');
@@ -3454,6 +3542,12 @@ if ($view === 'map_edit') {
           if(nodeOwnerInput) nodeOwnerInput.value='';
           if(nodeTagsInput) nodeTagsInput.value='';
           renderTagPreview([]);
+          if(foldField) foldField.hidden=true;
+          if(foldToggle){
+            foldToggle.checked=true;
+            foldToggle.disabled=true;
+          }
+          syncFoldStateLabel(true);
           inspectorSyncing=false;
           if(popoverOpen){ positionInspectorPopover(null); }
           return;
@@ -3467,10 +3561,43 @@ if ($view === 'map_edit') {
         if(nodeOwnerInput) nodeOwnerInput.value=data.owner||'';
         if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
         renderTagPreview(data.tags||[]);
+        if(foldField){
+          const hasChildren=Array.isArray(node.children) && node.children.length>0;
+          foldField.hidden=!hasChildren;
+          if(foldToggle){
+            const expanded=node.expanded!==false;
+            foldToggle.checked=expanded;
+            foldToggle.disabled=!hasChildren;
+            syncFoldStateLabel(expanded);
+          }else{
+            syncFoldStateLabel(true);
+          }
+        }else{
+          syncFoldStateLabel(true);
+        }
         inspectorSyncing=false;
         if(popoverOpen){ positionInspectorPopover(node); }
       }
       refreshInspector(jm.get_selected_node());
+      if(foldToggle){
+        foldToggle.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node) return;
+          commitInlineEditing();
+          const expanded=!!foldToggle.checked;
+          syncFoldStateLabel(expanded);
+          if(node.expanded===expanded) return;
+          node.expanded=expanded;
+          if(node.model) node.model.expanded=expanded;
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(node.id);
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_node(node.id)));
+        });
+      }
       if(jm.options){ jm.options.onNodeDetails=openInspectorPopover; }
       function applyInspectorChange(mutator){
         if(typeof mutator!=='function') return;
@@ -3844,16 +3971,23 @@ if ($view === 'map_edit') {
             case 'delete': deleteSelectedNode(); break;
             case 'import': triggerImport(); break;
             case 'export': exportMindmap(); break;
-            case 'toggle-fold': {
-              const node=ensureNode();
-              if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
-              break;
-            }
             case 'fit-view':
               if(!callView('zoomToFit')){
                 callView('set_zoom',1);
                 if(!callView('move_to_center')) callView('center_root');
               }
+              break;
+            case 'center-view':
+              if(!callView('move_to_center')) callView('center_root');
+              break;
+            case 'zoom-in':
+              if(!callView('zoomIn')) callView('zoom_in');
+              break;
+            case 'zoom-out':
+              if(!callView('zoomOut')) callView('zoom_out');
+              break;
+            case 'toggle-all-fold':
+              toggleAllNodes();
               break;
             case 'details': {
               const node=ensureNode();
@@ -3926,29 +4060,28 @@ if ($view === 'map_edit') {
         }
         return false;
       }
-      if(fitButton){
-        fitButton.onclick=()=>{
-          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-            callView('set_zoom', 1);
-            if(!callView('move_to_center')) callView('center_root');
+      function toggleAllNodes(){
+        if(!jm || !(jm.nodes instanceof Map)) return;
+        const nodes=Array.from(jm.nodes.values()).filter(node=>node && Array.isArray(node.children) && node.children.length);
+        if(!nodes.length) return;
+        const nonRoot=nodes.filter(node=>!node.isroot);
+        const pool=nonRoot.length?nonRoot:nodes;
+        const shouldCollapse=pool.some(node=>node.expanded!==false);
+        nodes.forEach(node=>{
+          if(node.isroot){
+            node.expanded=true;
+            if(node.model) node.model.expanded=true;
+            return;
           }
-        };
-      }
-      if(fitFloatingButton && fitButton){
-        fitFloatingButton.onclick=()=>fitButton.click();
-      }
-      const centerButton=document.getElementById('btn-center');
-      if(centerButton){ centerButton.onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); }; }
-      const zoomInButton=document.getElementById('btn-zoom-in');
-      if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
-      const zoomOutButton=document.getElementById('btn-zoom-out');
-      if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
-      const collapseButton=document.getElementById('btn-collapse');
-      if(collapseButton){
-        collapseButton.addEventListener('click',()=>{
-          const node=ensureNode();
-          if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
+          const next=!shouldCollapse;
+          node.expanded=next;
+          if(node.model) node.model.expanded=next;
         });
+        jm.computeLayout();
+        jm.render();
+        markDirty();
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
       }
       let dropHoverNode=null;
       function clearDropHover(){
