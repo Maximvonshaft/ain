@@ -1699,7 +1699,7 @@ if ($view === 'map_edit') {
       .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
       .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
-      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative}
+      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;justify-content:center}
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
@@ -1721,9 +1721,14 @@ if ($view === 'map_edit') {
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock{gap:8px;padding:10px 12px}.dock-btn{width:82px;height:60px}}
       @media (max-width:720px){.mind-dock{padding:10px 12px;border-radius:24px}.dock-btn{width:78px;height:56px}}
+      @media (max-width:600px){.mind-dock{flex-wrap:wrap;row-gap:8px;column-gap:8px;max-width:calc(100vw - 24px)}.dock-btn{width:calc(50% - 12px);flex:1 1 calc(50% - 12px);height:56px}.dock-sep{display:none}.dock-more{width:100%}.dock-more .dock-btn{width:100%;flex:1 1 100%}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
-      .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px)}
-      .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px}
+      .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);transition:transform .24s ease,opacity .24s ease}
+      .node-popover[hidden]{display:none!important}
+      .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px;touch-action:pan-y}
+      .node-popover.dragging{transition:none!important}
+      .node-popover .sheet-handle{display:none;width:56px;height:5px;border-radius:999px;background:rgba(201,168,106,.32);margin:4px auto 8px}
+      .node-popover[data-mode="sheet"] .sheet-handle{display:block}
       .node-popover header{display:flex;align-items:center;justify-content:space-between;gap:12px}
       .node-popover h2{margin:0;font:600 16px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.14em;text-transform:uppercase}
       .node-popover button.close{background:none;border:1px solid rgba(201,168,106,.3);border-radius:999px;color:var(--gold-400);width:32px;height:32px;cursor:pointer}
@@ -1751,6 +1756,12 @@ if ($view === 'map_edit') {
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
       .node-popover .popover-actions button:hover{border-color:rgba(227,198,139,.6)}
       .node-popover.disabled{pointer-events:none;opacity:.6}
+      .node-context-menu{position:fixed;z-index:150;min-width:180px;padding:12px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 22px 48px rgba(0,0,0,.6);display:grid;gap:8px}
+      .node-context-menu[hidden]{display:none!important}
+      .node-context-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
+      .node-context-menu button:hover{border-color:rgba(201,168,106,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
+      .node-context-menu[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding:16px 16px 28px;gap:12px}
+      .node-context-menu[data-mode="sheet"] button{width:100%}
       .mind-settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:130;background:rgba(5,6,8,.6);backdrop-filter:blur(8px)}
       .mind-settings[aria-hidden="false"]{display:flex}
       .mind-settings .settings-panel{background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 32px 60px rgba(0,0,0,.65);padding:20px 22px;display:grid;gap:16px;min-width:280px;max-width:360px}
@@ -1841,15 +1852,8 @@ if ($view === 'map_edit') {
               <span class="label">更多</span>
             </button>
             <ul class="dock-menu" role="menu">
-              <li role="menuitem" data-action="details">节点属性</li>
               <li role="menuitem" data-action="import">导入 JSON</li>
               <li role="menuitem" data-action="export">导出 JSON</li>
-              <li role="menuitem" data-action="fit-view">适应视图</li>
-              <li role="menuitem" data-action="center-view">视图居中</li>
-              <li role="menuitem" data-action="zoom-in">放大</li>
-              <li role="menuitem" data-action="zoom-out">缩小</li>
-              <li role="menuitem" data-action="fold-all">折叠全部</li>
-              <li role="menuitem" data-action="settings">设置</li>
               <?php if ($mind['id']): ?>
               <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
               <?php endif; ?>
@@ -1859,6 +1863,7 @@ if ($view === 'map_edit') {
       </div>
     </div>
     <div class="node-popover" id="node-popover" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
       <header>
         <h2>节点属性</h2>
         <button type="button" class="close" data-pop-close aria-label="关闭">×</button>
@@ -1920,6 +1925,9 @@ if ($view === 'map_edit') {
         </div>
       </form>
     </div>
+    <div class="node-context-menu" id="node-context-menu" hidden>
+      <button type="button" data-menu-action="edit">编辑属性</button>
+    </div>
     <div class="mind-settings" id="mind-settings" aria-hidden="true">
       <div class="settings-panel">
         <header>
@@ -1936,6 +1944,8 @@ if ($view === 'map_edit') {
     <script>
       (function(){
       const DOUBLE_TAP_WINDOW=320;
+      const LONG_PRESS_DELAY=550;
+      const LONG_PRESS_TOLERANCE=14;
       const NODE_TYPES=[
         {value:'idea',label:'创意',icon:'💡',accent:'#0284c7'},
         {value:'task',label:'任务',icon:'✅',accent:'#ca8a04'},
@@ -3351,6 +3361,9 @@ if ($view === 'map_edit') {
       const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
       const foldAllMenuItem=dockMenu ? dockMenu.querySelector('[data-action="fold-all"]') : null;
       const nodePopover=document.getElementById('node-popover');
+      const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
+      const popoverHeader=nodePopover ? nodePopover.querySelector('header') : null;
+      const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
       const fisheyeToggle=document.getElementById('setting-fisheye');
@@ -3381,6 +3394,7 @@ if ($view === 'map_edit') {
       let dirty=false;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
+      let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
@@ -3570,21 +3584,66 @@ if ($view === 'map_edit') {
         updateFoldAllLabel();
       }
       let popoverOpen=false;
+      let sheetDragState=null;
+      let longPressState=null;
       const popoverMedia=window.matchMedia('(max-width: 768px)');
       function updatePopoverMode(){
         if(!nodePopover) return;
         nodePopover.dataset.mode = popoverMedia.matches ? 'sheet' : 'panel';
+        nodePopover.classList.remove('dragging');
+        if(!sheetDragState){ nodePopover.style.transform=''; }
         if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
       }
       updatePopoverMode();
       if(popoverMedia.addEventListener) popoverMedia.addEventListener('change',()=>updatePopoverMode());
       else if(popoverMedia.addListener) popoverMedia.addListener(()=>updatePopoverMode());
+      function isContextMenuOpen(){ return !!(nodeContextMenu && !nodeContextMenu.hidden); }
+      function closeNodeContextMenu(){
+        if(!nodeContextMenu) return;
+        nodeContextMenu.hidden=true;
+        nodeContextMenu.removeAttribute('style');
+        nodeContextMenu.removeAttribute('data-mode');
+        contextMenuState=null;
+      }
+      function openNodeContextMenu(node, anchor){
+        if(!nodeContextMenu || !node) return;
+        try{ jm.select_node(node.id); }catch(_){ }
+        contextMenuState={nodeId:node.id};
+        nodeContextMenu.hidden=false;
+        const mode=popoverMedia.matches ? 'sheet' : 'menu';
+        nodeContextMenu.dataset.mode=mode;
+        if(mode==='sheet'){
+          nodeContextMenu.style.left='';
+          nodeContextMenu.style.top='';
+          return;
+        }
+        nodeContextMenu.style.left='';
+        nodeContextMenu.style.top='';
+        requestAnimationFrame(()=>{
+          const rect=nodeContextMenu.getBoundingClientRect();
+          const margin=12;
+          const fallback=node.el ? node.el.getBoundingClientRect() : null;
+          const baseX=anchor && typeof anchor.x==='number' ? anchor.x : (fallback ? fallback.right : window.innerWidth/2);
+          const baseY=anchor && typeof anchor.y==='number' ? anchor.y : (fallback ? fallback.top : window.innerHeight/2);
+          let left=baseX - rect.width/2;
+          let top=baseY;
+          if(left < margin) left=margin;
+          if(left + rect.width > window.innerWidth - margin){ left = window.innerWidth - rect.width - margin; }
+          if(top < margin) top=margin;
+          if(top + rect.height > window.innerHeight - margin){ top = window.innerHeight - rect.height - margin; }
+          nodeContextMenu.style.left=`${Math.round(left)}px`;
+          nodeContextMenu.style.top=`${Math.round(top)}px`;
+        });
+      }
       function isPopoverOpen(){ return popoverOpen; }
       function openInspectorPopover(node){
         if(!nodePopover || !node) return;
+        closeNodeContextMenu();
         popoverOpen=true;
         updatePopoverMode();
         nodePopover.hidden=false;
+        nodePopover.classList.remove('dragging');
+        nodePopover.style.transform='';
         refreshInspector(node);
         if(nodeTopicInput){
           requestAnimationFrame(()=>{
@@ -3597,6 +3656,12 @@ if ($view === 'map_edit') {
         if(!nodePopover) return;
         popoverOpen=false;
         nodePopover.hidden=true;
+        nodePopover.classList.remove('dragging');
+        nodePopover.style.transform='';
+        if(sheetDragState && sheetDragState.pointerId!=null && nodePopover.releasePointerCapture){
+          try{ nodePopover.releasePointerCapture(sheetDragState.pointerId); }catch(_){ }
+        }
+        sheetDragState=null;
       }
       function positionInspectorPopover(node){
         if(!nodePopover) return;
@@ -3618,6 +3683,43 @@ if ($view === 'map_edit') {
           if(e.target.closest('[data-pop-save]')){ e.preventDefault(); commitInlineEditing(); closeInspectorPopover(); }
         });
       }
+      const startSheetDrag=(e)=>{
+        if(!nodePopover || nodePopover.dataset.mode!=='sheet') return;
+        if(e.pointerType==='mouse' && e.button!==0) return;
+        const isHandle=sheetHandle && sheetHandle.contains(e.target);
+        const isHeaderDrag=popoverHeader && popoverHeader.contains(e.target) && !e.target.closest('button, [data-pop-close], [data-pop-save]');
+        if(!isHandle && !isHeaderDrag) return;
+        sheetDragState={pointerId:e.pointerId,startY:e.clientY,translate:0};
+        nodePopover.classList.add('dragging');
+        try{ nodePopover.setPointerCapture(e.pointerId); }catch(_){ }
+        e.preventDefault();
+      };
+      const moveSheetDrag=(e)=>{
+        if(!sheetDragState || !nodePopover || e.pointerId!==sheetDragState.pointerId) return;
+        const delta=Math.max(0, e.clientY - sheetDragState.startY);
+        sheetDragState.translate=delta;
+        nodePopover.style.transform=`translateX(-50%) translateY(${delta}px)`;
+      };
+      const endSheetDrag=(e,cancelled=false)=>{
+        if(!sheetDragState || !nodePopover || e.pointerId!==sheetDragState.pointerId) return;
+        const delta=sheetDragState.translate || 0;
+        const pointerId=sheetDragState.pointerId;
+        sheetDragState=null;
+        if(nodePopover.releasePointerCapture){ try{ nodePopover.releasePointerCapture(pointerId); }catch(_){ } }
+        if(!cancelled && delta>120){
+          closeInspectorPopover();
+        }else{
+          nodePopover.classList.remove('dragging');
+          nodePopover.style.transform='';
+        }
+      };
+      if(sheetHandle){ sheetHandle.addEventListener('pointerdown', startSheetDrag); }
+      if(popoverHeader){ popoverHeader.addEventListener('pointerdown', startSheetDrag); }
+      if(nodePopover){
+        nodePopover.addEventListener('pointermove', moveSheetDrag);
+        nodePopover.addEventListener('pointerup',e=>endSheetDrag(e,false));
+        nodePopover.addEventListener('pointercancel',e=>endSheetDrag(e,true));
+      }
       document.addEventListener('pointerdown',e=>{
         if(!popoverOpen || !nodePopover) return;
         if(nodePopover.contains(e.target)) return;
@@ -3625,8 +3727,81 @@ if ($view === 'map_edit') {
         closeInspectorPopover();
       });
       document.addEventListener('keydown',e=>{
-        if(e.key==='Escape' && popoverOpen){ closeInspectorPopover(); }
+        if(e.key==='Escape'){
+          if(popoverOpen){ closeInspectorPopover(); }
+          if(isContextMenuOpen()){ closeNodeContextMenu(); }
+        }
       });
+      document.addEventListener('pointerdown',e=>{
+        if(!isContextMenuOpen() || !nodeContextMenu) return;
+        if(nodeContextMenu.contains(e.target)) return;
+        closeNodeContextMenu();
+      });
+      if(nodeContextMenu){
+        nodeContextMenu.addEventListener('click',e=>{
+          const btn=e.target.closest('button[data-menu-action]');
+          if(!btn) return;
+          const action=btn.dataset.menuAction;
+          if(action==='edit'){
+            const nodeId=contextMenuState?.nodeId;
+            const node=nodeId ? jm.get_node(nodeId) : ensureNode();
+            closeNodeContextMenu();
+            if(node){ openInspectorPopover(node); }
+          }
+        });
+      }
+      window.addEventListener('resize',closeNodeContextMenu);
+      const cancelLongPressState=()=>{
+        if(longPressState && longPressState.timer){ clearTimeout(longPressState.timer); }
+        longPressState=null;
+      };
+      if(jmContainer){
+        jmContainer.addEventListener('pointerdown',e=>{
+          const nodeEl=e.target.closest('.jsmind-node');
+          if(!nodeEl){ cancelLongPressState(); return; }
+          if(e.pointerType && !['touch','pen'].includes(e.pointerType)){ cancelLongPressState(); return; }
+          const nodeId=nodeEl.getAttribute('nodeid');
+          if(!nodeId){ cancelLongPressState(); return; }
+          cancelLongPressState();
+          longPressState={
+            pointerId:e.pointerId,
+            nodeId,
+            startX:e.clientX,
+            startY:e.clientY,
+            triggered:false,
+            timer:window.setTimeout(()=>{
+              if(!longPressState || longPressState.pointerId!==e.pointerId) return;
+              longPressState.triggered=true;
+              longPressState.timer=null;
+              const node=jm.get_node(longPressState.nodeId);
+              if(node){ openNodeContextMenu(node,{x:longPressState.startX,y:longPressState.startY}); }
+            }, LONG_PRESS_DELAY)
+          };
+        });
+        jmContainer.addEventListener('pointermove',e=>{
+          if(!longPressState || e.pointerId!==longPressState.pointerId) return;
+          if(longPressState.triggered) return;
+          const dx=Math.abs(e.clientX-longPressState.startX);
+          const dy=Math.abs(e.clientY-longPressState.startY);
+          if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){ cancelLongPressState(); }
+        });
+        const finishLongPress=(e)=>{
+          if(!longPressState || e.pointerId!==longPressState.pointerId) return;
+          const triggered=!!longPressState.triggered;
+          cancelLongPressState();
+          if(triggered){ e.preventDefault(); e.stopPropagation(); }
+        };
+        jmContainer.addEventListener('pointerup',finishLongPress);
+        jmContainer.addEventListener('pointercancel',finishLongPress);
+        jmContainer.addEventListener('contextmenu',e=>{
+          const nodeEl=e.target.closest('.jsmind-node');
+          if(!nodeEl) return;
+          e.preventDefault();
+          cancelLongPressState();
+          const node=jm.get_node(nodeEl.getAttribute('nodeid'));
+          if(node){ openNodeContextMenu(node,{x:e.clientX,y:e.clientY}); }
+        });
+      }
       function refreshInspector(node){
         inspectorSyncing=true;
         if(!node){
@@ -4038,31 +4213,6 @@ if ($view === 'map_edit') {
             case 'delete': deleteSelectedNode(); break;
             case 'import': triggerImport(); break;
             case 'export': exportMindmap(); break;
-            case 'fit-view':
-              if(!callView('zoomToFit')){
-                callView('set_zoom',1);
-                if(!callView('move_to_center')) callView('center_root');
-              }
-              break;
-            case 'center-view':
-              if(!callView('move_to_center')) callView('center_root');
-              break;
-            case 'zoom-in':
-              if(!callView('zoomIn')) callView('zoom_in');
-              break;
-            case 'zoom-out':
-              if(!callView('zoomOut')) callView('zoom_out');
-              break;
-            case 'fold-all':
-              toggleFoldAll();
-              break;
-            case 'details': {
-              const node=ensureNode();
-              if(node){ openInspectorPopover(node); }
-              else{ alert('请先选择一个节点'); }
-              break;
-            }
-            case 'settings': toggleSettings(true); break;
             case 'delete-map':
               if(deleteMapForm && confirm('确认删除该导图？')){ deleteMapForm.submit(); }
               break;
@@ -4173,6 +4323,9 @@ if ($view === 'map_edit') {
       if(titleInput){ titleInput.addEventListener('input', markDirty); }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
+          if(isContextMenuOpen() && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
+            closeNodeContextMenu();
+          }
           if(type===jsMind.event_type.select){
             const selected=jm.get_selected_node();
             const editingId=currentEditingId();
