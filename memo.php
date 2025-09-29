@@ -2058,6 +2058,8 @@ if ($view === 'map_edit') {
           if(!this.container) throw new Error('Mind container not found');
           this.listeners=[];
           this.scale=1;
+          this.lastLayoutScale=1;
+          this.pendingScaleRelayout=false;
           this.offsetX=0;
           this.offsetY=0;
           this.mind=null;
@@ -2165,7 +2167,9 @@ if ($view === 'map_edit') {
                 const centerX=((a.x+b.x)/2)-rect.left;
                 const centerY=((a.y+b.y)/2)-rect.top;
                 const nextScale=Math.max(0.3, Math.min(2.5, pinch.baseScale * (distance / pinch.initialDistance)));
+                const prevScale=this.scale;
                 this.scale=nextScale;
+                if(Math.abs(nextScale-prevScale)>0.0001){ this.pendingScaleRelayout=true; }
                 this.offsetX=centerX - pinch.originX*this.scale;
                 this.offsetY=centerY - pinch.originY*this.scale;
                 this.applyTransform();
@@ -2190,6 +2194,9 @@ if ($view === 'map_edit') {
               this.dragState=null;
             }
             if(this.activePointers.size<2){
+              if(evt.pointerType==='touch' && this.activePointers.size===0 && this.pendingScaleRelayout){
+                this.relayoutForScale();
+              }
               this.pinchState=null;
             }else{
               updatePinchBaseline();
@@ -2218,6 +2225,7 @@ if ($view === 'map_edit') {
             this.offsetX=evt.clientX-rect.left - originX*this.scale;
             this.offsetY=evt.clientY-rect.top - originY*this.scale;
             this.applyTransform();
+            this.relayoutForScale();
             return;
           }
           evt.preventDefault();
@@ -2486,7 +2494,9 @@ if ($view === 'map_edit') {
             const el=this.buildNodeElement(node,{forMeasure:true});
             this.measureHost.appendChild(el);
             const rect=el.getBoundingClientRect();
-            this.sizeCache.set(node.id,{width:rect.width,height:rect.height});
+            const VISUAL_MARGIN_Y=24;
+            const measuredHeight=Math.max(0, rect.height + VISUAL_MARGIN_Y);
+            this.sizeCache.set(node.id,{width:rect.width,height:measuredHeight});
             el.remove();
             if(node.expanded!==false && node.children && node.children.length){ node.children.forEach(child=>measureNode(child)); }
           };
@@ -2495,9 +2505,10 @@ if ($view === 'map_edit') {
         computeLayout(){
           if(!this.root) return;
           this.collectNodeSizes();
-          const H_SPACING=220;
-          const MIN_SPACING=40;
-          const MIN_HEIGHT=60;
+          const clamp=(value,min,max)=>Math.min(Math.max(value,min),max);
+          const MIN_HEIGHT=88;
+          const MIN_WIDTH=120;
+          const scale=(typeof this.scale==='number' && isFinite(this.scale) && this.scale>0)?this.scale:1;
           const heightMap=new Map();
           const getNodeHeight=(node)=>{
             if(!node) return MIN_HEIGHT;
@@ -2505,72 +2516,166 @@ if ($view === 'map_edit') {
             if(cached && cached.height){ return Math.max(MIN_HEIGHT, cached.height); }
             return MIN_HEIGHT;
           };
-          const gapBetween=(a,b)=>Math.max(MIN_SPACING, Math.min(160,(a+b)*0.25));
-          const measure=(node)=>{
+          const getNodeWidth=(node)=>{
+            if(!node) return MIN_WIDTH;
+            const cached=this.sizeCache.get(node.id);
+            if(cached && cached.width){ return Math.max(MIN_WIDTH, cached.width); }
+            return MIN_WIDTH;
+          };
+          const verticalSpace=(depth)=>clamp(72 + depth*6, 56, 120);
+          const horizontalSpace=(depth,parentWidth)=>{
+            const base=clamp(180 + depth*12, 160, 260);
+            const widthBased=parentWidth ? (parentWidth*0.75 + 140) : 0;
+            const spacing=Math.max(base, widthBased);
+            return spacing/scale;
+          };
+          const gapBetween=(a,b,depth)=>{
+            const base=Math.max(verticalSpace(depth), (a+b)*0.3);
+            return base/scale;
+          };
+          const measure=(node, depth=0)=>{
             if(!node) return MIN_HEIGHT;
             if(heightMap.has(node.id)) return heightMap.get(node.id);
             const base=getNodeHeight(node);
-            if(!node.expanded || !node.children.length){ heightMap.set(node.id, base); return base; }
+            if(node.expanded===false || !node.children || !node.children.length){
+              heightMap.set(node.id, base);
+              return base;
+            }
             const visible=node.children.filter(Boolean);
-            if(!visible.length){ heightMap.set(node.id, base); return base; }
-            const childHeights=visible.map(child=>measure(child));
+            if(!visible.length){
+              heightMap.set(node.id, base);
+              return base;
+            }
+            const childHeights=visible.map(child=>measure(child, depth+1));
             let total=0;
             for(let i=0;i<childHeights.length;i++){
               total+=childHeights[i];
-              if(i<childHeights.length-1){ total+=gapBetween(childHeights[i], childHeights[i+1]); }
+              if(i<childHeights.length-1){
+                total+=gapBetween(childHeights[i], childHeights[i+1], depth+1);
+              }
             }
             const result=Math.max(base,total);
             heightMap.set(node.id,result);
             return result;
           };
-          const subtreeHeight=(nodes)=>{
-            if(!nodes || !nodes.length) return 0;
-            let total=0;
-            for(let i=0;i<nodes.length;i++){
-              const node=nodes[i];
-              const h=measure(node);
-              total+=h;
-              if(i<nodes.length-1){ total+=gapBetween(h, measure(nodes[i+1])); }
+          const shiftSubtree=(node,delta)=>{
+            if(!node || !delta) return;
+            const stack=[node];
+            while(stack.length){
+              const current=stack.pop();
+              current.y+=delta;
+              if(typeof current.layoutTop==='number'){ current.layoutTop+=delta; }
+              if(typeof current.layoutBottom==='number'){ current.layoutBottom+=delta; }
+              if(current.children && current.children.length){
+                for(const child of current.children){ if(child) stack.push(child); }
+              }
             }
-            return total;
           };
-          const right=this.root.children.filter(Boolean);
-          const rightHeight=subtreeHeight(right);
-          const rootHeight=getNodeHeight(this.root);
-          const canvasHeight=Math.max(rootHeight, rightHeight);
-          this.root.x=0;
-          this.root.y=canvasHeight/2;
-          this.root.dir=0;
-          this.root.direction='center';
-          if(this.root.model){ this.root.model.direction='center'; }
-          const assign=(node,depth,startTop)=>{
-            const height=measure(node);
-            node.x=this.root.x + depth*H_SPACING;
-            node.y=startTop+height/2;
+          const updateLayoutMetrics=(node)=>{
+            if(!node) return {top:0,bottom:0};
+            const nodeHeight=getNodeHeight(node);
+            let top=node.y - nodeHeight/2;
+            let bottom=node.y + nodeHeight/2;
+            if(node.expanded!==false && node.children && node.children.length){
+              const visible=node.children.filter(Boolean);
+              for(const child of visible){
+                const bounds=updateLayoutMetrics(child);
+                top=Math.min(top, bounds.top);
+                bottom=Math.max(bottom, bounds.bottom);
+              }
+            }
+            node.layoutTop=top;
+            node.layoutBottom=bottom;
+            node.layoutHeight=bottom-top;
+            return {top,bottom};
+          };
+          const assign=(node, depth, startTop, parent=null, index=0, siblingCount=1)=>{
+            if(!node) return 0;
+            const height=measure(node, depth);
+            const parentWidth=parent?getNodeWidth(parent):0;
+            const horizontalOffset=depth===0?0:horizontalSpace(depth, parentWidth);
+            node.x=parent?parent.x+horizontalOffset:0;
+            node.y=startTop + height/2;
+            node.depth=depth;
             node.dir=depth===0?0:1;
             node.direction=depth===0?'center':'right';
             if(node.model){ node.model.direction=node.direction; }
-            if(!node.expanded || !node.children.length) return height;
+            node.layoutTop=startTop;
+            node.layoutHeight=height;
+            node.layoutBottom=startTop + height;
+            node.portOffset=parent ? (index - (siblingCount-1)/2) * 10 : 0;
+            if(node.expanded===false || !node.children || !node.children.length){
+              return height;
+            }
             let cursor=startTop;
             const children=node.children.filter(Boolean);
             for(let i=0;i<children.length;i++){
               const child=children[i];
-              const childHeight=assign(child, depth+1, cursor);
+              const childHeight=assign(child, depth+1, cursor, node, i, children.length);
               cursor+=childHeight;
               if(i<children.length-1){
-                const nextHeight=measure(children[i+1]);
-                cursor+=gapBetween(childHeight, nextHeight);
+                const nextHeight=measure(children[i+1], depth+1);
+                cursor+=gapBetween(childHeight, nextHeight, depth+1);
               }
             }
+            const bottom=Math.max(cursor, startTop + height);
+            node.layoutBottom=bottom;
+            node.layoutHeight=bottom - node.layoutTop;
             return height;
           };
-          let rightTop=this.root.y - rightHeight/2;
-          for(let i=0;i<right.length;i++){
-            const child=right[i];
-            const h=assign(child,1,rightTop);
-            rightTop+=h;
-            if(i<right.length-1){ rightTop+=gapBetween(h, measure(right[i+1])); }
-          }
+          const resolveCollisions=(node, depth=0)=>{
+            if(!node || node.expanded===false || !node.children || !node.children.length){
+              if(node) updateLayoutMetrics(node);
+              return;
+            }
+            const children=node.children.filter(Boolean);
+            if(!children.length){
+              updateLayoutMetrics(node);
+              return;
+            }
+            for(const child of children){
+              resolveCollisions(child, depth+1);
+            }
+            for(let i=1;i<children.length;i++){
+              const prev=children[i-1];
+              const current=children[i];
+              const minGap=gapBetween(prev.layoutHeight, current.layoutHeight, depth+1);
+              const desiredTop=prev.layoutBottom + minGap;
+              if(current.layoutTop < desiredTop){
+                const delta=desiredTop - current.layoutTop;
+                shiftSubtree(current, delta);
+                updateLayoutMetrics(current);
+              }
+            }
+            updateLayoutMetrics(node);
+          };
+          const recenterNodes=(node)=>{
+            if(!node || node.expanded===false || !node.children || !node.children.length){
+              return;
+            }
+            const children=node.children.filter(Boolean);
+            if(!children.length) return;
+            for(const child of children){
+              recenterNodes(child);
+            }
+            const first=children[0];
+            const last=children[children.length-1];
+            if(first && last){
+              const center=(first.layoutTop + last.layoutBottom)/2;
+              node.y=center;
+            }
+            updateLayoutMetrics(node);
+          };
+          measure(this.root,0);
+          assign(this.root,0,0,null,0,1);
+          updateLayoutMetrics(this.root);
+          resolveCollisions(this.root,0);
+          recenterNodes(this.root);
+          updateLayoutMetrics(this.root);
+          this.root.dir=0;
+          this.root.direction='center';
+          if(this.root.model){ this.root.model.direction='center'; }
+          this.lastLayoutScale=scale;
           this.bounds={minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity};
           for(const node of this.nodes.values()){
             if(node.y<this.bounds.minY) this.bounds.minY=node.y;
@@ -2597,6 +2702,16 @@ if ($view === 'map_edit') {
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
           this.viewport.style.height=`${this.bounds.height}px`;
+        }
+        relayoutForScale(force=false){
+          this.pendingScaleRelayout=false;
+          const scaleValue=(typeof this.scale==='number' && isFinite(this.scale) && this.scale>0)?this.scale:1;
+          if(!force && typeof this.lastLayoutScale==='number' && Math.abs(scaleValue - this.lastLayoutScale)<0.001){
+            this.applyTransform();
+            return;
+          }
+          this.computeLayout();
+          this.render();
         }
         buildNodeElement(node,{forMeasure=false}={}){
           const el=document.createElement('div');
@@ -2770,8 +2885,11 @@ if ($view === 'map_edit') {
           if(!node.parent.anchors) this.updateAnchors(node.parent);
           const parent=node.parent;
           const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
-          const start=isLeft ? parent.anchors.left : parent.anchors.right;
-          const end=isLeft ? node.anchors.right : node.anchors.left;
+          const anchorStart=isLeft ? parent.anchors.left : parent.anchors.right;
+          const anchorEnd=isLeft ? node.anchors.right : node.anchors.left;
+          const offset=typeof node.portOffset==='number'?node.portOffset:0;
+          const start={x:anchorStart.x,y:anchorStart.y+offset};
+          const end={x:anchorEnd.x,y:anchorEnd.y};
           const route=buildTraceRoute(start,end,isLeft?-1:1);
           let pathData=buildChamferedPath(route, TRACE_CHAMFER);
           if(!pathData){
@@ -2814,8 +2932,10 @@ if ($view === 'map_edit') {
         }
         zoom(step){
           const prev=this.scale;
-          this.scale=Math.max(0.3, Math.min(2.5, this.scale*step));
-          if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
+          const next=Math.max(0.3, Math.min(2.5, this.scale*step));
+          if(Math.abs(next-prev)<0.001) return;
+          this.scale=next;
+          this.relayoutForScale();
         }
         viewCommand(cmd){
           switch(cmd){
@@ -2850,13 +2970,14 @@ if ($view === 'map_edit') {
           if(rect.width<=0 || rect.height<=0) return false;
           const scale=Math.min(rect.width/(this.bounds.width+200), rect.height/(this.bounds.height+200));
           this.scale=Math.max(0.3, Math.min(2.5, scale));
+          this.relayoutForScale(true);
           this.center_root();
           return true;
         }
         set_zoom(z){
           if(typeof z!=='number' || !isFinite(z)) return false;
           this.scale=Math.max(0.3, Math.min(2.5, z));
-          this.applyTransform();
+          this.relayoutForScale();
           return true;
         }
         center_root(){
