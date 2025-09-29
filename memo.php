@@ -824,12 +824,11 @@ if ($view === 'new') {
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.18);opacity:.65;pointer-events:none}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));border:1px solid rgba(201,168,106,.28);border-radius:var(--r-lg);padding:24px;box-shadow:var(--shadow-1);backdrop-filter:blur(14px)}
       .card::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-lg) - 4px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;opacity:.9}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 0 0 0 rgba(227,198,139,0);overflow:hidden}
-      .btn::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(227,198,139,.18),transparent);transform:translateX(-100%);animation:scanline 2.8s linear infinite;opacity:.8}
-      @keyframes scanline{to{transform:translateX(100%)}}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.16);border-color:rgba(227,198,139,.65)}
+      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn::after{content:none}
+      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
       .btn:active{transform:translateY(0);background:rgba(21,26,30,.94);border-color:var(--gold-700)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 16px 32px rgba(0,0,0,.55)}
+      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));color:var(--gold-400);box-shadow:none}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
       .row{display:grid;grid-template-columns:2fr 1fr auto;gap:16px;margin-bottom:20px;align-items:center}
       .row input,.row select{padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 15px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
@@ -1200,13 +1199,12 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       h1,h2,h3,h4{font-family:'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:-0.5px;text-transform:uppercase}
       .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;position:relative;z-index:0}
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.2);opacity:.6;pointer-events:none}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-      .btn::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(227,198,139,.18),transparent);transform:translateX(-100%);animation:scanline 2.8s linear infinite;opacity:.8}
-      @keyframes scanline{to{transform:translateX(100%)}}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.16);border-color:rgba(227,198,139,.65)}
+      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn::after{content:none}
+      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
       .btn:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.94)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));box-shadow:0 0 0 1px rgba(227,198,139,.25),0 16px 32px rgba(0,0,0,.55)}
-      .btn.danger{color:#F8E6E6;border-color:rgba(209,75,75,.55);box-shadow:0 0 24px rgba(209,75,75,.32)}
+      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));box-shadow:none}
+      .btn.danger{color:#F8E6E6;border-color:rgba(209,75,75,.55);box-shadow:none}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));border:1px solid rgba(201,168,106,.32);border-radius:24px;padding:28px;box-shadow:var(--shadow-1);backdrop-filter:blur(16px)}
       .card::before{content:"";position:absolute;inset:12px;border-radius:calc(24px - 6px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 40px rgba(227,198,139,.1);pointer-events:none}
@@ -1641,45 +1639,37 @@ if ($view === 'map_edit') {
       .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
       @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
       a{color:inherit;text-decoration:none}
-      .layout{display:grid;grid-template-columns:360px 1fr;min-height:100vh;position:relative;gap:0}
-      @media (max-width:1180px){.layout{grid-template-columns:320px 1fr}}
-      @media (max-width:1024px){.layout{grid-template-columns:1fr}}
-      .sidebar{position:relative;z-index:90;display:flex;flex-direction:column;gap:20px;padding:32px;border-right:1px solid rgba(201,168,106,.28);background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));box-shadow:var(--shadow-1);backdrop-filter:blur(18px)}
-      .sidebar::before{content:"";position:absolute;inset:14px;border-radius:var(--r-lg);border:1px solid rgba(201,168,106,.18);opacity:.6;pointer-events:none}
-      .sidebar h1{margin:0;font:600 24px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-transform:uppercase}
-      .sidebar .meta{color:var(--text-muted);font:500 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
-      .sidebar label{display:block;margin-bottom:6px;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
-      .sidebar input,.sidebar select{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.76);color:var(--text-strong);font:500 15px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
-      .sidebar input:focus,.sidebar select:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
-      .actions,.toolbar{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
-      .sidebar button,.map-toolbar button,.mobile-toolbar button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-      .sidebar button::after,.map-toolbar button::after,.mobile-toolbar button::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(227,198,139,.18),transparent);transform:translateX(-100%);animation:scanline 2.8s linear infinite;opacity:.75}
-      @keyframes scanline{to{transform:translateX(100%)}}
-      .sidebar button:hover,.map-toolbar button:hover,.mobile-toolbar button:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.16);border-color:rgba(227,198,139,.65)}
-      .sidebar button:active,.map-toolbar button:active,.mobile-toolbar button:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.92)}
-      .sidebar button.acc,.mobile-toolbar button.primary{background:linear-gradient(135deg,rgba(201,168,106,.2),rgba(170,140,84,.28));color:var(--bg-void);box-shadow:0 0 0 1px rgba(227,198,139,.28),0 18px 34px rgba(0,0,0,.55)}
-      .sidebar button.danger,.mobile-toolbar button.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;box-shadow:0 0 24px rgba(209,75,75,.32)}
-      .btn-like{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:12px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(12,16,18,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:all var(--transition)}
-      .btn-like.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;background:rgba(35,10,14,.86);box-shadow:0 20px 38px rgba(209,75,75,.32)}
-      .inspector{margin-top:8px;padding:18px;border-radius:var(--r-md);border:1px solid rgba(201,168,106,.3);background:rgba(15,19,22,.82);box-shadow:var(--shadow-1);display:grid;gap:16px}
-      .inspector h2{margin:0 0 6px;font:600 16px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-transform:uppercase}
-      .field{display:grid;gap:8px}
-      .chips-preview{display:flex;gap:8px;flex-wrap:wrap;min-height:26px}
-      .chips-preview .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.82);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase}
-      .chips-preview .empty{color:var(--text-muted);font-size:12px}
-      .tips{font:400 13px/1.8 'Noto Sans SC','Inter',sans-serif;color:var(--text-muted)}
-      .tips strong{color:var(--gold-500);letter-spacing:.08em}
-      .tips code{padding:2px 6px;border-radius:6px;background:rgba(21,26,30,.9);border:1px solid rgba(201,168,106,.26);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif}
-      .editor-pane{position:relative;background:rgba(6,10,12,.35)}
-      #jsmind-container{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:linear-gradient(160deg,rgba(21,26,30,.82),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6)}
+      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:28px 24px 140px}
+      @media (max-width:900px){.mind-shell{padding:18px 14px 150px;gap:14px}}
+      .mind-header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;z-index:10}
+      .mind-title-group{display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:420px}
+      .map-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+      .map-meta a{color:var(--gold-400);text-decoration:none}
+      .map-title-input{padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
+      .save-state{align-self:flex-start;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+      .save-state.show{opacity:1;transform:translateY(0)}
+      .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
+      .mind-header-actions{display:flex;flex-direction:column;gap:14px;align-items:flex-end;margin-left:auto}
+      .mind-view-controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+      .view-btn{min-width:0;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);touch-action:manipulation}
+      .view-btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+      .view-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .mind-stage{position:relative;flex:1;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
+      .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
+      #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
-      .mind-links{pointer-events:none;filter:drop-shadow(0 0 8px rgba(227,198,139,.25))}
-      .mind-links path{fill:none;stroke:var(--fiber);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:18 32;animation:fiberFlow 8s linear infinite}
-      .mind-links path[data-status="doing"]{stroke:var(--gold-400);stroke-dasharray:12 24;animation:fiberPulse 3s linear infinite}
-      .mind-links path[data-status="done"]{stroke:rgba(201,168,106,.5);opacity:.8;stroke-dasharray:20 36}
-      @keyframes fiberFlow{0%{stroke-dashoffset:0;opacity:.85}100%{stroke-dashoffset:-480;opacity:1}}
-      @keyframes fiberPulse{0%{stroke-dashoffset:0;opacity:.9}100%{stroke-dashoffset:-320;opacity:1}}
+      .mind-links{pointer-events:none;overflow:visible}
+      .mind-links .trace-group{pointer-events:none}
+      .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
+      .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
+      .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
+      .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-links .trace-group[data-status="doing"] .trace.shadow{stroke:rgba(36,194,160,.42);opacity:.7}
+      .mind-links .trace-group[data-status="doing"] .trace.highlight{stroke:rgba(207,250,234,.4)}
+      .mind-links .trace-group[data-status="done"] .trace.core{opacity:.78}
+      .mind-links .trace-group[data-status="done"] .trace.highlight{opacity:.28}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.22);opacity:.7;pointer-events:none;animation:nodeGlow 9s ease-in-out infinite}
@@ -1698,143 +1688,226 @@ if ($view === 'map_edit') {
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
-      .map-toolbar{position:absolute;top:24px;right:24px;display:flex;gap:12px;z-index:60}
-      .map-toolbar button{padding:10px 14px}
-      .mobile-toolbar{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;gap:10px;background:rgba(12,16,18,.88);border:1px solid rgba(201,168,106,.28);border-radius:999px;padding:10px 16px;box-shadow:0 28px 60px rgba(0,0,0,.55);backdrop-filter:blur(16px);z-index:80}
-      .mobile-toolbar button{min-width:70px;padding:10px 16px}
-      @media (max-width:820px){.map-toolbar{display:none}}
-      .mobile-save-status{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.34);background:rgba(21,26,30,.9);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;box-shadow:0 18px 44px rgba(0,0,0,.55);backdrop-filter:blur(14px);opacity:0;pointer-events:none;transition:opacity var(--t) ease;z-index:85}
-      .mobile-save-status.show{opacity:1}
-      .mobile-save-status.state-success{border-color:rgba(36,194,160,.42);color:#CFFAEA;box-shadow:0 0 28px rgba(36,194,160,.32)}
-      .mobile-save-status.state-error{border-color:rgba(209,75,75,.52);color:#F6D6D6;box-shadow:0 0 28px rgba(209,75,75,.32)}
-      .sidebar-toggle{position:absolute;top:22px;left:22px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.86);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;display:none;z-index:95;box-shadow:0 12px 28px rgba(0,0,0,.45)}
-      @media (max-width:1024px){
-        .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(86vw,360px);transform:translateX(-105%);transition:transform var(--transition);border-right:1px solid rgba(201,168,106,.28);border-radius:0 24px 24px 0}
-        body.sidebar-open .sidebar{transform:translateX(0)}
-        .sidebar-toggle{display:inline-flex;align-items:center;gap:8px}
-      }
-      .sidebar-backdrop{display:none}
-      @media (max-width:1024px){
-        .sidebar-backdrop{position:fixed;inset:0;background:rgba(8,10,12,.65);backdrop-filter:blur(10px);z-index:80;opacity:0;transition:opacity var(--t) ease}
-        body.sidebar-open .sidebar-backdrop{display:block;opacity:1}
-      }
-      .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px dashed rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase}
-      .save-tip{display:none;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;color:var(--gold-400);text-transform:uppercase}
-      .save-tip.dirty{color:var(--accent-crimson)}
-      .save-tip.show{display:inline-block}
-      .placeholder-muted{color:var(--text-muted)}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
+      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation}
+      .dock-btn .icon{font-size:20px}
+      .dock-btn .label{font-size:12px}
+      .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
+      .dock-btn:active{transform:translateY(-1px)}
+      .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .dock-btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
+      .dock-btn.danger{color:#F6D6D6;border-color:rgba(209,75,75,.52);background:rgba(209,75,75,.12)}
+      .dock-btn.ghost{background:rgba(201,168,106,.04);border-style:dashed}
+      .dock-btn[data-state="dirty"]{color:#F6D6D6;border-color:rgba(209,75,75,.6);background:rgba(209,75,75,.18)}
+      .dock-btn[data-state="saving"]{color:var(--gold-500)}
+      .dock-btn[data-state="saved"]{color:var(--gold-400)}
+      .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
+      .dock-more{position:relative}
+      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
+      .dock-more[aria-expanded="true"] .dock-menu{display:block}
+      .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
+      .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
+      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
+      @media (max-width:960px){.mind-dock{gap:8px;padding:10px 12px}.dock-btn{width:82px;height:60px}}
+      @media (max-width:720px){.mind-dock{padding:10px 12px;border-radius:24px}.dock-btn{width:78px;height:56px}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px)}
+      .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px}
+      .node-popover header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .node-popover h2{margin:0;font:600 16px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.14em;text-transform:uppercase}
+      .node-popover button.close{background:none;border:1px solid rgba(201,168,106,.3);border-radius:999px;color:var(--gold-400);width:32px;height:32px;cursor:pointer}
+      .node-popover button.close:hover{border-color:var(--gold-500)}
+      .node-popover form{display:grid;gap:14px}
+      .node-popover .field{display:grid;gap:8px}
+      .node-popover label{font:600 12px/1.2 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
+      .node-popover input,.node-popover select,.node-popover textarea{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .node-popover input:focus,.node-popover select:focus,.node-popover textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 2px rgba(227,198,139,.18)}
+      .node-popover .chips-preview{display:flex;flex-wrap:wrap;gap:8px;min-height:26px}
+      .node-popover .chips-preview span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+      .node-popover .chips-preview .empty{color:var(--text-muted);border-style:dashed}
+      .node-popover .popover-actions{display:flex;justify-content:flex-end;gap:10px}
+      .node-popover .popover-actions button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition)}
+      .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
+      .node-popover .popover-actions button:hover{border-color:rgba(227,198,139,.6)}
+      .node-popover.disabled{pointer-events:none;opacity:.6}
+      .mind-settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:130;background:rgba(5,6,8,.6);backdrop-filter:blur(8px)}
+      .mind-settings[aria-hidden="false"]{display:flex}
+      .mind-settings .settings-panel{background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 32px 60px rgba(0,0,0,.65);padding:20px 22px;display:grid;gap:16px;min-width:280px;max-width:360px}
+      .mind-settings h3{margin:0;font:600 16px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.14em;text-transform:uppercase}
+      .mind-settings label{display:flex;align-items:center;gap:10px;color:var(--text-strong);font:500 14px/1.4 'Noto Sans SC','Inter',sans-serif}
+      .mind-settings .settings-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .mind-settings .settings-panel button.close{width:32px;height:32px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:none;color:var(--gold-400);cursor:pointer}
+      .mind-settings .settings-panel button.close:hover{border-color:var(--gold-500)}
+      .mind-settings .settings-actions{display:flex;justify-content:flex-end;gap:10px}
+      .mind-settings .settings-actions button{padding:10px 14px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+      .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      body.grid-off::after{opacity:0!important}
     </style>
 
   </head>
   <body>
     <div class="scanlines" aria-hidden="true"></div>
-    <div class="layout">
-      <aside class="sidebar">
-        <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-          <h1>思维导图编辑器</h1>
-          <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" style="font-size:13px;color:var(--text-dim)">← 导图库</a>
-        </div>
-        <div class="meta">ID：<?php echo $mind['id'] ?: '新建'; ?> · 最近保存：<?php echo dt((int)$mind['updated_at']); ?></div>
-        <label for="map-title">导图标题</label>
-        <input id="map-title" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
-        <div class="actions">
-          <button id="btn-save" class="acc">💾 保存</button>
-          <button id="btn-export-json">⬇️ 导出 JSON</button>
-          <button id="btn-import-json">⬆️ 导入 JSON</button>
-          <input id="import-input" type="file" accept="application/json" style="display:none">
-        </div>
-        <div class="toolbar">
-          <button id="btn-add-sibling">↕ 同级节点 (Enter)</button>
-          <button id="btn-add-child">→ 子级节点 (Tab)</button>
-          <button id="btn-delete" class="danger">🗑 删除节点 (Del)</button>
-        </div>
-        <div class="toolbar">
-          <button id="btn-attach-file">📎 上传附件</button>
-          <button id="btn-attach-link">🔗 新增链接</button>
-          <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
-        </div>
-        <section class="inspector" id="node-inspector">
-          <h2>节点信息</h2>
-          <div class="field">
-            <label for="node-type">类型</label>
-            <select id="node-type">
-              <option value="idea">💡 创意</option>
-              <option value="task">✅ 任务</option>
-              <option value="document">📄 文档</option>
-              <option value="media">🖼 媒体</option>
-              <option value="decision">🧭 决策</option>
-            </select>
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+      <defs>
+        <linearGradient id="mindGoldTrace" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#E3C68B" />
+          <stop offset="50%" stop-color="#C9A86A" />
+          <stop offset="100%" stop-color="#AA8C54" />
+        </linearGradient>
+        <filter id="mindSoftGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+    </svg>
+    <div class="mind-shell" data-fisheye="on">
+      <header class="mind-header">
+        <div class="mind-title-group">
+          <div class="map-meta">
+            <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
+            <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+            <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">← 返回导图库</a>
           </div>
-          <div class="field">
-            <label for="node-status">状态</label>
-            <select id="node-status">
-              <option value="backlog">待计划</option>
-              <option value="doing">进行中</option>
-              <option value="done">已完成</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="node-priority">优先级</label>
-            <select id="node-priority">
-              <option value="normal">普通</option>
-              <option value="high">高</option>
-              <option value="low">低</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="node-owner">负责人</label>
-            <input id="node-owner" type="text" placeholder="输入姓名或团队">
-          </div>
-          <div class="field">
-            <label for="node-tags">标签</label>
-            <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
-            <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
-          </div>
-        </section>
-        <div class="toolbar">
-          <button id="btn-fit">🧭 自适应视图</button>
-          <button id="btn-center">◎ 居中</button>
-          <button id="btn-zoom-in">＋ 放大</button>
-          <button id="btn-zoom-out">－ 缩小</button>
+          <label class="sr-only" for="map-title">导图标题</label>
+          <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+          <div class="save-state" id="save-state">保存成功</div>
         </div>
-        <div class="tips">
-          <strong>快捷键</strong><br>
-          <code>Enter</code> 同级 · <code>Tab</code> 子级 · <code>Shift+Tab</code> 升级 · <code>Del</code> 删除 · <code>F2</code> 重命名 · <code>Ctrl/Cmd+Z</code> 撤销<br>
-          鼠标中键/空格拖拽 · 滚轮缩放 · 按住 <code>Alt</code> 拖动可复制节点。<br>
-          将图片、PDF、ZIP、文本或视频文件拖到节点上即可为该节点附加附件，超过 15MB 或不在白名单内的文件将被拒绝。
+        <div class="mind-header-actions">
+          <div class="mind-view-controls" role="group" aria-label="视图控制">
+            <button type="button" class="view-btn" id="btn-fit" title="自适应视图">🧭 自适应</button>
+            <button type="button" class="view-btn" id="btn-center" title="居中">◎ 居中</button>
+            <button type="button" class="view-btn" id="btn-zoom-in" title="放大">＋ 放大</button>
+            <button type="button" class="view-btn" id="btn-zoom-out" title="缩小">－ 缩小</button>
+            <button type="button" class="view-btn" id="btn-collapse" title="折叠/展开当前节点">折叠/展开</button>
+          </div>
         </div>
-        <div>
-          <span class="badge">提示</span>
-          <div class="meta" style="margin-top:6px">保存数据存入 SQLite，可多端共享；导出 JSON 可用于备份或导入其他工具（如 FreeMind、XMind）。</div>
-        </div>
-        <div class="save-tip" id="save-state">保存成功</div>
-        <?php if ($mind['id']): ?>
-          <form method="post" onsubmit="return confirm('确认删除该导图？');" style="margin-top:auto">
-            <input type="hidden" name="action" value="delete_mindmap">
-            <input type="hidden" name="id" value="<?php echo $mind['id']; ?>">
-            <button class="btn-like danger btn-block">删除导图</button>
-          </form>
-        <?php endif; ?>
-      </aside>
-      <main class="editor-pane">
-        <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="false">☰ 操作</button>
+      </header>
+      <div class="mind-stage">
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
-        <div class="map-toolbar">
-          <button id="btn-collapse">折叠/展开节点</button>
-          <button id="btn-fit-floating">自适应视图</button>
-        </div>
-        <div class="mobile-toolbar" id="mobile-toolbar">
-          <button data-action="save" class="primary">保存</button>
-          <button data-action="add-sibling">同级</button>
-          <button data-action="add-child">子级</button>
-          <button data-action="attach-file">附件</button>
-          <button data-action="attach-link">链接</button>
-          <button data-action="delete" class="danger">删除</button>
-        </div>
-        <div class="mobile-save-status" id="mobile-save-status" role="status" aria-live="polite"></div>
-      </main>
+      </div>
+      <input id="import-input" type="file" accept="application/json" hidden>
+      <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" hidden>
+      <?php if ($mind['id']): ?>
+        <form id="delete-map-form" method="post" hidden>
+          <input type="hidden" name="action" value="delete_mindmap">
+          <input type="hidden" name="id" value="<?php echo $mind['id']; ?>">
+        </form>
+      <?php endif; ?>
+      <div class="mind-dock-wrap">
+        <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
+          <button class="dock-btn" data-action="save" data-default-label="保存" title="保存 (Ctrl+S)" aria-label="保存">
+            <span class="icon">💾</span>
+            <span class="label">保存</span>
+          </button>
+          <button class="dock-btn" data-action="sibling" title="新增同级 (Enter)" aria-label="新增同级节点">
+            <span class="icon">⧉</span>
+            <span class="label">同级</span>
+          </button>
+          <button class="dock-btn" data-action="child" title="新增子级 (Tab)" aria-label="新增子级节点">
+            <span class="icon">↳</span>
+            <span class="label">子级</span>
+          </button>
+          <button class="dock-btn" data-action="attach" title="上传附件" aria-label="上传附件">
+            <span class="icon">📎</span>
+            <span class="label">附件</span>
+          </button>
+          <button class="dock-btn" data-action="link" title="新增链接" aria-label="新增链接">
+            <span class="icon">🔗</span>
+            <span class="label">链接</span>
+          </button>
+          <button class="dock-btn danger" data-action="delete" title="删除节点 (Del)" aria-label="删除节点">
+            <span class="icon">🗑</span>
+            <span class="label">删除</span>
+          </button>
+          <div class="dock-sep" aria-hidden="true"></div>
+          <div class="dock-more" aria-expanded="false">
+            <button class="dock-btn ghost" type="button" aria-haspopup="menu" aria-expanded="false" title="更多选项" aria-label="更多">
+              <span class="icon">⋯</span>
+              <span class="label">更多</span>
+            </button>
+            <ul class="dock-menu" role="menu">
+              <li role="menuitem" data-action="details">节点属性</li>
+              <li role="menuitem" data-action="import">导入 JSON</li>
+              <li role="menuitem" data-action="export">导出 JSON</li>
+              <li role="menuitem" data-action="toggle-fold">折叠/展开节点</li>
+              <li role="menuitem" data-action="fit-view">适应视图</li>
+              <li role="menuitem" data-action="settings">设置</li>
+              <?php if ($mind['id']): ?>
+              <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
+              <?php endif; ?>
+            </ul>
+          </div>
+        </nav>
+      </div>
     </div>
-    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+    <div class="node-popover" id="node-popover" hidden>
+      <header>
+        <h2>节点属性</h2>
+        <button type="button" class="close" data-pop-close aria-label="关闭">×</button>
+      </header>
+      <form id="node-inspector" autocomplete="off">
+        <div class="field">
+          <label for="node-topic-input">标题</label>
+          <input id="node-topic-input" type="text" placeholder="输入节点标题">
+        </div>
+        <div class="field">
+          <label for="node-type">类型</label>
+          <select id="node-type">
+            <option value="idea">💡 创意</option>
+            <option value="task">✅ 任务</option>
+            <option value="document">📄 文档</option>
+            <option value="media">🖼 媒体</option>
+            <option value="decision">🧭 决策</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="node-status">状态</label>
+          <select id="node-status">
+            <option value="backlog">待计划</option>
+            <option value="doing">进行中</option>
+            <option value="done">已完成</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="node-priority">优先级</label>
+          <select id="node-priority">
+            <option value="normal">普通</option>
+            <option value="high">高</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="node-owner">负责人</label>
+          <input id="node-owner" type="text" placeholder="输入姓名或团队">
+        </div>
+        <div class="field">
+          <label for="node-tags">标签</label>
+          <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
+          <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
+        </div>
+        <div class="popover-actions">
+          <button type="button" data-pop-close>取消</button>
+          <button type="button" class="accent" data-pop-save>完成</button>
+        </div>
+      </form>
+    </div>
+    <div class="mind-settings" id="mind-settings" aria-hidden="true">
+      <div class="settings-panel">
+        <header>
+          <h3>设置</h3>
+          <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
+        </header>
+        <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
+        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
+        <div class="settings-actions">
+          <button type="button" data-settings-close>关闭</button>
+        </div>
+      </div>
+    </div>
     <script>
       (function(){
       const DOUBLE_TAP_WINDOW=320;
@@ -1859,6 +1932,84 @@ if ($view === 'map_edit') {
       const TYPE_ACCENT_MAP=NODE_TYPES.reduce((acc,item)=>{acc[item.value]=item.accent;return acc;},{});
       const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
       let lastTapInfo={id:null,time:0};
+      const TRACE_GRID=8;
+      const TRACE_CHAMFER=3;
+      const nearlyEqual=(a,b)=>Math.abs(a-b)<0.5;
+      function alignToTraceGrid(value){
+        return Math.round(value/TRACE_GRID)*TRACE_GRID;
+      }
+      function buildTraceRoute(start,end,directionHint=1){
+        if(!start || !end){ return []; }
+        const points=[{x:start.x,y:start.y}];
+        const rawDx=end.x-start.x;
+        const absDx=Math.abs(rawDx);
+        const direction=(absDx<TRACE_GRID*0.5)
+          ? (directionHint>=0?1:-1)
+          : (rawDx>=0?1:-1);
+        const MIN_LEAD=TRACE_GRID*3;
+        let midX;
+        if(absDx<TRACE_GRID*0.25){
+          midX=start.x + direction*MIN_LEAD;
+        }else if(absDx<=TRACE_GRID*3){
+          const halfSpan=absDx/2;
+          midX=start.x + direction*Math.max(MIN_LEAD, halfSpan);
+        }else{
+          const maxLead=Math.max(MIN_LEAD, absDx - TRACE_GRID*2);
+          let lead=absDx*0.45;
+          lead=Math.min(Math.max(MIN_LEAD, lead), maxLead);
+          midX=start.x + direction*lead;
+        }
+        midX=alignToTraceGrid(midX);
+        const viaY=alignToTraceGrid(end.y);
+        points.push({x:midX,y:start.y});
+        if(!nearlyEqual(viaY,start.y)){
+          points.push({x:midX,y:viaY});
+        }
+        points.push({x:end.x,y:end.y});
+        const cleaned=[];
+        for(const pt of points){
+          if(!cleaned.length){ cleaned.push(pt); continue; }
+          const prev=cleaned[cleaned.length-1];
+          if(nearlyEqual(prev.x, pt.x) && nearlyEqual(prev.y, pt.y)){
+            continue;
+          }
+          cleaned.push(pt);
+        }
+        return cleaned;
+      }
+      function buildChamferedPath(points,chamfer){
+        if(!Array.isArray(points) || points.length<2) return '';
+        let d=`M${points[0].x} ${points[0].y}`;
+        for(let i=1;i<points.length;i++){
+          const current=points[i];
+          const prev=points[i-1];
+          const next=i+1<points.length ? points[i+1] : null;
+          if(next){
+            const prevVec={x:current.x-prev.x,y:current.y-prev.y};
+            const nextVec={x:next.x-current.x,y:next.y-current.y};
+            const prevLen=Math.hypot(prevVec.x,prevVec.y);
+            const nextLen=Math.hypot(nextVec.x,nextVec.y);
+            if(prevLen<0.01 || nextLen<0.01){
+              d+=` L${current.x} ${current.y}`;
+              continue;
+            }
+            const cut=Math.min(chamfer, prevLen/2, nextLen/2);
+            const entry={
+              x:current.x - Math.sign(prevVec.x)*cut,
+              y:current.y - Math.sign(prevVec.y)*cut
+            };
+            const exit={
+              x:current.x + Math.sign(nextVec.x)*cut,
+              y:current.y + Math.sign(nextVec.y)*cut
+            };
+            d+=` L${entry.x} ${entry.y}`;
+            d+=` L${exit.x} ${exit.y}`;
+          }else{
+            d+=` L${current.x} ${current.y}`;
+          }
+        }
+        return d;
+      }
       function normalizeNodeData(value){
         if(!value || typeof value!=='object' || Array.isArray(value)) return {};
         const data=value;
@@ -1920,6 +2071,10 @@ if ($view === 'map_edit') {
           this.selectedId=null;
           this.container.innerHTML='';
           this.container.classList.add('mind-container');
+          this.container.style.touchAction='none';
+          this.container.addEventListener('gesturestart',evt=>evt.preventDefault());
+          this.container.addEventListener('gesturechange',evt=>evt.preventDefault());
+          this.container.addEventListener('gestureend',evt=>evt.preventDefault());
           this.background=document.createElement('div');
           this.background.className='mind-background';
           this.container.appendChild(this.background);
@@ -1946,6 +2101,7 @@ if ($view === 'map_edit') {
           this.linkRegistry=new Map();
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
+          this.setupTouchGuards();
         }
         setupPan(){
           const updatePinchBaseline=()=>{
@@ -1978,6 +2134,9 @@ if ($view === 'map_edit') {
               return;
             }
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+            if(isTouch && (this.activePointers.size>=2 || !onNode)){
+              evt.preventDefault();
+            }
             if(this.activePointers.size>=2){
               for(const id of this.activePointers.keys()){
                 try{ this.container.setPointerCapture(id); }catch(_){ }
@@ -2016,6 +2175,9 @@ if ($view === 'map_edit') {
                 this.offsetY=centerY - pinch.originY*this.scale;
                 this.applyTransform();
                 return;
+              }
+              if(this.dragState && this.dragState.pointerId===evt.pointerId){
+                evt.preventDefault();
               }
             }
             if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
@@ -2188,6 +2350,60 @@ if ($view === 'map_edit') {
           this.render();
           this.select_node(parent.id);
           this.emit(SimpleMind.event_type.update);
+        }
+        setupTouchGuards(){
+          let lastTapTime=0;
+          let lastTapX=0;
+          let lastTapY=0;
+          let tapTimer=null;
+          const DOUBLE_TAP_DELAY=320;
+          const DOUBLE_TAP_DISTANCE=26;
+          const reset=()=>{
+            if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+            lastTapTime=0;
+          };
+          const isEditableTarget=(target)=>{
+            if(!target || !target.tagName) return false;
+            const tag=target.tagName.toLowerCase();
+            return tag==='input' || tag==='textarea' || tag==='select' || target.isContentEditable===true;
+          };
+          this.container.addEventListener('touchstart',(evt)=>{
+            if(evt.touches.length>1){ reset(); return; }
+            const target=evt.target;
+            if(isEditableTarget(target)){ reset(); return; }
+            const touch=evt.touches[0];
+            const now=performance.now();
+            if(lastTapTime){
+              const delta=now-lastTapTime;
+              const dx=touch.clientX-lastTapX;
+              const dy=touch.clientY-lastTapY;
+              if(delta>0 && delta<=DOUBLE_TAP_DELAY && (dx*dx + dy*dy) <= (DOUBLE_TAP_DISTANCE*DOUBLE_TAP_DISTANCE)){
+                evt.preventDefault();
+                const dblTarget=target || this.container;
+                const dblEvt=new MouseEvent('dblclick',{
+                  bubbles:true,
+                  cancelable:true,
+                  clientX:touch.clientX,
+                  clientY:touch.clientY,
+                });
+                dblTarget.dispatchEvent(dblEvt);
+                reset();
+                return;
+              }
+            }
+            lastTapTime=now;
+            lastTapX=touch.clientX;
+            lastTapY=touch.clientY;
+            if(tapTimer){ clearTimeout(tapTimer); }
+            tapTimer=setTimeout(reset, DOUBLE_TAP_DELAY+60);
+          },{passive:false});
+          this.container.addEventListener('touchend',(evt)=>{
+            if(evt.touches && evt.touches.length>0) return;
+            if(isEditableTarget(evt.target)){ reset(); return; }
+            if(tapTimer){ clearTimeout(tapTimer); }
+            tapTimer=setTimeout(reset, DOUBLE_TAP_DELAY);
+          });
+          this.container.addEventListener('touchcancel', reset);
         }
         toggle_node(id){
           const node=this.nodes.get(id);
@@ -2455,12 +2671,12 @@ if ($view === 'map_edit') {
                 const now=Date.now();
                 if(wasSelected && lastTapInfo.id===node.id && (now-lastTapInfo.time)<=DOUBLE_TAP_WINDOW){
                   evt.preventDefault();
-                  this.promptRename(node);
+                  this.showNodeDetails(node);
                 }
                 lastTapInfo={id:node.id,time:now};
               }
             });
-            el.addEventListener('dblclick',()=>{ this.promptRename(node); });
+            el.addEventListener('dblclick',()=>{ this.showNodeDetails(node); });
           }
           return el;
         }
@@ -2483,13 +2699,27 @@ if ($view === 'map_edit') {
             this.updateNodePosition(node);
             this.updateAnchors(node);
             if(node.parent){
-              const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-              path.setAttribute('data-from', node.parent.id);
-              path.setAttribute('data-to', node.id);
-              path.setAttribute('data-type', node.data && node.data.type ? node.data.type : 'idea');
-              this.linkLayer.appendChild(path);
-              node.linkPath=path;
-              this.linkRegistry.set(node.id,path);
+              const group=document.createElementNS('http://www.w3.org/2000/svg','g');
+              group.classList.add('trace-group');
+              const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
+              shadow.classList.add('trace','shadow');
+              const core=document.createElementNS('http://www.w3.org/2000/svg','path');
+              core.classList.add('trace','core');
+              core.setAttribute('stroke','url(#mindGoldTrace)');
+              const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
+              highlight.classList.add('trace','highlight');
+              group.appendChild(shadow);
+              group.appendChild(core);
+              group.appendChild(highlight);
+              group.dataset.from=node.parent.id;
+              group.dataset.to=node.id;
+              if(node.data && node.data.type){ group.dataset.type=node.data.type; }
+              this.linkLayer.appendChild(group);
+              node.linkGroup=group;
+              node.linkShadow=shadow;
+              node.linkPath=core;
+              node.linkHighlight=highlight;
+              this.linkRegistry.set(node.id,{group,shadow,core,highlight});
               this.updateLinkPath(node);
             }
             if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
@@ -2527,11 +2757,20 @@ if ($view === 'map_edit') {
           const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
           const start=isLeft ? parent.anchors.left : parent.anchors.right;
           const end=isLeft ? node.anchors.right : node.anchors.left;
-          const horizontalGap=Math.max(60, Math.abs(end.x-start.x)*0.35);
-          const controlX=start.x + (isLeft?-horizontalGap:horizontalGap);
-          const controlY1=start.y;
-          const controlY2=end.y;
-          node.linkPath.setAttribute('d', `M${start.x} ${start.y} C ${controlX} ${controlY1} ${controlX} ${controlY2} ${end.x} ${end.y}`);
+          const route=buildTraceRoute(start,end,isLeft?-1:1);
+          let pathData=buildChamferedPath(route, TRACE_CHAMFER);
+          if(!pathData){
+            pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`;
+          }
+          node.linkPath.setAttribute('d', pathData);
+          if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
+          if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          if(node.linkGroup){
+            const status=(node.data && node.data.status) || 'backlog';
+            const priority=(node.data && node.data.priority) || 'normal';
+            node.linkGroup.dataset.status=status;
+            node.linkGroup.dataset.priority=priority;
+          }
         }
         handleNodeResize(entries){
           if(!entries || !entries.length) return;
@@ -2620,6 +2859,14 @@ if ($view === 'map_edit') {
           this.offsetY=rect.height/2 - centerY*this.scale;
           this.applyTransform();
           return true;
+        }
+        showNodeDetails(node){
+          if(!node) return;
+          if(typeof this.options.onNodeDetails==='function'){
+            this.options.onNodeDetails(node, this);
+            return;
+          }
+          this.promptRename(node);
         }
         promptRename(node){
           if(!node) return;
@@ -2765,7 +3012,7 @@ if ($view === 'map_edit') {
         if(span.parentElement){ span.parentElement.classList.remove('editing'); }
         if(!commit){
           span.textContent=initialText;
-          requestAnimationFrame(updateHandlePosition);
+          scheduleHandleRefresh();
           return;
         }
         let value=span.textContent || '';
@@ -2773,14 +3020,14 @@ if ($view === 'map_edit') {
         value=value.split('\n').map(line=>line.trim()).join('\n').trim();
         if(!value){
           span.textContent=initialText;
-          requestAnimationFrame(updateHandlePosition);
+          scheduleHandleRefresh();
           return;
         }
         if(value!==initialText){
           if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
           markDirty();
         }
-        requestAnimationFrame(updateHandlePosition);
+        scheduleHandleRefresh();
       }
       function startInlineEditing(node){
         if(!node || !node.el) return;
@@ -2897,6 +3144,12 @@ if ($view === 'map_edit') {
         handleSource=node;
         syncOverlaySize();
       }
+      function scheduleHandleRefresh(){
+        requestAnimationFrame(()=>{
+          updateHandlePosition();
+          if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
+        });
+      }
       function svgPointFromClient(x,y){
         const matrix=overlay.getScreenCTM();
         if(!matrix){ return {x,y}; }
@@ -2987,75 +3240,78 @@ if ($view === 'map_edit') {
       });
       window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
       window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
-      window.addEventListener('resize',()=>requestAnimationFrame(updateHandlePosition));
-      document.addEventListener('scroll',()=>requestAnimationFrame(updateHandlePosition), true);
-      requestAnimationFrame(updateHandlePosition);
+      window.addEventListener('resize',scheduleHandleRefresh);
+      document.addEventListener('scroll',scheduleHandleRefresh, true);
+      scheduleHandleRefresh();
       const titleInput=document.getElementById('map-title');
       const saveState=document.getElementById('save-state');
       const importInput=document.getElementById('import-input');
       const attachInput=document.getElementById('attach-file-input');
-      const attachFileBtn=document.getElementById('btn-attach-file');
-      const attachLinkBtn=document.getElementById('btn-attach-link');
       const inspector=document.getElementById('node-inspector');
+      const nodeTopicInput=document.getElementById('node-topic-input');
       const nodeTypeSelect=document.getElementById('node-type');
       const nodeStatusSelect=document.getElementById('node-status');
       const nodePrioritySelect=document.getElementById('node-priority');
       const nodeOwnerInput=document.getElementById('node-owner');
       const nodeTagsInput=document.getElementById('node-tags');
       const nodeTagsPreview=document.getElementById('node-tags-preview');
-      const mobileToolbar=document.getElementById('mobile-toolbar');
-      const mobileSaveButton=mobileToolbar ? mobileToolbar.querySelector('button[data-action="save"]') : null;
-      const mobileSaveStatus=document.getElementById('mobile-save-status');
-      const sidebarToggle=document.getElementById('sidebar-toggle');
-      const sidebarBackdrop=document.getElementById('sidebar-backdrop');
-      const saveButton=document.getElementById('btn-save');
+      const mindShell=document.querySelector('.mind-shell');
+      const dock=document.getElementById('mind-dock');
+      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
+      const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
+      const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
+      const dockMore=dock ? dock.querySelector('.dock-more') : null;
+      const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
+      const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
+      const nodePopover=document.getElementById('node-popover');
+      const settingsLayer=document.getElementById('mind-settings');
+      const gridToggle=document.getElementById('setting-grid');
+      const fisheyeToggle=document.getElementById('setting-fisheye');
+      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
+      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
+      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
+      function isFisheyeEnabled(){
+        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
+      }
+      function syncFisheyeState(){
+        const enabled=isFisheyeEnabled();
+        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
+        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
+      }
+      function handlePointerPrecisionChange(event){
+        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
+        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
+        syncFisheyeState();
+      }
+      syncFisheyeState();
+      if(pointerMedia){
+        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
+        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
+      }
+      const deleteMapForm=document.getElementById('delete-map-form');
       const fitButton=document.getElementById('btn-fit');
-      const fitFloatingButton=document.getElementById('btn-fit-floating');
-      const addSiblingButton=document.getElementById('btn-add-sibling');
-      const addChildButton=document.getElementById('btn-add-child');
-      const deleteButton=document.getElementById('btn-delete');
-      let saveButtonDefault=saveButton ? saveButton.textContent : '保存';
-      if(saveButton){ saveButton.dataset.defaultLabel=saveButtonDefault; }
-      let mobileSaveDefault=mobileSaveButton ? mobileSaveButton.textContent : '保存';
-      if(mobileSaveButton){ mobileSaveButton.dataset.defaultLabel=mobileSaveDefault; }
+      const fitFloatingButton=null;
+      const addSiblingButton=null;
+      const addChildButton=null;
+      const deleteButton=null;
+      let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
+      if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
-      let mobileStatusTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
       const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v'];
-      function setMobileSaveStatus(text, state, opts={}){
-        if(!mobileSaveStatus) return;
-        if(mobileStatusTimer){ clearTimeout(mobileStatusTimer); mobileStatusTimer=null; }
-        if(!text){
-          mobileSaveStatus.textContent='';
-          mobileSaveStatus.className='mobile-save-status';
-          return;
+      function setSaveButtonState(text, disabled, state){
+        if(dockSaveLabel){
+          if(typeof text==='string'){ dockSaveLabel.textContent=text; }
+          else if(text===null){ dockSaveLabel.textContent=saveButtonDefault; }
         }
-        mobileSaveStatus.textContent=text;
-        mobileSaveStatus.className='mobile-save-status show';
-        if(state){ mobileSaveStatus.classList.add(`state-${state}`); }
-        if(opts.autoHide){
-          const duration=typeof opts.duration==='number' && isFinite(opts.duration)?opts.duration:1800;
-          mobileStatusTimer=setTimeout(()=>{
-            mobileStatusTimer=null;
-            if(!dirty){ setMobileSaveStatus('', null); }
-          }, duration);
-        }
-      }
-      function setSaveButtonState(text, disabled){
-        if(typeof text==='string'){
-          if(saveButton) saveButton.textContent=text;
-          if(mobileSaveButton) mobileSaveButton.textContent=text;
-        }else if(text===null){
-          if(saveButton) saveButton.textContent=saveButtonDefault;
-          if(mobileSaveButton) mobileSaveButton.textContent=mobileSaveDefault;
-        }
-        if(typeof disabled==='boolean'){
-          if(saveButton) saveButton.disabled=disabled;
-          if(mobileSaveButton) mobileSaveButton.disabled=disabled;
+        if(dockSaveButton && typeof disabled==='boolean'){ dockSaveButton.disabled=disabled; }
+        if(dockSaveButton){
+          if(state){ dockSaveButton.dataset.state=state; }
+          else{ dockSaveButton.removeAttribute('data-state'); }
         }
       }
       function markDirty(){
@@ -3064,8 +3320,7 @@ if ($view === 'map_edit') {
           saveState.textContent='未保存';
           saveState.classList.add('show','dirty');
         }
-        setSaveButtonState(null,false);
-        setMobileSaveStatus('未保存','dirty');
+        setSaveButtonState('未保存',false,'dirty');
       }
       function showSaving(){
         if(saveState){
@@ -3073,8 +3328,7 @@ if ($view === 'map_edit') {
           saveState.classList.add('show');
           saveState.classList.remove('dirty');
         }
-        setSaveButtonState('⏳ 保存中...', true);
-        setMobileSaveStatus('保存中...','saving');
+        setSaveButtonState('保存中...', true,'saving');
       }
       function markSaved(){
         dirty=false;
@@ -3083,17 +3337,29 @@ if ($view === 'map_edit') {
           saveState.classList.add('show');
           saveState.classList.remove('dirty');
         }
-        setSaveButtonState('✅ 保存成功', false);
-        setMobileSaveStatus('保存成功','success',{autoHide:true});
+        setSaveButtonState('保存成功', false,'saved');
         setTimeout(()=>{
           if(!dirty){
             if(saveState) saveState.classList.remove('show');
-            setSaveButtonState(null,false);
-            setMobileSaveStatus('', null);
+            setSaveButtonState(null,false,null);
           }
         },1500);
       }
-      const inspectorFields=[nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput].filter(Boolean);
+      function toggleSettings(forceShow){
+        if(!settingsLayer) return;
+        const currentHidden=settingsLayer.getAttribute('aria-hidden')!=='false';
+        const willShow=typeof forceShow==='boolean' ? forceShow : currentHidden;
+        settingsLayer.setAttribute('aria-hidden', willShow ? 'false' : 'true');
+      }
+      if(settingsLayer){
+        settingsLayer.addEventListener('click',e=>{
+          if(e.target===settingsLayer){ toggleSettings(false); }
+        });
+        settingsLayer.querySelectorAll('[data-settings-close]').forEach(btn=>{
+          btn.addEventListener('click',()=>toggleSettings(false));
+        });
+      }
+      const inspectorFields=[nodeTopicInput,nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput].filter(Boolean);
       let inspectorSyncing=false;
       function parseTagsString(value){
         if(!value) return [];
@@ -3119,10 +3385,69 @@ if ($view === 'map_edit') {
           nodeTagsPreview.appendChild(span);
         });
       }
+      let popoverOpen=false;
+      const popoverMedia=window.matchMedia('(max-width: 768px)');
+      function updatePopoverMode(){
+        if(!nodePopover) return;
+        nodePopover.dataset.mode = popoverMedia.matches ? 'sheet' : 'panel';
+        if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
+      }
+      updatePopoverMode();
+      if(popoverMedia.addEventListener) popoverMedia.addEventListener('change',()=>updatePopoverMode());
+      else if(popoverMedia.addListener) popoverMedia.addListener(()=>updatePopoverMode());
+      function isPopoverOpen(){ return popoverOpen; }
+      function openInspectorPopover(node){
+        if(!nodePopover || !node) return;
+        popoverOpen=true;
+        updatePopoverMode();
+        nodePopover.hidden=false;
+        refreshInspector(node);
+        if(nodeTopicInput){
+          requestAnimationFrame(()=>{
+            try{ nodeTopicInput.focus({preventScroll:true}); }
+            catch(_){ nodeTopicInput.focus(); }
+          });
+        }
+      }
+      function closeInspectorPopover(){
+        if(!nodePopover) return;
+        popoverOpen=false;
+        nodePopover.hidden=true;
+      }
+      function positionInspectorPopover(node){
+        if(!nodePopover) return;
+        if(nodePopover.dataset.mode==='sheet'){ nodePopover.style.left=''; nodePopover.style.top=''; return; }
+        const el=node ? document.querySelector(`.jsmind-node[nodeid="${node.id}"]`) : null;
+        const rect=el ? el.getBoundingClientRect() : null;
+        const popRect=nodePopover.getBoundingClientRect();
+        const margin=24;
+        let left=rect ? rect.right + 16 : margin;
+        let top=rect ? rect.top : margin;
+        if(left + popRect.width > window.innerWidth - margin){ left = window.innerWidth - popRect.width - margin; }
+        if(top + popRect.height > window.innerHeight - margin){ top = window.innerHeight - popRect.height - margin; }
+        nodePopover.style.left=`${Math.max(margin,left)}px`;
+        nodePopover.style.top=`${Math.max(margin,top)}px`;
+      }
+      if(nodePopover){
+        nodePopover.addEventListener('click',e=>{
+          if(e.target.closest('[data-pop-close]')){ e.preventDefault(); closeInspectorPopover(); }
+          if(e.target.closest('[data-pop-save]')){ e.preventDefault(); commitInlineEditing(); closeInspectorPopover(); }
+        });
+      }
+      document.addEventListener('pointerdown',e=>{
+        if(!popoverOpen || !nodePopover) return;
+        if(nodePopover.contains(e.target)) return;
+        if(e.target.closest && e.target.closest('.jsmind-node')) return;
+        closeInspectorPopover();
+      });
+      document.addEventListener('keydown',e=>{
+        if(e.key==='Escape' && popoverOpen){ closeInspectorPopover(); }
+      });
       function refreshInspector(node){
         inspectorSyncing=true;
         if(!node){
           setInspectorEnabled(false);
+          if(nodeTopicInput) nodeTopicInput.value='';
           if(nodeTypeSelect) nodeTypeSelect.value='idea';
           if(nodeStatusSelect) nodeStatusSelect.value='backlog';
           if(nodePrioritySelect) nodePrioritySelect.value='normal';
@@ -3130,9 +3455,11 @@ if ($view === 'map_edit') {
           if(nodeTagsInput) nodeTagsInput.value='';
           renderTagPreview([]);
           inspectorSyncing=false;
+          if(popoverOpen){ positionInspectorPopover(null); }
           return;
         }
         setInspectorEnabled(true);
+        if(nodeTopicInput) nodeTopicInput.value=node.topic || '';
         const data=normalizeNodeData(deepClone(node.data||{}));
         if(nodeTypeSelect) nodeTypeSelect.value=data.type||'idea';
         if(nodeStatusSelect) nodeStatusSelect.value=data.status||'backlog';
@@ -3141,8 +3468,10 @@ if ($view === 'map_edit') {
         if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
         renderTagPreview(data.tags||[]);
         inspectorSyncing=false;
+        if(popoverOpen){ positionInspectorPopover(node); }
       }
       refreshInspector(jm.get_selected_node());
+      if(jm.options){ jm.options.onNodeDetails=openInspectorPopover; }
       function applyInspectorChange(mutator){
         if(typeof mutator!=='function') return;
         const node=ensureNode();
@@ -3210,7 +3539,7 @@ if ($view === 'map_edit') {
         window.__mindmapCommands=commandLog;
         jm.select_node(newNode.id);
         markDirty();
-        requestAnimationFrame(updateHandlePosition);
+        scheduleHandleRefresh();
         refreshInspector(jm.get_node(newNode.id));
         return newNode;
       }
@@ -3310,7 +3639,7 @@ if ($view === 'map_edit') {
         jm.render();
         jm.select_node(targetNode.id);
         markDirty();
-        requestAnimationFrame(updateHandlePosition);
+        scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
       }
       function handleDroppedText(text, parent, event){
@@ -3356,7 +3685,7 @@ if ($view === 'map_edit') {
         const node=ensureNode(); if(!node || node.isroot) return;
         commitInlineEditing();
         jm.remove_node(node.id); markDirty();
-        requestAnimationFrame(updateHandlePosition);
+        scheduleHandleRefresh();
         requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
       }
       function renameSelectedNode(){
@@ -3366,7 +3695,7 @@ if ($view === 'map_edit') {
       }
       function focusParentNode(){
         const node=ensureNode();
-        if(node && node.parent){ jm.select_node(node.parent.id); requestAnimationFrame(updateHandlePosition); }
+        if(node && node.parent){ jm.select_node(node.parent.id); scheduleHandleRefresh(); }
       }
       function openAttachmentDialog(){
         commitInlineEditing();
@@ -3396,14 +3725,12 @@ if ($view === 'map_edit') {
         jm.render();
         jm.select_node(node.id);
         markDirty();
-        requestAnimationFrame(updateHandlePosition);
+        scheduleHandleRefresh();
         refreshInspector(jm.get_node(node.id));
       }
       if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
       if(addChildButton) addChildButton.onclick=addChildNode;
       if(deleteButton) deleteButton.onclick=deleteSelectedNode;
-      if(attachFileBtn) attachFileBtn.onclick=openAttachmentDialog;
-      if(attachLinkBtn) attachLinkBtn.onclick=openLinkPrompt;
       if(attachInput){
         attachInput.addEventListener('change',async e=>{
           const files=Array.from(e.target.files||[]);
@@ -3437,6 +3764,29 @@ if ($view === 'map_edit') {
           applyInspectorChange(data=>{ data.priority=value; });
         });
       }
+      if(nodeTopicInput){
+        const commitTopic=()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node) return;
+          const value=(nodeTopicInput.value||'').trim();
+          if(!value){
+            nodeTopicInput.value=node.topic || '';
+            return;
+          }
+          if(value===node.topic) return;
+          commitInlineEditing();
+          if(typeof jm.update_node==='function'){ jm.update_node(node.id, value); }
+        };
+        nodeTopicInput.addEventListener('change',commitTopic);
+        nodeTopicInput.addEventListener('blur',commitTopic);
+        nodeTopicInput.addEventListener('keydown',e=>{
+          if(e.key==='Enter' && !e.shiftKey){
+            e.preventDefault();
+            commitTopic();
+          }
+        });
+      }
       if(nodeOwnerInput){
         const commit=()=>{
           if(inspectorSyncing) return;
@@ -3459,35 +3809,103 @@ if ($view === 'map_edit') {
         nodeTagsInput.addEventListener('change',commitTags);
         nodeTagsInput.addEventListener('blur',commitTags);
       }
-      function setSidebar(open){
-        document.body.classList.toggle('sidebar-open', !!open);
-        if(sidebarToggle){ sidebarToggle.setAttribute('aria-expanded', open?'true':'false'); }
-        if(sidebarBackdrop){ sidebarBackdrop.hidden=!open; }
-      }
-      if(sidebarToggle){
-        sidebarToggle.addEventListener('click',()=>{
-          const willOpen=!document.body.classList.contains('sidebar-open');
-          setSidebar(willOpen);
+      if(dock){
+        const closeDockMenu=()=>{
+          if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
+          if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
+        };
+        const openDockMenu=()=>{
+          if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
+          if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
+        };
+        const toggleDockMenu=()=>{
+          const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
+          if(expanded) closeDockMenu(); else openDockMenu();
+        };
+        if(dockMoreButton){
+          dockMoreButton.addEventListener('click',e=>{
+            e.preventDefault();
+            e.stopPropagation();
+            toggleDockMenu();
+          });
+        }
+        document.addEventListener('pointerdown',e=>{
+          if(!dockMore || dockMore.getAttribute('aria-expanded')!=='true') return;
+          if(dockMore.contains(e.target)) return;
+          closeDockMenu();
         });
-      }
-      if(sidebarBackdrop){ sidebarBackdrop.addEventListener('click',()=>setSidebar(false)); }
-      const sidebarMedia=window.matchMedia('(max-width: 1024px)');
-      const handleSidebarMedia=(evt)=>{ if(!evt.matches){ setSidebar(false); } };
-      sidebarMedia.addEventListener('change',handleSidebarMedia);
-      setSidebar(false);
-      if(mobileToolbar){
-        mobileToolbar.addEventListener('click',e=>{
-          const btn=e.target.closest('button');
-          if(!btn) return;
-          switch(btn.dataset.action){
+        const handleDockAction=(action)=>{
+          switch(action){
             case 'save': saveMindmap(); break;
-            case 'add-sibling': addSiblingNode(); break;
-            case 'add-child': addChildNode(); break;
-            case 'attach-file': openAttachmentDialog(); break;
-            case 'attach-link': openLinkPrompt(); break;
+            case 'sibling': addSiblingNode(); break;
+            case 'child': addChildNode(); break;
+            case 'attach': openAttachmentDialog(); break;
+            case 'link': openLinkPrompt(); break;
             case 'delete': deleteSelectedNode(); break;
+            case 'import': triggerImport(); break;
+            case 'export': exportMindmap(); break;
+            case 'toggle-fold': {
+              const node=ensureNode();
+              if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
+              break;
+            }
+            case 'fit-view':
+              if(!callView('zoomToFit')){
+                callView('set_zoom',1);
+                if(!callView('move_to_center')) callView('center_root');
+              }
+              break;
+            case 'details': {
+              const node=ensureNode();
+              if(node){ openInspectorPopover(node); }
+              else{ alert('请先选择一个节点'); }
+              break;
+            }
+            case 'settings': toggleSettings(true); break;
+            case 'delete-map':
+              if(deleteMapForm && confirm('确认删除该导图？')){ deleteMapForm.submit(); }
+              break;
+          }
+        };
+        dock.addEventListener('click',e=>{
+          const btn=e.target.closest('.dock-btn');
+          if(!btn || !dock.contains(btn)) return;
+          const action=btn.dataset.action;
+          if(action){
+            if(btn!==dockMoreButton) closeDockMenu();
+            handleDockAction(action);
           }
         });
+        dock.addEventListener('keydown',e=>{
+          if((e.key==='Enter' || e.key===' ') && e.target instanceof HTMLElement && e.target.closest('.dock-btn')){
+            const btn=e.target.closest('.dock-btn');
+            if(btn && btn.dataset.action){
+              e.preventDefault();
+              handleDockAction(btn.dataset.action);
+            }
+          }else if(e.key==='Escape'){ closeDockMenu(); }
+        });
+        const applyFisheye=(event)=>{
+          if(!dockButtons.length) return;
+          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
+          const rect=dock.getBoundingClientRect();
+          const centerX=event.clientX-rect.left;
+          dockButtons.forEach(btn=>{
+            const bx=btn.offsetLeft + btn.offsetWidth/2;
+            const dist=Math.abs(centerX-bx);
+            const scale=Math.max(1, 1.18 - dist/800);
+            btn.style.transform=`scale(${scale})`;
+          });
+        };
+        if(dockButtons.length){
+          dock.addEventListener('mousemove',applyFisheye);
+          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
+        }
+        if(fisheyeToggle){
+          fisheyeToggle.addEventListener('change',()=>{
+            syncFisheyeState();
+          });
+        }
       }
       document.addEventListener('keydown',e=>{
         const activeEl=document.activeElement;
@@ -3529,7 +3947,7 @@ if ($view === 'map_edit') {
       if(collapseButton){
         collapseButton.addEventListener('click',()=>{
           const node=ensureNode();
-          if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
+          if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
         });
       }
       let dropHoverNode=null;
@@ -3586,30 +4004,26 @@ if ($view === 'map_edit') {
             }
           }
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
-            requestAnimationFrame(updateHandlePosition);
+            scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
-      const exportButton=document.getElementById('btn-export-json');
-      if(exportButton){
-        exportButton.addEventListener('click',()=>{
-          const data=jm.get_data('node_tree');
-          if(data && data.data){ enforceRightOrientation(data.data); }
-          const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement('a');
-          a.href=url;
-          const titleValue=titleInput ? titleInput.value.trim() : '';
-          a.download=(titleValue || 'mindmap')+'.json';
-          a.click();
-          setTimeout(()=>URL.revokeObjectURL(url), 1000);
-        });
+      function exportMindmap(){
+        const data=jm.get_data('node_tree');
+        if(data && data.data){ enforceRightOrientation(data.data); }
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        const titleValue=titleInput ? titleInput.value.trim() : '';
+        a.download=(titleValue || 'mindmap')+'.json';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
       }
-      const importButton=document.getElementById('btn-import-json');
-      if(importButton && importInput){
-        importButton.addEventListener('click',()=>importInput.click());
+      function triggerImport(){
+        if(importInput){ importInput.click(); }
       }
       if(importInput){
         importInput.addEventListener('change', e=>{
@@ -3632,7 +4046,9 @@ if ($view === 'map_edit') {
           reader.readAsText(file,'utf-8');
         });
       }
-      if(saveButton) saveButton.onclick=saveMindmap;
+      if(dockSaveButton){
+        dockSaveButton.addEventListener('click',e=>{ e.preventDefault(); saveMindmap(); });
+      }
       async function saveMindmap(){
         commitInlineEditing();
         const title=titleInput.value.trim()||'未命名导图';
@@ -3659,7 +4075,6 @@ if ($view === 'map_edit') {
         }catch(err){
           alert(err.message||'保存失败');
           markDirty();
-          setMobileSaveStatus(err && err.message ? err.message : '保存失败','error');
         }
       }
       window.addEventListener('beforeunload',e=>{
@@ -3743,12 +4158,11 @@ if ($view === 'maps') {
       .header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:24px}
       .header h1{margin:0;font:600 28px/1.2 'Cinzel','Noto Serif SC',serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400);text-shadow:0 0 26px rgba(227,198,139,.28)}
       .header .meta{color:var(--text-muted);font:14px/1.7 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
-      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(201,168,106,.38);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 0 0 0 rgba(227,198,139,0);overflow:hidden}
-      .btn::after{content:"";position:absolute;inset:2px;border-radius:12px;border:1px solid rgba(201,168,106,.22);opacity:.85;pointer-events:none;transition:opacity var(--transition)}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.18);border-color:rgba(227,198,139,.6)}
-      .btn:hover::after{opacity:1}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.26));color:var(--bg-void);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 22px 48px rgba(0,0,0,.6)}
-      .btn.danger{border-color:rgba(209,75,75,.55);color:#F6D6D6;box-shadow:0 0 24px rgba(209,75,75,.28)}
+      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(201,168,106,.38);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn::after{content:none}
+      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.26));color:var(--bg-void);box-shadow:none}
+      .btn.danger{border-color:rgba(209,75,75,.55);color:#F6D6D6;box-shadow:none}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px}
       .search{margin-top:20px;display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:linear-gradient(135deg,rgba(21,26,30,.82),rgba(15,19,22,.92));box-shadow:inset 0 0 22px rgba(0,0,0,.5);max-width:480px}
       .search input{all:unset;flex:1;color:var(--text-strong);font-size:15px;letter-spacing:.06em}
@@ -3923,13 +4337,13 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);animation:breathe 6s ease-in-out infinite}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
-  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 0 0 0 rgba(227,198,139,0);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-  .btn::after{content:"";position:absolute;inset:2px;border-radius:12px;border:1px solid rgba(201,168,106,.24);opacity:.85;transition:opacity var(--transition);pointer-events:none}
-  .btn:hover{transform:translateY(-2px);box-shadow:0 18px 34px rgba(0,0,0,.55),0 0 20px rgba(227,198,139,.18);border-color:rgba(227,198,139,.6)}
-  .btn:hover::after{opacity:1}
-  .btn:active{transform:translateY(0);box-shadow:0 0 12px rgba(227,198,139,.22)}
-  .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.22),rgba(170,140,84,.3));color:var(--bg-void);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 20px 40px rgba(0,0,0,.6)}
-  .btn.danger{color:var(--danger);border-color:rgba(255,93,125,.45);box-shadow:inset 0 0 16px rgba(255,93,125,.15)}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:none;transition:transform var(--transition),border-color var(--transition);overflow:hidden}
+  .btn::after{content:none}
+  .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+  .btn:hover::after{content:none}
+  .btn:active{transform:translateY(0)}
+  .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.22),rgba(170,140,84,.3));color:var(--bg-void);box-shadow:none}
+  .btn.danger{color:var(--danger);border-color:rgba(255,93,125,.45);box-shadow:none}
   .btn.small{padding:8px 12px;border-radius:12px;font-size:11px}
   .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 3px rgba(201,168,106,.25)}
   .section-title{font:600 12px/1 'Cinzel','Noto Serif SC',serif;text-transform:uppercase;letter-spacing:.24em;color:var(--gold-400);margin:14px 0 8px;text-shadow:0 0 14px rgba(227,198,139,.24)}
@@ -3939,7 +4353,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .cat:hover{transform:translateX(4px);border-color:rgba(201,168,106,.45);box-shadow:0 10px 22px rgba(0,0,0,.6)}
   .cat:hover::before{opacity:1}
   .cat.active{border-color:var(--glow);box-shadow:0 0 18px rgba(201,168,106,.3)}
-  .cat .name{font-weight:600;color:var(--text-strong);text-shadow:0 0 8px rgba(201,168,106,.18)}
+  .cat .name{flex:1;display:block;font-weight:600;color:var(--text-strong);text-shadow:0 0 8px rgba(201,168,106,.18)}
   .cat .count{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
   .footer{margin-top:18px;color:var(--text-dim);font-size:12px;line-height:1.8;text-shadow:0 0 10px rgba(201,168,106,.15)}
   .main{padding:24px 20px;background:linear-gradient(160deg,rgba(12,14,18,.82),rgba(10,12,14,.85));backdrop-filter:blur(14px) saturate(160%);position:relative}
@@ -4024,13 +4438,13 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     <div class="section-title">分类 · Categories</div>
     <div class="cat-list" id="cat-list">
       <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
-        <div class="name">全部 · All</div><div class="count"><?php echo $all_total; ?></div>
+        <span class="name">全部 · All</span><span class="count"><?php echo $all_total; ?></span>
       </a>
       <?php foreach ($cats as $c): ?>
-      <div class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>">
-        <a href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>" style="flex:1" class="name"><?php echo h($c['name']); ?></a>
-        <div class="count"><?php echo (int)($counts[$c['id']] ?? 0); ?></div>
-      </div>
+      <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>">
+        <span class="name"><?php echo h($c['name']); ?></span>
+        <span class="count"><?php echo (int)($counts[$c['id']] ?? 0); ?></span>
+      </a>
       <?php endforeach; ?>
     </div>
     <div class="footer">
@@ -4220,14 +4634,15 @@ function refreshSidebarCats(cats, counts, total){
   const all=document.createElement('a');
   all.className='cat'+(urlCat==='all'?' active':'');
   all.href='?cat=all&q='+encodeURIComponent(qParam);
-  all.innerHTML='<div class="name">全部 · All</div><div class="count">'+(total??0)+'</div>';
+  all.innerHTML='<span class="name">全部 · All</span><span class="count">'+(total??0)+'</span>';
   list.appendChild(all);
   cats.forEach(c=>{
-    const div=document.createElement('div');
-    div.className='cat'+(String(urlCat)===String(c.id)?' active':'');
-    div.dataset.id=c.id;
-    div.innerHTML=`<a href="?cat=${c.id}&q=${encodeURIComponent(qParam)}" style="flex:1" class="name">${escapeHtml(c.name)}</a><div class="count">${counts[c.id]||0}</div>`;
-    list.appendChild(div);
+    const link=document.createElement('a');
+    link.className='cat'+(String(urlCat)===String(c.id)?' active':'');
+    link.dataset.id=c.id;
+    link.href='?cat='+c.id+'&q='+encodeURIComponent(qParam);
+    link.innerHTML=`<span class="name">${escapeHtml(c.name)}</span><span class="count">${counts[c.id]||0}</span>`;
+    list.appendChild(link);
   });
 }
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
