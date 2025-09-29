@@ -1673,10 +1673,6 @@ if ($view === 'map_edit') {
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
-      .mind-links .trace-group[data-status="doing"] .trace.shadow{stroke:rgba(36,194,160,.42);opacity:.7}
-      .mind-links .trace-group[data-status="doing"] .trace.highlight{stroke:rgba(207,250,234,.4)}
-      .mind-links .trace-group[data-status="done"] .trace.core{opacity:.78}
-      .mind-links .trace-group[data-status="done"] .trace.highlight{opacity:.28}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.22);opacity:.7;pointer-events:none;animation:nodeGlow 9s ease-in-out infinite}
@@ -1686,6 +1682,7 @@ if ($view === 'map_edit') {
       .jsmind-node .node-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-dim);font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em}
       .jsmind-node .node-meta span{padding:2px 8px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78)}
       .jsmind-node .node-body{color:var(--text-muted);font:400 13px/1.7 'Noto Sans SC','Inter',sans-serif}
+      .jsmind-node .node-note{color:var(--text-muted);font:400 13px/1.7 'Noto Sans SC','Inter',sans-serif;white-space:pre-wrap;word-break:break-word}
       .jsmind-node .node-footer{display:flex;gap:8px;flex-wrap:wrap;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
       .jsmind-node.isroot{border-width:2px;border-color:rgba(227,198,139,.55);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 30px 60px rgba(0,0,0,.6)}
       .jsmind-node.isroot::after{opacity:.4;animation:ringPulse 3.6s linear infinite}
@@ -1696,8 +1693,6 @@ if ($view === 'map_edit') {
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.42)}
-      .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
-      .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
       .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
       .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;justify-content:center}
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation}
@@ -1738,9 +1733,7 @@ if ($view === 'map_edit') {
       .node-popover label{font:600 12px/1.2 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
       .node-popover input,.node-popover select,.node-popover textarea{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em;transition:border-color var(--transition),box-shadow var(--transition)}
       .node-popover input:focus,.node-popover select:focus,.node-popover textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 2px rgba(227,198,139,.18)}
-      .node-popover .chips-preview{display:flex;flex-wrap:wrap;gap:8px;min-height:26px}
-      .node-popover .chips-preview span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
-      .node-popover .chips-preview .empty{color:var(--text-muted);border-style:dashed}
+      .node-popover textarea{min-height:120px;resize:vertical}
       .node-popover .fold-field{padding-top:6px}
       .node-popover .fold-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
       .toggle-switch{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--text-muted)}
@@ -1874,39 +1867,8 @@ if ($view === 'map_edit') {
           <input id="node-topic-input" type="text" placeholder="输入节点标题">
         </div>
         <div class="field">
-          <label for="node-type">类型</label>
-          <select id="node-type">
-            <option value="idea">💡 创意</option>
-            <option value="task">✅ 任务</option>
-            <option value="document">📄 文档</option>
-            <option value="media">🖼 媒体</option>
-            <option value="decision">🧭 决策</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="node-status">状态</label>
-          <select id="node-status">
-            <option value="backlog">待计划</option>
-            <option value="doing">进行中</option>
-            <option value="done">已完成</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="node-priority">优先级</label>
-          <select id="node-priority">
-            <option value="normal">普通</option>
-            <option value="high">高</option>
-            <option value="low">低</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="node-owner">负责人</label>
-          <input id="node-owner" type="text" placeholder="输入姓名或团队">
-        </div>
-        <div class="field">
-          <label for="node-tags">标签</label>
-          <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
-          <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
+          <label for="node-note">备注</label>
+          <textarea id="node-note" rows="4" placeholder="例如：&#10;状态：已完成&#10;优先级：高&#10;负责人：张三&#10;标签：#重要 #任务"></textarea>
         </div>
         <div class="field fold-field" id="node-fold-field" hidden>
           <div class="fold-row">
@@ -1946,25 +1908,7 @@ if ($view === 'map_edit') {
       const DOUBLE_TAP_WINDOW=320;
       const LONG_PRESS_DELAY=550;
       const LONG_PRESS_TOLERANCE=14;
-      const NODE_TYPES=[
-        {value:'idea',label:'创意',icon:'💡',accent:'#0284c7'},
-        {value:'task',label:'任务',icon:'✅',accent:'#ca8a04'},
-        {value:'document',label:'文档',icon:'📄',accent:'#1d4ed8'},
-        {value:'media',label:'媒体',icon:'🖼',accent:'#db2777'},
-        {value:'decision',label:'决策',icon:'🧭',accent:'#059669'},
-      ];
-      const NODE_STATUS=[
-        {value:'backlog',label:'待计划',icon:'⏳'},
-        {value:'doing',label:'进行中',icon:'🛠'},
-        {value:'done',label:'已完成',icon:'✅'},
-      ];
-      const NODE_PRIORITY=[
-        {value:'high',label:'高',icon:'⚡'},
-        {value:'normal',label:'普通',icon:'•'},
-        {value:'low',label:'低',icon:'⬇️'},
-      ];
-      const TYPE_ICON_MAP=NODE_TYPES.reduce((acc,item)=>{acc[item.value]=item.icon;return acc;},{});
-      const TYPE_ACCENT_MAP=NODE_TYPES.reduce((acc,item)=>{acc[item.value]=item.accent;return acc;},{});
+      const DEFAULT_NODE_ICON='🧠';
       const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
       let lastTapInfo={id:null,time:0};
       const TRACE_GRID=8;
@@ -2057,21 +2001,8 @@ if ($view === 'map_edit') {
         }
         if(data.attachments.length){ data.attachment=data.attachments[0]; }
         else if('attachment' in data){ delete data.attachment; }
-        const allowedTypes=NODE_TYPES.map(item=>item.value);
-        const allowedStatus=NODE_STATUS.map(item=>item.value);
-        const allowedPriority=NODE_PRIORITY.map(item=>item.value);
-        if(!allowedTypes.includes(data.type)){ data.type='idea'; }
-        if(!allowedStatus.includes(data.status)){ data.status='backlog'; }
-        if(!allowedPriority.includes(data.priority)){ data.priority='normal'; }
-        if(typeof data.owner!=='string'){ data.owner=''; }
-        else{ data.owner=data.owner.trim(); }
-        if(Array.isArray(data.tags)){
-          data.tags=data.tags.map(tag=>String(tag||'').trim()).filter(Boolean);
-        }else if(typeof data.tags==='string'){
-          data.tags=data.tags.split(/[;,，\s]+/).map(tag=>tag.trim()).filter(Boolean);
-        }else{
-          data.tags=[];
-        }
+        if(typeof data.note!=='string'){ data.note=''; }
+        else{ data.note=data.note.replace(/\r\n?/g,'\n'); }
         return data;
       }
       function enforceRightOrientation(node, depth=0){
@@ -2662,53 +2593,17 @@ if ($view === 'map_edit') {
           span.textContent=node.topic || '';
           el.appendChild(span);
           const data=node.data || {};
-          const type=(data.type && TYPE_ICON_MAP[data.type])?data.type:'idea';
-          el.dataset.type=type;
-          el.dataset.icon=TYPE_ICON_MAP[type] || '🧠';
+          el.dataset.icon=DEFAULT_NODE_ICON;
           el.dataset.depth=String(node.depth||0);
-          if(TYPE_ACCENT_MAP[type]){ el.style.setProperty('--node-accent', TYPE_ACCENT_MAP[type]); }
-          if(data.status){ el.dataset.status=data.status; } else{ el.dataset.status='backlog'; }
-          if(data.priority){ el.dataset.priority=data.priority; } else{ el.dataset.priority='normal'; }
           const attachments=gatherAttachments(data);
           if(attachments.length){ el.classList.add('has-attachment'); }
           if(data.url){ el.classList.add('has-link'); }
-          const flairElements=[];
-          const statusInfo=NODE_STATUS.find(item=>item.value===data.status);
-          if(statusInfo){
-            const badge=document.createElement('span');
-            badge.className='pill status';
-            badge.textContent=`${statusInfo.icon||''} ${statusInfo.label}`.trim();
-            flairElements.push(badge);
-          }
-          const priorityInfo=NODE_PRIORITY.find(item=>item.value===data.priority);
-          if(priorityInfo && data.priority!=='normal'){
-            const badge=document.createElement('span');
-            badge.className='pill priority';
-            badge.textContent=`${priorityInfo.icon||''} ${priorityInfo.label}`.trim();
-            flairElements.push(badge);
-          }
-          if(data.owner){
-            const badge=document.createElement('span');
-            badge.className='pill owner';
-            badge.textContent=`👤 ${data.owner}`;
-            flairElements.push(badge);
-          }
-          if(flairElements.length){
-            const wrap=document.createElement('div');
-            wrap.className='node-flair';
-            flairElements.forEach(item=>wrap.appendChild(item));
-            el.appendChild(wrap);
-          }
-          if(data.tags && data.tags.length){
-            const tagWrap=document.createElement('div');
-            tagWrap.className='node-tags';
-            data.tags.slice(0,6).forEach(tag=>{
-              const chip=document.createElement('span');
-              chip.className='node-tag';
-              chip.textContent=tag;
-              tagWrap.appendChild(chip);
-            });
-            el.appendChild(tagWrap);
+          const noteText=typeof data.note==='string'?data.note:'';
+          if(noteText.trim()){
+            const note=document.createElement('div');
+            note.className='node-note';
+            note.textContent=noteText;
+            el.appendChild(note);
           }
           const badges=[];
           if(attachments.length){
@@ -2805,7 +2700,6 @@ if ($view === 'map_edit') {
               group.appendChild(highlight);
               group.dataset.from=node.parent.id;
               group.dataset.to=node.id;
-              if(node.data && node.data.type){ group.dataset.type=node.data.type; }
               this.linkLayer.appendChild(group);
               node.linkGroup=group;
               node.linkShadow=shadow;
@@ -2857,12 +2751,6 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
-          if(node.linkGroup){
-            const status=(node.data && node.data.status) || 'backlog';
-            const priority=(node.data && node.data.priority) || 'normal';
-            node.linkGroup.dataset.status=status;
-            node.linkGroup.dataset.priority=priority;
-          }
         }
         handleNodeResize(entries){
           if(!entries || !entries.length) return;
@@ -3341,12 +3229,7 @@ if ($view === 'map_edit') {
       const attachInput=document.getElementById('attach-file-input');
       const inspector=document.getElementById('node-inspector');
       const nodeTopicInput=document.getElementById('node-topic-input');
-      const nodeTypeSelect=document.getElementById('node-type');
-      const nodeStatusSelect=document.getElementById('node-status');
-      const nodePrioritySelect=document.getElementById('node-priority');
-      const nodeOwnerInput=document.getElementById('node-owner');
-      const nodeTagsInput=document.getElementById('node-tags');
-      const nodeTagsPreview=document.getElementById('node-tags-preview');
+      const nodeNoteInput=document.getElementById('node-note');
       const nodeFoldField=document.getElementById('node-fold-field');
       const nodeFoldToggle=document.getElementById('node-fold-toggle');
       const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
@@ -3455,31 +3338,11 @@ if ($view === 'map_edit') {
           btn.addEventListener('click',()=>toggleSettings(false));
         });
       }
-      const inspectorFields=[nodeTopicInput,nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput,nodeFoldToggle].filter(Boolean);
+      const inspectorFields=[nodeTopicInput,nodeNoteInput,nodeFoldToggle].filter(Boolean);
       let inspectorSyncing=false;
-      function parseTagsString(value){
-        if(!value) return [];
-        return value.split(/[;,，\s]+/).map(tag=>tag.trim()).filter(Boolean).slice(0,12);
-      }
       function setInspectorEnabled(enabled){
         inspectorFields.forEach(el=>{ el.disabled=!enabled; });
         if(inspector){ inspector.classList.toggle('disabled', !enabled); }
-      }
-      function renderTagPreview(tags){
-        if(!nodeTagsPreview) return;
-        nodeTagsPreview.innerHTML='';
-        if(!tags || !tags.length){
-          const span=document.createElement('span');
-          span.className='empty';
-          span.textContent='暂无标签';
-          nodeTagsPreview.appendChild(span);
-          return;
-        }
-        tags.slice(0,12).forEach(tag=>{
-          const span=document.createElement('span');
-          span.textContent=tag;
-          nodeTagsPreview.appendChild(span);
-        });
       }
       function updateFoldToggleUI(node){
         if(!nodeFoldField || !nodeFoldToggle || !nodeFoldToggleText) return;
@@ -3807,12 +3670,7 @@ if ($view === 'map_edit') {
         if(!node){
           setInspectorEnabled(false);
           if(nodeTopicInput) nodeTopicInput.value='';
-          if(nodeTypeSelect) nodeTypeSelect.value='idea';
-          if(nodeStatusSelect) nodeStatusSelect.value='backlog';
-          if(nodePrioritySelect) nodePrioritySelect.value='normal';
-          if(nodeOwnerInput) nodeOwnerInput.value='';
-          if(nodeTagsInput) nodeTagsInput.value='';
-          renderTagPreview([]);
+          if(nodeNoteInput) nodeNoteInput.value='';
           updateFoldToggleUI(null);
           updateFoldAllLabel();
           inspectorSyncing=false;
@@ -3822,12 +3680,7 @@ if ($view === 'map_edit') {
         setInspectorEnabled(true);
         if(nodeTopicInput) nodeTopicInput.value=node.topic || '';
         const data=normalizeNodeData(deepClone(node.data||{}));
-        if(nodeTypeSelect) nodeTypeSelect.value=data.type||'idea';
-        if(nodeStatusSelect) nodeStatusSelect.value=data.status||'backlog';
-        if(nodePrioritySelect) nodePrioritySelect.value=data.priority||'normal';
-        if(nodeOwnerInput) nodeOwnerInput.value=data.owner||'';
-        if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
-        renderTagPreview(data.tags||[]);
+        if(nodeNoteInput) nodeNoteInput.value=data.note || '';
         updateFoldToggleUI(node);
         updateFoldAllLabel();
         inspectorSyncing=false;
@@ -3877,7 +3730,6 @@ if ($view === 'map_edit') {
         if(!parent) return null;
         const nodeId=input.id || randomId();
         const payloadData=deepClone(input.data)||{};
-        if(!payloadData.type && parent && parent.data && parent.data.type){ payloadData.type=parent.data.type; }
         const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
         const style=deepClone(input.style);
         if(style && (style.background || style.foreground)){
@@ -4103,27 +3955,6 @@ if ($view === 'map_edit') {
           refreshInspector(jm.get_node(node.id));
         });
       }
-      if(nodeTypeSelect){
-        nodeTypeSelect.addEventListener('change',()=>{
-          if(inspectorSyncing) return;
-          const value=nodeTypeSelect.value;
-          applyInspectorChange(data=>{ data.type=value; });
-        });
-      }
-      if(nodeStatusSelect){
-        nodeStatusSelect.addEventListener('change',()=>{
-          if(inspectorSyncing) return;
-          const value=nodeStatusSelect.value;
-          applyInspectorChange(data=>{ data.status=value; });
-        });
-      }
-      if(nodePrioritySelect){
-        nodePrioritySelect.addEventListener('change',()=>{
-          if(inspectorSyncing) return;
-          const value=nodePrioritySelect.value;
-          applyInspectorChange(data=>{ data.priority=value; });
-        });
-      }
       if(nodeTopicInput){
         const commitTopic=()=>{
           if(inspectorSyncing) return;
@@ -4147,27 +3978,18 @@ if ($view === 'map_edit') {
           }
         });
       }
-      if(nodeOwnerInput){
-        const commit=()=>{
+      if(nodeNoteInput){
+        const commitNote=()=>{
           if(inspectorSyncing) return;
-          const value=nodeOwnerInput.value.trim();
-          applyInspectorChange(data=>{ data.owner=value; });
+          const node=ensureNode();
+          if(!node) return;
+          const value=(nodeNoteInput.value||'').replace(/\r\n?/g,'\n');
+          const current=typeof (node.data && node.data.note)==='string'?node.data.note:'';
+          if(current===value) return;
+          applyInspectorChange(data=>{ data.note=value; });
         };
-        nodeOwnerInput.addEventListener('change',commit);
-        nodeOwnerInput.addEventListener('blur',commit);
-      }
-      if(nodeTagsInput){
-        nodeTagsInput.addEventListener('input',()=>{
-          if(inspectorSyncing) return;
-          renderTagPreview(parseTagsString(nodeTagsInput.value));
-        });
-        const commitTags=()=>{
-          if(inspectorSyncing) return;
-          const tags=parseTagsString(nodeTagsInput.value);
-          applyInspectorChange(data=>{ data.tags=tags; });
-        };
-        nodeTagsInput.addEventListener('change',commitTags);
-        nodeTagsInput.addEventListener('blur',commitTags);
+        nodeNoteInput.addEventListener('change',commitNote);
+        nodeNoteInput.addEventListener('blur',commitNote);
       }
       if(nodeFoldToggle){
         nodeFoldToggle.addEventListener('change',()=>{
