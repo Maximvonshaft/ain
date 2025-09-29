@@ -1639,35 +1639,7 @@ if ($view === 'map_edit') {
       .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
       @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
       a{color:inherit;text-decoration:none}
-      .layout{display:grid;grid-template-columns:360px 1fr;min-height:100vh;position:relative;gap:0}
-      @media (max-width:1180px){.layout{grid-template-columns:320px 1fr}}
-      @media (max-width:1024px){.layout{grid-template-columns:1fr}}
-      .sidebar{position:relative;z-index:90;display:flex;flex-direction:column;gap:20px;padding:32px;border-right:1px solid rgba(201,168,106,.28);background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));box-shadow:var(--shadow-1);backdrop-filter:blur(18px)}
-      .sidebar::before{content:"";position:absolute;inset:14px;border-radius:var(--r-lg);border:1px solid rgba(201,168,106,.18);opacity:.6;pointer-events:none}
-      .sidebar h1{margin:0;font:600 24px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-transform:uppercase}
-      .sidebar .meta{color:var(--text-muted);font:500 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
-      .sidebar label{display:block;margin-bottom:6px;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
-      .sidebar input,.sidebar select{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.76);color:var(--text-strong);font:500 15px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
-      .sidebar input:focus,.sidebar select:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
-      .actions,.toolbar{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
-      .sidebar button,.map-toolbar button,.mobile-toolbar button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden;touch-action:manipulation}
-      .sidebar button::after,.map-toolbar button::after,.mobile-toolbar button::after{content:none}
-      .sidebar button:hover,.map-toolbar button:hover,.mobile-toolbar button:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
-      .sidebar button:active,.map-toolbar button:active,.mobile-toolbar button:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.92)}
-      .sidebar button.acc,.mobile-toolbar button.primary{background:linear-gradient(135deg,rgba(201,168,106,.2),rgba(170,140,84,.28));color:var(--bg-void);box-shadow:none}
-      .sidebar button.danger,.mobile-toolbar button.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;box-shadow:none}
-      .btn-like{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:12px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(12,16,18,.78);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:all var(--transition)}
-      .btn-like.danger{border-color:rgba(209,75,75,.52);color:#F6D6D6;background:rgba(35,10,14,.86);box-shadow:none}
-      .inspector{margin-top:8px;padding:18px;border-radius:var(--r-md);border:1px solid rgba(201,168,106,.3);background:rgba(15,19,22,.82);box-shadow:var(--shadow-1);display:grid;gap:16px}
-      .inspector h2{margin:0 0 6px;font:600 16px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-transform:uppercase}
-      .field{display:grid;gap:8px}
-      .chips-preview{display:flex;gap:8px;flex-wrap:wrap;min-height:26px}
-      .chips-preview .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.82);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase}
-      .chips-preview .empty{color:var(--text-muted);font-size:12px}
-      .tips{font:400 13px/1.8 'Noto Sans SC','Inter',sans-serif;color:var(--text-muted)}
-      .tips strong{color:var(--gold-500);letter-spacing:.08em}
-      .tips code{padding:2px 6px;border-radius:6px;background:rgba(21,26,30,.9);border:1px solid rgba(201,168,106,.26);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif}
-      .editor-pane{position:relative;background:rgba(6,10,12,.35)}
+      .workspace{position:relative;min-height:100vh;min-height:100dvh;background:rgba(6,10,12,.4)}
       #jsmind-container{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:linear-gradient(160deg,rgba(21,26,30,.82),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6);touch-action:none}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
@@ -1703,18 +1675,70 @@ if ($view === 'map_edit') {
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
-      .map-toolbar{position:absolute;top:24px;right:24px;display:flex;gap:12px;z-index:60}
-      .map-toolbar button{padding:10px 14px}
-      .mobile-toolbar{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);width:min(640px,calc(100% - 32px));display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;background:rgba(12,16,18,.88);border:1px solid rgba(201,168,106,.28);border-radius:20px;padding:12px;box-shadow:0 18px 36px rgba(0,0,0,.5);backdrop-filter:blur(16px);z-index:80}
-      .mobile-toolbar button{min-width:0;padding:10px 12px;width:100%}
-      @media (max-width:820px){.map-toolbar{display:none}}
-      .sidebar-toggle{position:absolute;top:22px;left:22px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.86);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;display:none;z-index:95;box-shadow:0 12px 28px rgba(0,0,0,.45)}
-      @media (max-width:1024px){
-        .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(86vw,360px);transform:translateX(-105%);transition:transform var(--transition);border-right:1px solid rgba(201,168,106,.28);border-radius:0 24px 24px 0}
-        body.sidebar-open .sidebar{transform:translateX(0)}
-        .sidebar-toggle{display:inline-flex;align-items:center;gap:8px}
+      .map-hud{position:fixed;top:24px;left:24px;z-index:70;display:grid;gap:12px;padding:18px 20px;border-radius:20px;background:linear-gradient(160deg,rgba(21,26,30,.92),rgba(12,16,18,.94));border:1px solid rgba(201,168,106,.28);box-shadow:0 20px 44px rgba(0,0,0,.55);backdrop-filter:blur(16px);max-width:min(420px,calc(100vw - 48px))}
+      .map-hud h1{margin:0;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.1em;text-transform:uppercase}
+      .map-hud .hud-top{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+      .map-hud .hud-meta{color:var(--text-muted);font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+      .map-hud input{width:100%;padding:12px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.72);color:var(--text-strong);font:500 15px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em}
+      .map-hud input:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
+      .map-hud a{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase}
+      .save-tip{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);opacity:0;transition:opacity var(--transition)}
+      .save-tip.show{opacity:1}
+      .save-tip.dirty{color:var(--gold-400)}
+      @media (max-width:820px){
+        .map-hud{position:fixed;left:50%;transform:translateX(-50%);top:18px;width:calc(100% - 32px);max-width:520px}
       }
-      .sidebar-backdrop{display:none}
+      .fit-pill{position:fixed;top:24px;right:24px;z-index:65;padding:10px 16px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.86);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.45);cursor:pointer;transition:transform var(--transition),border-color var(--transition)}
+      .fit-pill:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+      @media (max-width:640px){
+        .fit-pill{top:auto;bottom:120px;right:18px}
+      }
+      .dock-wrap{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;pointer-events:none}
+      .dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:10px;background:linear-gradient(180deg,rgba(21,26,30,.88),rgba(12,16,18,.84));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(10px)}
+      .dock-btn{position:relative;isolation:isolate;display:grid;place-items:center;width:88px;height:56px;border-radius:18px;color:var(--gold-400);background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.38);box-shadow:inset 0 0 18px rgba(201,168,106,.1);transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease),border-color var(--t) var(--ease),background-color var(--t) var(--ease);cursor:pointer;outline:none}
+      .dock-btn svg{width:22px;height:22px}
+      .dock-btn .label{position:absolute;bottom:6px;font:500 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.02em;pointer-events:none}
+      .dock-btn:disabled{opacity:.6;cursor:not-allowed}
+      .dock-btn:hover{background:rgba(201,168,106,.14);border-color:var(--gold-500);box-shadow:0 0 26px rgba(227,198,139,.16),inset 0 0 18px rgba(227,198,139,.14)}
+      .dock-btn:focus-visible{box-shadow:0 0 0 3px rgba(227,198,139,.2),0 0 0 5px rgba(75,195,209,.25)}
+      .dock-btn.danger{color:#f4c9c9;border-color:rgba(209,75,75,.45)}
+      .dock-btn.danger:hover{box-shadow:0 0 24px rgba(209,75,75,.18),inset 0 0 18px rgba(209,75,75,.12)}
+      .dock-sep{width:8px;height:36px;border-right:1px solid rgba(201,168,106,.24);opacity:.65}
+      .dock-more{position:relative}
+      .dock-menu{position:absolute;bottom:64px;right:0;min-width:180px;padding:8px;margin:0;list-style:none;display:none;background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.32);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.6)}
+      .dock-more[aria-expanded="true"] .dock-menu{display:block}
+      .dock-menu li{padding:10px 12px;color:var(--text-strong);border-radius:10px;cursor:pointer;font:500 13px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.04em}
+      .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
+      @media (max-width:960px){
+        .dock{gap:8px;padding:8px}
+        .dock-btn{width:74px;height:52px}
+        .dock-btn .label{font-size:11px}
+      }
+      @media (max-width:600px){
+        .dock-wrap{bottom:16px}
+        .dock-btn{width:64px;height:52px}
+        .dock-btn .label{font-size:10px}
+      }
+      @media (prefers-reduced-motion:reduce){
+        .dock-btn,.dock-btn:hover{transition:none;transform:none!important}
+      }
+      .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+      #node-popover{position:fixed;z-index:120;min-width:260px;max-width:360px;padding:16px 18px;border-radius:18px;background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.32);box-shadow:0 22px 54px rgba(0,0,0,.6),inset 0 0 24px rgba(227,198,139,.08);display:grid;gap:12px}
+      #node-popover[hidden]{display:none}
+      #node-popover header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+      #node-popover h2{margin:0;font:600 16px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.12em;text-transform:uppercase}
+      #node-popover label{display:block;margin-bottom:6px;font:600 12px/1.2 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
+      #node-popover input,#node-popover select,#node-popover textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.72);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em}
+      #node-popover textarea{min-height:90px;resize:vertical}
+      #node-popover input:focus,#node-popover select:focus,#node-popover textarea:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
+      #node-popover .actions{display:flex;gap:10px;justify-content:flex-end}
+      #node-popover .actions button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.86);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer}
+      #node-popover .actions button.primary{background:linear-gradient(135deg,rgba(201,168,106,.2),rgba(170,140,84,.28));color:var(--bg-void)}
+      #node-popover-backdrop{position:fixed;inset:0;background:rgba(3,6,8,.72);backdrop-filter:blur(10px);z-index:110;display:none}
+      #node-popover-backdrop.show{display:block}
+      @media (max-width:720px){
+        #node-popover{left:50%;bottom:0;top:auto;transform:translate(-50%,0);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0}
+      }
       @media (max-width:1024px){
         .sidebar-backdrop{position:fixed;inset:0;background:rgba(8,10,12,.65);backdrop-filter:blur(10px);z-index:80;opacity:0;transition:opacity var(--t) ease}
         body.sidebar-open .sidebar-backdrop{display:block;opacity:1}
@@ -1745,112 +1769,78 @@ if ($view === 'map_edit') {
         </filter>
       </defs>
     </svg>
-    <div class="layout">
-      <aside class="sidebar">
-        <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-          <h1>思维导图编辑器</h1>
-          <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" style="font-size:13px;color:var(--text-dim)">← 导图库</a>
-        </div>
-        <div class="meta">ID：<?php echo $mind['id'] ?: '新建'; ?> · 最近保存：<?php echo dt((int)$mind['updated_at']); ?></div>
-        <label for="map-title">导图标题</label>
-        <input id="map-title" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
-        <div class="actions">
-          <button id="btn-save" class="acc">💾 保存</button>
-          <button id="btn-export-json">⬇️ 导出 JSON</button>
-          <button id="btn-import-json">⬆️ 导入 JSON</button>
-          <input id="import-input" type="file" accept="application/json" style="display:none">
-        </div>
-        <div class="toolbar">
-          <button id="btn-add-sibling">↕ 同级节点 (Enter)</button>
-          <button id="btn-add-child">→ 子级节点 (Tab)</button>
-          <button id="btn-delete" class="danger">🗑 删除节点 (Del)</button>
-        </div>
-        <div class="toolbar">
-          <button id="btn-attach-file">📎 上传附件</button>
-          <button id="btn-attach-link">🔗 新增链接</button>
-          <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
-        </div>
-        <section class="inspector" id="node-inspector">
-          <h2>节点信息</h2>
-          <div class="field">
-            <label for="node-type">类型</label>
-            <select id="node-type">
-              <option value="idea">💡 创意</option>
-              <option value="task">✅ 任务</option>
-              <option value="document">📄 文档</option>
-              <option value="media">🖼 媒体</option>
-              <option value="decision">🧭 决策</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="node-status">状态</label>
-            <select id="node-status">
-              <option value="backlog">待计划</option>
-              <option value="doing">进行中</option>
-              <option value="done">已完成</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="node-priority">优先级</label>
-            <select id="node-priority">
-              <option value="normal">普通</option>
-              <option value="high">高</option>
-              <option value="low">低</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="node-owner">负责人</label>
-            <input id="node-owner" type="text" placeholder="输入姓名或团队">
-          </div>
-          <div class="field">
-            <label for="node-tags">标签</label>
-            <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
-            <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
-          </div>
-        </section>
-        <div class="toolbar">
-          <button id="btn-fit">🧭 自适应视图</button>
-          <button id="btn-center">◎ 居中</button>
-          <button id="btn-zoom-in">＋ 放大</button>
-          <button id="btn-zoom-out">－ 缩小</button>
-        </div>
-        <div class="tips">
-          <strong>快捷键</strong><br>
-          <code>Enter</code> 同级 · <code>Tab</code> 子级 · <code>Shift+Tab</code> 升级 · <code>Del</code> 删除 · <code>F2</code> 重命名 · <code>Ctrl/Cmd+Z</code> 撤销<br>
-          鼠标中键/空格拖拽 · 滚轮缩放 · 按住 <code>Alt</code> 拖动可复制节点。<br>
-          将图片、PDF、ZIP、文本或视频文件拖到节点上即可为该节点附加附件，超过 15MB 或不在白名单内的文件将被拒绝。
-        </div>
-        <div>
-          <span class="badge">提示</span>
-          <div class="meta" style="margin-top:6px">保存数据存入 SQLite，可多端共享；导出 JSON 可用于备份或导入其他工具（如 FreeMind、XMind）。</div>
-        </div>
-        <div class="save-tip" id="save-state">保存成功</div>
-        <?php if ($mind['id']): ?>
-          <form method="post" onsubmit="return confirm('确认删除该导图？');" style="margin-top:auto">
-            <input type="hidden" name="action" value="delete_mindmap">
-            <input type="hidden" name="id" value="<?php echo $mind['id']; ?>">
-            <button class="btn-like danger btn-block">删除导图</button>
-          </form>
-        <?php endif; ?>
-      </aside>
-      <main class="editor-pane">
-        <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="false">☰ 操作</button>
-        <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
-        <div class="map-toolbar">
-          <button id="btn-collapse">折叠/展开节点</button>
-          <button id="btn-fit-floating">自适应视图</button>
-        </div>
-        <div class="mobile-toolbar" id="mobile-toolbar">
-          <button data-action="save" class="primary">保存</button>
-          <button data-action="add-sibling">同级</button>
-          <button data-action="add-child">子级</button>
-          <button data-action="attach-file">附件</button>
-          <button data-action="attach-link">链接</button>
-          <button data-action="delete" class="danger">删除</button>
-        </div>
-      </main>
+    <div class="map-hud">
+      <div class="hud-top">
+        <h1>思维导图编辑器</h1>
+        <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">← 导图库</a>
+      </div>
+      <div class="hud-meta">ID：<?php echo $mind['id'] ?: '新建'; ?> · 最近保存：<?php echo dt((int)$mind['updated_at']); ?></div>
+      <label class="sr-only" for="map-title">导图标题</label>
+      <input id="map-title" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+      <div class="save-tip" id="save-state" role="status">保存成功</div>
     </div>
-    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+    <button type="button" id="btn-fit-floating" class="fit-pill">自适应视图</button>
+    <div class="workspace">
+      <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
+    </div>
+    <input id="import-input" type="file" accept="application/json" hidden>
+    <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" hidden>
+    <div class="dock-wrap" role="toolbar" aria-label="思维导图操作工具栏">
+      <nav class="dock" id="dock">
+        <button class="dock-btn" data-action="save" title="保存 (Ctrl+S)" aria-label="保存">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5zM7 4v6h8V4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="label">保存</span>
+        </button>
+        <button class="dock-btn" data-action="sibling" title="同级 (Enter)" aria-label="新增同级">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4v16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="label">同级</span>
+        </button>
+        <button class="dock-btn" data-action="child" title="子级 (Tab)" aria-label="新增子级">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h8v4H5zM13 8h6M5 14h8v4H5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="label">子级</span>
+        </button>
+        <button class="dock-btn" data-action="attach" title="附件" aria-label="上传附件">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12v5a4 4 0 0 0 8 0V7a3 3 0 0 0-6 0v8a2 2 0 0 0 4 0V9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="label">附件</span>
+        </button>
+        <button class="dock-btn" data-action="link" title="链接" aria-label="新增链接">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l-2 2a4 4 0 0 1-6-6l2-2m14 0l2 2a4 4 0 0 1-6 6l-2-2M7 13l10-10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="label">链接</span>
+        </button>
+        <button class="dock-btn danger" data-action="delete" title="删除 (Del)" aria-label="删除" aria-describedby="danger-hint">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M9 10v8M15 10v8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="label">删除</span>
+        </button>
+        <div class="dock-sep" aria-hidden="true"></div>
+        <div class="dock-more">
+          <button class="dock-btn ghost" data-action="more" aria-haspopup="menu" aria-expanded="false" title="更多" aria-label="更多">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+            <span class="label">更多</span>
+          </button>
+          <ul class="dock-menu" role="menu">
+            <li role="menuitem" data-action="import">导入 JSON</li>
+            <li role="menuitem" data-action="export">导出 JSON</li>
+            <li role="menuitem" data-action="toggle-fold">折叠/展开节点</li>
+            <li role="menuitem" data-action="fit-view">自适应视图</li>
+            <li role="menuitem" data-action="center">居中视图</li>
+            <li role="menuitem" data-action="zoom-in">放大</li>
+            <li role="menuitem" data-action="zoom-out">缩小</li>
+            <?php if ($mind['id']): ?>
+            <li role="menuitem" data-action="delete-map">删除导图</li>
+            <?php endif; ?>
+          </ul>
+        </div>
+      </nav>
+      <p id="danger-hint" class="sr-only">此操作不可撤销，请谨慎。</p>
+    </div>
+    <div id="node-popover" hidden></div>
+    <div id="node-popover-backdrop"></div>
+    <?php if ($mind['id']): ?>
+      <form id="delete-map-form" method="post" hidden>
+        <input type="hidden" name="action" value="delete_mindmap">
+        <input type="hidden" name="id" value="<?php echo $mind['id']; ?>">
+      </form>
+    <?php endif; ?>
     <script>
       (function(){
       const DOUBLE_TAP_WINDOW=320;
@@ -2934,107 +2924,10 @@ if ($view === 'map_edit') {
         if(!json.ok) throw new Error(json.error||'上传失败');
         return json;
       }
-      let inlineEditState=null;
-      function finishInlineEditing(commit){
-        if(!inlineEditState) return;
-        const {span,nodeId,initialText,onBlur,onKeydown,onPaste}=inlineEditState;
-        inlineEditState=null;
-        span.removeEventListener('blur', onBlur);
-        span.removeEventListener('keydown', onKeydown);
-        span.removeEventListener('paste', onPaste);
-        span.contentEditable='false';
-        span.removeAttribute('data-editing');
-        if(span.parentElement){ span.parentElement.classList.remove('editing'); }
-        if(!commit){
-          span.textContent=initialText;
-          requestAnimationFrame(updateHandlePosition);
-          return;
-        }
-        let value=span.textContent || '';
-        value=value.replace(/\r/g,'');
-        value=value.split('\n').map(line=>line.trim()).join('\n').trim();
-        if(!value){
-          span.textContent=initialText;
-          requestAnimationFrame(updateHandlePosition);
-          return;
-        }
-        if(value!==initialText){
-          if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
-          markDirty();
-        }
-        requestAnimationFrame(updateHandlePosition);
-      }
       function startInlineEditing(node){
-        if(!node || !node.el) return;
-        if(inlineEditState && inlineEditState.nodeId===node.id) return;
-        finishInlineEditing(true);
-        const el=node.el;
-        const span=el.querySelector('.node-topic');
-        if(!span) return;
-        const initialText=node.topic || '';
-        const onBlur=()=>finishInlineEditing(true);
-        const onKeydown=(e)=>{
-          if(e.key==='Enter' && !e.shiftKey){
-            e.preventDefault();
-            span.blur();
-          }else if(e.key==='Escape'){
-            e.preventDefault();
-            finishInlineEditing(false);
-            span.blur();
-          }
-        };
-        const onPaste=(e)=>{
-          if(!e.clipboardData) return;
-          e.preventDefault();
-          const text=e.clipboardData.getData('text/plain');
-          if(!text) return;
-          const selection=window.getSelection();
-          if(selection && selection.rangeCount){
-            selection.deleteFromDocument();
-            const range=selection.getRangeAt(0);
-            const node=document.createTextNode(text);
-            range.insertNode(node);
-            range.setStartAfter(node);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }else{
-            span.textContent+=text;
-            const sel=window.getSelection();
-            if(sel){
-              const range=document.createRange();
-              range.selectNodeContents(span);
-              range.collapse(false);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          }
-          span.normalize();
-        };
-        inlineEditState={nodeId:node.id, span, initialText, onBlur, onKeydown, onPaste};
-        el.classList.add('editing');
-        span.contentEditable='true';
-        span.spellcheck=false;
-        span.dataset.editing='1';
-        span.addEventListener('blur', onBlur);
-        span.addEventListener('keydown', onKeydown);
-        span.addEventListener('paste', onPaste);
-        hideHandle();
-        requestAnimationFrame(()=>{
-          try{ span.focus({preventScroll:true}); }
-          catch(_){ span.focus(); }
-          const selection=window.getSelection();
-          if(selection){
-            const range=document.createRange();
-            range.selectNodeContents(span);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-        });
+        if(node){ openNodePopover(node); }
       }
-      function commitInlineEditing(){ finishInlineEditing(true); }
-      function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
-      jm.options.onInlineEdit=startInlineEditing;
+      jm.options.onInlineEdit=node=>{ startInlineEditing(node); return false; };
       jm.show(initialData);
       jmContainer.appendChild(overlay);
       syncOverlaySize();
@@ -3176,29 +3069,17 @@ if ($view === 'map_edit') {
       const saveState=document.getElementById('save-state');
       const importInput=document.getElementById('import-input');
       const attachInput=document.getElementById('attach-file-input');
-      const attachFileBtn=document.getElementById('btn-attach-file');
-      const attachLinkBtn=document.getElementById('btn-attach-link');
-      const inspector=document.getElementById('node-inspector');
-      const nodeTypeSelect=document.getElementById('node-type');
-      const nodeStatusSelect=document.getElementById('node-status');
-      const nodePrioritySelect=document.getElementById('node-priority');
-      const nodeOwnerInput=document.getElementById('node-owner');
-      const nodeTagsInput=document.getElementById('node-tags');
-      const nodeTagsPreview=document.getElementById('node-tags-preview');
-      const mobileToolbar=document.getElementById('mobile-toolbar');
-      const mobileSaveButton=mobileToolbar ? mobileToolbar.querySelector('button[data-action="save"]') : null;
-      const sidebarToggle=document.getElementById('sidebar-toggle');
-      const sidebarBackdrop=document.getElementById('sidebar-backdrop');
-      const saveButton=document.getElementById('btn-save');
-      const fitButton=document.getElementById('btn-fit');
+      const nodePopover=document.getElementById('node-popover');
+      const nodePopoverBackdrop=document.getElementById('node-popover-backdrop');
+      const dock=document.getElementById('dock');
+      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn')) : [];
+      const dockMoreToggle=dock ? dock.querySelector('.dock-more > .dock-btn') : null;
+      const dockMenu=dock ? dock.querySelector('.dock-menu') : null;
+      const saveDockButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
+      const saveDockLabel=saveDockButton ? saveDockButton.querySelector('.label') : null;
       const fitFloatingButton=document.getElementById('btn-fit-floating');
-      const addSiblingButton=document.getElementById('btn-add-sibling');
-      const addChildButton=document.getElementById('btn-add-child');
-      const deleteButton=document.getElementById('btn-delete');
-      let saveButtonDefault=saveButton ? saveButton.textContent : '保存';
-      if(saveButton){ saveButton.dataset.defaultLabel=saveButtonDefault; }
-      let mobileSaveDefault=mobileSaveButton ? mobileSaveButton.textContent : '保存';
-      if(mobileSaveButton){ mobileSaveButton.dataset.defaultLabel=mobileSaveDefault; }
+      const deleteMapForm=document.getElementById('delete-map-form');
+      let saveButtonDefault=saveDockLabel ? saveDockLabel.textContent.trim() : '保存';
       let dirty=false;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
@@ -3207,16 +3088,13 @@ if ($view === 'map_edit') {
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
       const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v'];
       function setSaveButtonState(text, disabled){
-        if(typeof text==='string'){
-          if(saveButton) saveButton.textContent=text;
-          if(mobileSaveButton) mobileSaveButton.textContent=text;
-        }else if(text===null){
-          if(saveButton) saveButton.textContent=saveButtonDefault;
-          if(mobileSaveButton) mobileSaveButton.textContent=mobileSaveDefault;
+        if(saveDockLabel){
+          const label=typeof text==='string' ? text : saveButtonDefault;
+          saveDockLabel.textContent=label;
+          if(saveDockButton){ saveDockButton.setAttribute('aria-label', label); }
         }
-        if(typeof disabled==='boolean'){
-          if(saveButton) saveButton.disabled=disabled;
-          if(mobileSaveButton) mobileSaveButton.disabled=disabled;
+        if(typeof disabled==='boolean' && saveDockButton){
+          saveDockButton.disabled=disabled;
         }
       }
       function markDirty(){
@@ -3250,73 +3128,164 @@ if ($view === 'map_edit') {
           }
         },1500);
       }
-      const inspectorFields=[nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput].filter(Boolean);
-      let inspectorSyncing=false;
+      let popoverState=null;
       function parseTagsString(value){
         if(!value) return [];
         return value.split(/[;,，\s]+/).map(tag=>tag.trim()).filter(Boolean).slice(0,12);
       }
-      function setInspectorEnabled(enabled){
-        inspectorFields.forEach(el=>{ el.disabled=!enabled; });
-        if(inspector){ inspector.classList.toggle('disabled', !enabled); }
+      function hideNodePopover(){
+        if(!popoverState) return;
+        popoverState=null;
+        nodePopover.hidden=true;
+        nodePopover.innerHTML='';
+        nodePopover.style.left='';
+        nodePopover.style.top='';
+        nodePopoverBackdrop.classList.remove('show');
       }
-      function renderTagPreview(tags){
-        if(!nodeTagsPreview) return;
-        nodeTagsPreview.innerHTML='';
-        if(!tags || !tags.length){
-          const span=document.createElement('span');
-          span.className='empty';
-          span.textContent='暂无标签';
-          nodeTagsPreview.appendChild(span);
-          return;
-        }
-        tags.slice(0,12).forEach(tag=>{
-          const span=document.createElement('span');
-          span.textContent=tag;
-          nodeTagsPreview.appendChild(span);
-        });
-      }
-      function refreshInspector(node){
-        inspectorSyncing=true;
-        if(!node){
-          setInspectorEnabled(false);
-          if(nodeTypeSelect) nodeTypeSelect.value='idea';
-          if(nodeStatusSelect) nodeStatusSelect.value='backlog';
-          if(nodePrioritySelect) nodePrioritySelect.value='normal';
-          if(nodeOwnerInput) nodeOwnerInput.value='';
-          if(nodeTagsInput) nodeTagsInput.value='';
-          renderTagPreview([]);
-          inspectorSyncing=false;
-          return;
-        }
-        setInspectorEnabled(true);
-        const data=normalizeNodeData(deepClone(node.data||{}));
-        if(nodeTypeSelect) nodeTypeSelect.value=data.type||'idea';
-        if(nodeStatusSelect) nodeStatusSelect.value=data.status||'backlog';
-        if(nodePrioritySelect) nodePrioritySelect.value=data.priority||'normal';
-        if(nodeOwnerInput) nodeOwnerInput.value=data.owner||'';
-        if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
-        renderTagPreview(data.tags||[]);
-        inspectorSyncing=false;
-      }
-      refreshInspector(jm.get_selected_node());
-      function applyInspectorChange(mutator){
-        if(typeof mutator!=='function') return;
-        const node=ensureNode();
-        if(!node) return;
-        commitInlineEditing();
+      function applyNodePopoverChanges(form){
+        if(!popoverState) return;
+        const node=jm.get_node(popoverState.nodeId);
+        if(!node){ hideNodePopover(); return; }
+        const titleInput=form.querySelector('[name="title"]');
+        const typeInput=form.querySelector('[name="type"]');
+        const statusInput=form.querySelector('[name="status"]');
+        const priorityInput=form.querySelector('[name="priority"]');
+        const ownerInput=form.querySelector('[name="owner"]');
+        const tagsInput=form.querySelector('[name="tags"]');
+        const noteInput=form.querySelector('[name="note"]');
+        const nextTopic=(titleInput ? titleInput.value.trim() : '') || '新节点';
+        if(typeof jm.update_node==='function'){ jm.update_node(node.id, nextTopic); }
         const data=ensureNodeDataObject(node);
-        mutator(data,node);
+        if(typeInput) data.type=typeInput.value;
+        if(statusInput) data.status=statusInput.value;
+        if(priorityInput) data.priority=priorityInput.value;
+        if(ownerInput){
+          const ownerValue=ownerInput.value.trim();
+          if(ownerValue){ data.owner=ownerValue; }
+          else if(data.owner){ delete data.owner; }
+        }
+        if(tagsInput) data.tags=parseTagsString(tagsInput.value);
+        if(noteInput){
+          const noteValue=noteInput.value.trim();
+          if(noteValue){ data.note=noteValue; }
+          else if(data.note){ delete data.note; }
+        }
         node.model.data=data;
         node.data=data;
         jm.computeLayout();
         jm.render();
         jm.select_node(node.id);
         markDirty();
-        requestAnimationFrame(()=>{
-          updateHandlePosition();
-          refreshInspector(jm.get_node(node.id));
-        });
+        requestAnimationFrame(updateHandlePosition);
+        hideNodePopover();
+      }
+      function openNodePopover(node){
+        if(!node) return;
+        const data=normalizeNodeData(deepClone(node.data||{}));
+        hideNodePopover();
+        const typeOptions=[
+          {value:'idea',label:'💡 创意'},
+          {value:'task',label:'✅ 任务'},
+          {value:'document',label:'📄 文档'},
+          {value:'media',label:'🖼 媒体'},
+          {value:'decision',label:'🧭 决策'}
+        ];
+        const statusOptions=[
+          {value:'backlog',label:'待计划'},
+          {value:'doing',label:'进行中'},
+          {value:'done',label:'已完成'}
+        ];
+        const priorityOptions=[
+          {value:'high',label:'高'},
+          {value:'normal',label:'普通'},
+          {value:'low',label:'低'}
+        ];
+        const anchor=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+        nodePopover.innerHTML=`
+          <form id="node-popover-form">
+            <header>
+              <h2>节点属性</h2>
+            </header>
+            <div class="field">
+              <label for="np-title">标题</label>
+              <input id="np-title" name="title" value="${escapeHtml(node.topic||'')}" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="np-type">类型</label>
+              <select id="np-type" name="type">
+                ${typeOptions.map(opt=>`<option value="${opt.value}" ${data.type===opt.value?'selected':''}>${opt.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label for="np-status">状态</label>
+              <select id="np-status" name="status">
+                ${statusOptions.map(opt=>`<option value="${opt.value}" ${data.status===opt.value?'selected':''}>${opt.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label for="np-priority">优先级</label>
+              <select id="np-priority" name="priority">
+                ${priorityOptions.map(opt=>`<option value="${opt.value}" ${data.priority===opt.value?'selected':''}>${opt.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label for="np-owner">负责人</label>
+              <input id="np-owner" name="owner" value="${escapeHtml(data.owner||'')}" placeholder="输入姓名或团队" />
+            </div>
+            <div class="field">
+              <label for="np-tags">标签</label>
+              <input id="np-tags" name="tags" value="${escapeHtml((data.tags||[]).join(', '))}" placeholder="用逗号分隔多个标签" />
+            </div>
+            <div class="field">
+              <label for="np-note">备注</label>
+              <textarea id="np-note" name="note" placeholder="补充描述...">${escapeHtml(data.note||'')}</textarea>
+            </div>
+            <div class="actions">
+              <button type="button" data-action="cancel">取消</button>
+              <button type="submit" class="primary">保存</button>
+            </div>
+          </form>`;
+        nodePopover.hidden=false;
+        nodePopoverBackdrop.classList.add('show');
+        const form=nodePopover.querySelector('form');
+        const cancelBtn=form.querySelector('button[data-action="cancel"]');
+        cancelBtn.addEventListener('click',()=>hideNodePopover());
+        form.addEventListener('submit',e=>{ e.preventDefault(); applyNodePopoverChanges(form); });
+        popoverState={nodeId:node.id, form};
+        const isSheet=window.matchMedia('(max-width:720px)').matches;
+        if(!isSheet && anchor){
+          requestAnimationFrame(()=>{
+            const rect=nodePopover.getBoundingClientRect();
+            const anchorRect=anchor.getBoundingClientRect();
+            let left=anchorRect.right+18;
+            let top=anchorRect.top;
+            const maxLeft=window.innerWidth-rect.width-16;
+            const maxTop=window.innerHeight-rect.height-16;
+            if(left>maxLeft){ left=Math.max(16, anchorRect.left-rect.width-18); }
+            if(left<16) left=16;
+            if(top>maxTop) top=maxTop;
+            if(top<16) top=16;
+            nodePopover.style.left=`${left}px`;
+            nodePopover.style.top=`${top}px`;
+          });
+        }
+        const titleInput=form.querySelector('#np-title');
+        requestAnimationFrame(()=>{ if(titleInput){ try{ titleInput.focus({preventScroll:true}); }catch(_){ titleInput.focus(); } titleInput.select(); } });
+      }
+      function commitInlineEditing(){
+        if(popoverState && popoverState.form){
+          popoverState.form.requestSubmit();
+        }
+      }
+      function currentEditingId(){ return popoverState ? popoverState.nodeId : null; }
+      function escapeHtml(text){
+        return String(text||'').replace(/[&<>'"]/g, ch=>({
+          '&':'&amp;',
+          '<':'&lt;',
+          '>':'&gt;',
+          '"':'&quot;',
+          "'":'&#39;'
+        })[ch] || ch);
       }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
       function ensureNode(){
@@ -3368,7 +3337,6 @@ if ($view === 'map_edit') {
         jm.select_node(newNode.id);
         markDirty();
         requestAnimationFrame(updateHandlePosition);
-        refreshInspector(jm.get_node(newNode.id));
         return newNode;
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
@@ -3468,7 +3436,6 @@ if ($view === 'map_edit') {
         jm.select_node(targetNode.id);
         markDirty();
         requestAnimationFrame(updateHandlePosition);
-        refreshInspector(jm.get_node(targetNode.id));
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -3514,7 +3481,6 @@ if ($view === 'map_edit') {
         commitInlineEditing();
         jm.remove_node(node.id); markDirty();
         requestAnimationFrame(updateHandlePosition);
-        requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
       }
       function renameSelectedNode(){
         const node=ensureNode();
@@ -3554,13 +3520,11 @@ if ($view === 'map_edit') {
         jm.select_node(node.id);
         markDirty();
         requestAnimationFrame(updateHandlePosition);
-        refreshInspector(jm.get_node(node.id));
       }
       if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
       if(addChildButton) addChildButton.onclick=addChildNode;
       if(deleteButton) deleteButton.onclick=deleteSelectedNode;
       if(attachFileBtn) attachFileBtn.onclick=openAttachmentDialog;
-      if(attachLinkBtn) attachLinkBtn.onclick=openLinkPrompt;
       if(attachInput){
         attachInput.addEventListener('change',async e=>{
           const files=Array.from(e.target.files||[]);
@@ -3570,83 +3534,122 @@ if ($view === 'map_edit') {
           const node=targetId ? jm.get_node(targetId) : ensureNode();
           if(!node){ alert('请先选择一个节点'); return; }
           await attachFilesToNode(node, files);
-          refreshInspector(jm.get_node(node.id));
         });
       }
-      if(nodeTypeSelect){
-        nodeTypeSelect.addEventListener('change',()=>{
-          if(inspectorSyncing) return;
-          const value=nodeTypeSelect.value;
-          applyInspectorChange(data=>{ data.type=value; });
+      if(nodePopoverBackdrop){
+        nodePopoverBackdrop.addEventListener('click', hideNodePopover);
+      }
+      function setDockMenu(open){
+        if(!dockMoreToggle) return;
+        const expanded=open===true;
+        dockMoreToggle.setAttribute('aria-expanded', String(expanded));
+        const holder=dockMoreToggle.parentElement;
+        if(holder){
+          if(expanded){ holder.setAttribute('aria-expanded','true'); }
+          else{ holder.removeAttribute('aria-expanded'); }
+        }
+      }
+      function handleDockAction(action){
+        switch(action){
+          case 'save': saveMindmap(); break;
+          case 'sibling': addSiblingNode(); break;
+          case 'child': addChildNode(); break;
+          case 'attach': openAttachmentDialog(); break;
+          case 'link': openLinkPrompt(); break;
+          case 'delete': deleteSelectedNode(); break;
+          case 'import':
+            if(importInput){ importInput.value=''; importInput.click(); }
+            break;
+          case 'export':
+            exportMindmap();
+            break;
+          case 'toggle-fold':
+            toggleFoldSelected();
+            break;
+          case 'fit-view':
+            fitToView();
+            break;
+          case 'center':
+            centerView();
+            break;
+          case 'zoom-in':
+            zoomInView();
+            break;
+          case 'zoom-out':
+            zoomOutView();
+            break;
+          case 'delete-map':
+            confirmDeleteMap();
+            break;
+        }
+      }
+      if(dock){
+        dock.dataset.fisheye='on';
+        dockButtons.forEach((btn,i)=>btn.style.setProperty('--idx', String(i)));
+        dock.addEventListener('mousemove',e=>{
+          const rect=dock.getBoundingClientRect();
+          const x=e.clientX-rect.left;
+          dockButtons.forEach(btn=>{
+            const bx=btn.offsetLeft+btn.offsetWidth/2;
+            const dist=Math.abs(x-bx);
+            const scale=Math.max(1, 1.18 - dist/800);
+            btn.style.transform=`scale(${scale})`;
+          });
         });
-      }
-      if(nodeStatusSelect){
-        nodeStatusSelect.addEventListener('change',()=>{
-          if(inspectorSyncing) return;
-          const value=nodeStatusSelect.value;
-          applyInspectorChange(data=>{ data.status=value; });
+        dock.addEventListener('mouseleave',()=>{
+          dockButtons.forEach(btn=>{ btn.style.transform=''; });
         });
-      }
-      if(nodePrioritySelect){
-        nodePrioritySelect.addEventListener('change',()=>{
-          if(inspectorSyncing) return;
-          const value=nodePrioritySelect.value;
-          applyInspectorChange(data=>{ data.priority=value; });
-        });
-      }
-      if(nodeOwnerInput){
-        const commit=()=>{
-          if(inspectorSyncing) return;
-          const value=nodeOwnerInput.value.trim();
-          applyInspectorChange(data=>{ data.owner=value; });
-        };
-        nodeOwnerInput.addEventListener('change',commit);
-        nodeOwnerInput.addEventListener('blur',commit);
-      }
-      if(nodeTagsInput){
-        nodeTagsInput.addEventListener('input',()=>{
-          if(inspectorSyncing) return;
-          renderTagPreview(parseTagsString(nodeTagsInput.value));
-        });
-        const commitTags=()=>{
-          if(inspectorSyncing) return;
-          const tags=parseTagsString(nodeTagsInput.value);
-          applyInspectorChange(data=>{ data.tags=tags; });
-        };
-        nodeTagsInput.addEventListener('change',commitTags);
-        nodeTagsInput.addEventListener('blur',commitTags);
-      }
-      function setSidebar(open){
-        document.body.classList.toggle('sidebar-open', !!open);
-        if(sidebarToggle){ sidebarToggle.setAttribute('aria-expanded', open?'true':'false'); }
-        if(sidebarBackdrop){ sidebarBackdrop.hidden=!open; }
-      }
-      if(sidebarToggle){
-        sidebarToggle.addEventListener('click',()=>{
-          const willOpen=!document.body.classList.contains('sidebar-open');
-          setSidebar(willOpen);
-        });
-      }
-      if(sidebarBackdrop){ sidebarBackdrop.addEventListener('click',()=>setSidebar(false)); }
-      const sidebarMedia=window.matchMedia('(max-width: 1024px)');
-      const handleSidebarMedia=(evt)=>{ if(!evt.matches){ setSidebar(false); } };
-      sidebarMedia.addEventListener('change',handleSidebarMedia);
-      setSidebar(false);
-      if(mobileToolbar){
-        mobileToolbar.addEventListener('click',e=>{
-          const btn=e.target.closest('button');
+        dock.addEventListener('click',e=>{
+          const btn=e.target.closest('.dock-btn');
           if(!btn) return;
-          switch(btn.dataset.action){
-            case 'save': saveMindmap(); break;
-            case 'add-sibling': addSiblingNode(); break;
-            case 'add-child': addChildNode(); break;
-            case 'attach-file': openAttachmentDialog(); break;
-            case 'attach-link': openLinkPrompt(); break;
-            case 'delete': deleteSelectedNode(); break;
+          const action=btn.dataset.action;
+          if(action==='more'){
+            e.preventDefault();
+            const open=dockMoreToggle && dockMoreToggle.getAttribute('aria-expanded')==='true';
+            setDockMenu(!open);
+            return;
+          }
+          if(action){
+            e.preventDefault();
+            setDockMenu(false);
+            handleDockAction(action);
+          }
+        });
+        dock.addEventListener('keydown',e=>{
+          const idx=dockButtons.indexOf(document.activeElement);
+          if(idx<0) return;
+          if(e.key==='ArrowRight'){
+            e.preventDefault();
+            dockButtons[Math.min(idx+1,dockButtons.length-1)].focus();
+          }else if(e.key==='ArrowLeft'){
+            e.preventDefault();
+            dockButtons[Math.max(idx-1,0)].focus();
+          }else if(e.key==='Escape'){
+            setDockMenu(false);
+            if(popoverState){ hideNodePopover(); }
           }
         });
       }
+      if(dockMenu){
+        dockMenu.addEventListener('click',e=>{
+          const item=e.target.closest('[data-action]');
+          if(!item) return;
+          e.preventDefault();
+          setDockMenu(false);
+          handleDockAction(item.dataset.action);
+        });
+      }
+      document.addEventListener('click',e=>{
+        if(dock && dockMoreToggle){
+          if(!dock.contains(e.target)){ setDockMenu(false); }
+        }
+      });
       document.addEventListener('keydown',e=>{
+        if(e.key==='Escape'){
+          if(popoverState){ hideNodePopover(); }
+          setDockMenu(false);
+          return;
+        }
         const activeEl=document.activeElement;
         if(activeEl){
           const tag=activeEl.tagName || '';
@@ -3665,30 +3668,24 @@ if ($view === 'map_edit') {
         }
         return false;
       }
-      if(fitButton){
-        fitButton.onclick=()=>{
-          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-            callView('set_zoom', 1);
-            if(!callView('move_to_center')) callView('center_root');
-          }
-        };
+      function fitToView(){
+        if(!callView('zoomToFit') && !callView('zoom_to_fit')){
+          callView('set_zoom', 1);
+          if(!callView('move_to_center')) callView('center_root');
+        }
       }
-      if(fitFloatingButton && fitButton){
-        fitFloatingButton.onclick=()=>fitButton.click();
+      function centerView(){ if(!callView('move_to_center')) callView('center_root'); }
+      function zoomInView(){ if(!callView('zoomIn')) callView('zoom_in'); }
+      function zoomOutView(){ if(!callView('zoomOut')) callView('zoom_out'); }
+      function toggleFoldSelected(){
+        const node=ensureNode();
+        if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
       }
-      const centerButton=document.getElementById('btn-center');
-      if(centerButton){ centerButton.onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); }; }
-      const zoomInButton=document.getElementById('btn-zoom-in');
-      if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
-      const zoomOutButton=document.getElementById('btn-zoom-out');
-      if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
-      const collapseButton=document.getElementById('btn-collapse');
-      if(collapseButton){
-        collapseButton.addEventListener('click',()=>{
-          const node=ensureNode();
-          if(node){ jm.toggle_node(node.id); markDirty(); requestAnimationFrame(updateHandlePosition); }
-        });
+      function confirmDeleteMap(){
+        if(!deleteMapForm) return;
+        if(confirm('确认删除该导图？')){ deleteMapForm.submit(); }
       }
+      if(fitFloatingButton){ fitFloatingButton.onclick=()=>{ fitToView(); }; }
       let dropHoverNode=null;
       function clearDropHover(){
         if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
@@ -3744,29 +3741,21 @@ if ($view === 'map_edit') {
           }
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             requestAnimationFrame(updateHandlePosition);
-            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
-      const exportButton=document.getElementById('btn-export-json');
-      if(exportButton){
-        exportButton.addEventListener('click',()=>{
-          const data=jm.get_data('node_tree');
-          if(data && data.data){ enforceRightOrientation(data.data); }
-          const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement('a');
-          a.href=url;
-          const titleValue=titleInput ? titleInput.value.trim() : '';
-          a.download=(titleValue || 'mindmap')+'.json';
-          a.click();
-          setTimeout(()=>URL.revokeObjectURL(url), 1000);
-        });
-      }
-      const importButton=document.getElementById('btn-import-json');
-      if(importButton && importInput){
-        importButton.addEventListener('click',()=>importInput.click());
+      function exportMindmap(){
+        const data=jm.get_data('node_tree');
+        if(data && data.data){ enforceRightOrientation(data.data); }
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        const titleValue=titleInput ? titleInput.value.trim() : '';
+        a.download=(titleValue || 'mindmap')+'.json';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
       }
       if(importInput){
         importInput.addEventListener('change', e=>{
@@ -3789,7 +3778,6 @@ if ($view === 'map_edit') {
           reader.readAsText(file,'utf-8');
         });
       }
-      if(saveButton) saveButton.onclick=saveMindmap;
       async function saveMindmap(){
         commitInlineEditing();
         const title=titleInput.value.trim()||'未命名导图';
