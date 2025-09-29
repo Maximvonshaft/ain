@@ -1645,8 +1645,8 @@ if ($view === 'map_edit') {
       a{color:inherit;text-decoration:none}
       .mind-shell{position:relative;min-height:100vh;min-height:100dvh;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden}
       @media (max-width:900px){.mind-shell{padding:0}}
-      .mind-info-bar{position:absolute;top:calc(var(--safe-top) + 28px);left:calc(var(--safe-left) + 28px);display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:260px;max-width:min(460px,calc(100% - 56px));pointer-events:auto;z-index:20;overflow:hidden;max-height:320px;transition:max-height var(--t-fast) var(--ease),padding var(--t-fast) var(--ease),gap var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
-      .mind-info-bar[data-collapsed="true"]{max-height:20px;padding:0 12px;gap:0;min-width:auto;width:auto;border-radius:14px;border-color:rgba(201,168,106,.2);background:rgba(15,19,22,.82);box-shadow:0 12px 28px rgba(0,0,0,.45)}
+      .mind-info-bar{position:absolute;top:calc(var(--safe-top) + 28px);left:calc(var(--safe-left) + 28px);display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:260px;max-width:min(460px,calc(100% - 56px));pointer-events:auto;z-index:20;overflow:visible;max-height:320px;transition:max-height var(--t-fast) var(--ease),padding var(--t-fast) var(--ease),gap var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
+      .mind-info-bar[data-collapsed="true"]{max-height:20px;padding:0 12px;gap:0;min-width:auto;width:auto;border-radius:14px;border-color:rgba(201,168,106,.2);background:rgba(15,19,22,.82);box-shadow:0 12px 28px rgba(0,0,0,.45);overflow:hidden}
       .mind-info-content{display:flex;flex-direction:column;gap:12px;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);transform-origin:top}
       .mind-info-bar[data-collapsed="true"] .mind-info-content{opacity:0;transform:translateY(-6px);pointer-events:none}
       .mind-info-handle{align-self:center;display:flex;align-items:center;justify-content:center;width:36px;height:20px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);margin-bottom:4px}
@@ -1655,11 +1655,24 @@ if ($view === 'map_edit') {
       .mind-info-handle:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .mind-info-bar[data-collapsed="true"] .mind-info-handle{margin-bottom:0}
       .mind-info-row{display:flex;align-items:center;gap:12px}
+      .map-io{position:relative;flex:0 0 auto}
+      .map-io-button{padding:10px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.36);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+      .map-io-button:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5)}
+      .map-io-button:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .map-io[aria-expanded="true"] .map-io-button{background:rgba(201,168,106,.24)}
+      .map-io-menu{position:absolute;top:calc(100% + 10px);right:0;display:none;flex-direction:column;gap:8px;padding:12px;border-radius:16px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 16px 42px rgba(0,0,0,.55);min-width:180px;z-index:30}
+      .map-io[aria-expanded="true"] .map-io-menu{display:flex}
+      .map-io-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition),color var(--transition);text-align:left}
+      .map-io-menu button:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
       .map-back{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.08);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);transition:background var(--transition),border-color var(--transition),transform var(--transition)}
       .map-back:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16);transform:translateY(-1px)}
       .mind-info-row .map-title-input{flex:1;min-width:0}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
+      .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
+      .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
+      .map-delete-btn[disabled]{opacity:.5;cursor:not-allowed}
       .map-title-input{width:100%;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 17px/1.35 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
       .save-state{margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
@@ -1728,11 +1741,6 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .dock-more{position:relative}
-      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
-      .dock-more[aria-expanded="true"] .dock-menu{display:block}
-      .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
-      .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 32px),660px)}.mind-dock{gap:10px;padding:10px 14px}.dock-btn{width:84px;height:60px}}
       @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:10px 14px;border-radius:24px;gap:10px}.dock-btn{width:78px;height:56px}.dock-btn .label{font-size:11px}}
@@ -1819,11 +1827,21 @@ if ($view === 'map_edit') {
               <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" aria-label="返回导图库">← 导图库</a>
               <label class="sr-only" for="map-title">导图标题</label>
               <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+              <div class="map-io" id="map-io" aria-expanded="false">
+                <button type="button" class="map-io-button" id="map-io-button" aria-haspopup="true" aria-expanded="false">导入 / 导出</button>
+                <div class="map-io-menu" id="map-io-menu" role="menu">
+                  <button type="button" data-action="import" role="menuitem">导入 JSON</button>
+                  <button type="button" data-action="export" role="menuitem">导出 JSON</button>
+                </div>
+              </div>
               <div class="save-state" id="save-state">保存成功</div>
             </div>
             <div class="map-meta">
               <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
               <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+              <?php if ($mind['id']): ?>
+              <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
+              <?php endif; ?>
             </div>
           </div>
         </header>
@@ -1863,20 +1881,6 @@ if ($view === 'map_edit') {
             <span class="icon">🗑</span>
             <span class="label">删除</span>
           </button>
-          <div class="dock-sep" aria-hidden="true"></div>
-          <div class="dock-more" aria-expanded="false">
-            <button class="dock-btn ghost" type="button" aria-haspopup="menu" aria-expanded="false" title="更多选项" aria-label="更多">
-              <span class="icon">⋯</span>
-              <span class="label">更多</span>
-            </button>
-            <ul class="dock-menu" role="menu">
-              <li role="menuitem" data-action="import">导入 JSON</li>
-              <li role="menuitem" data-action="export">导出 JSON</li>
-              <?php if ($mind['id']): ?>
-              <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
-              <?php endif; ?>
-            </ul>
-          </div>
         </nav>
       </div>
     </div>
@@ -3269,10 +3273,11 @@ if ($view === 'map_edit') {
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
-      const dockMore=dock ? dock.querySelector('.dock-more') : null;
-      const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
-      const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
-      const foldAllMenuItem=dockMenu ? dockMenu.querySelector('[data-action="fold-all"]') : null;
+      const mapIo=document.getElementById('map-io');
+      const mapIoButton=document.getElementById('map-io-button');
+      const mapIoMenu=document.getElementById('map-io-menu');
+      const mapDeleteButton=document.getElementById('map-delete-btn');
+      const foldAllMenuItem=null;
       const nodePopover=document.getElementById('node-popover');
       const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
       const popoverHeader=nodePopover ? nodePopover.querySelector('header') : null;
@@ -3282,6 +3287,7 @@ if ($view === 'map_edit') {
       const fisheyeToggle=document.getElementById('setting-fisheye');
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
+      if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
@@ -4081,6 +4087,67 @@ if ($view === 'map_edit') {
           setNodeExpandedState(node, nodeFoldToggle.checked);
         });
       }
+      const closeMapIoMenu=()=>{
+        if(mapIo){ mapIo.setAttribute('aria-expanded','false'); }
+        if(mapIoButton){ mapIoButton.setAttribute('aria-expanded','false'); }
+      };
+      const openMapIoMenu=()=>{
+        if(mapIo){ mapIo.setAttribute('aria-expanded','true'); }
+        if(mapIoButton){ mapIoButton.setAttribute('aria-expanded','true'); }
+      };
+      const toggleMapIoMenu=()=>{
+        const expanded=mapIoButton && mapIoButton.getAttribute('aria-expanded')==='true';
+        if(expanded) closeMapIoMenu(); else openMapIoMenu();
+      };
+      const handleMindAction=(action)=>{
+        if(!action) return;
+        closeMapIoMenu();
+        switch(action){
+          case 'save': saveMindmap(); break;
+          case 'sibling': addSiblingNode(); break;
+          case 'child': addChildNode(); break;
+          case 'attach': openAttachmentDialog(); break;
+          case 'link': openLinkPrompt(); break;
+          case 'delete': deleteSelectedNode(); break;
+          case 'import': triggerImport(); break;
+          case 'export': exportMindmap(); break;
+          case 'delete-map':
+            if(!currentMapId){
+              alert('该导图尚未保存，无法删除。');
+              break;
+            }
+            if(deleteMapForm && confirm('确认删除该导图？')){ deleteMapForm.submit(); }
+            break;
+        }
+      };
+      if(mapIoButton){
+        mapIoButton.addEventListener('click',e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          toggleMapIoMenu();
+        });
+      }
+      if(mapIoMenu){
+        mapIoMenu.addEventListener('click',e=>{
+          const item=e.target.closest('button[data-action]');
+          if(!item) return;
+          e.preventDefault();
+          handleMindAction(item.dataset.action);
+        });
+      }
+      if(mapIo){
+        document.addEventListener('pointerdown',e=>{
+          if(mapIo.getAttribute('aria-expanded')!=='true') return;
+          if(mapIo.contains(e.target)) return;
+          closeMapIoMenu();
+        });
+      }
+      if(mapDeleteButton){
+        mapDeleteButton.addEventListener('click',e=>{
+          e.preventDefault();
+          handleMindAction('delete-map');
+        });
+      }
       if(dock){
         updateDockScrollMarkers();
         window.addEventListener('resize',updateDockScrollMarkers);
@@ -4092,53 +4159,12 @@ if ($view === 'map_edit') {
           updateDockScrollMarkers();
           e.preventDefault();
         });
-        const closeDockMenu=()=>{
-          if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
-          if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
-        };
-        const openDockMenu=()=>{
-          if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
-          if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
-          updateFoldAllLabel();
-        };
-        const toggleDockMenu=()=>{
-          const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
-          if(expanded) closeDockMenu(); else openDockMenu();
-        };
-        if(dockMoreButton){
-          dockMoreButton.addEventListener('click',e=>{
-            e.preventDefault();
-            e.stopPropagation();
-            toggleDockMenu();
-          });
-        }
-        document.addEventListener('pointerdown',e=>{
-          if(!dockMore || dockMore.getAttribute('aria-expanded')!=='true') return;
-          if(dockMore.contains(e.target)) return;
-          closeDockMenu();
-        });
-        const handleDockAction=(action)=>{
-          switch(action){
-            case 'save': saveMindmap(); break;
-            case 'sibling': addSiblingNode(); break;
-            case 'child': addChildNode(); break;
-            case 'attach': openAttachmentDialog(); break;
-            case 'link': openLinkPrompt(); break;
-            case 'delete': deleteSelectedNode(); break;
-            case 'import': triggerImport(); break;
-            case 'export': exportMindmap(); break;
-            case 'delete-map':
-              if(deleteMapForm && confirm('确认删除该导图？')){ deleteMapForm.submit(); }
-              break;
-          }
-        };
         dock.addEventListener('click',e=>{
           const btn=e.target.closest('.dock-btn');
           if(!btn || !dock.contains(btn)) return;
           const action=btn.dataset.action;
           if(action){
-            if(btn!==dockMoreButton) closeDockMenu();
-            handleDockAction(action);
+            handleMindAction(action);
           }
         });
         dock.addEventListener('keydown',e=>{
@@ -4146,9 +4172,9 @@ if ($view === 'map_edit') {
             const btn=e.target.closest('.dock-btn');
             if(btn && btn.dataset.action){
               e.preventDefault();
-              handleDockAction(btn.dataset.action);
+              handleMindAction(btn.dataset.action);
             }
-          }else if(e.key==='Escape'){ closeDockMenu(); }
+          }
         });
         const applyFisheye=(event)=>{
           if(!dockButtons.length) return;
@@ -4172,6 +4198,9 @@ if ($view === 'map_edit') {
           });
         }
       }
+      document.addEventListener('keydown',e=>{
+        if(e.key==='Escape'){ closeMapIoMenu(); }
+      }, true);
       document.addEventListener('keydown',e=>{
         const activeEl=document.activeElement;
         if(activeEl){
@@ -4267,12 +4296,97 @@ if ($view === 'map_edit') {
         const a=document.createElement('a');
         a.href=url;
         const titleValue=titleInput ? titleInput.value.trim() : '';
-        a.download=(titleValue || 'mindmap')+'.json';
+        const safeTitle=(titleValue || 'mindmap').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim() || 'mindmap';
+        const now=new Date();
+        const pad=(num)=>String(num).padStart(2,'0');
+        const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        a.download=`${safeTitle}-${timestamp}.json`;
         a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 1000);
       }
       function triggerImport(){
         if(importInput){ importInput.click(); }
+      }
+      function promptImportMode(){
+        const message='请选择导入方式：\n1. 覆盖当前导图\n2. 导入为新节点\n3. 导入为新导图\n取消：中止导入';
+        while(true){
+          const input=prompt(message,'1');
+          if(input===null) return null;
+          const value=input.trim();
+          if(value==='1') return 'replace';
+          if(value==='2') return 'append-node';
+          if(value==='3') return 'new-map';
+          alert('请输入 1、2 或 3。');
+        }
+      }
+      function findModelById(node,id){
+        if(!node || !id) return null;
+        if(node.id===id) return node;
+        if(Array.isArray(node.children)){
+          for(const child of node.children){
+            const found=findModelById(child,id);
+            if(found) return found;
+          }
+        }
+        return null;
+      }
+      function cloneImportSubtree(source){
+        if(!source || typeof source!=='object') return null;
+        const cloned={
+          id:'node-'+Math.random().toString(36).slice(2,10),
+          topic:typeof source.topic==='string' && source.topic.trim()?source.topic.trim():'导入节点',
+          data:normalizeNodeData(source.data ? JSON.parse(JSON.stringify(source.data)) : {}),
+          expanded:source.expanded!==false,
+          direction:'right',
+          children:[]
+        };
+        if(source.meta){ cloned.meta=JSON.parse(JSON.stringify(source.meta)); }
+        if(source.style){ cloned.style=JSON.parse(JSON.stringify(source.style)); }
+        if(Array.isArray(source.children)){
+          cloned.children=source.children.map(child=>cloneImportSubtree(child)).filter(Boolean);
+        }
+        return cloned;
+      }
+      function importJsonAsSubtree(json){
+        const tree=json && json.data ? json.data : null;
+        if(!tree){ alert('文件格式不兼容'); return; }
+        const target=jm.get_selected_node() || jm.get_root();
+        if(!target){ alert('请选择要导入到的节点'); return; }
+        const current=jm.get_data('node_tree');
+        if(!current || !current.data){ alert('当前导图数据异常'); return; }
+        const parentModel=findModelById(current.data, target.id);
+        if(!parentModel){ alert('无法定位目标节点'); return; }
+        const newNode=cloneImportSubtree(tree);
+        if(!newNode){ alert('导入数据为空'); return; }
+        if(!Array.isArray(parentModel.children)){ parentModel.children=[]; }
+        parentModel.children.push(newNode);
+        parentModel.expanded=true;
+        enforceRightOrientation(current.data);
+        jm.show(current);
+        requestAnimationFrame(()=>{ jm.select_node(newNode.id); scheduleHandleRefresh(); });
+        markDirty();
+      }
+      function importJsonAsNewMap(json){
+        const cloned=JSON.parse(JSON.stringify(json));
+        if(cloned && cloned.data){ enforceRightOrientation(cloned.data); }
+        jm.show(cloned);
+        initialData=JSON.parse(JSON.stringify(cloned));
+        if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+        currentMapId=0;
+        if(jmContainer){ jmContainer.dataset.mapId='0'; }
+        if(deleteMapForm){
+          const idInput=deleteMapForm.querySelector('input[name="id"]');
+          if(idInput){ idInput.value=''; }
+        }
+        if(mapDeleteButton){ mapDeleteButton.disabled=true; }
+        if(titleInput){
+          const metaName=cloned?.meta && typeof cloned.meta.name==='string' ? cloned.meta.name.trim() : '';
+          const topicName=cloned?.data && typeof cloned.data.topic==='string' ? cloned.data.topic.trim() : '';
+          const nextTitle=metaName || topicName || titleInput.value;
+          if(nextTitle){ titleInput.value=nextTitle; }
+        }
+        markDirty();
+        scheduleHandleRefresh();
       }
       if(importInput){
         importInput.addEventListener('change', e=>{
@@ -4281,16 +4395,30 @@ if ($view === 'map_edit') {
           reader.onload=evt=>{
             try{
               const json=JSON.parse(evt.target.result);
-              if(json && json.data){
-                commitInlineEditing();
-                enforceRightOrientation(json.data);
-                jm.show(json);
-                initialData=JSON.parse(JSON.stringify(json));
-                if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-                markDirty();
+              if(!json || !json.data){ alert('文件格式不兼容'); return; }
+              enforceRightOrientation(json.data);
+              const mode=promptImportMode();
+              if(!mode) return;
+              commitInlineEditing();
+              if(mapDeleteButton && mode!=='new-map'){ mapDeleteButton.disabled=!currentMapId; }
+              switch(mode){
+                case 'replace':
+                  jm.show(json);
+                  initialData=JSON.parse(JSON.stringify(json));
+                  if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+                  markDirty();
+                  break;
+                case 'append-node':
+                  importJsonAsSubtree(json);
+                  break;
+                case 'new-map':
+                  importJsonAsNewMap(json);
+                  break;
               }
-              else alert('文件格式不兼容');
             }catch(err){ alert('无法解析 JSON：'+err.message); }
+            finally{
+              importInput.value='';
+            }
           };
           reader.readAsText(file,'utf-8');
         });
@@ -4317,6 +4445,11 @@ if ($view === 'map_edit') {
           if(!json.ok) throw new Error(json.error||'保存失败');
           currentMapId=parseInt(json.id,10)||0;
           document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+          if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+          if(deleteMapForm){
+            const idInput=deleteMapForm.querySelector('input[name="id"]');
+            if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+          }
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
           if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
