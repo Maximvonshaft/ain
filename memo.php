@@ -2755,8 +2755,8 @@ if ($view === 'map_edit') {
           if(!node.parent.anchors) this.updateAnchors(node.parent);
           const parent=node.parent;
           const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
-          const start=isLeft ? parent.anchors.left : parent.anchors.right;
-          const end=isLeft ? node.anchors.right : node.anchors.left;
+          const start=parent.anchors.center || parent.anchors.left || parent.anchors.right;
+          const end=node.anchors.center || node.anchors.left || node.anchors.right;
           const route=buildTraceRoute(start,end,isLeft?-1:1);
           let pathData=buildChamferedPath(route, TRACE_CHAMFER);
           if(!pathData){
