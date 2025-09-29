@@ -1870,10 +1870,10 @@ if ($view === 'map_edit') {
               <span class="label">更多</span>
             </button>
             <ul class="dock-menu" role="menu">
-              <li role="menuitem" data-action="import">导入 JSON</li>
-              <li role="menuitem" data-action="export">导出 JSON</li>
+              <li role="menuitem" tabindex="0" data-action="import">导入 JSON</li>
+              <li role="menuitem" tabindex="0" data-action="export">导出 JSON</li>
               <?php if ($mind['id']): ?>
-              <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
+              <li role="menuitem" tabindex="0" data-action="delete-map" data-danger="true">删除导图</li>
               <?php endif; ?>
             </ul>
           </div>
@@ -4141,6 +4141,29 @@ if ($view === 'map_edit') {
             handleDockAction(action);
           }
         });
+        if(dockMenu){
+          dockMenu.addEventListener('click',e=>{
+            const item=e.target.closest('[data-action]');
+            if(!item) return;
+            e.preventDefault();
+            e.stopPropagation();
+            handleDockAction(item.dataset.action);
+            closeDockMenu();
+          });
+          dockMenu.addEventListener('keydown',e=>{
+            if(e.key==='Enter' || e.key===' '){
+              const item=e.target.closest('[data-action]');
+              if(item){
+                e.preventDefault();
+                handleDockAction(item.dataset.action);
+                closeDockMenu();
+              }
+            }else if(e.key==='Escape'){
+              closeDockMenu();
+              if(dockMoreButton){ dockMoreButton.focus(); }
+            }
+          });
+        }
         dock.addEventListener('keydown',e=>{
           if((e.key==='Enter' || e.key===' ') && e.target instanceof HTMLElement && e.target.closest('.dock-btn')){
             const btn=e.target.closest('.dock-btn');
