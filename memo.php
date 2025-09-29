@@ -1641,7 +1641,15 @@ if ($view === 'map_edit') {
       a{color:inherit;text-decoration:none}
       .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:0;padding:24px 24px 160px}
       @media (max-width:900px){.mind-shell{padding:18px 14px 170px}}
-      .mind-info-bar{position:absolute;top:28px;left:28px;display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:260px;max-width:min(460px,calc(100% - 56px));pointer-events:auto;z-index:20}
+      .mind-info-bar{position:absolute;top:28px;left:28px;display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:260px;max-width:min(460px,calc(100% - 56px));pointer-events:auto;z-index:20;overflow:hidden;max-height:320px;transition:max-height var(--t-fast) var(--ease),padding var(--t-fast) var(--ease),gap var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
+      .mind-info-bar[data-collapsed="true"]{max-height:20px;padding:0 12px;gap:0;min-width:auto;width:auto;border-radius:14px;border-color:rgba(201,168,106,.2);background:rgba(15,19,22,.82);box-shadow:0 12px 28px rgba(0,0,0,.45)}
+      .mind-info-content{display:flex;flex-direction:column;gap:12px;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);transform-origin:top}
+      .mind-info-bar[data-collapsed="true"] .mind-info-content{opacity:0;transform:translateY(-6px);pointer-events:none}
+      .mind-info-handle{align-self:center;display:flex;align-items:center;justify-content:center;width:36px;height:20px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);margin-bottom:4px}
+      .mind-info-handle .icon{font-size:14px;line-height:1}
+      .mind-info-handle:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5)}
+      .mind-info-handle:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .mind-info-bar[data-collapsed="true"] .mind-info-handle{margin-bottom:0}
       .mind-info-row{display:flex;align-items:center;gap:12px}
       .map-back{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.08);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);transition:background var(--transition),border-color var(--transition),transform var(--transition)}
       .map-back:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16);transform:translateY(-1px)}
@@ -1655,6 +1663,8 @@ if ($view === 'map_edit') {
       .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
       @media (max-width:720px){
         .mind-info-bar{left:50%;top:16px;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;padding:8px 12px 10px;gap:6px;border-radius:18px}
+        .mind-info-bar[data-collapsed="true"]{padding:0 10px}
+        .mind-info-handle{width:32px;height:20px;margin-bottom:2px}
         .mind-info-row{gap:8px}
         .map-back{padding:5px 9px;font-size:11px}
         .map-title-input{padding:8px 12px;font-size:15px}
@@ -1693,9 +1703,15 @@ if ($view === 'map_edit') {
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.42)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
-      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;justify-content:center}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 40px),720px)}
+      .mind-dock-wrap::before,.mind-dock-wrap::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:26px;height:70%;pointer-events:none;opacity:0;transition:opacity var(--t-fast) var(--ease);z-index:0}
+      .mind-dock-wrap::before{left:8px;background:linear-gradient(90deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
+      .mind-dock-wrap::after{right:8px;background:linear-gradient(270deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
+      .mind-dock-wrap[data-scroll-left="true"]::before{opacity:.8}
+      .mind-dock-wrap[data-scroll-right="true"]::after{opacity:.8}
+      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x proximity}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 auto;scroll-snap-align:center}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
@@ -1714,9 +1730,9 @@ if ($view === 'map_edit') {
       .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
       .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock{gap:8px;padding:10px 12px}.dock-btn{width:82px;height:60px}}
-      @media (max-width:720px){.mind-dock{padding:10px 12px;border-radius:24px}.dock-btn{width:78px;height:56px}}
-      @media (max-width:600px){.mind-dock{flex-wrap:wrap;row-gap:8px;column-gap:8px;max-width:calc(100vw - 24px)}.dock-btn{width:calc(50% - 12px);flex:1 1 calc(50% - 12px);height:56px}.dock-sep{display:none}.dock-more{width:100%}.dock-more .dock-btn{width:100%;flex:1 1 100%}}
+      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 32px),660px)}.mind-dock{gap:10px;padding:10px 14px}.dock-btn{width:84px;height:60px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:10px 14px;border-radius:24px;gap:10px}.dock-btn{width:78px;height:56px}.dock-btn .label{font-size:11px}}
+      @media (max-width:600px){.dock-btn{width:72px;height:54px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);transition:transform .24s ease,opacity .24s ease}
       .node-popover[hidden]{display:none!important}
@@ -1790,16 +1806,21 @@ if ($view === 'map_edit') {
     </svg>
     <div class="mind-shell" data-fisheye="on">
       <div class="mind-stage">
-        <header class="mind-info-bar">
-          <div class="mind-info-row">
-            <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" aria-label="返回导图库">← 导图库</a>
-            <label class="sr-only" for="map-title">导图标题</label>
-            <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
-            <div class="save-state" id="save-state">保存成功</div>
-          </div>
-          <div class="map-meta">
-            <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
-            <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+        <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
+          <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
+            <span class="icon" aria-hidden="true">∧</span>
+          </button>
+          <div class="mind-info-content" aria-hidden="false">
+            <div class="mind-info-row">
+              <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" aria-label="返回导图库">← 导图库</a>
+              <label class="sr-only" for="map-title">导图标题</label>
+              <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+              <div class="save-state" id="save-state">保存成功</div>
+            </div>
+            <div class="map-meta">
+              <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
+              <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+            </div>
           </div>
         </header>
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
@@ -3235,7 +3256,12 @@ if ($view === 'map_edit') {
       const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
       const nodeFoldHint=document.getElementById('node-fold-hint');
       const mindShell=document.querySelector('.mind-shell');
+      const mindInfoBar=document.getElementById('mind-info-bar');
+      const mindInfoHandle=document.getElementById('mind-info-handle');
+      const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
+      const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
+      const dockWrap=document.querySelector('.mind-dock-wrap');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
@@ -3253,6 +3279,58 @@ if ($view === 'map_edit') {
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
+      let infoBarCollapsed=false;
+      function applyInfoBarState(){
+        if(!mindInfoBar) return;
+        mindInfoBar.dataset.collapsed=infoBarCollapsed?'true':'false';
+        if(mindInfoHandle){
+          mindInfoHandle.setAttribute('aria-expanded', infoBarCollapsed?'false':'true');
+          mindInfoHandle.setAttribute('aria-label', infoBarCollapsed?'展开顶部栏':'收起顶部栏');
+        }
+        if(mindInfoHandleIcon){
+          mindInfoHandleIcon.textContent=infoBarCollapsed ? '∨' : '∧';
+        }
+        if(mindInfoContent){
+          mindInfoContent.setAttribute('aria-hidden', infoBarCollapsed?'true':'false');
+        }
+      }
+      function collapseInfoBar(force=false){
+        if(!mindInfoBar || infoBarCollapsed) return;
+        if(!force && document.activeElement && mindInfoBar.contains(document.activeElement)){ return; }
+        infoBarCollapsed=true;
+        applyInfoBarState();
+      }
+      function expandInfoBar(){
+        if(!mindInfoBar || !infoBarCollapsed) return;
+        infoBarCollapsed=false;
+        applyInfoBarState();
+      }
+      function toggleInfoBar(){
+        if(infoBarCollapsed){ expandInfoBar(); }
+        else{ collapseInfoBar(true); }
+      }
+      applyInfoBarState();
+      if(mindInfoHandle){
+        mindInfoHandle.addEventListener('click',e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          toggleInfoBar();
+        });
+      }
+      if(mindInfoBar){
+        mindInfoBar.addEventListener('focusin',()=>{ expandInfoBar(); });
+      }
+      function updateDockScrollMarkers(){
+        if(!dock || !dockWrap) return;
+        const maxScroll=Math.max(0, dock.scrollWidth - dock.clientWidth);
+        if(maxScroll <= 1){
+          dockWrap.dataset.scrollLeft='false';
+          dockWrap.dataset.scrollRight='false';
+          return;
+        }
+        dockWrap.dataset.scrollLeft=dock.scrollLeft > 4 ? 'true' : 'false';
+        dockWrap.dataset.scrollRight=dock.scrollLeft < maxScroll - 4 ? 'true' : 'false';
+      }
       function isFisheyeEnabled(){
         return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
       }
@@ -4000,6 +4078,16 @@ if ($view === 'map_edit') {
         });
       }
       if(dock){
+        updateDockScrollMarkers();
+        window.addEventListener('resize',updateDockScrollMarkers);
+        dock.addEventListener('scroll',updateDockScrollMarkers);
+        dock.addEventListener('wheel',e=>{
+          const dominant=Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+          if(!dominant) return;
+          dock.scrollLeft += dominant;
+          updateDockScrollMarkers();
+          e.preventDefault();
+        });
         const closeDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
@@ -4062,7 +4150,7 @@ if ($view === 'map_edit') {
           if(!dockButtons.length) return;
           if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
           const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left;
+          const centerX=event.clientX-rect.left + dock.scrollLeft;
           dockButtons.forEach(btn=>{
             const bx=btn.offsetLeft + btn.offsetWidth/2;
             const dist=Math.abs(centerX-bx);
@@ -4102,6 +4190,9 @@ if ($view === 'map_edit') {
       let dropHoverNode=null;
       function clearDropHover(){
         if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
+      }
+      if(jmContainer){
+        jmContainer.addEventListener('pointerdown',()=>{ collapseInfoBar(true); });
       }
       jmContainer.addEventListener('dragenter',e=>{
         e.preventDefault();
@@ -4154,6 +4245,7 @@ if ($view === 'map_edit') {
             if(editingId && (!selected || selected.id!==editingId)){
               commitInlineEditing();
             }
+            collapseInfoBar();
           }
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             scheduleHandleRefresh();
