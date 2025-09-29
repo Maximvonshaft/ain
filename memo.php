@@ -1870,8 +1870,8 @@ if ($view === 'map_edit') {
               <span class="label">导入 / 导出</span>
             </button>
             <ul class="dock-menu" role="menu">
-              <li role="menuitem" data-action="export">导出为 JSON 文件</li>
-              <li role="menuitem" data-action="import">导入 JSON 文件</li>
+              <li role="menuitem" tabindex="0" data-action="export">导出为 JSON 文件</li>
+              <li role="menuitem" tabindex="0" data-action="import">导入 JSON 文件</li>
             </ul>
           </div>
         </nav>
@@ -4138,6 +4138,23 @@ if ($view === 'map_edit') {
             handleDockAction(action);
           }
         });
+        if(dockMenu){
+          dockMenu.addEventListener('click',e=>{
+            const item=e.target.closest('[data-action]');
+            if(!item || !dockMenu.contains(item)) return;
+            e.preventDefault();
+            closeDockMenu();
+            handleDockAction(item.dataset.action);
+          });
+          dockMenu.addEventListener('keydown',e=>{
+            if(e.key!=='Enter' && e.key!==' ') return;
+            const item=e.target.closest('[data-action]');
+            if(!item || !dockMenu.contains(item)) return;
+            e.preventDefault();
+            closeDockMenu();
+            handleDockAction(item.dataset.action);
+          });
+        }
         dock.addEventListener('keydown',e=>{
           if((e.key==='Enter' || e.key===' ') && e.target instanceof HTMLElement && e.target.closest('.dock-btn')){
             const btn=e.target.closest('.dock-btn');
