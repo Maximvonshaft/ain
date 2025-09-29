@@ -1639,14 +1639,29 @@ if ($view === 'map_edit') {
       .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
       @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
       a{color:inherit;text-decoration:none}
-      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:28px 24px 140px}
-      @media (max-width:900px){.mind-shell{padding:18px 14px 150px;gap:14px}}
-      .mind-header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;z-index:10}
-      .mind-title-group{display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:420px}
-      .map-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
-      .map-meta a{color:var(--gold-400);text-decoration:none}
-      .map-title-input{padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:28px 24px 160px}
+      @media (max-width:900px){.mind-shell{padding:18px 14px 170px;gap:14px}}
+      .mind-topbar{position:sticky;top:20px;z-index:160;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;padding:12px 18px;border-radius:22px;background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));border:1px solid rgba(201,168,106,.34);box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.12) inset;backdrop-filter:blur(14px)}
+      .topbar-back{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.65);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:border-color var(--transition),transform var(--transition)}
+      .topbar-back:hover{transform:translateY(-1px);border-color:rgba(227,198,139,.55)}
+      .topbar-back:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .topbar-title{display:flex;flex-direction:column;gap:6px;flex:1 1 auto;min-width:0}
+      .topbar-save .label{font-size:12px;letter-spacing:.12em}
+      .topbar-title label{display:none}
+      .map-title-input{width:100%;padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
+      .topbar-save{position:relative;display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.36);background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));color:var(--bg-void);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition),background var(--transition),color var(--transition)}
+      .topbar-save .icon{font-size:18px;line-height:1}
+      .topbar-save:disabled{opacity:.65;cursor:not-allowed}
+      .topbar-save:hover:not(:disabled){transform:translateY(-1px);border-color:rgba(227,198,139,.6)}
+      .topbar-save:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .topbar-save[data-state="dirty"]{background:rgba(209,75,75,.18);border-color:rgba(209,75,75,.55);color:#F6D6D6}
+      .topbar-save[data-state="saving"]{background:linear-gradient(135deg,rgba(201,168,106,.12),rgba(170,140,84,.2));color:var(--gold-400)}
+      .topbar-save[data-state="saved"]{background:linear-gradient(135deg,rgba(201,168,106,.26),rgba(170,140,84,.32));color:var(--bg-void)}
+      .mind-header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;z-index:10}
+      .mind-title-group{display:flex;flex-direction:column;gap:10px;min-width:200px;max-width:460px}
+      @media (max-width:768px){.mind-topbar{top:12px;padding:10px 14px;gap:12px;border-radius:20px;grid-template-columns:auto 1fr auto}.mind-title-group{min-width:0;width:100%}}
+      .map-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .save-state{align-self:flex-start;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .save-state.show{opacity:1;transform:translateY(0)}
       .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
@@ -1688,37 +1703,42 @@ if ($view === 'map_edit') {
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
-      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation}
-      .dock-btn .icon{font-size:20px}
-      .dock-btn .label{font-size:12px}
-      .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
-      .dock-btn:active{transform:translateY(-1px)}
-      .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
-      .dock-btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
-      .dock-btn.danger{color:#F6D6D6;border-color:rgba(209,75,75,.52);background:rgba(209,75,75,.12)}
-      .dock-btn.ghost{background:rgba(201,168,106,.04);border-style:dashed}
-      .dock-btn[data-state="dirty"]{color:#F6D6D6;border-color:rgba(209,75,75,.6);background:rgba(209,75,75,.18)}
-      .dock-btn[data-state="saving"]{color:var(--gold-500)}
-      .dock-btn[data-state="saved"]{color:var(--gold-400)}
-      .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);pointer-events:none;z-index:120}
+      .mind-dock{pointer-events:auto;display:flex;align-items:flex-end;gap:16px;padding:16px 20px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.86));border:1px solid rgba(201,168,106,.32);box-shadow:0 22px 44px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(16px);position:relative}
+      .dock-btn{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0;border:none;background:none;color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition);touch-action:manipulation}
+      .dock-btn .icon{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:linear-gradient(160deg,rgba(201,168,106,.16),rgba(170,140,84,.2));border:1px solid rgba(201,168,106,.32);box-shadow:0 14px 28px rgba(0,0,0,.5),0 0 22px rgba(227,198,139,.16);font-size:26px;line-height:1;color:var(--gold-400);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background var(--transition)}
+      .dock-btn .label{position:absolute;top:calc(100% + 10px);left:50%;transform:translate(-50%,12px);padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.88);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition)}
+      .dock-btn:hover .icon{transform:translateY(-6px);box-shadow:0 22px 36px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.2);border-color:rgba(227,198,139,.5)}
+      .dock-btn:hover .label{opacity:1;transform:translate(-50%,0)}
+      .dock-btn:focus-visible{outline:none}
+      .dock-btn:focus-visible .icon{outline:3px solid rgba(75,195,209,.35);outline-offset:3px}
+      .dock-btn:focus-visible .label{opacity:1;transform:translate(-50%,0)}
+      .dock-btn[disabled] .icon{opacity:.55;cursor:not-allowed}
+      .dock-btn.danger .icon{background:rgba(209,75,75,.18);border-color:rgba(209,75,75,.5);color:#F6D6D6;box-shadow:0 18px 30px rgba(209,75,75,.25)}
+      .dock-btn.ghost .icon{background:rgba(201,168,106,.06);border-style:dashed;color:var(--text-muted)}
+      .dock-btn[data-state="dirty"] .icon{background:rgba(209,75,75,.18);border-color:rgba(209,75,75,.55);color:#F6D6D6}
+      .dock-btn[data-state="saving"] .icon{background:linear-gradient(160deg,rgba(201,168,106,.14),rgba(170,140,84,.22));color:var(--gold-400)}
+      .dock-btn[data-state="saved"] .icon{background:linear-gradient(160deg,rgba(201,168,106,.2),rgba(170,140,84,.28));color:var(--bg-void)}
       .dock-more{position:relative}
-      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
+      .dock-menu{position:absolute;bottom:88px;right:0;min-width:200px;padding:12px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 24px 52px rgba(0,0,0,.6);display:none}
       .dock-more[aria-expanded="true"] .dock-menu{display:block}
       .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
       .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock{gap:8px;padding:10px 12px}.dock-btn{width:82px;height:60px}}
-      @media (max-width:720px){.mind-dock{padding:10px 12px;border-radius:24px}.dock-btn{width:78px;height:56px}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
-      .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px)}
-      .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px}
+      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 80%}
+      @media (max-width:960px){.mind-dock{gap:12px;padding:14px 16px}.dock-btn .icon{width:60px;height:60px;font-size:24px}}
+      @media (max-width:720px){.mind-dock-wrap{bottom:24px}.mind-dock{gap:10px;padding:12px 14px;border-radius:26px}.dock-btn{gap:6px}.dock-btn .icon{width:56px;height:56px;font-size:22px}.dock-btn .label{position:static;opacity:1;transform:none;padding:0;border:none;background:none;color:var(--text-muted)}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.dock-btn .icon{transition:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity var(--transition),transform var(--transition)}
+      .node-popover[data-open="true"]{opacity:1;transform:translateY(0);pointer-events:auto}
+      .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;width:calc(100% - 24px);max-width:none;border-radius:24px 24px 0 0;padding:20px 18px 30px;display:flex;flex-direction:column;gap:16px;max-height:min(640px,60vh);height:min(60vh,640px);transform:translate(-50%,110%)}
+      .node-popover[data-mode="sheet"][data-open="true"]{transform:translate(-50%,0)}
       .node-popover header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .node-popover[data-mode="sheet"] header{padding-bottom:6px;border-bottom:1px solid rgba(201,168,106,.18)}
       .node-popover h2{margin:0;font:600 16px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.14em;text-transform:uppercase}
       .node-popover button.close{background:none;border:1px solid rgba(201,168,106,.3);border-radius:999px;color:var(--gold-400);width:32px;height:32px;cursor:pointer}
       .node-popover button.close:hover{border-color:var(--gold-500)}
       .node-popover form{display:grid;gap:14px}
+      .node-popover[data-mode="sheet"] form{display:flex;flex-direction:column;gap:14px;flex:1;overflow:auto;padding-right:2px}
       .node-popover .field{display:grid;gap:8px}
       .node-popover label{font:600 12px/1.2 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
       .node-popover input,.node-popover select,.node-popover textarea{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em;transition:border-color var(--transition),box-shadow var(--transition)}
@@ -1727,6 +1747,7 @@ if ($view === 'map_edit') {
       .node-popover .chips-preview span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
       .node-popover .chips-preview .empty{color:var(--text-muted);border-style:dashed}
       .node-popover .popover-actions{display:flex;justify-content:flex-end;gap:10px}
+      .node-popover[data-mode="sheet"] .popover-actions{margin-top:auto;padding-top:8px;border-top:1px solid rgba(201,168,106,.18)}
       .node-popover .popover-actions button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition)}
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
       .node-popover .popover-actions button:hover{border-color:rgba(227,198,139,.6)}
@@ -1765,15 +1786,23 @@ if ($view === 'map_edit') {
       </defs>
     </svg>
     <div class="mind-shell" data-fisheye="on">
+      <header class="mind-topbar" role="banner">
+        <a class="topbar-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" title="返回导图库">← 返回导图库</a>
+        <div class="topbar-title">
+          <label class="sr-only" for="map-title">导图标题</label>
+          <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+        </div>
+        <button type="button" class="topbar-save" data-role="save-button" data-default-label="保存" aria-label="保存 (Ctrl+S)" title="保存 (Ctrl+S)">
+          <span class="icon">💾</span>
+          <span class="label">保存</span>
+        </button>
+      </header>
       <header class="mind-header">
         <div class="mind-title-group">
           <div class="map-meta">
             <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
             <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
-            <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">← 返回导图库</a>
           </div>
-          <label class="sr-only" for="map-title">导图标题</label>
-          <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
           <div class="save-state" id="save-state">保存成功</div>
         </div>
         <div class="mind-header-actions">
@@ -1799,16 +1828,12 @@ if ($view === 'map_edit') {
       <?php endif; ?>
       <div class="mind-dock-wrap">
         <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
-          <button class="dock-btn" data-action="save" data-default-label="保存" title="保存 (Ctrl+S)" aria-label="保存">
-            <span class="icon">💾</span>
-            <span class="label">保存</span>
-          </button>
           <button class="dock-btn" data-action="sibling" title="新增同级 (Enter)" aria-label="新增同级节点">
-            <span class="icon">⧉</span>
+            <span class="icon">➕</span>
             <span class="label">同级</span>
           </button>
           <button class="dock-btn" data-action="child" title="新增子级 (Tab)" aria-label="新增子级节点">
-            <span class="icon">↳</span>
+            <span class="icon">⤵</span>
             <span class="label">子级</span>
           </button>
           <button class="dock-btn" data-action="attach" title="上传附件" aria-label="上传附件">
@@ -1823,7 +1848,6 @@ if ($view === 'map_edit') {
             <span class="icon">🗑</span>
             <span class="label">删除</span>
           </button>
-          <div class="dock-sep" aria-hidden="true"></div>
           <div class="dock-more" aria-expanded="false">
             <button class="dock-btn ghost" type="button" aria-haspopup="menu" aria-expanded="false" title="更多选项" aria-label="更多">
               <span class="icon">⋯</span>
@@ -2900,6 +2924,13 @@ if ($view === 'map_edit') {
     if(jmContainer){
       const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
       currentMapId=Number.isFinite(parsed)?parsed:0;
+      let lastTouchEnd=0;
+      jmContainer.addEventListener('touchend',evt=>{
+        if(evt.touches && evt.touches.length){ return; }
+        const now=Date.now();
+        if(now-lastTouchEnd<350){ evt.preventDefault(); }
+        lastTouchEnd=now;
+      },{passive:false});
     }
     if(!window.jsMind){
       if(jmContainer){
@@ -3101,6 +3132,7 @@ if ($view === 'map_edit') {
       function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
       jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
+      ensureViewportFit();
       jmContainer.appendChild(overlay);
       syncOverlaySize();
       if(!jm.get_selected_node() && initialData && initialData.data){
@@ -3258,16 +3290,18 @@ if ($view === 'map_edit') {
       const mindShell=document.querySelector('.mind-shell');
       const dock=document.getElementById('mind-dock');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
-      const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
-      const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
+      const saveActionButton=document.querySelector('[data-role="save-button"]');
+      const saveButtonLabel=saveActionButton ? saveActionButton.querySelector('.label') : null;
       const dockMore=dock ? dock.querySelector('.dock-more') : null;
       const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
       const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
       const nodePopover=document.getElementById('node-popover');
+      if(nodePopover){ nodePopover.dataset.open='false'; }
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
       const fisheyeToggle=document.getElementById('setting-fisheye');
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
+      const narrowViewportMedia=window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       function isFisheyeEnabled(){
@@ -3294,8 +3328,9 @@ if ($view === 'map_edit') {
       const addSiblingButton=null;
       const addChildButton=null;
       const deleteButton=null;
-      let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
-      if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
+      let saveButtonDefault=saveButtonLabel ? (saveActionButton?.dataset.defaultLabel || saveButtonLabel.textContent || '保存') : '保存';
+      if(saveActionButton && !saveActionButton.dataset.defaultLabel){ saveActionButton.dataset.defaultLabel=saveButtonDefault; }
+      if(saveActionButton){ setSaveButtonState(null,false,null); }
       let dirty=false;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
@@ -3304,14 +3339,17 @@ if ($view === 'map_edit') {
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log'];
       const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v'];
       function setSaveButtonState(text, disabled, state){
-        if(dockSaveLabel){
-          if(typeof text==='string'){ dockSaveLabel.textContent=text; }
-          else if(text===null){ dockSaveLabel.textContent=saveButtonDefault; }
+        if(saveButtonLabel){
+          if(typeof text==='string'){ saveButtonLabel.textContent=text; }
+          else if(text===null){ saveButtonLabel.textContent=saveButtonDefault; }
         }
-        if(dockSaveButton && typeof disabled==='boolean'){ dockSaveButton.disabled=disabled; }
-        if(dockSaveButton){
-          if(state){ dockSaveButton.dataset.state=state; }
-          else{ dockSaveButton.removeAttribute('data-state'); }
+        if(saveActionButton && typeof disabled==='boolean'){ saveActionButton.disabled=disabled; }
+        if(saveActionButton){
+          if(state){ saveActionButton.dataset.state=state; }
+          else{ saveActionButton.removeAttribute('data-state'); }
+          const currentLabel=saveButtonLabel ? saveButtonLabel.textContent.trim() : '';
+          if(currentLabel){ saveActionButton.setAttribute('aria-label', `保存按钮：${currentLabel}`); }
+          else{ saveActionButton.setAttribute('aria-label','保存按钮'); }
         }
       }
       function markDirty(){
@@ -3401,7 +3439,9 @@ if ($view === 'map_edit') {
         popoverOpen=true;
         updatePopoverMode();
         nodePopover.hidden=false;
+        nodePopover.dataset.open='false';
         refreshInspector(node);
+        requestAnimationFrame(()=>{ nodePopover.dataset.open='true'; });
         if(nodeTopicInput){
           requestAnimationFrame(()=>{
             try{ nodeTopicInput.focus({preventScroll:true}); }
@@ -3412,7 +3452,12 @@ if ($view === 'map_edit') {
       function closeInspectorPopover(){
         if(!nodePopover) return;
         popoverOpen=false;
-        nodePopover.hidden=true;
+        nodePopover.dataset.open='false';
+        const delay=nodePopover.dataset.mode==='sheet'?260:200;
+        setTimeout(()=>{
+          if(popoverOpen) return;
+          nodePopover.hidden=true;
+        }, delay);
       }
       function positionInspectorPopover(node){
         if(!nodePopover) return;
@@ -3836,7 +3881,6 @@ if ($view === 'map_edit') {
         });
         const handleDockAction=(action)=>{
           switch(action){
-            case 'save': saveMindmap(); break;
             case 'sibling': addSiblingNode(); break;
             case 'child': addChildNode(); break;
             case 'attach': openAttachmentDialog(); break;
@@ -3908,6 +3952,11 @@ if ($view === 'map_edit') {
         }
       }
       document.addEventListener('keydown',e=>{
+        if((e.key==='s' || e.key==='S') && (e.metaKey || e.ctrlKey)){
+          e.preventDefault();
+          saveMindmap();
+          return;
+        }
         const activeEl=document.activeElement;
         if(activeEl){
           const tag=activeEl.tagName || '';
@@ -3926,6 +3975,21 @@ if ($view === 'map_edit') {
         }
         return false;
       }
+      function ensureViewportFit(){
+        if(!narrowViewportMedia || !narrowViewportMedia.matches) return;
+        requestAnimationFrame(()=>{
+          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
+            callView('set_zoom', 1);
+            if(!callView('move_to_center')) callView('center_root');
+          }
+        });
+      }
+      if(narrowViewportMedia){
+        const handleViewportChange=event=>{ if(event.matches){ ensureViewportFit(); } };
+        if(narrowViewportMedia.addEventListener) narrowViewportMedia.addEventListener('change', handleViewportChange);
+        else if(narrowViewportMedia.addListener) narrowViewportMedia.addListener(handleViewportChange);
+      }
+      ensureViewportFit();
       if(fitButton){
         fitButton.onclick=()=>{
           if(!callView('zoomToFit') && !callView('zoom_to_fit')){
@@ -4007,6 +4071,7 @@ if ($view === 'map_edit') {
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
           }
+          if(type===jsMind.event_type.show){ ensureViewportFit(); }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
@@ -4046,8 +4111,8 @@ if ($view === 'map_edit') {
           reader.readAsText(file,'utf-8');
         });
       }
-      if(dockSaveButton){
-        dockSaveButton.addEventListener('click',e=>{ e.preventDefault(); saveMindmap(); });
+      if(saveActionButton){
+        saveActionButton.addEventListener('click',e=>{ e.preventDefault(); saveMindmap(); });
       }
       async function saveMindmap(){
         commitInlineEditing();
