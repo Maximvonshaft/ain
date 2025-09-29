@@ -1729,7 +1729,9 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .dock-more{position:relative}
-      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
+      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none;z-index:160;max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px);overflow:auto}
+      .dock-menu[data-placement="below"]{bottom:auto;top:78px}
+      .dock-menu[data-floating="true"]{position:fixed;bottom:auto;right:auto}
       .dock-more[aria-expanded="true"] .dock-menu{display:block}
       .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
       .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
@@ -3273,6 +3275,55 @@ if ($view === 'map_edit') {
       const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
       const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
       const foldAllMenuItem=dockMenu ? dockMenu.querySelector('[data-action="fold-all"]') : null;
+      let dockMenuFloating=false;
+      const DOCK_MENU_MARGIN=12;
+      const resetDockMenuPosition=()=>{
+        if(!dockMenu) return;
+        dockMenuFloating=false;
+        dockMenu.removeAttribute('data-floating');
+        dockMenu.removeAttribute('data-placement');
+        dockMenu.style.removeProperty('left');
+        dockMenu.style.removeProperty('top');
+        dockMenu.style.removeProperty('bottom');
+        dockMenu.style.removeProperty('right');
+        dockMenu.style.removeProperty('position');
+        dockMenu.style.removeProperty('visibility');
+      };
+      const updateDockMenuPosition=()=>{
+        if(!dockMenu || !dockMoreButton) return;
+        if(!dockMore || dockMore.getAttribute('aria-expanded')!=='true') return;
+        const margin=DOCK_MENU_MARGIN;
+        dockMenu.dataset.floating='true';
+        dockMenu.style.position='fixed';
+        const previousVisibility=dockMenu.style.visibility;
+        dockMenu.style.visibility='hidden';
+        dockMenu.style.left='0px';
+        dockMenu.style.top='0px';
+        const menuRect=dockMenu.getBoundingClientRect();
+        const buttonRect=dockMoreButton.getBoundingClientRect();
+        const viewportWidth=document.documentElement.clientWidth;
+        const viewportHeight=document.documentElement.clientHeight;
+        let left=buttonRect.right - menuRect.width;
+        const maxLeft=viewportWidth - margin - menuRect.width;
+        if(left>maxLeft) left=maxLeft;
+        if(left<margin) left=margin;
+        let top=buttonRect.top - menuRect.height - margin;
+        let placement='above';
+        if(top<margin){
+          placement='below';
+          top=buttonRect.bottom + margin;
+        }
+        const maxTop=viewportHeight - margin - menuRect.height;
+        if(top>maxTop){ top=Math.max(margin, maxTop); }
+        if(top<margin){ top=margin; }
+        dockMenu.style.left=`${Math.round(left)}px`;
+        dockMenu.style.top=`${Math.round(top)}px`;
+        dockMenu.style.bottom='auto';
+        dockMenu.style.right='auto';
+        dockMenu.dataset.placement=placement;
+        dockMenu.style.visibility=previousVisibility || '';
+        dockMenuFloating=true;
+      };
       const nodePopover=document.getElementById('node-popover');
       const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
       const popoverHeader=nodePopover ? nodePopover.querySelector('header') : null;
@@ -4082,24 +4133,30 @@ if ($view === 'map_edit') {
         });
       }
       if(dock){
+        const refreshDockMetrics=()=>{
+          updateDockScrollMarkers();
+          if(dockMenuFloating){ requestAnimationFrame(()=>updateDockMenuPosition()); }
+        };
         updateDockScrollMarkers();
-        window.addEventListener('resize',updateDockScrollMarkers);
-        dock.addEventListener('scroll',updateDockScrollMarkers);
+        window.addEventListener('resize',refreshDockMetrics);
+        dock.addEventListener('scroll',refreshDockMetrics);
         dock.addEventListener('wheel',e=>{
           const dominant=Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
           if(!dominant) return;
           dock.scrollLeft += dominant;
-          updateDockScrollMarkers();
+          refreshDockMetrics();
           e.preventDefault();
         });
         const closeDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
+          resetDockMenuPosition();
         };
         const openDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
           updateFoldAllLabel();
+          requestAnimationFrame(()=>updateDockMenuPosition());
         };
         const toggleDockMenu=()=>{
           const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
@@ -4117,6 +4174,10 @@ if ($view === 'map_edit') {
           if(dockMore.contains(e.target)) return;
           closeDockMenu();
         });
+        const handleViewportScroll=()=>{
+          if(dockMenuFloating){ requestAnimationFrame(()=>updateDockMenuPosition()); }
+        };
+        window.addEventListener('scroll',handleViewportScroll, true);
         const handleDockAction=(action)=>{
           switch(action){
             case 'save': saveMindmap(); break;
