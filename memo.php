@@ -1935,32 +1935,49 @@ if ($view === 'map_edit') {
       function alignToTraceGrid(value){
         return Math.round(value/TRACE_GRID)*TRACE_GRID;
       }
-      function buildTraceRoute(start,end,directionHint=1){
+      function buildTraceRoute(start,end,options=1){
         if(!start || !end){ return []; }
-        const points=[{x:start.x,y:start.y}];
-        const rawDx=end.x-start.x;
-        const absDx=Math.abs(rawDx);
-        const direction=(absDx<TRACE_GRID*0.5)
-          ? (directionHint>=0?1:-1)
-          : (rawDx>=0?1:-1);
-        const MIN_LEAD=TRACE_GRID*3;
-        let midX;
-        if(absDx<TRACE_GRID*0.25){
-          midX=start.x + direction*MIN_LEAD;
-        }else if(absDx<=TRACE_GRID*3){
-          const halfSpan=absDx/2;
-          midX=start.x + direction*Math.max(MIN_LEAD, halfSpan);
-        }else{
-          const maxLead=Math.max(MIN_LEAD, absDx - TRACE_GRID*2);
-          let lead=absDx*0.45;
-          lead=Math.min(Math.max(MIN_LEAD, lead), maxLead);
-          midX=start.x + direction*lead;
+        let axis='horizontal';
+        let directionHint=1;
+        if(typeof options==='number'){
+          directionHint=options>=0?1:-1;
+        }else if(options && typeof options==='object'){
+          if(options.axis==='vertical'){ axis='vertical'; }
+          if(typeof options.directionHint==='number'){
+            directionHint=options.directionHint>=0?1:-1;
+          }
         }
-        midX=alignToTraceGrid(midX);
-        const viaY=alignToTraceGrid(end.y);
-        points.push({x:midX,y:start.y});
-        if(!nearlyEqual(viaY,start.y)){
-          points.push({x:midX,y:viaY});
+        const leadKey=axis==='vertical'?'y':'x';
+        const crossKey=axis==='vertical'?'x':'y';
+        const points=[{x:start.x,y:start.y}];
+        const rawLead=end[leadKey]-start[leadKey];
+        const absLead=Math.abs(rawLead);
+        const direction=(absLead<TRACE_GRID*0.5)
+          ? directionHint
+          : (rawLead>=0?1:-1);
+        const MIN_LEAD=TRACE_GRID*3;
+        let midLead;
+        if(absLead<TRACE_GRID*0.25){
+          midLead=start[leadKey] + direction*MIN_LEAD;
+        }else if(absLead<=TRACE_GRID*3){
+          const halfSpan=absLead/2;
+          midLead=start[leadKey] + direction*Math.max(MIN_LEAD, halfSpan);
+        }else{
+          const maxLead=Math.max(MIN_LEAD, absLead - TRACE_GRID*2);
+          let lead=absLead*0.45;
+          lead=Math.min(Math.max(MIN_LEAD, lead), maxLead);
+          midLead=start[leadKey] + direction*lead;
+        }
+        midLead=alignToTraceGrid(midLead);
+        const viaCross=alignToTraceGrid(end[crossKey]);
+        const buildPoint=(lead,cross)=>axis==='vertical'
+          ? {x:cross, y:lead}
+          : {x:lead, y:cross};
+        const anchorCross=start[crossKey];
+        const midPoint=buildPoint(midLead, anchorCross);
+        points.push(midPoint);
+        if(!nearlyEqual(viaCross, anchorCross)){
+          points.push(buildPoint(midLead, viaCross));
         }
         points.push({x:end.x,y:end.y});
         const cleaned=[];
@@ -2751,10 +2768,33 @@ if ($view === 'map_edit') {
           if(!node.anchors) this.updateAnchors(node);
           if(!node.parent.anchors) this.updateAnchors(node.parent);
           const parent=node.parent;
-          const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
-          const start=isLeft ? parent.anchors.left : parent.anchors.right;
-          const end=isLeft ? node.anchors.right : node.anchors.left;
-          const route=buildTraceRoute(start,end,isLeft?-1:1);
+          const dx=(node.absX ?? 0) - (parent.absX ?? 0);
+          const dy=(node.absY ?? 0) - (parent.absY ?? 0);
+          const preferHorizontal=Math.abs(dx) >= Math.abs(dy);
+          let start=null;
+          let end=null;
+          let routeOptions;
+          if(preferHorizontal){
+            const toRight=dx>=0;
+            start=toRight ? parent.anchors.right : parent.anchors.left;
+            end=toRight ? node.anchors.left : node.anchors.right;
+            routeOptions={axis:'horizontal', directionHint: toRight ? 1 : -1};
+          }else{
+            const toBottom=dy>=0;
+            start=toBottom ? parent.anchors.bottom : parent.anchors.top;
+            end=toBottom ? node.anchors.top : node.anchors.bottom;
+            routeOptions={axis:'vertical', directionHint: toBottom ? 1 : -1};
+          }
+          if(!start || !end){
+            const fallbackStart=parent.anchors ? parent.anchors.center : {x:parent.absX,y:parent.absY};
+            const fallbackEnd=node.anchors ? node.anchors.center : {x:node.absX,y:node.absY};
+            const fallback=`M${fallbackStart.x} ${fallbackStart.y} L${fallbackEnd.x} ${fallbackEnd.y}`;
+            node.linkPath.setAttribute('d', fallback);
+            if(node.linkShadow){ node.linkShadow.setAttribute('d', fallback); }
+            if(node.linkHighlight){ node.linkHighlight.setAttribute('d', fallback); }
+            return;
+          }
+          const route=buildTraceRoute(start,end,routeOptions);
           let pathData=buildChamferedPath(route, TRACE_CHAMFER);
           if(!pathData){
             pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`;
