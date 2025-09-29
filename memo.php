@@ -1728,9 +1728,14 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .dock-more{position:relative}
-      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
+      .dock-more{position:relative;--dock-menu-gap:12px}
+      .dock-menu{position:absolute;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none;z-index:10;top:auto;bottom:calc(100% + var(--dock-menu-gap));right:0;left:auto;overflow-y:auto;max-height:none;transform:none}
       .dock-more[aria-expanded="true"] .dock-menu{display:block}
+      .dock-more[data-placement="bottom"] .dock-menu{top:calc(100% + var(--dock-menu-gap));bottom:auto}
+      .dock-more[data-placement="top"] .dock-menu{bottom:calc(100% + var(--dock-menu-gap));top:auto}
+      .dock-more[data-align="left"] .dock-menu{left:0;right:auto;transform:none}
+      .dock-more[data-align="center"] .dock-menu{left:50%;right:auto;transform:translateX(-50%)}
+      .dock-more[data-align="right"] .dock-menu{right:0;left:auto;transform:none}
       .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
       .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
@@ -1864,7 +1869,7 @@ if ($view === 'map_edit') {
             <span class="label">删除</span>
           </button>
           <div class="dock-sep" aria-hidden="true"></div>
-          <div class="dock-more" aria-expanded="false">
+          <div class="dock-more" aria-expanded="false" data-placement="top" data-align="right">
             <button class="dock-btn ghost" type="button" aria-haspopup="menu" aria-expanded="false" title="更多选项" aria-label="更多">
               <span class="icon">⋯</span>
               <span class="label">更多</span>
@@ -4082,24 +4087,124 @@ if ($view === 'map_edit') {
         });
       }
       if(dock){
+        const resetDockMenuStyles=()=>{
+          if(!dockMenu) return;
+          dockMenu.style.top='';
+          dockMenu.style.bottom='';
+          dockMenu.style.left='';
+          dockMenu.style.right='';
+          dockMenu.style.transform='';
+          dockMenu.style.maxHeight='';
+          dockMenu.style.maxWidth='';
+          dockMenu.style.overflowY='';
+        };
+        const repositionDockMenu=()=>{
+          if(!dockMore || !dockMenu || !dockMoreButton) return;
+          if(dockMore.getAttribute('aria-expanded')!=='true') return;
+          const gap=12;
+          const margin=12;
+          const docEl=document.documentElement;
+          const viewportWidth=Math.max(docEl ? docEl.clientWidth : 0, window.innerWidth || 0);
+          const viewportHeight=Math.max(docEl ? docEl.clientHeight : 0, window.innerHeight || 0);
+          dockMore.dataset.placement='top';
+          dockMore.dataset.align='right';
+          resetDockMenuStyles();
+          const buttonRect=dockMoreButton.getBoundingClientRect();
+          const menuRect=dockMenu.getBoundingClientRect();
+          const availableAbove=Math.max(0, buttonRect.top - gap - margin);
+          const availableBelow=Math.max(0, viewportHeight - buttonRect.bottom - gap - margin);
+          let placement=availableAbove >= availableBelow ? 'top' : 'bottom';
+          if(placement==='top' && availableAbove < menuRect.height && availableBelow > availableAbove){
+            placement='bottom';
+          }else if(placement==='bottom' && availableBelow < menuRect.height && availableAbove > availableBelow){
+            placement='top';
+          }
+          dockMore.dataset.placement=placement;
+          const availableVertical=placement==='top' ? availableAbove : availableBelow;
+          if(availableVertical && availableVertical < menuRect.height){
+            dockMenu.style.maxHeight=availableVertical+'px';
+            dockMenu.style.overflowY='auto';
+          }
+          if(placement==='top'){
+            dockMenu.style.bottom=`calc(100% + ${gap}px)`;
+            dockMenu.style.top='auto';
+          }else{
+            dockMenu.style.top=`calc(100% + ${gap}px)`;
+            dockMenu.style.bottom='auto';
+          }
+          const viewportLeftMargin=margin;
+          const viewportRightMargin=viewportWidth - margin;
+          const overflowLeft=buttonRect.right - menuRect.width < viewportLeftMargin;
+          const overflowRight=buttonRect.left + menuRect.width > viewportRightMargin;
+          let align='right';
+          if(overflowLeft && !overflowRight){
+            align='left';
+          }else if(overflowRight && !overflowLeft){
+            align='right';
+          }else if(overflowLeft && overflowRight){
+            align='center';
+          }else{
+            const spaceLeft=buttonRect.left - viewportLeftMargin;
+            const spaceRight=viewportRightMargin - buttonRect.right;
+            align=spaceRight >= spaceLeft ? 'left' : 'right';
+          }
+          dockMore.dataset.align=align;
+          let maxWidthLimit=null;
+          if(align==='left'){
+            dockMenu.style.left='0';
+            dockMenu.style.right='auto';
+            dockMenu.style.transform='';
+            maxWidthLimit=viewportRightMargin - buttonRect.left;
+          }else if(align==='right'){
+            dockMenu.style.right='0';
+            dockMenu.style.left='auto';
+            dockMenu.style.transform='';
+            maxWidthLimit=buttonRect.right - viewportLeftMargin;
+          }else{
+            dockMenu.style.left='50%';
+            dockMenu.style.right='auto';
+            dockMenu.style.transform='translateX(-50%)';
+            maxWidthLimit=viewportWidth - margin * 2;
+          }
+          if(maxWidthLimit && maxWidthLimit < menuRect.width){
+            dockMenu.style.maxWidth=Math.max(0, Math.min(menuRect.width, maxWidthLimit))+'px';
+          }
+        };
+        const scheduleRepositionDockMenu=()=>{
+          if(!dockMore || dockMore.getAttribute('aria-expanded')!=='true') return;
+          requestAnimationFrame(repositionDockMenu);
+        };
         updateDockScrollMarkers();
-        window.addEventListener('resize',updateDockScrollMarkers);
-        dock.addEventListener('scroll',updateDockScrollMarkers);
+        window.addEventListener('resize',()=>{
+          updateDockScrollMarkers();
+          scheduleRepositionDockMenu();
+        });
+        dock.addEventListener('scroll',()=>{
+          updateDockScrollMarkers();
+          scheduleRepositionDockMenu();
+        });
         dock.addEventListener('wheel',e=>{
           const dominant=Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
           if(!dominant) return;
           dock.scrollLeft += dominant;
           updateDockScrollMarkers();
+          scheduleRepositionDockMenu();
           e.preventDefault();
         });
         const closeDockMenu=()=>{
-          if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
+          if(dockMore){
+            dockMore.setAttribute('aria-expanded','false');
+            dockMore.dataset.placement='top';
+            dockMore.dataset.align='right';
+          }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
+          resetDockMenuStyles();
         };
         const openDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
           updateFoldAllLabel();
+          requestAnimationFrame(repositionDockMenu);
         };
         const toggleDockMenu=()=>{
           const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
