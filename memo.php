@@ -1729,7 +1729,7 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .dock-more{position:relative}
-      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
+      .dock-menu{position:absolute;bottom:calc(100% + 12px);right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none;transform-origin:bottom right;transform:translate(var(--dock-menu-shift-x,0),var(--dock-menu-shift-y,0))}
       .dock-more[aria-expanded="true"] .dock-menu{display:block}
       .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
       .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
@@ -3272,6 +3272,47 @@ if ($view === 'map_edit') {
       const dockMore=dock ? dock.querySelector('.dock-more') : null;
       const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
       const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
+      let dockMenuAdjustFrame=null;
+      const isDockMenuOpen=()=>dockMore && dockMore.getAttribute('aria-expanded')==='true';
+      const clearDockMenuAdjustment=()=>{
+        if(dockMenuAdjustFrame){
+          cancelAnimationFrame(dockMenuAdjustFrame);
+          dockMenuAdjustFrame=null;
+        }
+      };
+      const applyDockMenuShift=(shiftX, shiftY)=>{
+        if(!dockMenu) return;
+        if(shiftX){ dockMenu.style.setProperty('--dock-menu-shift-x', `${Math.round(shiftX)}px`); }
+        else{ dockMenu.style.removeProperty('--dock-menu-shift-x'); }
+        if(shiftY){ dockMenu.style.setProperty('--dock-menu-shift-y', `${Math.round(shiftY)}px`); }
+        else{ dockMenu.style.removeProperty('--dock-menu-shift-y'); }
+      };
+      const adjustDockMenuViewport=()=>{
+        if(!dockMenu || !isDockMenuOpen()) return;
+        dockMenu.style.removeProperty('--dock-menu-shift-x');
+        dockMenu.style.removeProperty('--dock-menu-shift-y');
+        const rect=dockMenu.getBoundingClientRect();
+        const padding=16;
+        const viewportWidth=window.innerWidth || document.documentElement.clientWidth || rect.right;
+        const viewportHeight=window.innerHeight || document.documentElement.clientHeight || rect.bottom;
+        let shiftX=0;
+        let shiftY=0;
+        if(rect.left < padding){ shiftX = padding - rect.left; }
+        else if(rect.right > viewportWidth - padding){ shiftX = (viewportWidth - padding) - rect.right; }
+        if(rect.top < padding){ shiftY = padding - rect.top; }
+        else if(rect.bottom > viewportHeight - padding){ shiftY = (viewportHeight - padding) - rect.bottom; }
+        applyDockMenuShift(shiftX, shiftY);
+      };
+      const scheduleDockMenuAdjustment=()=>{
+        if(!dockMenu || !isDockMenuOpen()) return;
+        clearDockMenuAdjustment();
+        dockMenuAdjustFrame=requestAnimationFrame(()=>{
+          dockMenuAdjustFrame=requestAnimationFrame(()=>{
+            adjustDockMenuViewport();
+            dockMenuAdjustFrame=null;
+          });
+        });
+      };
       const foldAllMenuItem=dockMenu ? dockMenu.querySelector('[data-action="fold-all"]') : null;
       const nodePopover=document.getElementById('node-popover');
       const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
@@ -3330,10 +3371,12 @@ if ($view === 'map_edit') {
         if(maxScroll <= 1){
           dockWrap.dataset.scrollLeft='false';
           dockWrap.dataset.scrollRight='false';
+          if(isDockMenuOpen()) scheduleDockMenuAdjustment();
           return;
         }
         dockWrap.dataset.scrollLeft=dock.scrollLeft > 4 ? 'true' : 'false';
         dockWrap.dataset.scrollRight=dock.scrollLeft < maxScroll - 4 ? 'true' : 'false';
+        if(isDockMenuOpen()) scheduleDockMenuAdjustment();
       }
       function isFisheyeEnabled(){
         return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
@@ -4095,11 +4138,17 @@ if ($view === 'map_edit') {
         const closeDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
+          clearDockMenuAdjustment();
+          if(dockMenu){
+            dockMenu.style.removeProperty('--dock-menu-shift-x');
+            dockMenu.style.removeProperty('--dock-menu-shift-y');
+          }
         };
         const openDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
           updateFoldAllLabel();
+          scheduleDockMenuAdjustment();
         };
         const toggleDockMenu=()=>{
           const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
