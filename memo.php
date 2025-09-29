@@ -1865,16 +1865,13 @@ if ($view === 'map_edit') {
           </button>
           <div class="dock-sep" aria-hidden="true"></div>
           <div class="dock-more" aria-expanded="false">
-            <button class="dock-btn ghost" type="button" aria-haspopup="menu" aria-expanded="false" title="更多选项" aria-label="更多">
-              <span class="icon">⋯</span>
-              <span class="label">更多</span>
+            <button class="dock-btn ghost" type="button" aria-haspopup="menu" aria-expanded="false" title="导入或导出 JSON" aria-label="导入或导出">
+              <span class="icon">⇅</span>
+              <span class="label">导入 / 导出</span>
             </button>
             <ul class="dock-menu" role="menu">
-              <li role="menuitem" data-action="import">导入 JSON</li>
-              <li role="menuitem" data-action="export">导出 JSON</li>
-              <?php if ($mind['id']): ?>
-              <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
-              <?php endif; ?>
+              <li role="menuitem" data-action="export">导出为 JSON 文件</li>
+              <li role="menuitem" data-action="import">导入 JSON 文件</li>
             </ul>
           </div>
         </nav>
@@ -4259,6 +4256,19 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
+      function formatTimestampForFilename(date){
+        const pad=(value)=>String(value).padStart(2,'0');
+        return [
+          date.getFullYear(),
+          pad(date.getMonth()+1),
+          pad(date.getDate())
+        ].join('')+'-'+[pad(date.getHours()),pad(date.getMinutes()),pad(date.getSeconds())].join('');
+      }
+      function sanitizeFilenameSegment(value){
+        const fallback='mindmap';
+        const cleaned=(value||'').replace(/[\\/:*?"<>|]/g,'_').trim();
+        return cleaned || fallback;
+      }
       function exportMindmap(){
         const data=jm.get_data('node_tree');
         if(data && data.data){ enforceRightOrientation(data.data); }
@@ -4267,12 +4277,100 @@ if ($view === 'map_edit') {
         const a=document.createElement('a');
         a.href=url;
         const titleValue=titleInput ? titleInput.value.trim() : '';
-        a.download=(titleValue || 'mindmap')+'.json';
+        const timestamp=formatTimestampForFilename(new Date());
+        a.download=`${sanitizeFilenameSegment(titleValue)}-${timestamp}.json`;
         a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 1000);
       }
       function triggerImport(){
-        if(importInput){ importInput.click(); }
+        if(!importInput) return;
+        importInput.value='';
+        importInput.click();
+      }
+      function gatherAllNodeIds(node,set){
+        if(!node || typeof node!=='object') return;
+        if(node.id){ set.add(node.id); }
+        if(Array.isArray(node.children)){
+          node.children.forEach(child=>gatherAllNodeIds(child,set));
+        }
+      }
+      function ensureUniqueNodeId(candidate,set){
+        let base=(candidate && typeof candidate==='string')?candidate.trim():'';
+        if(!base){ base=randomId(); }
+        let next=base;
+        while(set.has(next)){
+          next=`${base}-${Math.random().toString(36).slice(2,6)}`;
+        }
+        set.add(next);
+        return next;
+      }
+      function cloneNodeTree(node){
+        return node ? JSON.parse(JSON.stringify(node)) : null;
+      }
+      function findNodeModelById(node,id){
+        if(!node || typeof node!=='object') return null;
+        if(node.id===id) return node;
+        if(Array.isArray(node.children)){
+          for(const child of node.children){
+            const found=findNodeModelById(child,id);
+            if(found) return found;
+          }
+        }
+        return null;
+      }
+      function normalizeImportedSubtree(node, existingIds){
+        if(!node || typeof node!=='object') return null;
+        const copy=cloneNodeTree(node);
+        copy.id=ensureUniqueNodeId(copy.id, existingIds);
+        copy.topic=copy.topic || '导入节点';
+        copy.data=normalizeNodeData(copy.data || {});
+        copy.direction='right';
+        if(copy.expanded===undefined){ copy.expanded=true; }
+        if(Array.isArray(copy.children)){
+          copy.children=copy.children
+            .filter(child=>child && typeof child==='object')
+            .map(child=>normalizeImportedSubtree(child, existingIds))
+            .filter(Boolean);
+        }else{
+          copy.children=[];
+        }
+        if(copy.style && typeof copy.style==='object'){
+          copy.style=JSON.parse(JSON.stringify(copy.style));
+        }
+        if(copy.meta && typeof copy.meta==='object'){
+          copy.meta=JSON.parse(JSON.stringify(copy.meta));
+        }
+        return copy;
+      }
+      function replaceMindmap(json){
+        enforceRightOrientation(json.data);
+        jm.show(json);
+        initialData=JSON.parse(JSON.stringify(json));
+        if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+        markDirty();
+      }
+      function mergeMindmap(json){
+        const current=jm.get_data('node_tree');
+        if(!current || !current.data) return false;
+        enforceRightOrientation(current.data);
+        const targetNode=ensureNode();
+        const targetId=targetNode ? targetNode.id : current.data.id;
+        const parentModel=findNodeModelById(current.data, targetId);
+        if(!parentModel) return false;
+        if(!Array.isArray(parentModel.children)){ parentModel.children=[]; }
+        const existingIds=new Set();
+        gatherAllNodeIds(current.data, existingIds);
+        const imported=normalizeImportedSubtree(json.data, existingIds);
+        if(!imported) return false;
+        parentModel.expanded=true;
+        parentModel.children.push(imported);
+        enforceRightOrientation(current.data);
+        jm.show(current);
+        initialData=JSON.parse(JSON.stringify(current));
+        if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+        jm.select_node(imported.id);
+        markDirty();
+        return true;
       }
       if(importInput){
         importInput.addEventListener('change', e=>{
@@ -4282,17 +4380,19 @@ if ($view === 'map_edit') {
             try{
               const json=JSON.parse(evt.target.result);
               if(json && json.data){
+                const override=window.confirm('导入 JSON 将覆盖当前导图内容。\n点击“确定”覆盖当前导图，点击“取消”将尝试把导入内容追加到当前选中节点。');
                 commitInlineEditing();
                 enforceRightOrientation(json.data);
-                jm.show(json);
-                initialData=JSON.parse(JSON.stringify(json));
-                if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-                markDirty();
+                const handled=override ? (replaceMindmap(json), true) : mergeMindmap(json);
+                if(!handled){
+                  alert('未能合并导入内容，请确认当前导图状态。');
+                }
               }
               else alert('文件格式不兼容');
             }catch(err){ alert('无法解析 JSON：'+err.message); }
           };
           reader.readAsText(file,'utf-8');
+          importInput.value='';
         });
       }
       if(dockSaveButton){
