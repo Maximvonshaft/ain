@@ -1639,22 +1639,30 @@ if ($view === 'map_edit') {
       .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
       @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
       a{color:inherit;text-decoration:none}
-      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:28px 24px 140px}
-      @media (max-width:900px){.mind-shell{padding:18px 14px 150px;gap:14px}}
-      .mind-header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;z-index:10}
-      .mind-title-group{display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:420px}
-      .map-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
-      .map-meta a{color:var(--gold-400);text-decoration:none}
-      .map-title-input{padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:0;padding:24px 24px 140px}
+      @media (max-width:900px){.mind-shell{padding:72px 14px 150px}}
+      .mind-header{position:fixed;top:24px;left:24px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;padding:18px 20px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.82);backdrop-filter:blur(18px);box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12);max-width:min(640px,calc(100% - 48px));z-index:60;pointer-events:auto}
+      .mind-header-main{display:flex;flex-direction:column;gap:10px;min-width:240px}
+      .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+      .map-title-input{width:100%;padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.35 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
-      .save-state{align-self:flex-start;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+      .map-back{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.68);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:border-color var(--transition),transform var(--transition);white-space:nowrap}
+      .map-back .icon{font-size:16px;line-height:1}
+      .map-back:hover{transform:translateY(-1px);border-color:rgba(227,198,139,.6)}
+      .map-back:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .save-state{justify-self:end;align-self:flex-start;padding:6px 14px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-4px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);white-space:nowrap}
       .save-state.show{opacity:1;transform:translateY(0)}
       .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
-      .mind-header-actions{display:flex;flex-direction:column;gap:14px;align-items:flex-end;margin-left:auto}
-      .mind-view-controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
-      .view-btn{min-width:0;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);touch-action:manipulation}
-      .view-btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
-      .view-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .map-back .label{display:inline}
+      @media (max-width:900px){
+        .mind-header{top:12px;left:12px;right:12px;padding:10px 14px;border-radius:16px;gap:12px;max-width:none}
+        .mind-header-main{gap:6px;min-width:0}
+        .map-meta{display:none}
+        .map-title-input{padding:10px 14px;font-size:16px}
+        .map-back{width:38px;height:38px;padding:0;border-radius:999px;justify-content:center}
+        .map-back .label{display:none}
+        .save-state{padding:4px 10px;font-size:11px;letter-spacing:.12em;align-self:center;transform:translateY(0)}
+      }
       .mind-stage{position:relative;flex:1;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
@@ -1682,6 +1690,10 @@ if ($view === 'map_edit') {
       .jsmind-node .node-footer{display:flex;gap:8px;flex-wrap:wrap;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
       .jsmind-node.isroot{border-width:2px;border-color:rgba(227,198,139,.55);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 30px 60px rgba(0,0,0,.6)}
       .jsmind-node.isroot::after{opacity:.4;animation:ringPulse 3.6s linear infinite}
+      .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.46);box-shadow:0 0 0 1px rgba(227,198,139,.18),0 18px 36px rgba(0,0,0,.42);padding-bottom:26px}
+      .node-fold-marker{position:absolute;right:18px;bottom:12px;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;border:1px solid rgba(201,168,106,.38);background:rgba(12,16,18,.88);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 16px rgba(227,198,139,.16);opacity:0;transform:translateY(6px);transition:opacity var(--transition),transform var(--transition)}
+      .jsmind-node.is-collapsed .node-fold-marker{opacity:1;transform:translateY(0)}
+      .node-fold-marker::after{content:"⤵"}
       @keyframes ringPulse{0%{transform:scale(.88);opacity:.15}50%{transform:scale(1.06);opacity:.32}100%{transform:scale(1.12);opacity:0}}
       .jsmind-node.selected{border-color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.32),0 0 40px rgba(227,198,139,.26);transform:translateY(-2px)}
       .jsmind-node.selected::after{opacity:.55;animation:ringPulse 2.4s linear infinite}
@@ -1726,6 +1738,17 @@ if ($view === 'map_edit') {
       .node-popover .chips-preview{display:flex;flex-wrap:wrap;gap:8px;min-height:26px}
       .node-popover .chips-preview span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
       .node-popover .chips-preview .empty{color:var(--text-muted);border-style:dashed}
+      .node-popover .field-toggle{padding:12px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.18);background:rgba(12,16,18,.6)}
+      .node-popover .field-toggle .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .node-popover .field-toggle .toggle-label{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
+      .node-popover .field-toggle .helper{margin:8px 0 0;color:var(--text-muted);font:500 12px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em}
+      .node-popover .switch{position:relative;display:inline-flex;align-items:center;justify-content:flex-start;width:48px;height:26px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.18);transition:background var(--transition),border-color var(--transition)}
+      .node-popover .switch input{appearance:none;width:100%;height:100%;opacity:0;position:absolute;top:0;left:0;margin:0;cursor:pointer}
+      .node-popover .switch .thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:999px;background:rgba(201,168,106,.68);box-shadow:0 2px 6px rgba(0,0,0,.45);transition:transform var(--transition),background var(--transition)}
+      .node-popover .switch[data-state="collapse"]{background:rgba(209,75,75,.18);border-color:rgba(209,75,75,.45)}
+      .node-popover .switch[data-state="collapse"] .thumb{background:rgba(209,75,75,.9)}
+      .node-popover .switch input:checked + .thumb{transform:translateX(20px)}
+      .node-popover .switch input:focus-visible + .thumb{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-popover .popover-actions{display:flex;justify-content:flex-end;gap:10px}
       .node-popover .popover-actions button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition)}
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
@@ -1765,26 +1788,20 @@ if ($view === 'map_edit') {
       </defs>
     </svg>
     <div class="mind-shell" data-fisheye="on">
-      <header class="mind-header">
-        <div class="mind-title-group">
+      <header class="mind-header" role="banner">
+        <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" aria-label="返回导图库">
+          <span class="icon" aria-hidden="true">←</span>
+          <span class="label">导图库</span>
+        </a>
+        <div class="mind-header-main">
           <div class="map-meta">
             <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
             <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
-            <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">← 返回导图库</a>
           </div>
           <label class="sr-only" for="map-title">导图标题</label>
           <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
-          <div class="save-state" id="save-state">保存成功</div>
         </div>
-        <div class="mind-header-actions">
-          <div class="mind-view-controls" role="group" aria-label="视图控制">
-            <button type="button" class="view-btn" id="btn-fit" title="自适应视图">🧭 自适应</button>
-            <button type="button" class="view-btn" id="btn-center" title="居中">◎ 居中</button>
-            <button type="button" class="view-btn" id="btn-zoom-in" title="放大">＋ 放大</button>
-            <button type="button" class="view-btn" id="btn-zoom-out" title="缩小">－ 缩小</button>
-            <button type="button" class="view-btn" id="btn-collapse" title="折叠/展开当前节点">折叠/展开</button>
-          </div>
-        </div>
+        <div class="save-state" id="save-state" role="status" aria-live="polite">保存成功</div>
       </header>
       <div class="mind-stage">
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
@@ -1830,11 +1847,14 @@ if ($view === 'map_edit') {
               <span class="label">更多</span>
             </button>
             <ul class="dock-menu" role="menu">
+              <li role="menuitem" data-action="fit-view">自适应视图</li>
+              <li role="menuitem" data-action="center-view">居中</li>
+              <li role="menuitem" data-action="zoom-in">放大</li>
+              <li role="menuitem" data-action="zoom-out">缩小</li>
+              <li role="menuitem" data-action="fold-all">折叠全部</li>
               <li role="menuitem" data-action="details">节点属性</li>
               <li role="menuitem" data-action="import">导入 JSON</li>
               <li role="menuitem" data-action="export">导出 JSON</li>
-              <li role="menuitem" data-action="toggle-fold">折叠/展开节点</li>
-              <li role="menuitem" data-action="fit-view">适应视图</li>
               <li role="menuitem" data-action="settings">设置</li>
               <?php if ($mind['id']): ?>
               <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
@@ -1888,6 +1908,16 @@ if ($view === 'map_edit') {
           <label for="node-tags">标签</label>
           <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
           <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
+        </div>
+        <div class="field field-toggle" id="node-fold-field" hidden>
+          <div class="toggle-row">
+            <span class="toggle-label" id="node-fold-label">折叠子节点</span>
+            <label class="switch" for="node-fold-toggle">
+              <input type="checkbox" id="node-fold-toggle" role="switch" aria-labelledby="node-fold-label">
+              <span class="thumb"></span>
+            </label>
+          </div>
+          <p class="helper">折叠后将隐藏该节点的子节点，可在此处重新展开。</p>
         </div>
         <div class="popover-actions">
           <button type="button" data-pop-close>取消</button>
@@ -2414,6 +2444,36 @@ if ($view === 'map_edit') {
           this.render();
           this.emit(SimpleMind.event_type.refresh);
         }
+        set_node_expanded(id, expanded){
+          const node=this.nodes.get(id);
+          if(!node) return false;
+          const flag=!!expanded;
+          if(node.expanded===flag) return false;
+          node.expanded=flag;
+          node.model.expanded=flag;
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.refresh);
+          return true;
+        }
+        set_all_expanded(expanded){
+          const flag=!!expanded;
+          let changed=false;
+          this.nodes.forEach(node=>{
+            if(!node || !node.parent) return;
+            if(node.expanded!==flag){
+              node.expanded=flag;
+              node.model.expanded=flag;
+              changed=true;
+            }
+          });
+          if(changed){
+            this.computeLayout();
+            this.render();
+            this.emit(SimpleMind.event_type.refresh);
+          }
+          return changed;
+        }
         set_node_color(id,bg,fg){
           const node=this.nodes.get(id);
           if(node && node.el){
@@ -2573,6 +2633,8 @@ if ($view === 'map_edit') {
           }
           if(orientation){ el.dataset.direction=orientation; }
           else{ el.removeAttribute('data-direction'); }
+          const hasChildren=Array.isArray(node.children) && node.children.length>0;
+          if(hasChildren){ el.classList.add('has-children'); }
           const span=document.createElement('span');
           span.className='node-topic';
           span.textContent=node.topic || '';
@@ -2625,6 +2687,13 @@ if ($view === 'map_edit') {
               tagWrap.appendChild(chip);
             });
             el.appendChild(tagWrap);
+          }
+          if(hasChildren && node.expanded===false){
+            el.classList.add('is-collapsed');
+            const marker=document.createElement('span');
+            marker.className='node-fold-marker';
+            marker.title='该节点包含已折叠的子节点';
+            el.appendChild(marker);
           }
           const badges=[];
           if(attachments.length){
@@ -3102,6 +3171,7 @@ if ($view === 'map_edit') {
       jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
       jmContainer.appendChild(overlay);
+      syncFoldAllMenuLabel();
       syncOverlaySize();
       if(!jm.get_selected_node() && initialData && initialData.data){
         jm.select_node(initialData.data.id);
@@ -3255,6 +3325,9 @@ if ($view === 'map_edit') {
       const nodeOwnerInput=document.getElementById('node-owner');
       const nodeTagsInput=document.getElementById('node-tags');
       const nodeTagsPreview=document.getElementById('node-tags-preview');
+      const nodeFoldField=document.getElementById('node-fold-field');
+      const nodeFoldToggle=document.getElementById('node-fold-toggle');
+      const nodeFoldSwitch=nodeFoldField ? nodeFoldField.querySelector('.switch') : null;
       const mindShell=document.querySelector('.mind-shell');
       const dock=document.getElementById('mind-dock');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
@@ -3263,6 +3336,7 @@ if ($view === 'map_edit') {
       const dockMore=dock ? dock.querySelector('.dock-more') : null;
       const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
       const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
+      const foldAllMenuItem=dockMenu ? dockMenu.querySelector('[data-action="fold-all"]') : null;
       const nodePopover=document.getElementById('node-popover');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
@@ -3289,11 +3363,6 @@ if ($view === 'map_edit') {
         else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const deleteMapForm=document.getElementById('delete-map-form');
-      const fitButton=document.getElementById('btn-fit');
-      const fitFloatingButton=null;
-      const addSiblingButton=null;
-      const addChildButton=null;
-      const deleteButton=null;
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
@@ -3385,6 +3454,36 @@ if ($view === 'map_edit') {
           nodeTagsPreview.appendChild(span);
         });
       }
+      function syncFoldToggleUI(collapsed, available){
+        if(nodeFoldField){ nodeFoldField.hidden=!available; }
+        if(nodeFoldToggle){
+          nodeFoldToggle.checked=!!collapsed;
+          nodeFoldToggle.setAttribute('aria-checked', (!!collapsed).toString());
+        }
+        if(nodeFoldSwitch){
+          if(collapsed){ nodeFoldSwitch.dataset.state='collapse'; }
+          else{ delete nodeFoldSwitch.dataset.state; }
+        }
+      }
+      function summarizeFoldState(){
+        let collapsed=0;
+        let expandable=0;
+        if(jm && jm.nodes instanceof Map){
+          jm.nodes.forEach(node=>{
+            if(!node || !node.parent) return;
+            if(Array.isArray(node.children) && node.children.length){
+              if(node.expanded===false) collapsed++;
+              else expandable++;
+            }
+          });
+        }
+        return {collapsed, expandable};
+      }
+      function syncFoldAllMenuLabel(){
+        if(!foldAllMenuItem) return;
+        const {collapsed}=summarizeFoldState();
+        foldAllMenuItem.textContent=collapsed>0 ? '展开全部' : '折叠全部';
+      }
       let popoverOpen=false;
       const popoverMedia=window.matchMedia('(max-width: 768px)');
       function updatePopoverMode(){
@@ -3454,6 +3553,7 @@ if ($view === 'map_edit') {
           if(nodeOwnerInput) nodeOwnerInput.value='';
           if(nodeTagsInput) nodeTagsInput.value='';
           renderTagPreview([]);
+          syncFoldToggleUI(false,false);
           inspectorSyncing=false;
           if(popoverOpen){ positionInspectorPopover(null); }
           return;
@@ -3467,6 +3567,8 @@ if ($view === 'map_edit') {
         if(nodeOwnerInput) nodeOwnerInput.value=data.owner||'';
         if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
         renderTagPreview(data.tags||[]);
+        const hasChildren=Array.isArray(node.children) && node.children.length>0;
+        syncFoldToggleUI(node.expanded===false, hasChildren);
         inspectorSyncing=false;
         if(popoverOpen){ positionInspectorPopover(node); }
       }
@@ -3488,6 +3590,7 @@ if ($view === 'map_edit') {
         requestAnimationFrame(()=>{
           updateHandlePosition();
           refreshInspector(jm.get_node(node.id));
+          syncFoldAllMenuLabel();
         });
       }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
@@ -3728,9 +3831,6 @@ if ($view === 'map_edit') {
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(node.id));
       }
-      if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
-      if(addChildButton) addChildButton.onclick=addChildNode;
-      if(deleteButton) deleteButton.onclick=deleteSelectedNode;
       if(attachInput){
         attachInput.addEventListener('change',async e=>{
           const files=Array.from(e.target.files||[]);
@@ -3809,6 +3909,23 @@ if ($view === 'map_edit') {
         nodeTagsInput.addEventListener('change',commitTags);
         nodeTagsInput.addEventListener('blur',commitTags);
       }
+      if(nodeFoldToggle){
+        nodeFoldToggle.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node){ syncFoldToggleUI(false,false); return; }
+          const collapse=nodeFoldToggle.checked;
+          const changed=typeof jm.set_node_expanded==='function' ? jm.set_node_expanded(node.id, !collapse) : false;
+          if(changed){
+            markDirty();
+            scheduleHandleRefresh();
+          }
+          const current=jm.get_node(node.id);
+          const hasChildren=current && Array.isArray(current.children) && current.children.length>0;
+          syncFoldToggleUI(current ? current.expanded===false : collapse, hasChildren);
+          syncFoldAllMenuLabel();
+        });
+      }
       if(dock){
         const closeDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
@@ -3844,17 +3961,33 @@ if ($view === 'map_edit') {
             case 'delete': deleteSelectedNode(); break;
             case 'import': triggerImport(); break;
             case 'export': exportMindmap(); break;
-            case 'toggle-fold': {
-              const node=ensureNode();
-              if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
-              break;
-            }
             case 'fit-view':
               if(!callView('zoomToFit')){
                 callView('set_zoom',1);
                 if(!callView('move_to_center')) callView('center_root');
               }
               break;
+            case 'center-view':
+              if(!callView('move_to_center')) callView('center_root');
+              break;
+            case 'zoom-in':
+              if(!callView('zoomIn')) callView('zoom_in');
+              break;
+            case 'zoom-out':
+              if(!callView('zoomOut')) callView('zoom_out');
+              break;
+            case 'fold-all': {
+              if(typeof jm.set_all_expanded==='function'){
+                const {collapsed}=summarizeFoldState();
+                const shouldExpand=collapsed>0;
+                if(jm.set_all_expanded(shouldExpand)){
+                  markDirty();
+                  scheduleHandleRefresh();
+                }
+                syncFoldAllMenuLabel();
+              }
+              break;
+            }
             case 'details': {
               const node=ensureNode();
               if(node){ openInspectorPopover(node); }
@@ -3926,30 +4059,6 @@ if ($view === 'map_edit') {
         }
         return false;
       }
-      if(fitButton){
-        fitButton.onclick=()=>{
-          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-            callView('set_zoom', 1);
-            if(!callView('move_to_center')) callView('center_root');
-          }
-        };
-      }
-      if(fitFloatingButton && fitButton){
-        fitFloatingButton.onclick=()=>fitButton.click();
-      }
-      const centerButton=document.getElementById('btn-center');
-      if(centerButton){ centerButton.onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); }; }
-      const zoomInButton=document.getElementById('btn-zoom-in');
-      if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
-      const zoomOutButton=document.getElementById('btn-zoom-out');
-      if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
-      const collapseButton=document.getElementById('btn-collapse');
-      if(collapseButton){
-        collapseButton.addEventListener('click',()=>{
-          const node=ensureNode();
-          if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
-        });
-      }
       let dropHoverNode=null;
       function clearDropHover(){
         if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
@@ -3996,6 +4105,7 @@ if ($view === 'map_edit') {
       if(titleInput){ titleInput.addEventListener('input', markDirty); }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
+          syncFoldAllMenuLabel();
           if(type===jsMind.event_type.select){
             const selected=jm.get_selected_node();
             const editingId=currentEditingId();
@@ -4038,6 +4148,7 @@ if ($view === 'map_edit') {
                 jm.show(json);
                 initialData=JSON.parse(JSON.stringify(json));
                 if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+                syncFoldAllMenuLabel();
                 markDirty();
               }
               else alert('文件格式不兼容');
