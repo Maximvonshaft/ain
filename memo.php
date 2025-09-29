@@ -1639,22 +1639,29 @@ if ($view === 'map_edit') {
       .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
       @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
       a{color:inherit;text-decoration:none}
-      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:28px 24px 140px}
-      @media (max-width:900px){.mind-shell{padding:18px 14px 150px;gap:14px}}
-      .mind-header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;z-index:10}
-      .mind-title-group{display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:420px}
-      .map-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font:600 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
-      .map-meta a{color:var(--gold-400);text-decoration:none}
-      .map-title-input{padding:14px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .mind-shell{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:0;padding:24px 24px 160px}
+      @media (max-width:900px){.mind-shell{padding:18px 14px 170px}}
+      .mind-info-bar{position:absolute;top:28px;left:28px;display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:260px;max-width:min(460px,calc(100% - 56px));pointer-events:auto;z-index:20}
+      .mind-info-row{display:flex;align-items:center;gap:12px}
+      .map-back{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.08);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);transition:background var(--transition),border-color var(--transition),transform var(--transition)}
+      .map-back:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16);transform:translateY(-1px)}
+      .mind-info-row .map-title-input{flex:1;min-width:0}
+      .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+      .map-meta span{white-space:nowrap}
+      .map-title-input{width:100%;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 17px/1.35 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
-      .save-state{align-self:flex-start;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+      .save-state{margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .save-state.show{opacity:1;transform:translateY(0)}
       .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
-      .mind-header-actions{display:flex;flex-direction:column;gap:14px;align-items:flex-end;margin-left:auto}
-      .mind-view-controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
-      .view-btn{min-width:0;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition);touch-action:manipulation}
-      .view-btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
-      .view-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      @media (max-width:720px){
+        .mind-info-bar{left:50%;top:16px;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;padding:8px 12px 10px;gap:6px;border-radius:18px}
+        .mind-info-row{gap:8px}
+        .map-back{padding:5px 9px;font-size:11px}
+        .map-title-input{padding:8px 12px;font-size:15px}
+        .save-state{font-size:10px;padding:4px 10px}
+        .map-meta{font-size:10px;gap:8px;letter-spacing:.12em;justify-content:space-between}
+        .map-meta span{flex:1 1 auto;min-width:0}
+      }
       .mind-stage{position:relative;flex:1;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
@@ -1685,7 +1692,10 @@ if ($view === 'map_edit') {
       @keyframes ringPulse{0%{transform:scale(.88);opacity:.15}50%{transform:scale(1.06);opacity:.32}100%{transform:scale(1.12);opacity:0}}
       .jsmind-node.selected{border-color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.32),0 0 40px rgba(227,198,139,.26);transform:translateY(-2px)}
       .jsmind-node.selected::after{opacity:.55;animation:ringPulse 2.4s linear infinite}
+      .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
+      .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
+      .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.42)}
       .jsmind-node.status-doing{border-color:rgba(36,194,160,.42);box-shadow:0 0 32px rgba(36,194,160,.25)}
       .jsmind-node.status-done{border-color:rgba(201,168,106,.28);filter:saturate(.82);opacity:.9}
       .mind-dock-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);pointer-events:none;z-index:120}
@@ -1726,6 +1736,16 @@ if ($view === 'map_edit') {
       .node-popover .chips-preview{display:flex;flex-wrap:wrap;gap:8px;min-height:26px}
       .node-popover .chips-preview span{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
       .node-popover .chips-preview .empty{color:var(--text-muted);border-style:dashed}
+      .node-popover .fold-field{padding-top:6px}
+      .node-popover .fold-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .toggle-switch{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--text-muted)}
+      .toggle-switch input{position:absolute;opacity:0;width:1px;height:1px;overflow:hidden}
+      .toggle-switch .track{position:relative;width:48px;height:24px;border-radius:999px;background:rgba(201,168,106,.14);border:1px solid rgba(201,168,106,.3);transition:background var(--transition),border-color var(--transition)}
+      .toggle-switch .thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 12px rgba(227,198,139,.45);transition:transform var(--transition)}
+      .toggle-switch input:checked + .track{background:rgba(36,194,160,.2);border-color:rgba(36,194,160,.4)}
+      .toggle-switch input:checked + .track .thumb{transform:translateX(24px)}
+      .toggle-switch .toggle-text{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+      .fold-hint{margin:8px 0 0;font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
       .node-popover .popover-actions{display:flex;justify-content:flex-end;gap:10px}
       .node-popover .popover-actions button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition)}
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
@@ -1765,28 +1785,19 @@ if ($view === 'map_edit') {
       </defs>
     </svg>
     <div class="mind-shell" data-fisheye="on">
-      <header class="mind-header">
-        <div class="mind-title-group">
+      <div class="mind-stage">
+        <header class="mind-info-bar">
+          <div class="mind-info-row">
+            <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" aria-label="返回导图库">← 导图库</a>
+            <label class="sr-only" for="map-title">导图标题</label>
+            <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+            <div class="save-state" id="save-state">保存成功</div>
+          </div>
           <div class="map-meta">
             <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
             <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
-            <a href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>">← 返回导图库</a>
           </div>
-          <label class="sr-only" for="map-title">导图标题</label>
-          <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
-          <div class="save-state" id="save-state">保存成功</div>
-        </div>
-        <div class="mind-header-actions">
-          <div class="mind-view-controls" role="group" aria-label="视图控制">
-            <button type="button" class="view-btn" id="btn-fit" title="自适应视图">🧭 自适应</button>
-            <button type="button" class="view-btn" id="btn-center" title="居中">◎ 居中</button>
-            <button type="button" class="view-btn" id="btn-zoom-in" title="放大">＋ 放大</button>
-            <button type="button" class="view-btn" id="btn-zoom-out" title="缩小">－ 缩小</button>
-            <button type="button" class="view-btn" id="btn-collapse" title="折叠/展开当前节点">折叠/展开</button>
-          </div>
-        </div>
-      </header>
-      <div class="mind-stage">
+        </header>
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
       </div>
       <input id="import-input" type="file" accept="application/json" hidden>
@@ -1833,8 +1844,11 @@ if ($view === 'map_edit') {
               <li role="menuitem" data-action="details">节点属性</li>
               <li role="menuitem" data-action="import">导入 JSON</li>
               <li role="menuitem" data-action="export">导出 JSON</li>
-              <li role="menuitem" data-action="toggle-fold">折叠/展开节点</li>
               <li role="menuitem" data-action="fit-view">适应视图</li>
+              <li role="menuitem" data-action="center-view">视图居中</li>
+              <li role="menuitem" data-action="zoom-in">放大</li>
+              <li role="menuitem" data-action="zoom-out">缩小</li>
+              <li role="menuitem" data-action="fold-all">折叠全部</li>
               <li role="menuitem" data-action="settings">设置</li>
               <?php if ($mind['id']): ?>
               <li role="menuitem" data-action="delete-map" data-danger="true">删除导图</li>
@@ -1888,6 +1902,17 @@ if ($view === 'map_edit') {
           <label for="node-tags">标签</label>
           <input id="node-tags" type="text" placeholder="用逗号分隔多个标签">
           <div class="chips-preview" id="node-tags-preview"><span class="empty">暂无标签</span></div>
+        </div>
+        <div class="field fold-field" id="node-fold-field" hidden>
+          <div class="fold-row">
+            <label for="node-fold-toggle">折叠子节点</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="node-fold-toggle">
+              <span class="track"><span class="thumb"></span></span>
+              <span class="toggle-text" id="node-fold-toggle-text">展开中</span>
+            </label>
+          </div>
+          <p class="fold-hint" id="node-fold-hint"></p>
         </div>
         <div class="popover-actions">
           <button type="button" data-pop-close>取消</button>
@@ -2414,6 +2439,51 @@ if ($view === 'map_edit') {
           this.render();
           this.emit(SimpleMind.event_type.refresh);
         }
+        set_node_expanded(id, expanded){
+          const node=this.nodes.get(id);
+          if(!node) return false;
+          const desired=expanded!==false;
+          if(node.expanded===desired) return false;
+          node.expanded=desired;
+          if(node.model){ node.model.expanded=desired; }
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.refresh);
+          return true;
+        }
+        set_all_expanded(expanded){
+          const desired=expanded!==false;
+          let changed=false;
+          if(this.root){
+            if(this.root.expanded!==true){
+              this.root.expanded=true;
+              if(this.root.model){ this.root.model.expanded=true; }
+              changed=true;
+            }
+          }
+          for(const node of this.nodes.values()){
+            if(!node || node.isroot) continue;
+            if(!node.children || !node.children.length) continue;
+            if(node.expanded===desired) continue;
+            node.expanded=desired;
+            if(node.model){ node.model.expanded=desired; }
+            changed=true;
+          }
+          if(changed){
+            this.computeLayout();
+            this.render();
+            this.emit(SimpleMind.event_type.refresh);
+          }
+          return changed;
+        }
+        has_collapsed_nodes(){
+          for(const node of this.nodes.values()){
+            if(node && node.children && node.children.length && node.expanded===false){
+              return true;
+            }
+          }
+          return false;
+        }
         set_node_color(id,bg,fg){
           const node=this.nodes.get(id);
           if(node && node.el){
@@ -2561,9 +2631,13 @@ if ($view === 'map_edit') {
         buildNodeElement(node,{forMeasure=false}={}){
           const el=document.createElement('div');
           el.className='jsmind-node';
+          if(node.isroot) el.classList.add('isroot');
+          if(node.children && node.children.length) el.classList.add('has-children');
+          if(node.expanded===false) el.classList.add('is-collapsed');
           if(node.selected && !forMeasure){ el.classList.add('selected'); }
           el.dataset.nodeid=node.id;
           el.setAttribute('nodeid', node.id);
+          el.dataset.foldState=node.expanded===false?'collapsed':'expanded';
           let orientation=null;
           if(node.direction==='left' || node.dir===-1) orientation='left';
           else if(node.direction==='right' || node.dir===1) orientation='right';
@@ -2662,6 +2736,14 @@ if ($view === 'map_edit') {
             wrap.className='node-affordances';
             badges.forEach(btn=>wrap.appendChild(btn));
             el.appendChild(wrap);
+          }
+          if(node.children && node.children.length && node.expanded===false){
+            const marker=document.createElement('span');
+            marker.className='node-collapse-marker';
+            marker.textContent='⤴ 已折叠';
+            marker.title='该节点包含折叠的子节点';
+            marker.setAttribute('aria-hidden','true');
+            el.appendChild(marker);
           }
           if(!forMeasure){
             el.addEventListener('click',(evt)=>{
@@ -3255,6 +3337,10 @@ if ($view === 'map_edit') {
       const nodeOwnerInput=document.getElementById('node-owner');
       const nodeTagsInput=document.getElementById('node-tags');
       const nodeTagsPreview=document.getElementById('node-tags-preview');
+      const nodeFoldField=document.getElementById('node-fold-field');
+      const nodeFoldToggle=document.getElementById('node-fold-toggle');
+      const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
+      const nodeFoldHint=document.getElementById('node-fold-hint');
       const mindShell=document.querySelector('.mind-shell');
       const dock=document.getElementById('mind-dock');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
@@ -3263,6 +3349,7 @@ if ($view === 'map_edit') {
       const dockMore=dock ? dock.querySelector('.dock-more') : null;
       const dockMoreButton=dockMore ? dockMore.querySelector('.dock-btn') : null;
       const dockMenu=dockMore ? dockMore.querySelector('.dock-menu') : null;
+      const foldAllMenuItem=dockMenu ? dockMenu.querySelector('[data-action="fold-all"]') : null;
       const nodePopover=document.getElementById('node-popover');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
@@ -3289,11 +3376,6 @@ if ($view === 'map_edit') {
         else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const deleteMapForm=document.getElementById('delete-map-form');
-      const fitButton=document.getElementById('btn-fit');
-      const fitFloatingButton=null;
-      const addSiblingButton=null;
-      const addChildButton=null;
-      const deleteButton=null;
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
@@ -3359,7 +3441,7 @@ if ($view === 'map_edit') {
           btn.addEventListener('click',()=>toggleSettings(false));
         });
       }
-      const inspectorFields=[nodeTopicInput,nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput].filter(Boolean);
+      const inspectorFields=[nodeTopicInput,nodeTypeSelect,nodeStatusSelect,nodePrioritySelect,nodeOwnerInput,nodeTagsInput,nodeFoldToggle].filter(Boolean);
       let inspectorSyncing=false;
       function parseTagsString(value){
         if(!value) return [];
@@ -3384,6 +3466,108 @@ if ($view === 'map_edit') {
           span.textContent=tag;
           nodeTagsPreview.appendChild(span);
         });
+      }
+      function updateFoldToggleUI(node){
+        if(!nodeFoldField || !nodeFoldToggle || !nodeFoldToggleText) return;
+        const hasChildren=!!(node && node.children && node.children.length);
+        nodeFoldField.hidden=!hasChildren;
+        if(!hasChildren){
+          nodeFoldToggle.checked=true;
+          if(nodeFoldToggleText) nodeFoldToggleText.textContent='展开中';
+          if(nodeFoldHint) nodeFoldHint.textContent='';
+          return;
+        }
+        const count=node.children ? node.children.filter(Boolean).length : 0;
+        const expanded=node.expanded!==false;
+        nodeFoldToggle.checked=expanded;
+        if(nodeFoldToggleText) nodeFoldToggleText.textContent=expanded?'展开中':'已折叠';
+        if(nodeFoldHint){
+          nodeFoldHint.textContent=expanded
+            ? `共有 ${count} 个直接子节点`
+            : `已折叠 ${count} 个直接子节点`;
+        }
+      }
+      function hasCollapsedNodes(){
+        if(typeof jm?.has_collapsed_nodes==='function'){
+          try{ return !!jm.has_collapsed_nodes(); }
+          catch(_){ /* ignore */ }
+        }
+        if(!jm || !jm.nodes || typeof jm.nodes.values!=='function') return false;
+        for(const node of jm.nodes.values()){
+          if(node && node.children && node.children.length && node.expanded===false){
+            return true;
+          }
+        }
+        return false;
+      }
+      function updateFoldAllLabel(){
+        if(!foldAllMenuItem) return;
+        foldAllMenuItem.textContent=hasCollapsedNodes() ? '展开全部' : '折叠全部';
+      }
+      function setAllNodesExpanded(expanded){
+        if(!jm) return false;
+        if(typeof jm.set_all_expanded==='function'){
+          try{ return !!jm.set_all_expanded(expanded); }
+          catch(_){ /* ignore */ }
+        }
+        if(!jm.nodes || typeof jm.nodes.values!=='function') return false;
+        const desired=!!expanded;
+        let changed=false;
+        for(const node of jm.nodes.values()){
+          if(!node || node.isroot) continue;
+          if(!node.children || !node.children.length) continue;
+          if(node.expanded===desired) continue;
+          node.expanded=desired;
+          if(node.model){ node.model.expanded=desired; }
+          changed=true;
+        }
+        if(changed){
+          jm.computeLayout();
+          jm.render();
+          if(typeof jm.emit==='function' && jsMind?.event_type?.refresh){
+            jm.emit(jsMind.event_type.refresh);
+          }
+        }
+        return changed;
+      }
+      function toggleFoldAll(){
+        const target=hasCollapsedNodes() ? true : false;
+        const changed=setAllNodesExpanded(target);
+        if(changed){
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+        }
+        updateFoldAllLabel();
+      }
+      function setNodeExpandedState(node, expanded){
+        if(!node) return;
+        let changed=false;
+        if(typeof jm.set_node_expanded==='function'){
+          try{ changed=!!jm.set_node_expanded(node.id, expanded); }
+          catch(_){ changed=false; }
+        }
+        if(!changed && typeof jm.set_node_expanded!=='function'){
+          const desired=expanded!==false;
+          if(node.expanded!==desired){
+            node.expanded=desired;
+            if(node.model){ node.model.expanded=desired; }
+            jm.computeLayout();
+            jm.render();
+            if(typeof jm.emit==='function' && jsMind?.event_type?.refresh){
+              jm.emit(jsMind.event_type.refresh);
+            }
+            changed=true;
+          }
+        }
+        if(changed){
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_node(node.id)));
+        }else{
+          updateFoldToggleUI(jm.get_node(node.id));
+        }
+        updateFoldAllLabel();
       }
       let popoverOpen=false;
       const popoverMedia=window.matchMedia('(max-width: 768px)');
@@ -3454,6 +3638,8 @@ if ($view === 'map_edit') {
           if(nodeOwnerInput) nodeOwnerInput.value='';
           if(nodeTagsInput) nodeTagsInput.value='';
           renderTagPreview([]);
+          updateFoldToggleUI(null);
+          updateFoldAllLabel();
           inspectorSyncing=false;
           if(popoverOpen){ positionInspectorPopover(null); }
           return;
@@ -3467,6 +3653,8 @@ if ($view === 'map_edit') {
         if(nodeOwnerInput) nodeOwnerInput.value=data.owner||'';
         if(nodeTagsInput) nodeTagsInput.value=data.tags && data.tags.length?data.tags.join(', '):'';
         renderTagPreview(data.tags||[]);
+        updateFoldToggleUI(node);
+        updateFoldAllLabel();
         inspectorSyncing=false;
         if(popoverOpen){ positionInspectorPopover(node); }
       }
@@ -3728,9 +3916,6 @@ if ($view === 'map_edit') {
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(node.id));
       }
-      if(addSiblingButton) addSiblingButton.onclick=addSiblingNode;
-      if(addChildButton) addChildButton.onclick=addChildNode;
-      if(deleteButton) deleteButton.onclick=deleteSelectedNode;
       if(attachInput){
         attachInput.addEventListener('change',async e=>{
           const files=Array.from(e.target.files||[]);
@@ -3809,6 +3994,14 @@ if ($view === 'map_edit') {
         nodeTagsInput.addEventListener('change',commitTags);
         nodeTagsInput.addEventListener('blur',commitTags);
       }
+      if(nodeFoldToggle){
+        nodeFoldToggle.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node) return;
+          setNodeExpandedState(node, nodeFoldToggle.checked);
+        });
+      }
       if(dock){
         const closeDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
@@ -3817,6 +4010,7 @@ if ($view === 'map_edit') {
         const openDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
+          updateFoldAllLabel();
         };
         const toggleDockMenu=()=>{
           const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
@@ -3844,16 +4038,23 @@ if ($view === 'map_edit') {
             case 'delete': deleteSelectedNode(); break;
             case 'import': triggerImport(); break;
             case 'export': exportMindmap(); break;
-            case 'toggle-fold': {
-              const node=ensureNode();
-              if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
-              break;
-            }
             case 'fit-view':
               if(!callView('zoomToFit')){
                 callView('set_zoom',1);
                 if(!callView('move_to_center')) callView('center_root');
               }
+              break;
+            case 'center-view':
+              if(!callView('move_to_center')) callView('center_root');
+              break;
+            case 'zoom-in':
+              if(!callView('zoomIn')) callView('zoom_in');
+              break;
+            case 'zoom-out':
+              if(!callView('zoomOut')) callView('zoom_out');
+              break;
+            case 'fold-all':
+              toggleFoldAll();
               break;
             case 'details': {
               const node=ensureNode();
@@ -3926,30 +4127,6 @@ if ($view === 'map_edit') {
         }
         return false;
       }
-      if(fitButton){
-        fitButton.onclick=()=>{
-          if(!callView('zoomToFit') && !callView('zoom_to_fit')){
-            callView('set_zoom', 1);
-            if(!callView('move_to_center')) callView('center_root');
-          }
-        };
-      }
-      if(fitFloatingButton && fitButton){
-        fitFloatingButton.onclick=()=>fitButton.click();
-      }
-      const centerButton=document.getElementById('btn-center');
-      if(centerButton){ centerButton.onclick=()=>{ if(!callView('move_to_center')) callView('center_root'); }; }
-      const zoomInButton=document.getElementById('btn-zoom-in');
-      if(zoomInButton){ zoomInButton.onclick=()=>{ if(!callView('zoomIn')) callView('zoom_in'); }; }
-      const zoomOutButton=document.getElementById('btn-zoom-out');
-      if(zoomOutButton){ zoomOutButton.onclick=()=>{ if(!callView('zoomOut')) callView('zoom_out'); }; }
-      const collapseButton=document.getElementById('btn-collapse');
-      if(collapseButton){
-        collapseButton.addEventListener('click',()=>{
-          const node=ensureNode();
-          if(node){ jm.toggle_node(node.id); markDirty(); scheduleHandleRefresh(); }
-        });
-      }
       let dropHoverNode=null;
       function clearDropHover(){
         if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
@@ -4006,6 +4183,7 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+            updateFoldAllLabel();
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
