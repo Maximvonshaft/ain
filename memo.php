@@ -1729,7 +1729,7 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .dock-more{position:relative}
-      .dock-menu{position:absolute;bottom:78px;right:0;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none}
+      .dock-menu{position:absolute;min-width:180px;padding:10px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));box-shadow:0 22px 48px rgba(0,0,0,.6);display:none;z-index:150}
       .dock-more[aria-expanded="true"] .dock-menu{display:block}
       .dock-menu li{padding:10px 12px;border-radius:12px;color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background-color var(--transition),color var(--transition)}
       .dock-menu li:hover{background:rgba(201,168,106,.12);color:var(--gold-400)}
@@ -3335,6 +3335,88 @@ if ($view === 'map_edit') {
         dockWrap.dataset.scrollLeft=dock.scrollLeft > 4 ? 'true' : 'false';
         dockWrap.dataset.scrollRight=dock.scrollLeft < maxScroll - 4 ? 'true' : 'false';
       }
+      const DOCK_MENU_GAP=12;
+      const DOCK_MENU_MARGIN=12;
+      const isDockMenuOpen=()=>dockMore && dockMore.getAttribute('aria-expanded')==='true';
+      const resetDockMenuPlacement=()=>{
+        if(dockMenu){
+          dockMenu.style.position='';
+          dockMenu.style.top='';
+          dockMenu.style.left='';
+          dockMenu.style.right='';
+          dockMenu.style.bottom='';
+          dockMenu.style.visibility='';
+          dockMenu.removeAttribute('data-placement');
+        }
+        if(dockMore){ dockMore.removeAttribute('data-placement'); }
+      };
+      const positionDockMenu=()=>{
+        if(!dockMenu) return;
+        if(!dockMoreButton || !isDockMenuOpen()){ dockMenu.style.visibility=''; return; }
+        const buttonRect=dockMoreButton.getBoundingClientRect();
+        const menuWidth=dockMenu.offsetWidth;
+        const menuHeight=dockMenu.offsetHeight;
+        if(!menuWidth || !menuHeight){ dockMenu.style.visibility=''; return; }
+        const vw=window.innerWidth || document.documentElement?.clientWidth || document.body?.clientWidth || 0;
+        const vh=window.innerHeight || document.documentElement?.clientHeight || document.body?.clientHeight || 0;
+        const spaceAbove=buttonRect.top;
+        const spaceBelow=vh - buttonRect.bottom;
+        const spaceLeft=buttonRect.left;
+        const spaceRight=vw - buttonRect.right;
+        let placement='above';
+        let top=buttonRect.top - menuHeight - DOCK_MENU_GAP;
+        let left=buttonRect.right - menuWidth;
+        if(spaceAbove < menuHeight + DOCK_MENU_GAP && spaceBelow > spaceAbove){
+          placement='below';
+          top=buttonRect.bottom + DOCK_MENU_GAP;
+        }else if(spaceBelow >= menuHeight + DOCK_MENU_GAP && spaceBelow >= spaceAbove){
+          placement='below';
+          top=buttonRect.bottom + DOCK_MENU_GAP;
+        }
+        if((placement==='above' && top < DOCK_MENU_MARGIN) || (placement==='below' && top + menuHeight > vh - DOCK_MENU_MARGIN)){
+          const canRight=spaceRight >= menuWidth + DOCK_MENU_GAP;
+          const canLeft=spaceLeft >= menuWidth + DOCK_MENU_GAP;
+          if(canRight || canLeft){
+            if(canRight && (!canLeft || spaceRight >= spaceLeft)){
+              placement='right';
+              left=buttonRect.right + DOCK_MENU_GAP;
+            }else{
+              placement='left';
+              left=buttonRect.left - menuWidth - DOCK_MENU_GAP;
+            }
+            top=buttonRect.top + (buttonRect.height - menuHeight)/2;
+          }else{
+            if(placement==='above'){
+              top=Math.max(DOCK_MENU_MARGIN, Math.min(top, vh - DOCK_MENU_MARGIN - menuHeight));
+            }else{
+              top=Math.max(DOCK_MENU_MARGIN, Math.min(buttonRect.bottom + DOCK_MENU_GAP, vh - DOCK_MENU_MARGIN - menuHeight));
+              placement='below';
+            }
+          }
+        }
+        if(placement==='above' || placement==='below'){
+          left=Math.min(Math.max(left, DOCK_MENU_MARGIN), Math.max(DOCK_MENU_MARGIN, vw - DOCK_MENU_MARGIN - menuWidth));
+        }else{
+          top=Math.min(Math.max(top, DOCK_MENU_MARGIN), Math.max(DOCK_MENU_MARGIN, vh - DOCK_MENU_MARGIN - menuHeight));
+          if(placement==='right' && left + menuWidth > vw - DOCK_MENU_MARGIN){
+            left=Math.max(DOCK_MENU_MARGIN, vw - DOCK_MENU_MARGIN - menuWidth);
+          }else if(placement==='left' && left < DOCK_MENU_MARGIN){
+            const maxLeft=Math.max(DOCK_MENU_MARGIN, vw - DOCK_MENU_MARGIN - menuWidth);
+            left=Math.max(DOCK_MENU_MARGIN, Math.min(buttonRect.left - menuWidth - DOCK_MENU_GAP, maxLeft));
+          }
+        }
+        dockMenu.style.position='fixed';
+        dockMenu.style.top=`${Math.round(top)}px`;
+        dockMenu.style.left=`${Math.round(left)}px`;
+        dockMenu.style.right='auto';
+        dockMenu.style.bottom='auto';
+        dockMenu.dataset.placement=placement;
+        if(dockMore){ dockMore.dataset.placement=placement; }
+        dockMenu.style.visibility='';
+      };
+      const handleDockViewportChange=()=>{
+        if(isDockMenuOpen()) positionDockMenu();
+      };
       function isFisheyeEnabled(){
         return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
       }
@@ -4083,27 +4165,39 @@ if ($view === 'map_edit') {
       }
       if(dock){
         updateDockScrollMarkers();
-        window.addEventListener('resize',updateDockScrollMarkers);
-        dock.addEventListener('scroll',updateDockScrollMarkers);
+        handleDockViewportChange();
+        window.addEventListener('resize',()=>{
+          updateDockScrollMarkers();
+          handleDockViewportChange();
+        });
+        dock.addEventListener('scroll',()=>{
+          updateDockScrollMarkers();
+          handleDockViewportChange();
+        });
+        window.addEventListener('scroll',handleDockViewportChange, true);
         dock.addEventListener('wheel',e=>{
           const dominant=Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
           if(!dominant) return;
           dock.scrollLeft += dominant;
           updateDockScrollMarkers();
+          handleDockViewportChange();
           e.preventDefault();
         });
         const closeDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','false'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','false'); }
+          resetDockMenuPlacement();
         };
         const openDockMenu=()=>{
           if(dockMore){ dockMore.setAttribute('aria-expanded','true'); }
           if(dockMoreButton){ dockMoreButton.setAttribute('aria-expanded','true'); }
+          resetDockMenuPlacement();
+          if(dockMenu){ dockMenu.style.visibility='hidden'; }
           updateFoldAllLabel();
+          requestAnimationFrame(()=>{ positionDockMenu(); });
         };
         const toggleDockMenu=()=>{
-          const expanded=dockMoreButton && dockMoreButton.getAttribute('aria-expanded')==='true';
-          if(expanded) closeDockMenu(); else openDockMenu();
+          if(isDockMenuOpen()) closeDockMenu(); else openDockMenu();
         };
         if(dockMoreButton){
           dockMoreButton.addEventListener('click',e=>{
@@ -4113,7 +4207,7 @@ if ($view === 'map_edit') {
           });
         }
         document.addEventListener('pointerdown',e=>{
-          if(!dockMore || dockMore.getAttribute('aria-expanded')!=='true') return;
+          if(!isDockMenuOpen()) return;
           if(dockMore.contains(e.target)) return;
           closeDockMenu();
         });
