@@ -549,8 +549,8 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
 function json_cats(): void {
   [$cats,$counts] = get_categories();
   $pdo=db();
-  $total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
-  $uncat = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE category_id IS NULL')->fetchColumn();
+  $total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
+  $uncat = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE category_id IS NULL AND done = 0')->fetchColumn();
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode(['ok'=>1,'cats'=>$cats,'counts'=>$counts,'total'=>$total,'uncat'=>$uncat], JSON_UNESCAPED_UNICODE);
   exit;
@@ -5298,11 +5298,14 @@ if ($view === 'maps') {
 // —— 首页 ——
 $pdo=db(); [$cats,$counts]=get_categories();
 $cat=$_GET['cat'] ?? 'all'; $q=trim((string)($_GET['q'] ?? '')); $params=[]; $where=[];
+if($cat==='all'){
+  $where[]='done = 0';
+}
 if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
 if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
 $sql='SELECT * FROM items'; if($where) $sql.=' WHERE '.implode(' AND ',$where); $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
 $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
-$all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
+$all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
 ?>
 <!doctype html>
 <html lang="zh-Hans">
@@ -5800,7 +5803,12 @@ if(itemsContainer){
           const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
           const categoryBadge=card.querySelector('.meta .badge:not(.js-updated)');
           if(categoryBadge && j.category_label){ categoryBadge.textContent=j.category_label; }
-          if(currentCategoryFilter!=='all' && currentCategoryFilter!==newCategoryId){
+          if(currentCategoryFilter==='all'){
+            if(j.done){
+              card.remove();
+              ensureItemsEmptyState();
+            }
+          } else if(currentCategoryFilter!==newCategoryId){
             card.remove();
             ensureItemsEmptyState();
           }
