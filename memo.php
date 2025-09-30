@@ -273,6 +273,16 @@ function ensure_other_category(): int {
   return (int)$pdo->lastInsertId();
 }
 
+function ensure_done_category(): int {
+  $pdo=db();
+  $st=$pdo->prepare("SELECT id FROM categories WHERE name=? LIMIT 1");
+  $st->execute(['已完成']);
+  $row=$st->fetch();
+  if($row) return (int)$row['id'];
+  $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)')->execute(['已完成', now()]);
+  return (int)$pdo->lastInsertId();
+}
+
 // —— 项及步骤、附件 ——
 function get_item(int $id): ?array {
   $pdo=db(); $st=$pdo->prepare('SELECT items.*, categories.name AS cat_name FROM items LEFT JOIN categories ON categories.id=items.category_id WHERE items.id=? LIMIT 1');
@@ -713,8 +723,36 @@ if (is_post()) {
       }
       case 'toggle_done': {
         $id=(int)$_POST['id']; $done=(int)($_POST['done']??0); $nowt=now();
-        $pdo->prepare('UPDATE items SET done=?, updated_at=? WHERE id=?')->execute([$done?1:0,$nowt,$id]);
-        if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$id,'updated_at'=>$nowt]); exit; }
+        if($done){
+          $doneCat=ensure_done_category();
+          $pdo->prepare('UPDATE items SET done=1, category_id=?, updated_at=? WHERE id=?')->execute([$doneCat,$nowt,$id]);
+        } else {
+          $pdo->prepare('UPDATE items SET done=0, updated_at=? WHERE id=?')->execute([$nowt,$id]);
+        }
+        $st=$pdo->prepare('SELECT items.done, items.category_id, categories.name FROM items LEFT JOIN categories ON categories.id=items.category_id WHERE items.id=? LIMIT 1');
+        $st->execute([$id]);
+        $row=$st->fetch();
+        $catId=null; $catName='未分类';
+        if($row){
+          if($row['category_id']!==null){
+            $catId=(int)$row['category_id'];
+            $catName=(string)($row['name'] ?? '');
+            if($catName==='') $catName='未分类';
+          }
+          $done=(int)$row['done'];
+        }
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode([
+            'ok'=>1,
+            'id'=>$id,
+            'done'=>$done?1:0,
+            'updated_at'=>$nowt,
+            'category_id'=>$catId,
+            'category_name'=>$catName,
+          ], JSON_UNESCAPED_UNICODE);
+          exit;
+        }
         break;
       }
       case 'edit_item': {
@@ -723,7 +761,16 @@ if (is_post()) {
         $pdo->prepare('UPDATE items SET title=?, description=?, category_id=?, updated_at=? WHERE id=?')->execute([$title,$desc,$catId,now(),$id]);
         if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1]); exit; } break;
       }
-      case 'delete_item': { $id=(int)$_POST['id']; $pdo->prepare('DELETE FROM items WHERE id=?')->execute([$id]); break; }
+      case 'delete_item': {
+        $id=(int)$_POST['id'];
+        $pdo->prepare('DELETE FROM items WHERE id=?')->execute([$id]);
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode(['ok'=>1], JSON_UNESCAPED_UNICODE);
+          exit;
+        }
+        break;
+      }
       case 'add_category': {
         $name=trim((string)($_POST['name']??'')); if($name==='') throw new RuntimeException('分类名必填');
         $pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)')->execute([$name,now()]);
@@ -5330,6 +5377,9 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .search button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.42);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.18em;cursor:pointer;transition:background var(--transition),box-shadow var(--transition),border-color var(--transition)}
   .search button:hover{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.6);box-shadow:0 0 18px rgba(227,198,139,.22)}
   .actions-row{display:flex;gap:10px;flex-wrap:wrap}
+  .actions-row.desktop-only{width:100%}
+  .mobile-actions{display:none;gap:10px;margin-bottom:12px}
+  .mobile-actions .btn{width:100%;justify-content:center}
   .items{display:grid;gap:16px;position:relative;grid-template-columns:repeat(3,minmax(0,1fr))}
   .item{position:relative;padding:18px 16px;border-radius:18px;background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:10px;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
   .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
@@ -5353,6 +5403,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
   .item-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .item-actions form{margin:0}
   .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
   .item-actions .status-tip{color:var(--gold-400)}
   .item-actions .note-tip{margin-right:0}
@@ -5385,6 +5436,8 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     .item-actions span.tip{display:none}
     .move-controls.desktop{display:none}
     .move-controls.mobile{display:flex}
+    .actions-row.desktop-only{display:none}
+    .mobile-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
   }
 </style>
 </head>
@@ -5420,7 +5473,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       <div>⤓ 导入 / 导出 JSON / CSV</div>
     </div>
   </aside>
-  <main class="main">
+  <main class="main" data-current-cat="<?php echo h((string)$cat); ?>">
     <?php if (!empty($_SESSION['flash'])): ?>
       <div class="err flash-message"><?php echo h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
     <?php endif; ?>
@@ -5430,11 +5483,16 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
         <input name="q" value="<?php echo h($q); ?>" placeholder="搜索标题/内容 · Search"/>
         <button>搜索</button>
       </form>
-      <div class="actions-row">
-        <button class="btn small" type="button" id="btn-import-items">导入 JSON</button>
+      <div class="actions-row desktop-only">
+        <button class="btn small" type="button" id="btn-import-items" data-role="memo-import">导入 JSON</button>
         <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
         <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
       </div>
+    </div>
+    <div class="mobile-actions">
+      <button class="btn small" type="button" data-role="memo-import">导入 JSON</button>
+      <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
+      <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
     </div>
     <input id="memo-import-input" type="file" accept="application/json" hidden>
     <div class="items" id="items">
@@ -5443,7 +5501,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       <?php endif; ?>
       <?php foreach ($items as $it): ?>
         <?php $steps_time=get_steps_by_time((int)$it['id']); ?>
-        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>">
+        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>">
           <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
             <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
               <input type="hidden" name="action" value="toggle_done">
@@ -5472,7 +5530,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
               </div>
               <?php endif; ?>
               <div class="meta meta-inline">
-                <span class="badge"><?php echo $it['category_id'] ? h(array_values(array_filter($cats,fn($c)=>$c['id']==$it['category_id']))[0]['name'] ?? '未分类') : '未分类'; ?></span>
+                <span class="badge js-category"><?php echo $it['category_id'] ? h(array_values(array_filter($cats,fn($c)=>$c['id']==$it['category_id']))[0]['name'] ?? '未分类') : '未分类'; ?></span>
                 <span class="badge js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
               </div>
             </div>
@@ -5489,6 +5547,11 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
               <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
             </div>
             <a class="btn small" href="?view=item&id=<?php echo $it['id']; ?>">详情</a>
+            <form method="post" class="form-delete-item" data-id="<?php echo $it['id']; ?>">
+              <input type="hidden" name="action" value="delete_item">
+              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+              <button class="btn small danger" type="submit">删除</button>
+            </form>
           </div>
         </article>
       <?php endforeach; ?>
@@ -5519,18 +5582,31 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
-const memoImportButton=document.getElementById('btn-import-items');
+const memoImportButtons=Array.from(document.querySelectorAll('[data-role="memo-import"]'));
 const memoImportInput=document.getElementById('memo-import-input');
-if(memoImportButton && memoImportInput){
-  const importButtonLabel=memoImportButton.textContent;
-  memoImportButton.addEventListener('click',()=>{ memoImportInput.click(); });
+let activeImportButton=null;
+if(memoImportButtons.length && memoImportInput){
+  memoImportButtons.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      activeImportButton=btn;
+      memoImportInput.click();
+    });
+  });
   memoImportInput.addEventListener('change',async ()=>{
     const file=memoImportInput.files && memoImportInput.files[0];
-    if(!file){ return; }
+    if(!file){ activeImportButton=null; return; }
     const confirmMessage=`确定要导入“${file.name}”吗？导入的条目将追加到当前列表。`;
-    if(!window.confirm(confirmMessage)){ memoImportInput.value=''; return; }
-    memoImportButton.disabled=true;
-    memoImportButton.textContent='导入中…';
+    if(!window.confirm(confirmMessage)){
+      memoImportInput.value='';
+      activeImportButton=null;
+      return;
+    }
+    const targetButton=activeImportButton || memoImportButtons[0] || null;
+    if(targetButton){
+      targetButton.dataset.loadingLabel=targetButton.textContent;
+      targetButton.disabled=true;
+      targetButton.textContent='导入中…';
+    }
     try{
       const fd=new FormData();
       fd.append('action','import_items');
@@ -5556,8 +5632,13 @@ if(memoImportButton && memoImportInput){
       alert(err instanceof Error ? err.message : '导入失败');
     }finally{
       memoImportInput.value='';
-      memoImportButton.disabled=false;
-      memoImportButton.textContent=importButtonLabel;
+      if(targetButton){
+        targetButton.disabled=false;
+        const label=targetButton.dataset.loadingLabel || '导入 JSON';
+        targetButton.textContent=label;
+        delete targetButton.dataset.loadingLabel;
+      }
+      activeImportButton=null;
     }
   });
 }
@@ -5680,6 +5761,27 @@ function refreshSidebarCats(cats, counts, total){
     list.appendChild(link);
   });
 }
+function refreshSidebarCounts(){
+  fetchCats().then(({cats,counts,total})=>{
+    refreshSidebarCats(cats,counts,total);
+  }).catch(()=>{});
+}
+function ensureMemoEmptyState(){
+  const grid=document.getElementById('items');
+  if(!grid) return;
+  const cards=grid.querySelectorAll('article.item');
+  let empty=grid.querySelector('.item-empty');
+  if(cards.length===0){
+    if(!empty){
+      empty=document.createElement('div');
+      empty.className='item item-empty';
+      empty.textContent='没有条目 · No items';
+      grid.appendChild(empty);
+    }
+  }else if(empty){
+    empty.remove();
+  }
+}
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 document.getElementById('items').addEventListener('change', async (e)=>{
   const t=e.target;
@@ -5690,8 +5792,31 @@ document.getElementById('items').addEventListener('change', async (e)=>{
     try{
       const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
       if(j && j.ok){
-        card.classList.toggle('done', !!done);
-        const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
+        const doneState=j.done?1:0;
+        t.checked=!!doneState;
+        card.classList.toggle('done', !!doneState);
+        const statusTip=card.querySelector('.status-tip');
+        if(statusTip) statusTip.textContent = doneState ? '已刻印完成' : '待刻录';
+        const updatedBadge=card.querySelector('.js-updated');
+        if(updatedBadge && j.updated_at) updatedBadge.textContent='更新 '+fmt(j.updated_at);
+        if(Object.prototype.hasOwnProperty.call(j,'category_name')){
+          const catBadge=card.querySelector('.js-category');
+          if(catBadge) catBadge.textContent=j.category_name || '未分类';
+        }
+        if(Object.prototype.hasOwnProperty.call(j,'category_id')){
+          if(j.category_id===null || j.category_id===''){
+            card.removeAttribute('data-category-id');
+          }else{
+            card.dataset.categoryId=String(j.category_id);
+          }
+          const main=document.querySelector('.main[data-current-cat]');
+          const currentCat=main ? main.dataset.currentCat : 'all';
+          if(currentCat && currentCat!=='all' && String(j.category_id ?? '')!==currentCat){
+            card.remove();
+          }
+        }
+        ensureMemoEmptyState();
+        refreshSidebarCounts();
       }
     }catch(_){ }
   }
@@ -5708,6 +5833,28 @@ document.getElementById('items').addEventListener('change', async (e)=>{
         if(badge && j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
       }
     }catch(_){ }
+  }
+});
+document.addEventListener('submit', async (e)=>{
+  const form=e.target;
+  if(form.classList.contains('form-delete-item')){
+    e.preventDefault();
+    if(!confirm('确认删除该备忘录？')) return false;
+    const fd=new FormData(form);
+    try{
+      const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+      const j=await res.json().catch(()=>null);
+      if(!res.ok || !j || !j.ok){
+        throw new Error('删除失败');
+      }
+      const card=form.closest('article.item');
+      if(card){ card.remove(); }
+      ensureMemoEmptyState();
+      refreshSidebarCounts();
+    }catch(err){
+      alert(err instanceof Error ? err.message : '删除失败');
+    }
+    return false;
   }
 });
 </script>
