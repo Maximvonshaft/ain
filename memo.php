@@ -8,7 +8,9 @@
 //   4. 修复搜索框颜色变量 bug（color:var(--text)）。
 
 declare(strict_types=1);
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 mb_internal_encoding('UTF-8');
 
 // 移除默认 X-Powered-By 头
@@ -23,7 +25,7 @@ header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 's
 
 // —— 配置 ——
 const DB_FILE = __DIR__ . '/memo.sqlite';
-const UPLOAD_DIR = __DIR__ . '/uploads';
+const UPLOAD_DIR = __DIR__ . '/storage/uploads';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 const ALLOWED_UPLOAD_MIME_MAP = [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
