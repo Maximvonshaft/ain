@@ -4356,6 +4356,13 @@ if ($view === 'map_edit') {
         if(e.key==='Escape'){ closeMapIoMenu(); }
       }, true);
       document.addEventListener('keydown',e=>{
+        const key=(e.key||'').toLowerCase();
+        if(key==='s' && (e.ctrlKey || e.metaKey)){
+          e.preventDefault();
+          saveMindmap();
+        }
+      });
+      document.addEventListener('keydown',e=>{
         const activeEl=document.activeElement;
         if(activeEl){
           const tag=activeEl.tagName || '';
@@ -4598,9 +4605,6 @@ if ($view === 'map_edit') {
           };
           reader.readAsText(file,'utf-8');
         });
-      }
-      if(dockSaveButton){
-        dockSaveButton.addEventListener('click',e=>{ e.preventDefault(); saveMindmap(); });
       }
       async function saveMindmap(){
         commitInlineEditing();
@@ -5117,6 +5121,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     --text:var(--text-strong);
     --bg:var(--bg-void);
     --panel:rgba(21,26,30,.9);
+    --sidebar-width:clamp(240px,26vw,320px);
     --panel-strong:rgba(15,19,22,.94);
     --grid:rgba(201,168,106,.12);
     --grid-strong:rgba(201,168,106,.18);
@@ -5151,7 +5156,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.18}
   a{color:inherit;text-decoration:none}
   .app{display:flex;min-height:100vh;position:relative;z-index:0}
-  .sidebar{position:fixed;top:0;left:0;bottom:0;width:100%;overflow:auto;background:linear-gradient(165deg,rgba(12,14,18,.94) 0%,rgba(15,19,22,.9) 55%,rgba(21,26,30,.9) 100%);border-right:1px solid var(--border);box-shadow:inset 0 0 0 1px rgba(201,168,106,.08),0 18px 45px rgba(0,0,0,.45);padding:20px;backdrop-filter:blur(18px) saturate(170%);
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar-width);overflow:auto;background:linear-gradient(165deg,rgba(12,14,18,.94) 0%,rgba(15,19,22,.9) 55%,rgba(21,26,30,.9) 100%);border-right:1px solid var(--border);box-shadow:inset 0 0 0 1px rgba(201,168,106,.08),0 18px 45px rgba(0,0,0,.45);padding:20px;backdrop-filter:blur(18px) saturate(170%);
     transition:transform var(--transition),box-shadow var(--transition);
   }
   .brand{display:flex;gap:12px;align-items:center;margin-bottom:18px;text-transform:uppercase;letter-spacing:.16em;color:var(--text-muted)}
@@ -5178,7 +5183,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .cat .name{flex:1;display:block;font-weight:600;color:var(--text-strong);text-shadow:0 0 8px rgba(201,168,106,.18)}
   .cat .count{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
   .footer{margin-top:18px;color:var(--text-dim);font-size:12px;line-height:1.8;text-shadow:0 0 10px rgba(201,168,106,.15)}
-  .main{padding:24px 20px 40px;margin-left:280px;background:linear-gradient(160deg,rgba(12,14,18,.82),rgba(10,12,14,.85));backdrop-filter:blur(14px) saturate(160%);position:relative;min-height:100vh;flex:1}
+  .main{padding:24px 20px 40px;margin-left:var(--sidebar-width);background:linear-gradient(160deg,rgba(12,14,18,.82),rgba(10,12,14,.85));backdrop-filter:blur(14px) saturate(160%);position:relative;min-height:100vh;flex:1}
   .main::before{content:"";position:absolute;inset:0;border-left:1px solid rgba(201,168,106,.12);border-top:1px solid rgba(201,168,106,.06);pointer-events:none;box-shadow:inset 0 0 0 1px rgba(201,168,106,.04)}
   .toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:18px}
   .search{flex:1 1 260px;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(15,19,22,.9),rgba(10,12,14,.88));border:1px solid rgba(201,168,106,.32);border-radius:16px;padding:10px 14px;box-shadow:inset 0 0 28px rgba(201,168,106,.08)}
@@ -5235,7 +5240,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   }
   @media (max-width:920px){
     .app{display:block}
-    .sidebar{position:static;height:auto;overflow:visible;border-right:0;border-bottom:1px solid rgba(201,168,106,.18);border-radius:0 0 22px 22px;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+    .sidebar{position:static;height:auto;overflow:visible;border-right:0;border-bottom:1px solid rgba(201,168,106,.18);border-radius:0 0 22px 22px;box-shadow:0 18px 40px rgba(0,0,0,.55);width:auto}
     .main{margin-left:0}
     .cat-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .items{grid-template-columns:1fr}
