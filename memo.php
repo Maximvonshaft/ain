@@ -128,6 +128,37 @@ function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok
 function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
 function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
 
+if(!function_exists('array_is_list')){
+  function array_is_list(array $array): bool {
+    $i=0;
+    foreach($array as $k=>$_){ if($k!==$i++) return false; }
+    return true;
+  }
+}
+
+function boolish(mixed $value): bool {
+  if(is_bool($value)) return $value;
+  if(is_int($value)) return $value !== 0;
+  if(is_float($value)) return $value != 0.0;
+  if(is_string($value)){
+    $normalized=strtolower(trim($value));
+    if($normalized==='' || in_array($normalized,['0','false','no','off','null'],true)) return false;
+    return true;
+  }
+  return (bool)$value;
+}
+
+function normalize_timestamp(mixed $value, ?int $fallback=null): int {
+  if(is_int($value)) return $value;
+  if(is_string($value)){
+    if(ctype_digit($value)) return (int)$value;
+    $ts=strtotime($value);
+    if($ts!==false) return $ts;
+  }
+  if(is_float($value)) return (int)$value;
+  return $fallback ?? now();
+}
+
 // —— 数据库 ——
 function db(): PDO {
   static $pdo;
@@ -559,6 +590,113 @@ if (is_post()) {
   $pdo=db(); $action=$_POST['action'] ?? '';
   try{
     switch($action){
+      case 'import_items': {
+        if(empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK){
+          throw new RuntimeException('请选择要导入的 JSON 文件');
+        }
+        $raw=file_get_contents($_FILES['file']['tmp_name']);
+        if($raw===false) throw new RuntimeException('无法读取导入文件');
+        $decoded=json_decode($raw,true);
+        if($decoded===null && json_last_error() !== JSON_ERROR_NONE){
+          throw new RuntimeException('JSON 解析失败：'.json_last_error_msg());
+        }
+        if(!is_array($decoded)){
+          throw new RuntimeException('导入数据格式不正确');
+        }
+        $itemsPayload=[];
+        if(isset($decoded['items']) && is_array($decoded['items'])){
+          $itemsPayload=$decoded['items'];
+        } elseif(array_is_list($decoded)){
+          $itemsPayload=$decoded;
+        } else {
+          throw new RuntimeException('未找到可导入的条目数据');
+        }
+        if(!$itemsPayload){
+          throw new RuntimeException('导入文件没有任何备忘录条目');
+        }
+        $pdo->beginTransaction();
+        $createdCategoryNames=[];
+        $existingCats=$pdo->query('SELECT id,name FROM categories')->fetchAll();
+        $catMap=[];
+        foreach($existingCats as $row){
+          $catMap[$row['name']]=(int)$row['id'];
+        }
+        $maxOrder=(int)$pdo->query('SELECT COALESCE(MAX(order_index), -1) FROM items')->fetchColumn();
+        $insertItem=$pdo->prepare('INSERT INTO items(title,description,done,category_id,order_index,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
+        $insertStep=$pdo->prepare('INSERT INTO steps(item_id,title,notes,done,order_index,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
+        $insertCat=$pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)');
+        $fetchCatId=$pdo->prepare('SELECT id FROM categories WHERE name=? LIMIT 1');
+        $imported=0; $skipped=0;
+        try {
+          foreach($itemsPayload as $item){
+            if(!is_array($item)){ $skipped++; continue; }
+            $title=trim((string)($item['title'] ?? ''));
+            if($title===''){ $skipped++; continue; }
+            $desc=(string)($item['description'] ?? ($item['desc'] ?? ''));
+            $done=boolish($item['done'] ?? false) ? 1 : 0;
+            $catId=null;
+            $catName='';
+            foreach(['cat_name','category_name','category'] as $key){
+              if(isset($item[$key]) && is_string($item[$key])){
+                $candidate=trim($item[$key]);
+                if($candidate!==''){ $catName=$candidate; break; }
+              }
+            }
+            if($catName!==''){
+              if(isset($catMap[$catName])){
+                $catId=$catMap[$catName];
+              } else {
+                $createdAt=now();
+                $insertCat->execute([$catName, $createdAt]);
+                $fetchCatId->execute([$catName]);
+                $newId=(int)($fetchCatId->fetchColumn() ?: 0);
+                if($newId>0){
+                  $catMap[$catName]=$newId;
+                  $createdCategoryNames[$catName]=true;
+                  $catId=$newId;
+                }
+              }
+            }
+            $nowTs=now();
+            $createdTs=normalize_timestamp($item['created_at'] ?? null, $nowTs);
+            $updatedTs=normalize_timestamp($item['updated_at'] ?? null, $createdTs);
+            $orderIndex=++$maxOrder;
+            $insertItem->execute([$title,$desc,$done,$catId,$orderIndex,$createdTs,$updatedTs]);
+            $itemId=(int)$pdo->lastInsertId();
+            if($itemId<=0){ $skipped++; continue; }
+            $stepsData=is_array($item['steps'] ?? null) ? $item['steps'] : [];
+            $stepIndex=0;
+            foreach($stepsData as $step){
+              if(!is_array($step)) continue;
+              $stepTitle=trim((string)($step['title'] ?? ''));
+              if($stepTitle==='') continue;
+              $stepNotes=(string)($step['notes'] ?? ($step['description'] ?? ''));
+              $stepDone=boolish($step['done'] ?? false) ? 1 : 0;
+              $stepCreated=normalize_timestamp($step['created_at'] ?? null, $createdTs);
+              $stepUpdated=normalize_timestamp($step['updated_at'] ?? null, $stepCreated);
+              $stepOrder=isset($step['order_index']) && is_numeric($step['order_index']) ? (int)$step['order_index'] : $stepIndex;
+              $insertStep->execute([$itemId,$stepTitle,$stepNotes,$stepDone,$stepOrder,$stepCreated,$stepUpdated]);
+              $stepIndex++;
+            }
+            $imported++;
+          }
+          $pdo->commit();
+        } catch(Throwable $inner){
+          $pdo->rollBack();
+          throw $inner;
+        }
+        $createdList=array_keys($createdCategoryNames);
+        $result=['ok'=>1,'imported'=>$imported,'skipped'=>$skipped,'created_categories'=>$createdList];
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode($result, JSON_UNESCAPED_UNICODE);
+          exit;
+        }
+        $_SESSION['flash']='成功导入 '.$imported.' 条备忘录';
+        if($skipped){ $_SESSION['flash'].='，跳过 '.$skipped.' 条'; }
+        if($createdList){ $_SESSION['flash'].='；新增分类：'.implode('、',$createdList); }
+        break;
+      }
       case 'create_draft': {
         $title='未命名'; $nowt=now();
         $pdo->prepare('INSERT INTO items(title,description,done,category_id,order_index,created_at,updated_at) VALUES(?,?,?,?,0,?,?)')
@@ -5279,7 +5417,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       <div>✅ 勾选完成</div>
       <div>↔ 左右按钮调整顺序（桌面）</div>
       <div>↑↓ 按钮调整顺序（移动端）</div>
-      <div>⤓ 导出 JSON / CSV</div>
+      <div>⤓ 导入 / 导出 JSON / CSV</div>
     </div>
   </aside>
   <main class="main">
@@ -5293,10 +5431,12 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
         <button>搜索</button>
       </form>
       <div class="actions-row">
+        <button class="btn small" type="button" id="btn-import-items">导入 JSON</button>
         <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
         <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
       </div>
     </div>
+    <input id="memo-import-input" type="file" accept="application/json" hidden>
     <div class="items" id="items">
       <?php if (!$items): ?>
         <div class="item item-empty">没有条目 · No items</div>
@@ -5379,6 +5519,48 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
+const memoImportButton=document.getElementById('btn-import-items');
+const memoImportInput=document.getElementById('memo-import-input');
+if(memoImportButton && memoImportInput){
+  const importButtonLabel=memoImportButton.textContent;
+  memoImportButton.addEventListener('click',()=>{ memoImportInput.click(); });
+  memoImportInput.addEventListener('change',async ()=>{
+    const file=memoImportInput.files && memoImportInput.files[0];
+    if(!file){ return; }
+    const confirmMessage=`确定要导入“${file.name}”吗？导入的条目将追加到当前列表。`;
+    if(!window.confirm(confirmMessage)){ memoImportInput.value=''; return; }
+    memoImportButton.disabled=true;
+    memoImportButton.textContent='导入中…';
+    try{
+      const fd=new FormData();
+      fd.append('action','import_items');
+      fd.append('file',file);
+      const res=await fetch(window.location.pathname + window.location.search,{
+        method:'POST',
+        body:fd,
+        headers:{'X-Requested-With':'XMLHttpRequest'}
+      });
+      const data=await res.json().catch(()=>null);
+      if(!res.ok || !data || !data.ok){
+        const errorMessage=(data && data.error) ? data.error : `导入失败（${res.status}）`;
+        throw new Error(errorMessage);
+      }
+      const summaryParts=[`成功导入 ${data.imported ?? 0} 条备忘录`];
+      if(data.skipped){ summaryParts.push(`跳过 ${data.skipped} 条`); }
+      if(Array.isArray(data.created_categories) && data.created_categories.length){
+        summaryParts.push(`新增分类：${data.created_categories.join('、')}`);
+      }
+      alert(summaryParts.join('，'));
+      window.location.reload();
+    }catch(err){
+      alert(err instanceof Error ? err.message : '导入失败');
+    }finally{
+      memoImportInput.value='';
+      memoImportButton.disabled=false;
+      memoImportButton.textContent=importButtonLabel;
+    }
+  });
+}
 function getColumnCount(){
   if(window.matchMedia('(max-width: 920px)').matches) return 1;
   if(window.matchMedia('(max-width: 1200px)').matches) return 2;
