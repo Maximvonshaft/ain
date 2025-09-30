@@ -217,6 +217,12 @@ function db(): PDO {
     $stmt=$pdo->prepare('INSERT INTO categories(name,created_at) VALUES(?,?)');
     foreach(['备忘录','流程','其他'] as $n){ $stmt->execute([$n, now()]); }
   }
+  $cols=$pdo->query('PRAGMA table_info(items)')->fetchAll();
+  $hasPrevCol=false;
+  foreach($cols as $col){ if(($col['name']??'')==='previous_category_id'){ $hasPrevCol=true; break; } }
+  if(!$hasPrevCol){ $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER'); }
+  $ensureDone=$pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)');
+  $ensureDone->execute(['已完成', now()]);
   $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -271,6 +277,24 @@ function ensure_other_category(): int {
   if($row) return (int)$row['id'];
   $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)')->execute(['其他', now()]);
   return (int)$pdo->lastInsertId();
+}
+
+function ensure_done_category(): int {
+  $pdo=db();
+  $pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)')->execute(['已完成', now()]);
+  $row=$pdo->query("SELECT id FROM categories WHERE name='已完成' LIMIT 1")->fetch();
+  return $row ? (int)$row['id'] : 0;
+}
+
+function get_category_name(?int $id): string {
+  if($id===null){
+    return '未分类';
+  }
+  $pdo=db();
+  $st=$pdo->prepare('SELECT name FROM categories WHERE id=? LIMIT 1');
+  $st->execute([$id]);
+  $row=$st->fetch();
+  return $row ? (string)$row['name'] : '未分类';
 }
 
 // —— 项及步骤、附件 ——
@@ -712,9 +736,62 @@ if (is_post()) {
         redirect('?view=item&id='.$newId); break;
       }
       case 'toggle_done': {
-        $id=(int)$_POST['id']; $done=(int)($_POST['done']??0); $nowt=now();
-        $pdo->prepare('UPDATE items SET done=?, updated_at=? WHERE id=?')->execute([$done?1:0,$nowt,$id]);
-        if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$id,'updated_at'=>$nowt]); exit; }
+        $id=(int)$_POST['id']; $done=(int)($_POST['done']??0)?1:0; $nowt=now();
+        $item=get_item($id);
+        if(!$item){ throw new RuntimeException('备忘录不存在'); }
+        $updates=['done'=>$done,'updated_at'=>$nowt];
+        $currentCategory=$item['category_id']??null;
+        $previousCategory=$item['previous_category_id']??null;
+        $doneCat=ensure_done_category();
+        $newCategoryId=$currentCategory!==null?(int)$currentCategory:null;
+        $newCategoryName=$newCategoryId!==null?get_category_name($newCategoryId):'未分类';
+        if($done){
+          if($currentCategory===null || (int)$currentCategory!==$doneCat){
+            $updates['previous_category_id']=$currentCategory;
+            $updates['category_id']=$doneCat;
+          }
+          $newCategoryId=$doneCat;
+          $newCategoryName=get_category_name($doneCat);
+        }else{
+          if((int)($currentCategory??0)===$doneCat){
+            if($previousCategory!==null){
+              $prevStmt=$pdo->prepare('SELECT name FROM categories WHERE id=? LIMIT 1');
+              $prevStmt->execute([$previousCategory]);
+              $prevRow=$prevStmt->fetch();
+              if($prevRow){
+                $updates['category_id']=$previousCategory;
+                $newCategoryId=(int)$previousCategory;
+                $newCategoryName=(string)$prevRow['name'];
+              }else{
+                $updates['category_id']=null;
+                $newCategoryId=null;
+                $newCategoryName='未分类';
+              }
+            }else{
+              $updates['category_id']=null;
+              $newCategoryId=null;
+              $newCategoryName='未分类';
+            }
+          }else{
+            $newCategoryName=$newCategoryId!==null?get_category_name($newCategoryId):'未分类';
+          }
+          $updates['previous_category_id']=null;
+        }
+        $setParts=[]; $values=[];
+        foreach($updates as $col=>$val){ $setParts[]=$col.'=?'; $values[]=$val; }
+        $values[]=$id;
+        $pdo->prepare('UPDATE items SET '.implode(',', $setParts).' WHERE id=?')->execute($values);
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode([
+            'ok'=>1,
+            'id'=>$id,
+            'updated_at'=>$nowt,
+            'category_id'=>$newCategoryId,
+            'category_name'=>$newCategoryName,
+          ], JSON_UNESCAPED_UNICODE);
+          exit;
+        }
         break;
       }
       case 'edit_item': {
@@ -5302,6 +5379,8 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);opacity:.85}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
+  .mobile-actions{display:none;gap:10px;flex-wrap:wrap;margin:16px 0 0}
+  .mobile-actions .btn{flex:1;justify-content:center}
   .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 16px 34px rgba(227,198,139,.24),0 0 24px rgba(227,198,139,.18);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
   .btn::after{content:none}
   .btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 30px rgba(227,198,139,.24)}
@@ -5353,6 +5432,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
   .item-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .item-actions form{margin:0}
   .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
   .item-actions .status-tip{color:var(--gold-400)}
   .item-actions .note-tip{margin-right:0}
@@ -5385,6 +5465,8 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     .item-actions span.tip{display:none}
     .move-controls.desktop{display:none}
     .move-controls.mobile{display:flex}
+    .mobile-actions{display:flex}
+    .toolbar .actions-row{display:none}
   }
 </style>
 </head>
@@ -5413,6 +5495,11 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       </a>
       <?php endforeach; ?>
     </div>
+    <div class="mobile-actions">
+      <button class="btn small" type="button" data-role="memo-import">导入 JSON</button>
+      <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
+      <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
+    </div>
     <div class="footer">
       <div>✅ 勾选完成</div>
       <div>↔ 左右按钮调整顺序（桌面）</div>
@@ -5431,7 +5518,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
         <button>搜索</button>
       </form>
       <div class="actions-row">
-        <button class="btn small" type="button" id="btn-import-items">导入 JSON</button>
+        <button class="btn small" type="button" id="btn-import-items" data-role="memo-import">导入 JSON</button>
         <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
         <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
       </div>
@@ -5443,7 +5530,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       <?php endif; ?>
       <?php foreach ($items as $it): ?>
         <?php $steps_time=get_steps_by_time((int)$it['id']); ?>
-        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>">
+        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>">
           <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
             <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
               <input type="hidden" name="action" value="toggle_done">
@@ -5489,6 +5576,11 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
               <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
             </div>
             <a class="btn small" href="?view=item&id=<?php echo $it['id']; ?>">详情</a>
+            <form method="post" onsubmit="return confirm('确认删除该备忘录？');">
+              <input type="hidden" name="action" value="delete_item">
+              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+              <button class="btn small danger" type="submit">删除</button>
+            </form>
           </div>
         </article>
       <?php endforeach; ?>
@@ -5519,18 +5611,19 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
-const memoImportButton=document.getElementById('btn-import-items');
+const memoImportButtons=Array.from(document.querySelectorAll('[data-role="memo-import"]'));
 const memoImportInput=document.getElementById('memo-import-input');
-if(memoImportButton && memoImportInput){
-  const importButtonLabel=memoImportButton.textContent;
-  memoImportButton.addEventListener('click',()=>{ memoImportInput.click(); });
+if(memoImportButtons.length && memoImportInput){
+  memoImportButtons.forEach(btn=>{
+    if(!btn.dataset.originalLabel){ btn.dataset.originalLabel=(btn.textContent||'').trim()||'导入 JSON'; }
+    btn.addEventListener('click',()=>{ if(!btn.disabled){ memoImportInput.click(); } });
+  });
   memoImportInput.addEventListener('change',async ()=>{
     const file=memoImportInput.files && memoImportInput.files[0];
     if(!file){ return; }
     const confirmMessage=`确定要导入“${file.name}”吗？导入的条目将追加到当前列表。`;
     if(!window.confirm(confirmMessage)){ memoImportInput.value=''; return; }
-    memoImportButton.disabled=true;
-    memoImportButton.textContent='导入中…';
+    memoImportButtons.forEach(btn=>{ btn.disabled=true; btn.textContent='导入中…'; });
     try{
       const fd=new FormData();
       fd.append('action','import_items');
@@ -5556,8 +5649,11 @@ if(memoImportButton && memoImportInput){
       alert(err instanceof Error ? err.message : '导入失败');
     }finally{
       memoImportInput.value='';
-      memoImportButton.disabled=false;
-      memoImportButton.textContent=importButtonLabel;
+      memoImportButtons.forEach(btn=>{
+        btn.disabled=false;
+        const label=btn.dataset.originalLabel || '导入 JSON';
+        btn.textContent=label;
+      });
     }
   });
 }
@@ -5691,7 +5787,18 @@ document.getElementById('items').addEventListener('change', async (e)=>{
       const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
       if(j && j.ok){
         card.classList.toggle('done', !!done);
-        const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
+        const updatedBadge=card.querySelector('.js-updated');
+        if(updatedBadge && j.updated_at){ updatedBadge.textContent='更新 '+fmt(j.updated_at); }
+        if(typeof j.category_name==='string'){
+          const categoryBadge=card.querySelector('.meta .badge:not(.js-updated)');
+          if(categoryBadge){ categoryBadge.textContent=j.category_name; }
+        }
+        if(Object.prototype.hasOwnProperty.call(j,'category_id')){
+          card.dataset.categoryId = j.category_id==null ? '' : String(j.category_id);
+        }
+        if(typeof fetchCats==='function'){
+          fetchCats().then(({cats,counts,total})=>{ refreshSidebarCats(cats,counts,total); }).catch(()=>{});
+        }
       }
     }catch(_){ }
   }
