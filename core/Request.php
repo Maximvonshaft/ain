@@ -10,13 +10,15 @@ class Request
         private array $server,
         private array $files,
         private array $cookies,
-        private array &$session
+        private array &$session,
+        private string $basePath = ''
     ) {
+        $this->basePath = $this->normalizeBasePath($basePath ?: $this->detectBasePath($server));
     }
 
-    public static function fromGlobals(): self
+    public static function fromGlobals(string $basePath = ''): self
     {
-        return new self($_GET, $_POST, $_SERVER, $_FILES, $_COOKIE, $_SESSION);
+        return new self($_GET, $_POST, $_SERVER, $_FILES, $_COOKIE, $_SESSION, $basePath);
     }
 
     public function method(): string
@@ -71,5 +73,77 @@ class Request
     public function &sessionRef(): array
     {
         return $this->session;
+    }
+
+    public function basePath(): string
+    {
+        return $this->basePath;
+    }
+
+    public function path(): string
+    {
+        $uri = $this->server['REQUEST_URI'] ?? '/';
+        $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+        $relative = $this->stripBasePath($path);
+
+        if ($relative === '' || $relative === null) {
+            return '/';
+        }
+
+        return '/' . ltrim($relative, '/');
+    }
+
+    private function normalizeBasePath(string $basePath): string
+    {
+        if ($basePath === '' || $basePath === '/') {
+            return '';
+        }
+
+        $basePath = trim($basePath);
+        if ($basePath === '') {
+            return '';
+        }
+
+        $parsed = parse_url($basePath, PHP_URL_PATH);
+        if (is_string($parsed)) {
+            $basePath = $parsed;
+        }
+
+        $basePath = '/' . trim($basePath, '/');
+
+        return $basePath === '/' ? '' : $basePath;
+    }
+
+    private function stripBasePath(string $path): string
+    {
+        if ($this->basePath === '') {
+            return $path;
+        }
+
+        if ($path === $this->basePath) {
+            return '/';
+        }
+
+        $prefixed = $this->basePath . '/';
+        if (str_starts_with($path, $prefixed)) {
+            return substr($path, strlen($this->basePath));
+        }
+
+        return $path;
+    }
+
+    private function detectBasePath(array $server): string
+    {
+        $scriptName = $server['SCRIPT_NAME'] ?? '';
+        if ($scriptName === '') {
+            return '';
+        }
+
+        $directory = str_replace('\\', '/', dirname($scriptName));
+        if ($directory === '/' || $directory === '.' || $directory === '') {
+            return '';
+        }
+
+        return $directory;
     }
 }

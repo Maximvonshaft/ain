@@ -9,9 +9,19 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-require __DIR__ . '/../bootstrap.php';
+/** @var \Core\Config $config */
+$config = require __DIR__ . '/../bootstrap.php';
 
-$request = Request::fromGlobals();
+$baseUrl = (string)($config->get('app.base_url', '') ?? '');
+$basePath = '';
+if ($baseUrl !== '') {
+    $parsedPath = parse_url($baseUrl, PHP_URL_PATH);
+    if (is_string($parsedPath)) {
+        $basePath = $parsedPath;
+    }
+}
+
+$request = Request::fromGlobals($basePath);
 $router = new Router();
 
 require __DIR__ . '/../routes/web.php';

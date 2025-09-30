@@ -24,8 +24,7 @@ class Router
     public function dispatch(Request $request): mixed
     {
         $method = $request->method();
-        $path = parse_url($request->server('REQUEST_URI', '/'), PHP_URL_PATH) ?: '/';
-        $normalized = $this->normalize($path);
+        $normalized = $this->normalize($request->path());
 
         if (!empty($this->routes[$method])) {
             foreach ($this->routes[$method] as $route => $handler) {
