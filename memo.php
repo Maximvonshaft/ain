@@ -186,7 +186,9 @@ function db(): PDO {
       order_index INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL
+      previous_category_id INTEGER,
+      FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+      FOREIGN KEY(previous_category_id) REFERENCES categories(id) ON DELETE SET NULL
     );');
     $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,17 +254,39 @@ function db(): PDO {
   }
   // 创建上传目录
   if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
+
+  $cols=$pdo->query('PRAGMA table_info(items)')->fetchAll();
+  $names=array_map(fn($col)=>$col['name']??'', $cols);
+  if(!in_array('previous_category_id',$names,true)){
+    $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
+  }
+
   return $pdo;
 }
 
 // —— 获取分类及计数 ——
 function get_categories(): array {
   $pdo=db();
+  ensure_done_category();
   $cats=$pdo->query('SELECT id,name FROM categories ORDER BY name COLLATE NOCASE')->fetchAll();
   $map=[]; foreach($cats as $c) $map[$c['id']] = 0;
   $rows=$pdo->query('SELECT category_id, COUNT(*) AS c FROM items GROUP BY category_id')->fetchAll();
   foreach($rows as $r){ $cid=$r['category_id']; if($cid!==null&&isset($map[$cid])) $map[$cid]=(int)$r['c']; }
   return [$cats,$map];
+}
+
+function ensure_done_category(): int {
+  static $cachedId=null;
+  if($cachedId!==null) return $cachedId;
+  $pdo=db();
+  $row=$pdo->query("SELECT id FROM categories WHERE name='已完成' LIMIT 1")->fetch();
+  if($row){
+    $cachedId=(int)$row['id'];
+    return $cachedId;
+  }
+  $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)')->execute(['已完成', now()]);
+  $cachedId=(int)$pdo->lastInsertId();
+  return $cachedId;
 }
 
 function ensure_other_category(): int {
@@ -712,9 +736,55 @@ if (is_post()) {
         redirect('?view=item&id='.$newId); break;
       }
       case 'toggle_done': {
-        $id=(int)$_POST['id']; $done=(int)($_POST['done']??0); $nowt=now();
-        $pdo->prepare('UPDATE items SET done=?, updated_at=? WHERE id=?')->execute([$done?1:0,$nowt,$id]);
-        if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$id,'updated_at'=>$nowt]); exit; }
+        $id=(int)$_POST['id'];
+        $done=boolish($_POST['done'] ?? 0) ? 1 : 0;
+        $nowt=now();
+        $pdo->beginTransaction();
+        try {
+          $st=$pdo->prepare('SELECT items.done, items.category_id, items.previous_category_id, cat.name AS category_name, prev.name AS previous_category_name FROM items LEFT JOIN categories AS cat ON cat.id=items.category_id LEFT JOIN categories AS prev ON prev.id=items.previous_category_id WHERE items.id=? LIMIT 1');
+          $st->execute([$id]);
+          $row=$st->fetch();
+          if(!$row){
+            throw new RuntimeException('指定的备忘录不存在');
+          }
+          $newCategoryId=null;
+          $categoryLabel='未分类';
+          if($done){
+            $doneCatId=ensure_done_category();
+            $prevCatId=(int)($row['done'] ? ($row['previous_category_id'] ?? $row['category_id']) : ($row['category_id'] ?? 0));
+            $prevCatId=$prevCatId>0 ? $prevCatId : null;
+            $pdo->prepare('UPDATE items SET previous_category_id=?, category_id=?, done=1, updated_at=? WHERE id=?')->execute([$prevCatId,$doneCatId,$nowt,$id]);
+            $newCategoryId=$doneCatId;
+            $categoryLabel='已完成';
+          } else {
+            $restoreCat=$row['previous_category_id']!==null ? (int)$row['previous_category_id'] : null;
+            $restoreName=$row['previous_category_name'] ?? null;
+            if($restoreCat!==null && !$restoreName){
+              $nameStmt=$pdo->prepare('SELECT name FROM categories WHERE id=? LIMIT 1');
+              $nameStmt->execute([$restoreCat]);
+              $restoreName=$nameStmt->fetchColumn() ?: null;
+            }
+            $pdo->prepare('UPDATE items SET previous_category_id=NULL, category_id=?, done=0, updated_at=? WHERE id=?')->execute([$restoreCat,$nowt,$id]);
+            $newCategoryId=$restoreCat;
+            if($restoreName){ $categoryLabel=$restoreName; }
+          }
+          $pdo->commit();
+        } catch(Throwable $err){
+          $pdo->rollBack();
+          throw $err;
+        }
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode([
+            'ok'=>1,
+            'id'=>$id,
+            'updated_at'=>$nowt,
+            'category_id'=>$newCategoryId,
+            'category_label'=>$categoryLabel,
+            'done'=>$done,
+          ]);
+          exit;
+        }
         break;
       }
       case 'edit_item': {
@@ -736,11 +806,15 @@ if (is_post()) {
       }
       case 'delete_category': {
         $id=(int)$_POST['id']; $other=ensure_other_category();
+        $fallback=$other===$id ? null : $other;
         $pdo->beginTransaction();
-        $pdo->prepare('UPDATE items SET category_id=? WHERE category_id=?')->execute([$other,$id]);
+        $pdo->prepare('UPDATE items SET category_id=? WHERE category_id=?')->execute([$fallback,$id]);
+        $pdo->prepare('UPDATE items SET previous_category_id=? WHERE previous_category_id=?')->execute([$fallback,$id]);
         $pdo->prepare('DELETE FROM categories WHERE id=?')->execute([$id]);
         $pdo->commit();
-        if(is_ajax()) json_cats(); break;
+        if($fallback===null){ ensure_other_category(); }
+        if(is_ajax()) json_cats();
+        break;
       }
       case 'add_step': {
         $item_id=(int)$_POST['item_id']; $title=trim((string)($_POST['title']??'')); if($title==='') throw new RuntimeException('步骤标题必填');
@@ -5353,6 +5427,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
   .item-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .item-actions form{margin:0}
   .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
   .item-actions .status-tip{color:var(--gold-400)}
   .item-actions .note-tip{margin-right:0}
@@ -5385,6 +5460,12 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     .item-actions span.tip{display:none}
     .move-controls.desktop{display:none}
     .move-controls.mobile{display:flex}
+  }
+  @media (max-width:720px){
+    .toolbar{flex-direction:column;align-items:stretch}
+    .search{width:100%}
+    .actions-row{width:100%;flex-direction:column;align-items:stretch}
+    .actions-row .btn{width:100%;justify-content:center}
   }
 </style>
 </head>
@@ -5443,7 +5524,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       <?php endif; ?>
       <?php foreach ($items as $it): ?>
         <?php $steps_time=get_steps_by_time((int)$it['id']); ?>
-        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>">
+        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>">
           <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
             <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
               <input type="hidden" name="action" value="toggle_done">
@@ -5489,6 +5570,11 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
               <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
             </div>
             <a class="btn small" href="?view=item&id=<?php echo $it['id']; ?>">详情</a>
+            <form method="post" onsubmit="return confirm('确认删除该备忘录？');" style="margin:0">
+              <input type="hidden" name="action" value="delete_item">
+              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+              <button class="btn small danger" type="submit">删除</button>
+            </form>
           </div>
         </article>
       <?php endforeach; ?>
@@ -5519,6 +5605,8 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
+const itemsContainer=document.getElementById('items');
+const currentCategoryFilter=<?php echo json_encode((string)$cat); ?>;
 const memoImportButton=document.getElementById('btn-import-items');
 const memoImportInput=document.getElementById('memo-import-input');
 if(memoImportButton && memoImportInput){
@@ -5560,6 +5648,21 @@ if(memoImportButton && memoImportInput){
       memoImportButton.textContent=importButtonLabel;
     }
   });
+}
+function ensureItemsEmptyState(){
+  if(!itemsContainer) return;
+  const hasCard=itemsContainer.querySelector('article.item');
+  const placeholder=itemsContainer.querySelector('.item-empty');
+  if(hasCard){
+    if(placeholder) placeholder.remove();
+    return;
+  }
+  if(!placeholder){
+    const empty=document.createElement('div');
+    empty.className='item item-empty';
+    empty.textContent='没有条目 · No items';
+    itemsContainer.appendChild(empty);
+  }
 }
 function getColumnCount(){
   if(window.matchMedia('(max-width: 920px)').matches) return 1;
@@ -5681,35 +5784,49 @@ function refreshSidebarCats(cats, counts, total){
   });
 }
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
-document.getElementById('items').addEventListener('change', async (e)=>{
-  const t=e.target;
-  if(t.classList.contains('item-toggle')){
-    const card=t.closest('article.item'); if(!card) return;
-    const id=card.dataset.id; const done=t.checked?1:0;
-    const fd=new FormData(); fd.append('action','toggle_done'); fd.append('id', id); fd.append('done', done);
-    try{
-      const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-      if(j && j.ok){
-        card.classList.toggle('done', !!done);
-        const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
-      }
-    }catch(_){ }
-  }
-  if(t.classList.contains('step-toggle')){
-    const row=t.closest('.tlrow'); if(!row) return;
-    const stepId=row.querySelector('input[name="id"]').value;
-    const done=t.checked?1:0;
-    const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
-    try{
-      const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-      if(j && j.ok){
-        row.classList.toggle('done', !!done);
-        const card=row.closest('article.item'); const badge=card && card.querySelector('.js-updated');
-        if(badge && j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
-      }
-    }catch(_){ }
-  }
-});
+if(itemsContainer){
+  itemsContainer.addEventListener('change', async (e)=>{
+    const t=e.target;
+    if(t.classList.contains('item-toggle')){
+      const card=t.closest('article.item'); if(!card) return;
+      const id=card.dataset.id; const done=t.checked?1:0;
+      const fd=new FormData(); fd.append('action','toggle_done'); fd.append('id', id); fd.append('done', done);
+      try{
+        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+        if(j && j.ok){
+          const newCategoryId=(j.category_id===null || typeof j.category_id==='undefined') ? '' : String(j.category_id);
+          card.dataset.categoryId=newCategoryId;
+          card.classList.toggle('done', !!j.done);
+          const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
+          const categoryBadge=card.querySelector('.meta .badge:not(.js-updated)');
+          if(categoryBadge && j.category_label){ categoryBadge.textContent=j.category_label; }
+          if(currentCategoryFilter!=='all' && currentCategoryFilter!==newCategoryId){
+            card.remove();
+            ensureItemsEmptyState();
+          }
+          try{
+            const {cats,counts,total}=await fetchCats();
+            refreshSidebarCats(cats,counts,total);
+          }catch(_){ }
+        }
+      }catch(_){ }
+    }
+    if(t.classList.contains('step-toggle')){
+      const row=t.closest('.tlrow'); if(!row) return;
+      const stepId=row.querySelector('input[name="id"]').value;
+      const done=t.checked?1:0;
+      const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
+      try{
+        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+        if(j && j.ok){
+          row.classList.toggle('done', !!done);
+          const card=row.closest('article.item'); const badge=card && card.querySelector('.js-updated');
+          if(badge && j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
+        }
+      }catch(_){ }
+    }
+  });
+}
 </script>
 </body>
 </html>
