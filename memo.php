@@ -798,7 +798,7 @@ if ($view === 'new') {
       }
       *,*::before,*::after{box-sizing:border-box}
       html,body{margin:0;min-height:100vh;color:var(--text-strong);background:var(--bg-void);font:16px/1.65 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow-x:hidden}
-      body{animation:breathing 10s ease-in-out infinite;background:
+      body{background:
         radial-gradient(1200px 700px at 70% -10%,rgba(227,198,139,.06),transparent 60%),
         linear-gradient(120deg,rgba(201,168,106,.08),transparent 30%,rgba(201,168,106,.06) 70%,transparent 90%),
         #0A0C0E;
@@ -812,23 +812,20 @@ if ($view === 'new') {
         repeating-linear-gradient(0deg,rgba(75,195,209,.08) 0,rgba(75,195,209,.08) 1px,transparent 1px,transparent var(--grid-size)),
         repeating-linear-gradient(90deg,rgba(201,168,106,.12) 0,rgba(201,168,106,.12) 1px,transparent 1px,transparent var(--grid-size));
         background-size:var(--grid-size) var(--grid-size);
-        mix-blend-mode:screen;opacity:.28;pointer-events:none;z-index:-3;animation:grid-pan 18s linear infinite;
+        mix-blend-mode:screen;opacity:.28;pointer-events:none;z-index:-3;background-attachment:fixed;
       }
-      @keyframes breathing{0%,100%{filter:brightness(.92)}50%{filter:brightness(1)}}
-      @keyframes grid-pan{0%{background-position:0 0,0 0}100%{background-position:0 var(--grid-size),var(--grid-size) 0}}
-      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.25;animation:scan 12s linear infinite}
-      @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.18}
       a{color:inherit;text-decoration:none}
       h1,h2,h3,h4{font-family:'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:-0.5px;text-transform:uppercase}
       .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;position:relative;z-index:0}
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.18);opacity:.65;pointer-events:none}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));border:1px solid rgba(201,168,106,.28);border-radius:var(--r-lg);padding:24px;box-shadow:var(--shadow-1);backdrop-filter:blur(14px)}
       .card::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-lg) - 4px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;opacity:.9}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 14px 32px rgba(227,198,139,.25),0 0 24px rgba(227,198,139,.18);overflow:hidden}
       .btn::after{content:none}
-      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
-      .btn:active{transform:translateY(0);background:rgba(21,26,30,.94);border-color:var(--gold-700)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));color:var(--gold-400);box-shadow:none}
+      .btn:hover{transform:translateY(-2px);box-shadow:0 18px 36px rgba(227,198,139,.3),0 0 28px rgba(227,198,139,.24)}
+      .btn:active{transform:translateY(0);box-shadow:0 8px 20px rgba(227,198,139,.22)}
+      .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
       .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
       .row{display:grid;grid-template-columns:2fr 1fr auto;gap:16px;margin-bottom:20px;align-items:center}
       .row input,.row select{padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 15px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
@@ -856,11 +853,11 @@ if ($view === 'new') {
       .thumb img{display:block;max-width:220px;max-height:150px}
       .att-meta{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
       .timeline{position:relative;margin-top:20px;margin-left:16px;padding-left:32px;color:var(--text-muted)}
-      .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.5),rgba(201,168,106,.06));animation:energy 6s linear infinite}
+      .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.6),rgba(201,168,106,.1));box-shadow:0 0 18px rgba(227,198,139,.28)}
       .tl-item{position:relative;margin:14px 0;padding:16px 18px 18px 24px;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-md);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));box-shadow:var(--shadow-1)}
       .tl-item::before{content:"";position:absolute;inset:8px;border-radius:calc(var(--r-md) - 4px);border:1px dashed rgba(201,168,106,.16);opacity:.6;pointer-events:none}
       .tl-item .tl-dot{position:absolute;left:-30px;top:20px;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.9));box-shadow:0 0 24px rgba(227,198,139,.32)}
-      .tl-item .tl-dot::after{content:"";position:absolute;inset:-6px;border-radius:inherit;border:1px dashed rgba(201,168,106,.4);animation:pulse 2.4s ease-in-out infinite}
+      .tl-item .tl-dot::after{content:"";position:absolute;inset:-6px;border-radius:inherit;border:1px dashed rgba(201,168,106,.45);opacity:.85;box-shadow:0 0 16px rgba(227,198,139,.28)}
       .tl-head{display:flex;gap:12px;align-items:center;color:var(--text-strong);font-family:'Inter','Noto Sans SC',sans-serif}
       .tl-item.done .tl-head div,.tl-item.done .md-body{opacity:.72;text-decoration:line-through}
       .tl-item.done{background:linear-gradient(160deg,rgba(36,194,160,.18),rgba(15,22,20,.92));border-color:rgba(36,194,160,.42);box-shadow:0 0 28px rgba(36,194,160,.28)}
@@ -871,8 +868,6 @@ if ($view === 'new') {
       .save-tip.dirty{color:var(--accent-crimson)}
       .save-tip.show{display:inline-block}
       .placeholder-muted{color:var(--text-muted)}
-      @keyframes pulse{0%,100%{transform:scale(.85);opacity:.7}50%{transform:scale(1.05);opacity:1}}
-      @keyframes energy{0%{background-position:0 0}100%{background-position:0 120px}}
     </style>
   </head>
   <body>
@@ -1190,22 +1185,20 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         repeating-linear-gradient(0deg,rgba(75,195,209,.08) 0,rgba(75,195,209,.08) 1px,transparent 1px,transparent var(--grid-size)),
         repeating-linear-gradient(90deg,rgba(201,168,106,.12) 0,rgba(201,168,106,.12) 1px,transparent 1px,transparent var(--grid-size));
         background-size:var(--grid-size) var(--grid-size);
-        mix-blend-mode:screen;opacity:.28;pointer-events:none;z-index:-3;animation:grid-pan 18s linear infinite;
+        mix-blend-mode:screen;opacity:.28;pointer-events:none;z-index:-3;background-attachment:fixed;
       }
-      @keyframes grid-pan{0%{background-position:0 0,0 0}100%{background-position:0 var(--grid-size),var(--grid-size) 0}}
-      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.25;animation:scan 12s linear infinite}
-      @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.18}
       a{color:inherit;text-decoration:none}
       h1,h2,h3,h4{font-family:'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:-0.5px;text-transform:uppercase}
       .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;position:relative;z-index:0}
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.2);opacity:.6;pointer-events:none}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.4);background:rgba(21,26,30,.82);color:var(--gold-400);cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 14px 32px rgba(227,198,139,.25),0 0 24px rgba(227,198,139,.18);overflow:hidden}
       .btn::after{content:none}
-      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.65)}
-      .btn:active{transform:translateY(0);border-color:var(--gold-700);background:rgba(21,26,30,.94)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.24));box-shadow:none}
-      .btn.danger{color:#F8E6E6;border-color:rgba(209,75,75,.55);box-shadow:none}
-      .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px}
+      .btn:hover{transform:translateY(-2px);box-shadow:0 18px 36px rgba(227,198,139,.3),0 0 28px rgba(227,198,139,.24)}
+      .btn:active{transform:translateY(0);box-shadow:0 8px 20px rgba(227,198,139,.22)}
+      .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
+      .btn.danger{color:#2b0909;background:linear-gradient(135deg,rgba(255,156,156,.85),rgba(209,75,75,.75));border-color:rgba(255,156,156,.8);box-shadow:0 14px 30px rgba(209,75,75,.25)}
+      .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));border:1px solid rgba(201,168,106,.32);border-radius:24px;padding:28px;box-shadow:var(--shadow-1);backdrop-filter:blur(16px)}
       .card::before{content:"";position:absolute;inset:12px;border-radius:calc(24px - 6px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 40px rgba(227,198,139,.1);pointer-events:none}
       .title{font:600 26px/1.35 'Cinzel','Noto Serif SC',serif;margin:0 0 10px;color:var(--gold-400);letter-spacing:.02em;text-transform:uppercase}
@@ -1246,11 +1239,11 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
       .thumb img{display:block;max-width:220px;max-height:150px}
       .timeline{position:relative;margin-top:22px;margin-left:18px;padding-left:34px;color:var(--text-muted)}
-      .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.5),rgba(201,168,106,.06));animation:energy 6s linear infinite}
+      .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.58),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.24)}
       .tl-item{position:relative;margin:14px 0;padding:16px 20px 20px 26px;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-md);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));box-shadow:var(--shadow-1)}
       .tl-item::before{content:"";position:absolute;inset:8px;border-radius:calc(var(--r-md) - 4px);border:1px dashed rgba(201,168,106,.2);pointer-events:none;opacity:.7}
       .tl-item .tl-dot{position:absolute;left:-28px;top:22px;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.9));box-shadow:0 0 24px rgba(227,198,139,.32)}
-      .tl-item .tl-dot::after{content:"";position:absolute;inset:-6px;border-radius:inherit;border:1px dashed rgba(201,168,106,.42);animation:pulse 2.4s ease-in-out infinite}
+      .tl-item .tl-dot::after{content:"";position:absolute;inset:-6px;border-radius:inherit;border:1px dashed rgba(201,168,106,.45);opacity:.85;box-shadow:0 0 18px rgba(227,198,139,.24)}
       .tl-head{display:flex;gap:12px;align-items:center;color:var(--text-strong);font-family:'Inter','Noto Sans SC',sans-serif}
       .tl-item.done .tl-head div,.tl-item.done .md-body{opacity:.72;text-decoration:line-through}
       .tl-item.done{background:linear-gradient(160deg,rgba(36,194,160,.18),rgba(15,22,20,.92));border-color:rgba(36,194,160,.42);box-shadow:0 0 28px rgba(36,194,160,.28)}
@@ -1267,8 +1260,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .toast.error .icon{color:var(--accent-crimson)}
       .toast .body{flex:1;font:14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .toast button{background:none;border:0;color:inherit;cursor:pointer}
-      @keyframes pulse{0%,100%{transform:scale(.85);opacity:.7}50%{transform:scale(1.05);opacity:1}}
-      @keyframes energy{0%{background-position:0 0}100%{background-position:0 120px}}
     </style>
 
   </head>
@@ -1622,7 +1613,7 @@ if ($view === 'map_edit') {
       }
       *,*::before,*::after{box-sizing:border-box}
       html,body{margin:0;min-height:100vh;color:var(--text-strong);background:var(--bg-void);font:16px/1.6 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow:hidden}
-      body{animation:breathing 12s ease-in-out infinite;background:
+      body{background:
         radial-gradient(1200px 700px at 72% -10%,rgba(227,198,139,.06),transparent 60%),
         linear-gradient(120deg,rgba(201,168,106,.08),transparent 30%,rgba(201,168,106,.06) 70%,transparent 90%),
         #0A0C0E;
@@ -1636,12 +1627,9 @@ if ($view === 'map_edit') {
         repeating-linear-gradient(0deg,rgba(75,195,209,.08) 0,rgba(75,195,209,.08) 1px,transparent 1px,transparent var(--grid-size)),
         repeating-linear-gradient(90deg,rgba(201,168,106,.12) 0,rgba(201,168,106,.12) 1px,transparent 1px,transparent var(--grid-size));
         background-size:var(--grid-size) var(--grid-size);
-        mix-blend-mode:screen;opacity:.3;pointer-events:none;z-index:-3;animation:grid-pan 18s linear infinite;
+        mix-blend-mode:screen;opacity:.3;pointer-events:none;z-index:-3;background-attachment:fixed;
       }
-      @keyframes breathing{0%,100%{filter:brightness(.9)}50%{filter:brightness(1)}}
-      @keyframes grid-pan{0%{background-position:0 0,0 0}100%{background-position:0 var(--grid-size),var(--grid-size) 0}}
-      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
-      @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.18}
       a{color:inherit;text-decoration:none}
       .mind-shell{position:relative;min-height:100vh;min-height:100dvh;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden}
       @media (max-width:900px){.mind-shell{padding:0}}
@@ -1664,6 +1652,18 @@ if ($view === 'map_edit') {
       .map-io[aria-expanded="true"] .map-io-menu{display:flex}
       .map-io-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition),color var(--transition);text-align:left}
       .map-io-menu button:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
+      .mind-import-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.78);backdrop-filter:blur(18px);z-index:180}
+      .mind-import-backdrop[data-open="true"]{display:flex}
+      .mind-import-panel{background:linear-gradient(165deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.36);border-radius:24px;box-shadow:0 32px 68px rgba(0,0,0,.68),0 0 32px rgba(227,198,139,.18);padding:24px;max-width:420px;width:100%;display:grid;gap:16px;position:relative}
+      .mind-import-panel::before{content:"";position:absolute;inset:10px;border-radius:18px;border:1px dashed rgba(201,168,106,.26);opacity:.75;pointer-events:none}
+      .mind-import-panel h3{margin:0;font:600 18px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.16em;text-transform:uppercase;text-align:center}
+      .mind-import-panel p{margin:0;color:var(--text-muted);font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-align:center}
+      .mind-import-options{display:grid;gap:10px}
+      .mind-import-options button{padding:12px 16px;border-radius:16px;border:1px solid rgba(227,198,139,.62);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.58));color:#1b1306;font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition)}
+      .mind-import-options button:hover{transform:translateY(-2px);box-shadow:0 18px 36px rgba(227,198,139,.32),0 0 28px rgba(227,198,139,.24)}
+      .mind-import-footer{display:flex;justify-content:flex-end}
+      .mind-import-footer button{padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition)}
+      .mind-import-footer button:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(227,198,139,.22)}
       .map-back{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.08);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);transition:background var(--transition),border-color var(--transition),transform var(--transition)}
       .map-back:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16);transform:translateY(-1px)}
       .mind-info-row .map-title-input{flex:1;min-width:0}
@@ -1682,7 +1682,9 @@ if ($view === 'map_edit') {
         .mind-info-bar{left:50%;top:calc(var(--safe-top) + 16px);transform:translateX(-50%);width:calc(100% - 24px);max-width:none;padding:8px 12px 10px;gap:6px;border-radius:18px}
         .mind-info-bar[data-collapsed="true"]{padding:0 10px}
         .mind-info-handle{width:32px;height:20px;margin-bottom:2px}
-        .mind-info-row{gap:8px}
+        .mind-info-content{align-items:center}
+        .mind-info-row{gap:8px;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+        .mind-info-row .map-title-input{text-align:center;max-width:260px;margin:0 auto}
         .map-back{padding:5px 9px;font-size:11px}
         .map-title-input{padding:8px 12px;font-size:15px}
         .save-state{font-size:10px;padding:4px 10px}
@@ -1702,9 +1704,8 @@ if ($view === 'map_edit') {
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
-      .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.22);opacity:.7;pointer-events:none;animation:nodeGlow 9s ease-in-out infinite}
-      .jsmind-node::after{content:"";position:absolute;inset:-14px;border-radius:calc(var(--r-md) + 10px);border:1px dashed rgba(201,168,106,.22);opacity:0;pointer-events:none}
-      @keyframes nodeGlow{0%,100%{opacity:.4}50%{opacity:.85}}
+      .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.18)}
+      .jsmind-node::after{content:"";position:absolute;inset:-14px;border-radius:calc(var(--r-md) + 10px);border:1px dashed rgba(201,168,106,.26);opacity:0;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.16)}
       .jsmind-node .node-topic{font:600 16px/1.45 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.06em;text-transform:uppercase}
       .jsmind-node .node-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-dim);font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em}
       .jsmind-node .node-meta span{padding:2px 8px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78)}
@@ -1712,10 +1713,9 @@ if ($view === 'map_edit') {
       .jsmind-node .node-note{color:var(--text-muted);font:400 13px/1.7 'Noto Sans SC','Inter',sans-serif;white-space:pre-wrap;word-break:break-word}
       .jsmind-node .node-footer{display:flex;gap:8px;flex-wrap:wrap;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
       .jsmind-node.isroot{border-width:2px;border-color:rgba(227,198,139,.55);box-shadow:0 0 0 1px rgba(227,198,139,.25),0 30px 60px rgba(0,0,0,.6)}
-      .jsmind-node.isroot::after{opacity:.4;animation:ringPulse 3.6s linear infinite}
-      @keyframes ringPulse{0%{transform:scale(.88);opacity:.15}50%{transform:scale(1.06);opacity:.32}100%{transform:scale(1.12);opacity:0}}
+      .jsmind-node.isroot::after{opacity:.42;transform:scale(.95);box-shadow:0 0 36px rgba(227,198,139,.28)}
       .jsmind-node.selected{border-color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.32),0 0 40px rgba(227,198,139,.26);transform:translateY(-2px)}
-      .jsmind-node.selected::after{opacity:.55;animation:ringPulse 2.4s linear infinite}
+      .jsmind-node.selected::after{opacity:.6;transform:scale(.98);box-shadow:0 0 40px rgba(75,195,209,.3)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
@@ -1882,6 +1882,20 @@ if ($view === 'map_edit') {
             <span class="label">删除</span>
           </button>
         </nav>
+      </div>
+    </div>
+    <div class="mind-import-backdrop" id="mind-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="mind-import-title">
+      <div class="mind-import-panel">
+        <h3 id="mind-import-title">导入导图</h3>
+        <p>文件：<strong data-import-name>未选择文件</strong></p>
+        <div class="mind-import-options">
+          <button type="button" data-import-mode="replace">覆盖当前导图</button>
+          <button type="button" data-import-mode="append-node">导入为新节点</button>
+          <button type="button" data-import-mode="new-map">导入为新导图</button>
+        </div>
+        <div class="mind-import-footer">
+          <button type="button" data-import-cancel>取消</button>
+        </div>
       </div>
     </div>
     <div class="node-popover" id="node-popover" hidden>
@@ -3390,6 +3404,12 @@ if ($view === 'map_edit') {
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
       const mapDeleteButton=document.getElementById('map-delete-btn');
+      const importModal=document.getElementById('mind-import-modal');
+      const importModalName=importModal ? importModal.querySelector('[data-import-name]') : null;
+      const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
+      const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
+      let pendingImportPayload=null;
+      let pendingImportFileName='';
       const foldAllMenuItem=null;
       const nodePopover=document.getElementById('node-popover');
       const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
@@ -4255,6 +4275,25 @@ if ($view === 'map_edit') {
           closeMapIoMenu();
         });
       }
+      if(importModal){
+        importModal.addEventListener('click',e=>{
+          if(e.target===importModal){ closeImportModeDialog(); }
+        });
+      }
+      if(importCancelButton){
+        importCancelButton.addEventListener('click',e=>{ e.preventDefault(); closeImportModeDialog(); });
+      }
+      if(importModeButtons.length){
+        importModeButtons.forEach(btn=>{
+          btn.addEventListener('click',e=>{
+            e.preventDefault();
+            const mode=btn.dataset.importMode;
+            if(!mode){ return; }
+            if(!pendingImportPayload){ closeImportModeDialog(); return; }
+            handleImportModeSelection(mode);
+          });
+        });
+      }
       if(mapDeleteButton){
         mapDeleteButton.addEventListener('click',e=>{
           e.preventDefault();
@@ -4417,20 +4456,46 @@ if ($view === 'map_edit') {
         a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 1000);
       }
+      function openImportModeDialog(fileName, data){
+        pendingImportPayload=data;
+        pendingImportFileName=fileName || '导图文件';
+        if(importModalName){ importModalName.textContent=pendingImportFileName; }
+        if(importModal){ importModal.dataset.open='true'; }
+      }
+      function closeImportModeDialog(){
+        pendingImportPayload=null;
+        pendingImportFileName='';
+        if(importModal){ importModal.dataset.open='false'; }
+      }
+      function handleImportModeSelection(mode){
+        if(!pendingImportPayload) return;
+        const payload=JSON.parse(JSON.stringify(pendingImportPayload));
+        try{
+          commitInlineEditing();
+          if(mapDeleteButton && mode!=='new-map'){ mapDeleteButton.disabled=!currentMapId; }
+          switch(mode){
+            case 'replace':
+              jm.show(payload);
+              initialData=JSON.parse(JSON.stringify(payload));
+              if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+              markDirty();
+              break;
+            case 'append-node':
+              importJsonAsSubtree(payload);
+              break;
+            case 'new-map':
+              importJsonAsNewMap(payload);
+              break;
+            default:
+              break;
+          }
+          closeImportModeDialog();
+        }catch(err){
+          alert(err.message || '导入失败');
+        }
+      }
       function triggerImport(){
         if(importInput){ importInput.click(); }
-      }
-      function promptImportMode(){
-        const message='请选择导入方式：\n1. 覆盖当前导图\n2. 导入为新节点\n3. 导入为新导图\n取消：中止导入';
-        while(true){
-          const input=prompt(message,'1');
-          if(input===null) return null;
-          const value=input.trim();
-          if(value==='1') return 'replace';
-          if(value==='2') return 'append-node';
-          if(value==='3') return 'new-map';
-          alert('请输入 1、2 或 3。');
-        }
       }
       function findModelById(node,id){
         if(!node || !id) return null;
@@ -4510,28 +4575,24 @@ if ($view === 'map_edit') {
               const json=JSON.parse(evt.target.result);
               if(!json || !json.data){ alert('文件格式不兼容'); return; }
               enforceRightOrientation(json.data);
-              const mode=promptImportMode();
-              if(!mode) return;
-              commitInlineEditing();
-              if(mapDeleteButton && mode!=='new-map'){ mapDeleteButton.disabled=!currentMapId; }
-              switch(mode){
-                case 'replace':
-                  jm.show(json);
-                  initialData=JSON.parse(JSON.stringify(json));
-                  if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-                  markDirty();
-                  break;
-                case 'append-node':
-                  importJsonAsSubtree(json);
-                  break;
-                case 'new-map':
-                  importJsonAsNewMap(json);
-                  break;
-              }
-            }catch(err){ alert('无法解析 JSON：'+err.message); }
+              closeImportModeDialog();
+              pendingImportPayload=json;
+              pendingImportFileName=file.name;
+              openImportModeDialog(file.name, json);
+            }catch(err){
+              pendingImportPayload=null;
+              pendingImportFileName='';
+              alert('无法解析 JSON：'+err.message);
+            }
             finally{
               importInput.value='';
             }
+          };
+          reader.onerror=()=>{
+            pendingImportPayload=null;
+            pendingImportFileName='';
+            alert('读取文件失败');
+            importInput.value='';
           };
           reader.readAsText(file,'utf-8');
         });
@@ -4628,7 +4689,7 @@ if ($view === 'maps') {
       }
       *,*::before,*::after{box-sizing:border-box}
       html,body{margin:0;min-height:100vh;background:var(--bg-void);color:var(--text-strong);font:16px/1.65 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow-x:hidden}
-      body{animation:breathing 12s ease-in-out infinite;background:
+      body{background:
         radial-gradient(1200px 700px at 70% -10%,rgba(227,198,139,.06),transparent 60%),
         linear-gradient(120deg,rgba(201,168,106,.08),transparent 30%,rgba(201,168,106,.06) 70%,transparent 90%),
         #0A0C0E;
@@ -4641,32 +4702,28 @@ if ($view === 'maps') {
       body::after{content:"";position:fixed;inset:0;background:
         repeating-linear-gradient(0deg,rgba(75,195,209,.08) 0,rgba(75,195,209,.08) 1px,transparent 1px,transparent var(--grid-size)),
         repeating-linear-gradient(90deg,rgba(201,168,106,.12) 0,rgba(201,168,106,.12) 1px,transparent 1px,transparent var(--grid-size));
-        mix-blend-mode:screen;opacity:.3;pointer-events:none;z-index:-4;animation:grid-pan 18s linear infinite;
+        mix-blend-mode:screen;opacity:.3;pointer-events:none;z-index:-4;background-attachment:fixed;
       }
-      @keyframes breathing{0%,100%{filter:brightness(.92)}50%{filter:brightness(1.02)}}
-      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.12) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
-      @keyframes grid-pan{0%{background-position:0 0,0 0}100%{background-position:0 var(--grid-size),var(--grid-size) 0}}
-      @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.12) 0,transparent 4px);background-size:100% 6px;opacity:.18}
       a{color:inherit;text-decoration:none}
       .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px;position:relative;z-index:0}
       .wrap::before{content:"";position:absolute;inset:20px;border-radius:28px;border:1px dashed rgba(201,168,106,.24);pointer-events:none}
       .header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:24px}
       .header h1{margin:0;font:600 28px/1.2 'Cinzel','Noto Serif SC',serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400);text-shadow:0 0 26px rgba(227,198,139,.28)}
       .header .meta{color:var(--text-muted);font:14px/1.7 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
-      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(201,168,106,.38);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),border-color var(--transition);box-shadow:none;overflow:hidden}
+      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 16px 36px rgba(227,198,139,.26),0 0 26px rgba(227,198,139,.2);overflow:hidden}
       .btn::after{content:none}
-      .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
-      .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.18),rgba(170,140,84,.26));color:var(--bg-void);box-shadow:none}
-      .btn.danger{border-color:rgba(209,75,75,.55);color:#F6D6D6;box-shadow:none}
-      .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px}
+      .btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 32px rgba(227,198,139,.26)}
+      .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
+      .btn.danger{border-color:rgba(255,156,156,.8);background:linear-gradient(135deg,rgba(255,156,156,.85),rgba(209,75,75,.72));color:#2b0909;box-shadow:0 16px 34px rgba(209,75,75,.24)}
+      .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
       .search{margin-top:20px;display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:linear-gradient(135deg,rgba(21,26,30,.82),rgba(15,19,22,.92));box-shadow:inset 0 0 22px rgba(0,0,0,.5);max-width:480px}
       .search input{all:unset;flex:1;color:var(--text-strong);font-size:15px;letter-spacing:.06em}
       .search input::placeholder{color:var(--text-dim)}
       .search span{font-size:20px;font-weight:600;color:var(--gold-400);text-shadow:0 0 16px rgba(227,198,139,.3)}
-      .grid{margin-top:28px;display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+      .grid{margin-top:28px;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
       .card{position:relative;display:flex;flex-direction:column;gap:14px;min-height:260px;padding:22px;border-radius:24px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));border:1px solid rgba(201,168,106,.32);box-shadow:0 24px 60px rgba(0,0,0,.58);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
-      .card::before{content:"";position:absolute;inset:12px;border-radius:20px;box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;animation:cardGlow 12s ease-in-out infinite}
-      @keyframes cardGlow{0%,100%{opacity:.55}50%{opacity:1}}
+      .card::before{content:"";position:absolute;inset:12px;border-radius:20px;box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;opacity:.9}
       .card:hover{transform:translateY(-6px);border-color:rgba(201,168,106,.45);box-shadow:0 0 24px rgba(201,168,106,.32),0 32px 68px rgba(0,0,0,.6)}
       .card h2{margin:0;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-shadow:0 0 18px rgba(227,198,139,.22)}
   .meta{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
@@ -4677,9 +4734,26 @@ if ($view === 'maps') {
       .empty{margin-top:48px;padding:48px;border:1px dashed rgba(201,168,106,.34);border-radius:24px;text-align:center;color:var(--text-muted);background:rgba(15,19,22,.85);box-shadow:0 24px 48px rgba(0,0,0,.55)}
       .empty strong{color:var(--gold-400);font-size:18px;letter-spacing:.12em;text-transform:uppercase}
       .tag{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--text-muted);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+      .import-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.78);backdrop-filter:blur(16px);z-index:160}
+      .import-backdrop[data-open="true"]{display:flex}
+      .import-panel{background:linear-gradient(160deg,rgba(21,26,30,.92),rgba(12,16,18,.94));border:1px solid rgba(201,168,106,.34);border-radius:24px;box-shadow:0 32px 64px rgba(0,0,0,.68),0 0 30px rgba(227,198,139,.18);padding:24px;max-width:420px;width:100%;display:grid;gap:16px;position:relative}
+      .import-panel::before{content:"";position:absolute;inset:12px;border-radius:18px;border:1px dashed rgba(201,168,106,.24);opacity:.7;pointer-events:none}
+      .import-panel h2{margin:0;font:600 20px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.16em;text-transform:uppercase;text-align:center}
+      .import-panel p{margin:0;color:var(--text-dim);font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-align:center}
+      .import-panel .mode-buttons{display:grid;gap:10px}
+      .import-panel .mode-buttons button{padding:12px 16px;border-radius:16px;border:1px solid rgba(227,198,139,.6);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.58));color:#1b1306;font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
+      .import-panel .mode-buttons button:hover{transform:translateY(-2px);box-shadow:0 18px 36px rgba(227,198,139,.3),0 0 28px rgba(227,198,139,.24)}
+      .import-panel .mode-buttons button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+      .import-panel label{display:flex;flex-direction:column;gap:6px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
+      .import-panel select{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.86);color:var(--text-strong);font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif}
+      .import-panel .import-tip{color:var(--text-dim);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;text-align:left}
+      .import-panel .actions{display:flex;justify-content:flex-end;gap:10px}
+      .import-panel .actions button{padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition)}
+      .import-panel .actions button:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(227,198,139,.22)}
       @media (max-width:720px){
-        .grid{grid-template-columns:1fr}
+        .grid{grid-template-columns:minmax(0,1fr)}
         .header{align-items:flex-start}
+        .import-panel{padding:18px}
       }
     </style>
 
@@ -4694,6 +4768,8 @@ if ($view === 'maps') {
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a class="btn" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回备忘录</a>
+          <button class="btn" type="button" id="btn-import-map">导入导图</button>
+          <button class="btn" type="button" id="btn-export-maps">导出全部</button>
           <a class="btn acc" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit') ?>">＋ 新建导图</a>
         </div>
       </div>
@@ -4731,7 +4807,258 @@ if ($view === 'maps') {
         </div>
       <?php endif; ?>
     </div>
+    <input id="mind-import-file" type="file" accept="application/json" hidden>
+    <div class="import-backdrop" id="map-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+      <div class="import-panel">
+        <h2 id="import-modal-title">导入导图</h2>
+        <p>选择导入方式以处理文件：<strong id="import-file-name">未选择文件</strong></p>
+        <div class="mode-buttons">
+          <button type="button" data-mode="replace" data-requires-target="true">覆盖现有导图</button>
+          <button type="button" data-mode="append" data-requires-target="true">导入为根节点</button>
+          <button type="button" data-mode="new">导入为新导图</button>
+        </div>
+        <label for="import-target-select">目标导图（覆盖/追加时选择）
+          <select id="import-target-select">
+            <option value="">请选择</option>
+            <?php foreach ($maps as $m): ?>
+              <option value="<?= $m['id']; ?>"><?= h($m['title']); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <p class="import-tip">导入文件将自动调整为向右展开结构。如需插入到特定节点，可在编辑界面使用导入功能。</p>
+        <div class="actions">
+          <button type="button" data-action="cancel">取消</button>
+        </div>
+      </div>
+    </div>
+    <script type="application/json" id="mind-maps-data"><?= json_encode(array_map(fn($m)=>[
+      'id'=>$m['id'],
+      'title'=>$m['title'],
+      'content'=>$m['content'],
+      'created_at'=>$m['created_at'],
+      'updated_at'=>$m['updated_at'],
+    ], $maps), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
     <script>
+      const mapsDataElement=document.getElementById('mind-maps-data');
+      let mapsData=[];
+      try{
+        mapsData=mapsDataElement ? JSON.parse(mapsDataElement.textContent||'[]') : [];
+      }catch(_){ mapsData=[]; }
+      const mapsById=new Map((mapsData||[]).map(item=>[String(item.id), item]));
+      const importInput=document.getElementById('mind-import-file');
+      const importButton=document.getElementById('btn-import-map');
+      const exportButton=document.getElementById('btn-export-maps');
+      const importModal=document.getElementById('map-import-modal');
+      const importFileNameEl=document.getElementById('import-file-name');
+      const importTargetSelect=document.getElementById('import-target-select');
+      let pendingImport=null;
+      let pendingImportName='';
+      if(importTargetSelect){
+        if(mapsData.length){
+          importTargetSelect.disabled=false;
+          importTargetSelect.value=importTargetSelect.value || String(mapsData[0].id);
+        }else{
+          importTargetSelect.disabled=true;
+        }
+      }
+      if(importModal){
+        const targetButtons=Array.from(importModal.querySelectorAll('[data-requires-target="true"]'));
+        if(!mapsData.length){ targetButtons.forEach(btn=>btn.disabled=true); }
+      }
+      function openImportModal(){
+        if(!importModal) return;
+        importModal.dataset.open='true';
+        if(importFileNameEl){ importFileNameEl.textContent=pendingImportName || '未选择文件'; }
+      }
+      function closeImportModal(){
+        if(importModal){ importModal.dataset.open='false'; }
+        pendingImport=null;
+        pendingImportName='';
+        if(importInput){ importInput.value=''; }
+      }
+      function resolveImportTitle(data,fallback){
+        const metaName=data?.meta && typeof data.meta.name==='string' ? data.meta.name.trim() : '';
+        const topicName=data?.data && typeof data.data.topic==='string' ? data.data.topic.trim() : '';
+        if(metaName) return metaName;
+        if(topicName) return topicName;
+        if(typeof fallback==='string' && fallback.trim()) return fallback.trim();
+        return '未命名导图';
+      }
+      function enforceRightOrientationFromRoot(node, depth=0){
+        if(!node || typeof node!=='object') return;
+        node.direction=depth===0?'center':'right';
+        if(Array.isArray(node.children)){
+          node.children=node.children.map(child=>{
+            if(child && typeof child==='object'){ enforceRightOrientationFromRoot(child, depth+1); return child; }
+            return null;
+          }).filter(Boolean);
+        }else{
+          node.children=[];
+        }
+      }
+      function cloneImportSubtree(source){
+        if(!source || typeof source!=='object') return null;
+        const cloned={
+          id:'node-'+Math.random().toString(36).slice(2,10),
+          topic:typeof source.topic==='string' && source.topic.trim()?source.topic.trim():'导入节点',
+          data:source.data?JSON.parse(JSON.stringify(source.data)):{},
+          expanded:source.expanded!==false,
+          direction:'right',
+          children:[],
+        };
+        if(source.meta){ cloned.meta=JSON.parse(JSON.stringify(source.meta)); }
+        if(source.style){ cloned.style=JSON.parse(JSON.stringify(source.style)); }
+        if(Array.isArray(source.children)){
+          cloned.children=source.children.map(child=>cloneImportSubtree(child)).filter(Boolean);
+        }
+        return cloned;
+      }
+      async function saveMindmapRequest(id,title,data){
+        const fd=new FormData();
+        fd.append('action','save_mindmap');
+        fd.append('id', String(id||0));
+        fd.append('title', title || '未命名导图');
+        fd.append('content', JSON.stringify(data));
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(!res.ok) throw new Error('网络异常');
+        const json=await res.json();
+        if(!json.ok) throw new Error(json.error||'保存失败');
+        return json;
+      }
+      async function handleImportMode(mode){
+        if(!pendingImport){
+          alert('请先选择导入文件');
+          return;
+        }
+        const requiresTarget=mode==='replace' || mode==='append';
+        const targetId=importTargetSelect ? importTargetSelect.value : '';
+        if(requiresTarget){
+          if(!targetId){ alert('请选择目标导图'); return; }
+          if(!mapsById.has(String(targetId))){ alert('目标导图不存在'); return; }
+        }
+        try{
+          if(mode==='new'){
+            const payload=JSON.parse(JSON.stringify(pendingImport));
+            if(payload && payload.data) enforceRightOrientationFromRoot(payload.data);
+            const title=resolveImportTitle(payload,'');
+            await saveMindmapRequest(0,title,payload);
+          }else if(mode==='replace'){
+            const target=mapsById.get(String(targetId));
+            if(!target) throw new Error('目标导图不存在');
+            const payload=JSON.parse(JSON.stringify(pendingImport));
+            if(payload && payload.data) enforceRightOrientationFromRoot(payload.data);
+            const title=resolveImportTitle(payload,target.title||'');
+            await saveMindmapRequest(target.id,title,payload);
+          }else if(mode==='append'){
+            const target=mapsById.get(String(targetId));
+            if(!target) throw new Error('目标导图不存在');
+            let base;
+            try{ base=JSON.parse(target.content); }catch(_){ throw new Error('目标导图内容无法解析'); }
+            if(!base || typeof base!=='object' || !base.data){ throw new Error('目标导图缺少数据'); }
+            const subtree=cloneImportSubtree(pendingImport.data || pendingImport);
+            if(!subtree){ throw new Error('导入文件中缺少节点数据'); }
+            if(!Array.isArray(base.data.children)){ base.data.children=[]; }
+            base.data.children.push(subtree);
+            enforceRightOrientationFromRoot(base.data);
+            const title=target.title || resolveImportTitle(pendingImport,'');
+            await saveMindmapRequest(target.id,title,base);
+          }else{
+            return;
+          }
+          alert('导入成功');
+          closeImportModal();
+          location.reload();
+        }catch(err){
+          alert(err.message || '导入失败');
+        }
+      }
+      function handleImportFile(event){
+        const file=event.target.files && event.target.files[0];
+        if(!file) return;
+        const reader=new FileReader();
+        reader.onload=evt=>{
+          try{
+            const json=JSON.parse(evt.target.result);
+            if(!json || typeof json!=='object' || !json.data){ throw new Error('文件格式不兼容'); }
+            pendingImport=json;
+            pendingImportName=file.name;
+            if(importTargetSelect && mapsData.length){
+              importTargetSelect.disabled=false;
+              if(!importTargetSelect.value){ importTargetSelect.value=String(mapsData[0].id); }
+            }
+            openImportModal();
+          }catch(err){
+            pendingImport=null;
+            pendingImportName='';
+            alert(err.message || '无法解析导图文件');
+          }finally{
+            if(importInput){ importInput.value=''; }
+          }
+        };
+        reader.onerror=()=>{
+          pendingImport=null;
+          pendingImportName='';
+          alert('读取文件失败');
+          if(importInput){ importInput.value=''; }
+        };
+        reader.readAsText(file,'utf-8');
+      }
+      function buildTimestamp(){
+        const now=new Date();
+        const pad=n=>String(n).padStart(2,'0');
+        return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      }
+      function exportAllMaps(){
+        if(!mapsData.length){
+          alert('暂无导图可导出');
+          return;
+        }
+        const payload=mapsData.map(map=>{
+          let content;
+          try{ content=JSON.parse(map.content); }
+          catch(_){ content=map.content; }
+          return {
+            id: map.id,
+            title: map.title,
+            created_at: map.created_at,
+            updated_at: map.updated_at,
+            content,
+          };
+        });
+        const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=`mindmaps-${buildTimestamp()}.json`;
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }
+      if(importButton && importInput){
+        importButton.addEventListener('click',()=>{
+          pendingImport=null;
+          pendingImportName='';
+          importInput.click();
+        });
+      }
+      if(importInput){
+        importInput.addEventListener('change',handleImportFile);
+      }
+      if(exportButton){
+        exportButton.addEventListener('click',exportAllMaps);
+      }
+      if(importModal){
+        importModal.addEventListener('click',e=>{
+          if(e.target===importModal){ closeImportModal(); }
+        });
+        importModal.querySelectorAll('[data-mode]').forEach(btn=>{
+          btn.addEventListener('click',e=>{
+            e.preventDefault();
+            handleImportMode(btn.dataset.mode);
+          });
+        });
+        const cancelBtn=importModal.querySelector('[data-action="cancel"]');
+        if(cancelBtn){ cancelBtn.addEventListener('click',e=>{ e.preventDefault(); closeImportModal(); }); }
+      }
       const searchInput=document.getElementById('mind-search');
       const cards=document.querySelectorAll('#mind-grid .card');
       if(searchInput){
@@ -4817,30 +5144,28 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       repeating-linear-gradient(0deg,rgba(75,195,209,.08) 0,rgba(75,195,209,.08) 1px,transparent 1px,transparent calc(var(--grid-size))),
       repeating-linear-gradient(90deg,rgba(201,168,106,.12) 0,rgba(201,168,106,.12) 1px,transparent 1px,transparent calc(var(--grid-size)));
     mix-blend-mode:screen;opacity:.32;pointer-events:none;z-index:-4;background-size:100% 100%,100% 100%,var(--grid-size) var(--grid-size),var(--grid-size) var(--grid-size);
-    animation:grid-shift 22s linear infinite;
+    background-attachment:fixed;
   }
-  @keyframes grid-shift{0%{background-position:0 0,0 0,0 0,0 0}100%{background-position:0 0,0 0,0 var(--grid-size),var(--grid-size) 0}}
-  .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.24;animation:scan 12s linear infinite}
-  @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%);}}
+  .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.18}
   a{color:inherit;text-decoration:none}
-  .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh;position:relative;z-index:0}
-  .sidebar{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;background:linear-gradient(165deg,rgba(12,14,18,.94) 0%,rgba(15,19,22,.9) 55%,rgba(21,26,30,.9) 100%);border-right:1px solid var(--border);box-shadow:inset 0 0 0 1px rgba(201,168,106,.08),0 18px 45px rgba(0,0,0,.45);padding:20px;backdrop-filter:blur(18px) saturate(170%);
+  .app{display:flex;min-height:100vh;position:relative;z-index:0}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;background:linear-gradient(165deg,rgba(12,14,18,.94) 0%,rgba(15,19,22,.9) 55%,rgba(21,26,30,.9) 100%);border-right:1px solid var(--border);box-shadow:inset 0 0 0 1px rgba(201,168,106,.08),0 18px 45px rgba(0,0,0,.45);padding:20px;backdrop-filter:blur(18px) saturate(170%);
     transition:transform var(--transition),box-shadow var(--transition);
   }
   .brand{display:flex;gap:12px;align-items:center;margin-bottom:18px;text-transform:uppercase;letter-spacing:.16em;color:var(--text-muted)}
   .brand .logo{width:34px;height:34px;border-radius:12px;background:radial-gradient(circle at 30% 30%,rgba(227,198,139,.85),rgba(227,198,139,.22));box-shadow:0 0 14px rgba(227,198,139,.45),0 0 32px rgba(227,198,139,.28);position:relative;overflow:hidden}
-  .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);animation:breathe 6s ease-in-out infinite}
+  .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);opacity:.85}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
-  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:none;transition:transform var(--transition),border-color var(--transition);overflow:hidden}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 16px 34px rgba(227,198,139,.24),0 0 24px rgba(227,198,139,.18);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
   .btn::after{content:none}
-  .btn:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.6)}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 30px rgba(227,198,139,.24)}
   .btn:hover::after{content:none}
-  .btn:active{transform:translateY(0)}
-  .btn.acc{background:linear-gradient(135deg,rgba(201,168,106,.22),rgba(170,140,84,.3));color:var(--bg-void);box-shadow:none}
-  .btn.danger{color:var(--danger);border-color:rgba(255,93,125,.45);box-shadow:none}
+  .btn:active{transform:translateY(0);box-shadow:0 10px 24px rgba(227,198,139,.22)}
+  .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
+  .btn.danger{color:#2b0909;border-color:rgba(255,156,156,.8);background:linear-gradient(135deg,rgba(255,156,156,.85),rgba(209,75,75,.72));box-shadow:0 16px 34px rgba(209,75,75,.24)}
   .btn.small{padding:8px 12px;border-radius:12px;font-size:11px}
-  .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 3px rgba(201,168,106,.25)}
+  .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 3px rgba(227,198,139,.25)}
   .section-title{font:600 12px/1 'Cinzel','Noto Serif SC',serif;text-transform:uppercase;letter-spacing:.24em;color:var(--gold-400);margin:14px 0 8px;text-shadow:0 0 14px rgba(227,198,139,.24)}
   .cat-list{display:flex;flex-direction:column;gap:8px}
   .cat{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:linear-gradient(140deg,rgba(15,19,22,.88),rgba(10,12,14,.88));border:1px solid var(--border-soft);box-shadow:inset 0 0 0 1px rgba(201,168,106,.06);transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition)}
@@ -4851,7 +5176,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .cat .name{flex:1;display:block;font-weight:600;color:var(--text-strong);text-shadow:0 0 8px rgba(201,168,106,.18)}
   .cat .count{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
   .footer{margin-top:18px;color:var(--text-dim);font-size:12px;line-height:1.8;text-shadow:0 0 10px rgba(201,168,106,.15)}
-  .main{padding:24px 20px;background:linear-gradient(160deg,rgba(12,14,18,.82),rgba(10,12,14,.85));backdrop-filter:blur(14px) saturate(160%);position:relative}
+  .main{padding:24px 20px 40px;margin-left:280px;background:linear-gradient(160deg,rgba(12,14,18,.82),rgba(10,12,14,.85));backdrop-filter:blur(14px) saturate(160%);position:relative;min-height:100vh;flex:1}
   .main::before{content:"";position:absolute;inset:0;border-left:1px solid rgba(201,168,106,.12);border-top:1px solid rgba(201,168,106,.06);pointer-events:none;box-shadow:inset 0 0 0 1px rgba(201,168,106,.04)}
   .toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:18px}
   .search{flex:1 1 260px;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(15,19,22,.9),rgba(10,12,14,.88));border:1px solid rgba(201,168,106,.32);border-radius:16px;padding:10px 14px;box-shadow:inset 0 0 28px rgba(201,168,106,.08)}
@@ -4860,29 +5185,27 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .search button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.42);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.18em;cursor:pointer;transition:background var(--transition),box-shadow var(--transition),border-color var(--transition)}
   .search button:hover{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.6);box-shadow:0 0 18px rgba(227,198,139,.22)}
   .actions-row{display:flex;gap:10px;flex-wrap:wrap}
-  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;position:relative}
+  .items{display:grid;gap:16px;position:relative;grid-template-columns:repeat(3,minmax(0,1fr))}
   .item{position:relative;padding:18px 16px;border-radius:18px;background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:10px;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
-  .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.24);opacity:.7;pointer-events:none;animation:breathe 12s ease-in-out infinite}
-  .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger);animation:pulse 1.4s ease-in-out infinite}
+  .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
+  .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger),0 0 20px rgba(209,75,75,.4)}
   .item:hover{transform:translateY(-4px);box-shadow:0 0 28px rgba(201,168,106,.28),0 26px 50px rgba(0,0,0,.6);border-color:rgba(201,168,106,.52)}
   .item.done{background:linear-gradient(155deg,rgba(26,24,18,.9),rgba(18,16,12,.94));border-color:rgba(227,198,139,.55);box-shadow:0 0 28px rgba(201,168,106,.38),0 24px 58px rgba(0,0,0,.7)}
   .item-empty{grid-column:1/-1;text-align:center;padding:40px 24px;background:linear-gradient(150deg,rgba(15,19,22,.88),rgba(10,12,14,.9));border:1px dashed rgba(201,168,106,.28);box-shadow:none;color:var(--text-muted);letter-spacing:.12em}
   .item-empty::after,.item-empty::before{display:none}
   .item.done::after{display:none}
-  .item.done::before{opacity:1;border-style:double;border-color:rgba(201,168,106,.45);animation:crystal 10s ease-in-out infinite}
-  @keyframes crystal{0%,100%{box-shadow:0 0 18px rgba(201,168,106,.25)}50%{box-shadow:0 0 28px rgba(201,168,106,.45)}}
-  .item[draggable="true"]{cursor:grab}
+  .item.done::before{opacity:1;border-style:double;border-color:rgba(201,168,106,.45);box-shadow:0 0 32px rgba(227,198,139,.3)}
   .item-title{font:600 16px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 16px rgba(227,198,139,.24);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;letter-spacing:.08em}
   .item.done .item-title,.item.done .item-desc,.item.done .tinyline{text-decoration:line-through;color:rgba(227,198,139,.75)}
   .item-desc{color:var(--text-dim);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
   .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.22em;padding:4px 10px;border-radius:999px;border:1px dashed rgba(201,168,106,.35);background:rgba(201,168,106,.08);color:var(--text-dim);box-shadow:inset 0 0 12px rgba(201,168,106,.05)}
   .kbd{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;padding:2px 6px;border:1px dashed rgba(201,168,106,.35);border-radius:6px;background:rgba(15,19,22,.82);color:var(--text-dim);text-transform:uppercase;letter-spacing:.16em;box-shadow:0 0 12px rgba(201,168,106,.12)}
   .tinyline{position:relative;margin-left:12px;padding-left:18px;color:var(--text-muted)}
-  .tinyline::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,rgba(201,168,106,.55),rgba(201,168,106,.08));animation:energy 6s linear infinite}
+  .tinyline::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,rgba(201,168,106,.65),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.25)}
   .tlrow{position:relative;margin:6px 0;padding-left:10px;display:flex;gap:8px;align-items:center}
   .tlrow.done .step-title{text-decoration:line-through;color:rgba(201,168,106,.7)}
   .dot{position:absolute;left:-6px;top:8px;width:10px;height:10px;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.85));border-radius:50%;box-shadow:0 0 12px rgba(201,168,106,.5),0 0 24px rgba(201,168,106,.35)}
-  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.4);animation:pulse 2.2s ease-in-out infinite}
+  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
   .item-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
   .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
@@ -4890,7 +5213,8 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .item-actions .note-tip{margin-right:0}
   .item-actions a{background:rgba(201,168,106,.12);border:1px solid rgba(201,168,106,.32);padding:8px 12px;border-radius:12px;color:var(--gold-400);text-transform:uppercase;letter-spacing:.14em;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;transition:var(--transition)}
   .item-actions a:hover{box-shadow:0 0 18px rgba(201,168,106,.3)}
-  .mob-move{display:none}
+  .move-controls{display:flex;gap:6px}
+  .move-controls.mobile{display:none}
   .err{background:rgba(209,75,75,.16);color:rgba(255,214,214,.92);border:1px solid rgba(209,75,75,.45);border-radius:16px;box-shadow:0 0 20px rgba(209,75,75,.24);padding:10px 14px}
   .flash-message{margin-bottom:12px;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
   .shortcuts{margin-top:14px;color:var(--text-dim);font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase}
@@ -4904,17 +5228,19 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
   .modal-input{flex:1;min-width:200px;padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.86);color:var(--text-strong);letter-spacing:.08em}
   .modal-input::placeholder{color:var(--text-dim)}
   .modal-count{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+  @media (max-width:1200px){
+    .items{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
   @media (max-width:920px){
-    .app{grid-template-columns:1fr}
+    .app{display:block}
     .sidebar{position:static;height:auto;overflow:visible;border-right:0;border-bottom:1px solid rgba(201,168,106,.18);border-radius:0 0 22px 22px;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+    .main{margin-left:0}
     .cat-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .items{grid-template-columns:1fr}
     .item-actions span.tip{display:none}
-    .mob-move{display:inline-flex;gap:6px}
+    .move-controls.desktop{display:none}
+    .move-controls.mobile{display:flex}
   }
-  @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
-  @keyframes pulse{0%,100%{transform:scale(.75);opacity:.6}50%{transform:scale(1.05);opacity:1}}
-  @keyframes energy{0%{background-position:0 0}100%{background-position:0 120px}}
 </style>
 </head>
 <body>
@@ -4944,8 +5270,8 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
     </div>
     <div class="footer">
       <div>✅ 勾选完成</div>
-      <div>⬍/↔ 拖拽排序（桌面）</div>
-      <div>↑↓ 移动按钮（移动端）</div>
+      <div>↔ 左右按钮调整顺序（桌面）</div>
+      <div>↑↓ 按钮调整顺序（移动端）</div>
       <div>⤓ 导出 JSON / CSV</div>
     </div>
   </aside>
@@ -4970,7 +5296,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
       <?php endif; ?>
       <?php foreach ($items as $it): ?>
         <?php $steps_time=get_steps_by_time((int)$it['id']); ?>
-        <article class="item <?php echo $it['done']?'done':''; ?>" draggable="true" data-id="<?php echo $it['id']; ?>">
+        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>">
           <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
             <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
               <input type="hidden" name="action" value="toggle_done">
@@ -5006,10 +5332,14 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items')->fetchColumn();
           </div>
           <div class="item-actions">
             <span class="tip status-tip"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></span>
-            <span class="tip note-tip">⬍/↔ 拖拽排序</span>
-            <div class="mob-move">
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,-1)">↑ 上移</button>
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,1)">↓ 下移</button>
+            <span class="tip note-tip">↔ 按钮调整排序</span>
+            <div class="move-controls desktop">
+              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
+              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
+            </div>
+            <div class="move-controls mobile">
+              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
+              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
             </div>
             <a class="btn small" href="?view=item&id=<?php echo $it['id']; ?>">详情</a>
           </div>
@@ -5042,35 +5372,56 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
-const isMobile=window.matchMedia('(max-width: 920px)').matches;
-(function(){
-  const grid=$('#items'); if(!grid || isMobile) return;
-  let dragging=null;
-  grid.addEventListener('dragstart', e=>{ const card=e.target.closest('article.item[draggable]'); if(!card) return; dragging=card; e.dataTransfer.effectAllowed='move'; });
-  grid.addEventListener('dragover', throttle(e=>{
-    if(!dragging) return; e.preventDefault();
-    const cards=$$('article.item[draggable]').filter(n=>n!==dragging); if(!cards.length) return;
-    let best=null, bestD=1e9;
-    for(const n of cards){ const r=n.getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+r.height/2; const d=Math.hypot(e.clientX-cx,e.clientY-cy); if(d<bestD){ bestD=d; best=n; } }
-    if(!best) return;
-    const r=best.getBoundingClientRect(); const dx=e.clientX-(r.left+r.width/2); const dy=e.clientY-(r.top+r.height/2);
-    const vertical=Math.abs(dy)>=Math.abs(dx); const after=vertical?(dy>0):(dx>0);
-    best.parentNode.insertBefore(dragging, after?best.nextSibling:best);
-  }, 30));
-  grid.addEventListener('drop', e=>{
-    e.preventDefault(); if(!dragging) return; dragging=null;
-    sendOrder();
-  });
-})();
-function moveCard(id, dir){
-  const grid=$('#items'); const el=grid.querySelector(`article.item[data-id="${id}"]`); if(!el) return;
-  const sib = dir<0 ? el.previousElementSibling : el.nextElementSibling;
-  if(!sib) return;
-  if(dir<0) grid.insertBefore(el, sib); else grid.insertBefore(sib, el);
+function getColumnCount(){
+  if(window.matchMedia('(max-width: 920px)').matches) return 1;
+  if(window.matchMedia('(max-width: 1200px)').matches) return 2;
+  return 3;
+}
+function moveCard(id, direction){
+  const grid=$('#items'); if(!grid) return;
+  const cards=$$('article.item');
+  const index=cards.findIndex(card=>card.dataset.id===String(id));
+  if(index===-1) return;
+  const columns=getColumnCount();
+  let offset=0;
+  switch(direction){
+    case 'left': {
+      if(index===0) return;
+      offset=-1;
+      break;
+    }
+    case 'right': {
+      if(index===cards.length-1) return;
+      offset=1;
+      break;
+    }
+    case 'up': {
+      offset=-columns;
+      break;
+    }
+    case 'down': {
+      offset=columns;
+      break;
+    }
+    default: {
+      if(typeof direction==='number' && direction!==0){ offset=direction; }
+      break;
+    }
+  }
+  if(offset===0) return;
+  const targetIndex=index+offset;
+  if(targetIndex<0 || targetIndex>=cards.length) return;
+  const card=cards[index];
+  const target=cards[targetIndex];
+  if(offset>0){
+    grid.insertBefore(card, target.nextElementSibling);
+  }else{
+    grid.insertBefore(card, target);
+  }
   sendOrder();
 }
 function sendOrder(){
-  const ids=$$('article.item[draggable]').map(x=>x.dataset.id).join(',');
+  const ids=$$('article.item').map(x=>x.dataset.id).join(',');
   const fd=new FormData(); fd.append('action','reorder_items'); fd.append('order', ids);
   fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
 }
