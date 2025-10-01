@@ -4762,17 +4762,35 @@ if ($view === 'map_edit') {
         }
         const titleValue=titleInput ? titleInput.value.trim() : '';
         const overlayDisplay=overlay ? overlay.style.display : null;
-        let prevState=null;
+        let exportHost=null;
         try{
           const htmlToImage=await ensureHtmlToImage();
           const computedStyle=getComputedStyle(document.body);
           const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
           const pixelRatio=Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
           if(overlay){ overlay.style.display='none'; }
-          prevState={ scale:jm.scale, offsetX:jm.offsetX, offsetY:jm.offsetY };
-          if(jm.view && typeof jm.view.zoomToFit==='function'){ try{ jm.view.zoomToFit(); }catch(err){ console.warn(err); } }
-          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-          const canvas=await htmlToImage.toCanvas(jmContainer,{
+          if(typeof jm.computeLayout==='function'){ try{ jm.computeLayout(); }catch(err){ console.warn(err); } }
+          const viewport=jm && jm.viewport ? jm.viewport : jmContainer.querySelector('.mind-viewport');
+          if(!viewport){ throw new Error('无法定位导出视图'); }
+          const bounds=jm && jm.bounds ? jm.bounds : null;
+          if(!bounds || !isFinite(bounds.width) || !isFinite(bounds.height)){
+            throw new Error('无法计算导图范围');
+          }
+          exportHost=document.createElement('div');
+          exportHost.style.position='fixed';
+          exportHost.style.left='-120vw';
+          exportHost.style.top='0';
+          exportHost.style.opacity='0';
+          exportHost.style.pointerEvents='none';
+          const clone=viewport.cloneNode(true);
+          clone.style.transform='translate(0px, 0px) scale(1)';
+          clone.style.transformOrigin='top left';
+          clone.style.width=`${Math.ceil(bounds.width)}px`;
+          clone.style.height=`${Math.ceil(bounds.height)}px`;
+          clone.style.overflow='visible';
+          exportHost.appendChild(clone);
+          document.body.appendChild(exportHost);
+          const canvas=await htmlToImage.toCanvas(clone,{
             backgroundColor,
             pixelRatio,
             filter:node=>{
@@ -4806,13 +4824,7 @@ if ($view === 'map_edit') {
           const message=error && error.message ? `导出失败：${error.message}` : '导出失败，请稍后重试。';
           alert(message);
         }finally{
-          if(prevState){
-            jm.scale=prevState.scale;
-            jm.offsetX=prevState.offsetX;
-            jm.offsetY=prevState.offsetY;
-            if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
-            scheduleHandleRefresh();
-          }
+          if(exportHost && exportHost.parentElement){ exportHost.remove(); }
           if(overlay){ overlay.style.display=overlayDisplay || ''; }
         }
       }
