@@ -1475,6 +1475,8 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .toast .body{flex:1;font:14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .toast button{background:none;border:0;color:inherit;cursor:pointer}
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   </head>
   <body>
@@ -2010,6 +2012,8 @@ if ($view === 'map_edit') {
       .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
       body.grid-off::after{opacity:0!important}
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   </head>
   <body>
@@ -2046,6 +2050,8 @@ if ($view === 'map_edit') {
                 <div class="map-io-menu" id="map-io-menu" role="menu">
                   <button type="button" data-action="import" role="menuitem">导入 JSON</button>
                   <button type="button" data-action="export" role="menuitem">导出 JSON</button>
+                  <button type="button" data-action="export-jpg" role="menuitem">导出 JPG 图片</button>
+                  <button type="button" data-action="export-pdf" role="menuitem">导出 PDF</button>
                 </div>
               </div>
               <div class="save-state" id="save-state">保存成功</div>
@@ -4446,18 +4452,41 @@ if ($view === 'map_edit') {
         const expanded=mapIoButton && mapIoButton.getAttribute('aria-expanded')==='true';
         if(expanded) closeMapIoMenu(); else openMapIoMenu();
       };
-      const handleMindAction=(action)=>{
+      const handleMindAction=async(action)=>{
         if(!action) return;
         closeMapIoMenu();
         switch(action){
-          case 'save': saveMindmap(); break;
-          case 'sibling': addSiblingNode(); break;
-          case 'child': addChildNode(); break;
-          case 'attach': openAttachmentDialog(); break;
-          case 'link': openLinkPrompt(); break;
-          case 'delete': deleteSelectedNode(); break;
-          case 'import': triggerImport(); break;
-          case 'export': exportMindmap(); break;
+          case 'save':
+            saveMindmap();
+            break;
+          case 'sibling':
+            addSiblingNode();
+            break;
+          case 'child':
+            addChildNode();
+            break;
+          case 'attach':
+            openAttachmentDialog();
+            break;
+          case 'link':
+            openLinkPrompt();
+            break;
+          case 'delete':
+            deleteSelectedNode();
+            break;
+          case 'import':
+            triggerImport();
+            break;
+          case 'export':
+          case 'export-json':
+            await exportMindmap('json');
+            break;
+          case 'export-jpg':
+            await exportMindmap('jpg');
+            break;
+          case 'export-pdf':
+            await exportMindmap('pdf');
+            break;
           case 'delete-map':
             if(!currentMapId){
               alert('该导图尚未保存，无法删除。');
@@ -4661,21 +4690,124 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
-      function exportMindmap(){
-        const data=jm.get_data('node_tree');
-        if(data && data.data){ enforceRightOrientation(data.data); }
-        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;
+      function buildExportFileName(extension){
         const titleValue=titleInput ? titleInput.value.trim() : '';
         const safeTitle=(titleValue || 'mindmap').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim() || 'mindmap';
         const now=new Date();
         const pad=(num)=>String(num).padStart(2,'0');
         const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-        a.download=`${safeTitle}-${timestamp}.json`;
+        return `${safeTitle}-${timestamp}.${extension}`;
+      }
+      function prepareMindmapData(){
+        const raw=jm.get_data('node_tree');
+        if(!raw) return null;
+        const cloned=JSON.parse(JSON.stringify(raw));
+        if(cloned && cloned.data){ enforceRightOrientation(cloned.data); }
+        return cloned;
+      }
+      function triggerBlobDownload(blob, filename){
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=filename;
+        document.body.appendChild(a);
         a.click();
-        setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }
+      function triggerDataUrlDownload(dataUrl, filename){
+        const a=document.createElement('a');
+        a.href=dataUrl;
+        a.download=filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      function createMindmapExportSnapshot(data){
+        const wrapper=document.createElement('div');
+        wrapper.style.position='fixed';
+        wrapper.style.left='-10000px';
+        wrapper.style.top='-10000px';
+        wrapper.style.padding='40px';
+        wrapper.style.background=getComputedStyle(document.body).backgroundColor || '#0A0C0E';
+        wrapper.style.pointerEvents='none';
+        wrapper.style.zIndex='-1';
+        wrapper.style.opacity='0';
+        document.body.appendChild(wrapper);
+        const container=document.createElement('div');
+        const containerId=`mind-export-${Date.now()}`;
+        container.id=containerId;
+        container.style.position='relative';
+        const estimatedWidth=Math.max(800, (jm && jm.bounds && jm.bounds.width ? jm.bounds.width + 200 : 800));
+        const estimatedHeight=Math.max(600, (jm && jm.bounds && jm.bounds.height ? jm.bounds.height + 200 : 600));
+        container.style.width=`${estimatedWidth}px`;
+        container.style.height=`${estimatedHeight}px`;
+        wrapper.appendChild(container);
+        const exportMind=new jsMind({container:containerId, editable:false, support_html:true, mode:'full'});
+        exportMind.show(data);
+        if(exportMind.view && typeof exportMind.view.zoomToFit==='function'){ exportMind.view.zoomToFit(); }
+        else if(typeof exportMind.zoomToFit==='function'){ exportMind.zoomToFit(); }
+        const cleanup=()=>{ wrapper.remove(); };
+        return {container, cleanup};
+      }
+      async function renderMindmapCanvas(data){
+        if(typeof window.html2canvas!=='function'){
+          throw new Error('图片导出组件未就绪');
+        }
+        const snapshot=createMindmapExportSnapshot(data);
+        const scale=Math.max(2, Math.min(3, window.devicePixelRatio || 2));
+        const bodyBg=getComputedStyle(document.body).backgroundColor || '#0A0C0E';
+        try{
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+          const canvas=await window.html2canvas(snapshot.container,{
+            backgroundColor: bodyBg && bodyBg!=='rgba(0, 0, 0, 0)' ? bodyBg : '#0A0C0E',
+            scale,
+            useCORS:true,
+            logging:false,
+          });
+          return {canvas, cleanup:snapshot.cleanup};
+        }catch(err){
+          snapshot.cleanup();
+          throw err;
+        }
+      }
+      async function exportMindmap(format='json'){
+        const data=prepareMindmapData();
+        if(!data){
+          alert('没有可导出的导图数据');
+          return;
+        }
+        try{
+          if(format==='json'){
+            const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+            triggerBlobDownload(blob, buildExportFileName('json'));
+          }else if(format==='jpg'){
+            const {canvas, cleanup}=await renderMindmapCanvas(data);
+            try{
+              const dataUrl=canvas.toDataURL('image/jpeg',0.92);
+              triggerDataUrlDownload(dataUrl, buildExportFileName('jpg'));
+            }finally{
+              cleanup();
+            }
+          }else if(format==='pdf'){
+            if(!window.jspdf || typeof window.jspdf.jsPDF!=='function'){
+              throw new Error('PDF 导出组件未就绪');
+            }
+            const {canvas, cleanup}=await renderMindmapCanvas(data);
+            try{
+              const orientation=canvas.width>=canvas.height?'landscape':'portrait';
+              const pdf=new window.jspdf.jsPDF({orientation,unit:'px',format:[canvas.width,canvas.height]});
+              const imgData=canvas.toDataURL('image/jpeg',0.92);
+              pdf.addImage(imgData,'JPEG',0,0,canvas.width,canvas.height);
+              pdf.save(buildExportFileName('pdf'));
+            }finally{
+              cleanup();
+            }
+          }
+        }catch(err){
+          console.error(err);
+          alert(err && err.message ? err.message : '导出失败，请稍后重试。');
+        }
       }
       function openImportModeDialog(fileName, data){
         pendingImportPayload=data;
