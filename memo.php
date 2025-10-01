@@ -2045,7 +2045,9 @@ if ($view === 'map_edit') {
                 <button type="button" class="map-io-button" id="map-io-button" aria-haspopup="true" aria-expanded="false">导入 / 导出</button>
                 <div class="map-io-menu" id="map-io-menu" role="menu">
                   <button type="button" data-action="import" role="menuitem">导入 JSON</button>
-                  <button type="button" data-action="export" role="menuitem">导出 JSON</button>
+                  <button type="button" data-action="export-json" role="menuitem">导出 JSON</button>
+                  <button type="button" data-action="export-pdf" role="menuitem">导出 PDF</button>
+                  <button type="button" data-action="export-jpg" role="menuitem">导出 JPG</button>
                 </div>
               </div>
               <div class="save-state" id="save-state">保存成功</div>
@@ -3259,6 +3261,7 @@ if ($view === 'map_edit') {
     }
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
     overlay.id='drag-overlay';
+    overlay.dataset.exportIgnore='true';
     overlay.setAttribute('width','100%');
     overlay.setAttribute('height','100%');
     overlay.setAttribute('viewBox','0 0 100 100');
@@ -3276,6 +3279,72 @@ if ($view === 'map_edit') {
         mode:'full',
       });
       const blobUrlRegistry=new Set();
+      const externalScriptCache=new Map();
+      function loadExternalScript(src, resolver){
+        if(typeof resolver==='function'){
+          try{
+            const immediate=resolver();
+            if(immediate){ return Promise.resolve(immediate); }
+          }catch(_){ }
+        }
+        if(externalScriptCache.has(src)){
+          return externalScriptCache.get(src);
+        }
+        const promise=new Promise((resolve,reject)=>{
+          const script=document.createElement('script');
+          script.src=src;
+          script.async=true;
+          script.onload=()=>{
+            if(typeof resolver==='function'){
+              try{
+                const resolved=resolver();
+                if(resolved){ resolve(resolved); return; }
+              }catch(err){ console.warn(err); }
+            }
+            resolve();
+          };
+          script.onerror=()=>{
+            externalScriptCache.delete(src);
+            reject(new Error(`Failed to load script: ${src}`));
+          };
+          document.head.appendChild(script);
+        });
+        externalScriptCache.set(src,promise);
+        return promise;
+      }
+      async function ensureHtmlToImage(){
+        if(window.htmlToImage){ return window.htmlToImage; }
+        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js',()=>window.htmlToImage);
+        if(lib){ return lib; }
+        if(window.htmlToImage){ return window.htmlToImage; }
+        throw new Error('图像导出依赖加载失败');
+      }
+      async function ensureJsPDF(){
+        if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
+        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>window.jspdf);
+        if(lib && lib.jsPDF){ return lib.jsPDF; }
+        if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
+        throw new Error('PDF 导出依赖加载失败');
+      }
+      function canvasToBlob(canvas, type, quality){
+        return new Promise((resolve,reject)=>{
+          if(!canvas || typeof canvas.toBlob!=='function'){
+            reject(new Error('Canvas 不受支持'));
+            return;
+          }
+          canvas.toBlob(blob=>{
+            if(blob){ resolve(blob); }
+            else{ reject(new Error('生成图像失败')); }
+          }, type, quality);
+        });
+      }
+      function buildExportFilename(extension, titleValue){
+        const safeTitle=(titleValue || 'mindmap').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim() || 'mindmap';
+        const now=new Date();
+        const pad=num=>String(num).padStart(2,'0');
+        const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        return `${safeTitle}-${timestamp}.${extension}`;
+      }
       function dataUrlToBlob(dataUrl){
         if(typeof dataUrl!=='string') return null;
         const match=dataUrl.match(/^data:(.*?);base64,(.*)$/);
@@ -3468,6 +3537,7 @@ if ($view === 'map_edit') {
       const dragHandle=document.createElement('div');
       dragHandle.id='node-handle';
       dragHandle.textContent='+';
+      dragHandle.dataset.exportIgnore='true';
       let handleSource=null;
       let pointerDragState=null;
       function hideHandle(){
@@ -4457,7 +4527,16 @@ if ($view === 'map_edit') {
           case 'link': openLinkPrompt(); break;
           case 'delete': deleteSelectedNode(); break;
           case 'import': triggerImport(); break;
-          case 'export': exportMindmap(); break;
+          case 'export':
+          case 'export-json':
+            exportMindmapAsJson();
+            break;
+          case 'export-pdf':
+            exportMindmapAsImage('pdf');
+            break;
+          case 'export-jpg':
+            exportMindmapAsImage('jpg');
+            break;
           case 'delete-map':
             if(!currentMapId){
               alert('该导图尚未保存，无法删除。');
@@ -4661,21 +4740,81 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
-      function exportMindmap(){
+      function exportMindmapAsJson(){
+        if(!jm){
+          alert('思维导图尚未加载');
+          return;
+        }
         const data=jm.get_data('node_tree');
         if(data && data.data){ enforceRightOrientation(data.data); }
         const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
         const url=URL.createObjectURL(blob);
         const a=document.createElement('a');
         a.href=url;
-        const titleValue=titleInput ? titleInput.value.trim() : '';
-        const safeTitle=(titleValue || 'mindmap').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim() || 'mindmap';
-        const now=new Date();
-        const pad=(num)=>String(num).padStart(2,'0');
-        const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-        a.download=`${safeTitle}-${timestamp}.json`;
+        a.download=buildExportFilename('json', titleInput ? titleInput.value.trim() : '');
         a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      }
+      async function exportMindmapAsImage(format){
+        if(!jmContainer){
+          alert('思维导图尚未加载');
+          return;
+        }
+        const titleValue=titleInput ? titleInput.value.trim() : '';
+        const overlayDisplay=overlay ? overlay.style.display : null;
+        let prevState=null;
+        try{
+          const htmlToImage=await ensureHtmlToImage();
+          const computedStyle=getComputedStyle(document.body);
+          const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
+          const pixelRatio=Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+          if(overlay){ overlay.style.display='none'; }
+          prevState={ scale:jm.scale, offsetX:jm.offsetX, offsetY:jm.offsetY };
+          if(jm.view && typeof jm.view.zoomToFit==='function'){ try{ jm.view.zoomToFit(); }catch(err){ console.warn(err); } }
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+          const canvas=await htmlToImage.toCanvas(jmContainer,{
+            backgroundColor,
+            pixelRatio,
+            filter:node=>{
+              if(!(node instanceof Element)) return true;
+              return node.dataset.exportIgnore!=='true';
+            }
+          });
+          if(!canvas){ throw new Error('无法生成导出图像'); }
+          if(format==='jpg'){
+            const blob=await canvasToBlob(canvas,'image/jpeg',0.95);
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');
+            a.href=url;
+            a.download=buildExportFilename('jpg', titleValue);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(()=>URL.revokeObjectURL(url), 1500);
+          }else if(format==='pdf'){
+            const jsPDF=await ensureJsPDF();
+            const orientation=canvas.width>=canvas.height?'landscape':'portrait';
+            const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
+            const dataUrl=canvas.toDataURL('image/jpeg',0.92);
+            pdf.addImage(dataUrl,'JPEG',0,0,canvas.width,canvas.height);
+            pdf.save(buildExportFilename('pdf', titleValue));
+          }else{
+            throw new Error('不支持的导出格式');
+          }
+        }catch(error){
+          console.error(error);
+          const message=error && error.message ? `导出失败：${error.message}` : '导出失败，请稍后重试。';
+          alert(message);
+        }finally{
+          if(prevState){
+            jm.scale=prevState.scale;
+            jm.offsetX=prevState.offsetX;
+            jm.offsetY=prevState.offsetY;
+            if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+            scheduleHandleRefresh();
+          }
+          if(overlay){ overlay.style.display=overlayDisplay || ''; }
+        }
       }
       function openImportModeDialog(fileName, data){
         pendingImportPayload=data;
