@@ -4802,7 +4802,6 @@ if ($view === 'map_edit') {
           const htmlToImage=await ensureHtmlToImage();
           const computedStyle=getComputedStyle(document.body);
           const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
-          const pixelRatio=Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
           if(overlay){ overlay.style.display='none'; }
           if(typeof jm.computeLayout==='function'){ try{ jm.computeLayout(); }catch(err){ console.warn(err); } }
           const viewport=jm && jm.viewport ? jm.viewport : jmContainer.querySelector('.mind-viewport');
@@ -4811,6 +4810,14 @@ if ($view === 'map_edit') {
           if(!bounds || !isFinite(bounds.width) || !isFinite(bounds.height)){
             throw new Error('无法计算导图范围');
           }
+          const viewportWidth=Math.max(1, Math.ceil(bounds.width));
+          const viewportHeight=Math.max(1, Math.ceil(bounds.height));
+          const SAFE_CANVAS_BOUND=16384;
+          const basePixelRatio=window.devicePixelRatio || 1;
+          const minPixelRatio=2;
+          const maxPixelRatio=4;
+          const sizeLimitedRatio=Math.max(1, Math.floor(SAFE_CANVAS_BOUND / Math.max(viewportWidth, viewportHeight)));
+          const pixelRatio=Math.min(maxPixelRatio, Math.max(minPixelRatio, basePixelRatio), sizeLimitedRatio);
           exportHost=document.createElement('div');
           exportHost.style.position='fixed';
           exportHost.style.left='-120vw';
@@ -4820,8 +4827,8 @@ if ($view === 'map_edit') {
           const clone=viewport.cloneNode(true);
           clone.style.transform='translate(0px, 0px) scale(1)';
           clone.style.transformOrigin='top left';
-          clone.style.width=`${Math.ceil(bounds.width)}px`;
-          clone.style.height=`${Math.ceil(bounds.height)}px`;
+          clone.style.width=`${viewportWidth}px`;
+          clone.style.height=`${viewportHeight}px`;
           clone.style.overflow='visible';
           exportHost.appendChild(clone);
           document.body.appendChild(exportHost);
@@ -4848,8 +4855,8 @@ if ($view === 'map_edit') {
             const jsPDF=await ensureJsPDF();
             const orientation=canvas.width>=canvas.height?'landscape':'portrait';
             const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
-            const dataUrl=canvas.toDataURL('image/jpeg',0.92);
-            pdf.addImage(dataUrl,'JPEG',0,0,canvas.width,canvas.height);
+            const dataUrl=canvas.toDataURL('image/png');
+            pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
