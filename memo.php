@@ -2312,6 +2312,17 @@ if ($view === 'map_edit') {
           this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.linkLayer.classList.add('mind-links');
           this.viewport.appendChild(this.linkLayer);
+          this.guideLayer=document.createElement('div');
+          this.guideLayer.className='mind-guides';
+          this.guideLayer.style.position='absolute';
+          this.guideLayer.style.left='0';
+          this.guideLayer.style.top='0';
+          this.guideLayer.style.width='100%';
+          this.guideLayer.style.height='100%';
+          this.guideLayer.style.pointerEvents='none';
+          this.guideLayer.style.zIndex='1';
+          this.guideLayer.style.display='none';
+          this.viewport.appendChild(this.guideLayer);
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
@@ -2736,6 +2747,13 @@ if ($view === 'map_edit') {
           const MIN_HEIGHT=88;
           const clamp=(value,min,max)=>Math.min(max, Math.max(min,value));
           const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const layoutOptions=this.options && this.options.layout ? this.options.layout : {};
+          const verticalSpacingValue=typeof layoutOptions.verticalSpacing==='number'?layoutOptions.verticalSpacing:72;
+          const horizontalSpacingValue=typeof layoutOptions.horizontalSpacing==='number'?layoutOptions.horizontalSpacing:160;
+          const verticalSpacing=clamp(verticalSpacingValue,56,120);
+          const horizontalSpacing=clamp(horizontalSpacingValue,120,220);
+          const verticalGap=verticalSpacing/scale;
+          const horizontalGap=horizontalSpacing/scale;
           const heightMap=new Map();
           const layers=new Map();
           const registerLayer=(depth,node)=>{
@@ -2754,17 +2772,39 @@ if ($view === 'map_edit') {
             if(cached && cached.width){ return cached.width; }
             return 0;
           };
-          const vSpaceForDepth=(depth)=>clamp(72 + depth*6,56,120);
-          const baseGapBetween=(a,b,depth)=>Math.max(vSpaceForDepth(depth), (a+b)*0.3);
-          const gapBetween=(a,b,depth)=>baseGapBetween(a,b,depth)/scale;
-          const hSpaceForDepth=(depth)=>clamp(180 + Math.max(0,depth-1)*12,160,260);
-          const horizontalOffset=(depth,parent)=>{
-            if(depth===0) return 0;
-            const parentWidth=getNodeWidth(parent);
-            const base=hSpaceForDepth(depth);
-            const widthDriven=parentWidth*0.75 + 140;
-            return Math.max(base,widthDriven)/scale;
+          const columnWidths=new Map();
+          const registerColumnWidth=(depth,node)=>{
+            if(!node) return;
+            const width=Math.max(1,getNodeWidth(node));
+            const prev=columnWidths.get(depth)||0;
+            if(width>prev){ columnWidths.set(depth,width); }
           };
+          const gatherColumnWidths=(node,depth=0)=>{
+            if(!node) return;
+            registerColumnWidth(depth,node);
+            if(node.expanded!==false && node.children && node.children.length){
+              node.children.filter(Boolean).forEach(child=>gatherColumnWidths(child, depth+1));
+            }
+          };
+          gatherColumnWidths(this.root,0);
+          if(!columnWidths.has(0)){
+            columnWidths.set(0,Math.max(1,getNodeWidth(this.root)));
+          }
+          const columnPositions=new Map();
+          const depthKeys=[...columnWidths.keys()].sort((a,b)=>a-b);
+          columnPositions.set(0,0);
+          for(const depth of depthKeys){
+            if(depth===0) continue;
+            let anchorDepth=depth-1;
+            while(anchorDepth>=0 && !columnPositions.has(anchorDepth)){
+              anchorDepth--;
+            }
+            const anchorPos=anchorDepth>=0?columnPositions.get(anchorDepth):0;
+            const anchorWidth=anchorDepth>=0?(columnWidths.get(anchorDepth)||0):0;
+            const currentWidth=columnWidths.get(depth)||0;
+            const base=anchorPos + anchorWidth/2 + horizontalGap + currentWidth/2;
+            columnPositions.set(depth, base);
+          }
           const measure=(node,depth=0)=>{
             if(!node) return MIN_HEIGHT;
             if(heightMap.has(node.id)) return heightMap.get(node.id);
@@ -2776,7 +2816,7 @@ if ($view === 'map_edit') {
             let total=0;
             for(let i=0;i<childHeights.length;i++){
               total+=childHeights[i];
-              if(i<childHeights.length-1){ total+=gapBetween(childHeights[i], childHeights[i+1], depth+1); }
+              if(i<childHeights.length-1){ total+=verticalGap; }
             }
             const result=Math.max(base,total);
             heightMap.set(node.id,result);
@@ -2791,7 +2831,7 @@ if ($view === 'map_edit') {
               const node=visible[i];
               const h=measure(node,depth);
               total+=h;
-              if(i<visible.length-1){ total+=gapBetween(h, measure(visible[i+1],depth), depth); }
+              if(i<visible.length-1){ total+=verticalGap; }
             }
             return total;
           };
@@ -2807,16 +2847,13 @@ if ($view === 'map_edit') {
           this.root._layoutHeight=measure(this.root,0);
           registerLayer(0,this.root);
           if(this.root.model){ this.root.model.direction='center'; }
-          const assign=(node,depth,startTop,parent)=>{
+          const assign=(node,depth,startTop)=>{
             const height=measure(node,depth);
-            const parentNode=depth>0?(parent||node.parent||this.root):null;
             node.depth=depth;
             node._layoutHeight=height;
-            if(parentNode){
-              node.x=parentNode.x + horizontalOffset(depth,parentNode);
-            }else{
-              node.x=this.root.x;
-            }
+            const fallbackAnchor=depth>0 && columnPositions.has(depth-1)?columnPositions.get(depth-1):this.root.x;
+            const columnX=columnPositions.has(depth)?columnPositions.get(depth):fallbackAnchor+horizontalGap;
+            node.x=columnX;
             node.y=startTop+height/2;
             node.dir=depth===0?0:1;
             node.direction=depth===0?'center':'right';
@@ -2827,21 +2864,32 @@ if ($view === 'map_edit') {
             const children=node.children.filter(Boolean);
             for(let i=0;i<children.length;i++){
               const child=children[i];
-              const childHeight=assign(child, depth+1, cursor, node);
+              const childHeight=assign(child, depth+1, cursor);
               cursor+=childHeight;
-              if(i<children.length-1){
-                const nextHeight=measure(children[i+1], depth+1);
-                cursor+=gapBetween(childHeight, nextHeight, depth+1);
-              }
+              if(i<children.length-1){ cursor+=verticalGap; }
+            }
+            if(children.length===1){
+              node.y=children[0].y;
+            }else if(children.length>1){
+              const first=children[0];
+              const last=children[children.length-1];
+              node.y=(first.y + last.y)/2;
             }
             return height;
           };
           let rightTop=this.root.y - rightHeight/2;
           for(let i=0;i<right.length;i++){
             const child=right[i];
-            const h=assign(child,1,rightTop,this.root);
+            const h=assign(child,1,rightTop);
             rightTop+=h;
-            if(i<right.length-1){ rightTop+=gapBetween(h, measure(right[i+1],1), 1); }
+            if(i<right.length-1){ rightTop+=verticalGap; }
+          }
+          if(right.length){
+            if(right.length===1){
+              this.root.y=right[0].y;
+            }else{
+              this.root.y=(right[0].y + right[right.length-1].y)/2;
+            }
           }
           const shiftSubtree=(node,delta)=>{
             if(!node || !delta) return;
@@ -2859,17 +2907,12 @@ if ($view === 'map_edit') {
             while(cursor){
               if(cursor.expanded!==false && cursor.children && cursor.children.length){
                 const visible=cursor.children.filter(Boolean);
-                if(visible.length){
+                if(visible.length===1){
+                  cursor.y=visible[0].y;
+                }else if(visible.length>1){
                   const first=visible[0];
                   const last=visible[visible.length-1];
-                  const firstDepth=(typeof first.depth==='number')?first.depth:0;
-                  const lastDepth=(typeof last.depth==='number')?last.depth:0;
-                  const firstHeight=(first._layoutHeight!=null)?first._layoutHeight:measure(first, firstDepth);
-                  const lastHeight=(last._layoutHeight!=null)?last._layoutHeight:measure(last, lastDepth);
-                  const firstTop=first.y - firstHeight/2;
-                  const lastBottom=last.y + lastHeight/2;
-                  const center=(firstTop+lastBottom)/2;
-                  cursor.y=center;
+                  cursor.y=(first.y + last.y)/2;
                 }
               }
               cursor=cursor.parent||null;
@@ -2888,7 +2931,7 @@ if ($view === 'map_edit') {
                 const prevHeight=(prev._layoutHeight!=null)?prev._layoutHeight:measure(prev, prevDepth);
                 const currentHeight=(current._layoutHeight!=null)?current._layoutHeight:measure(current, currentDepth);
                 const prevBottom=prev.y + prevHeight/2;
-                const minTop=prevBottom + gapBetween(prevHeight, currentHeight, depth);
+                const minTop=prevBottom + verticalGap;
                 const currentTop=current.y - currentHeight/2;
                 if(currentTop<minTop){
                   const delta=minTop-currentTop;
@@ -2920,6 +2963,11 @@ if ($view === 'map_edit') {
             node.absX=node.x+shiftX;
             node.absY=node.y+shiftY;
           }
+          if(this.guideLayer){
+            this.guideLayer.style.width=`${this.bounds.width}px`;
+            this.guideLayer.style.height=`${this.bounds.height}px`;
+          }
+          this.updateGuides(layers,columnPositions,shiftX,shiftY);
           this.linkLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
           this.linkLayer.setAttribute('width',`${this.bounds.width}`);
           this.linkLayer.setAttribute('height',`${this.bounds.height}`);
@@ -2929,6 +2977,49 @@ if ($view === 'map_edit') {
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
           this.viewport.style.height=`${this.bounds.height}px`;
+        }
+        updateGuides(layers,columnPositions,shiftX,shiftY){
+          if(!this.guideLayer) return;
+          const layoutOptions=this.options && this.options.layout ? this.options.layout : {};
+          if(!layoutOptions.debugGuides){
+            this.guideLayer.style.display='none';
+            this.guideLayer.innerHTML='';
+            return;
+          }
+          this.guideLayer.style.display='block';
+          this.guideLayer.innerHTML='';
+          const columnEntries=[...columnPositions.entries()].sort((a,b)=>a[0]-b[0]);
+          const verticalColor='rgba(227,198,139,0.35)';
+          const horizontalColor='rgba(98,173,255,0.28)';
+          for(const [,x] of columnEntries){
+            const line=document.createElement('div');
+            line.className='guide-line guide-vertical';
+            line.style.position='absolute';
+            line.style.top='0';
+            line.style.bottom='0';
+            line.style.left=`${x+shiftX}px`;
+            line.style.width='1px';
+            line.style.background=verticalColor;
+            this.guideLayer.appendChild(line);
+          }
+          const seen=new Set();
+          for(const nodes of layers.values()){
+            for(const node of nodes){
+              const y=node.y+shiftY;
+              const key=Math.round(y*100)/100;
+              if(seen.has(key)) continue;
+              seen.add(key);
+              const line=document.createElement('div');
+              line.className='guide-line guide-horizontal';
+              line.style.position='absolute';
+              line.style.left='0';
+              line.style.right='0';
+              line.style.top=`${y}px`;
+              line.style.height='1px';
+              line.style.background=horizontalColor;
+              this.guideLayer.appendChild(line);
+            }
+          }
         }
         buildNodeElement(node,{forMeasure=false}={}){
           const el=document.createElement('div');
