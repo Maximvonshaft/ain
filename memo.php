@@ -3212,6 +3212,32 @@ if ($view === 'map_edit') {
           this.applyTransform();
           return true;
         }
+        center_node(target){
+          if(!target || !this.bounds) return false;
+          const node=typeof target==='string'?this.get_node(target):target;
+          if(!node) return false;
+          const rect=this.container.getBoundingClientRect();
+          if(rect.width<=0 || rect.height<=0) return false;
+          if(!node.anchors || !node.anchors.center){ this.updateAnchors(node); }
+          let anchor=null;
+          if(node.anchors && node.anchors.center){ anchor=node.anchors.center; }
+          if(!anchor){
+            const cached=this.sizeCache.get(node.id)||{};
+            const width=node.el?node.el.offsetWidth:(cached.width||0);
+            const height=node.el?node.el.offsetHeight:(cached.height||0);
+            const baseX=(Number.isFinite(node.absX)?node.absX:0);
+            const baseY=(Number.isFinite(node.absY)?node.absY:0);
+            anchor={
+              x:baseX + (width?width/2:0),
+              y:baseY + (height?height/2:0)
+            };
+          }
+          if(!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return false;
+          this.offsetX=rect.width/2 - anchor.x*this.scale;
+          this.offsetY=rect.height/2 - anchor.y*this.scale;
+          this.applyTransform();
+          return true;
+        }
         showNodeDetails(node){
           if(!node) return;
           if(typeof this.options.onNodeDetails==='function'){
@@ -4261,6 +4287,15 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(newNode.id));
+        if(typeof requestAnimationFrame==='function'){
+          requestAnimationFrame(()=>{
+            const target=jm.get_node(newNode.id);
+            if(target && typeof jm.center_node==='function'){
+              const centered=jm.center_node(target);
+              if(centered){ scheduleHandleRefresh(); }
+            }
+          });
+        }
         return newNode;
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
