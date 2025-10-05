@@ -963,6 +963,7 @@ if ($view === 'new') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>新建备忘录</title>
+    <script src="assets/offline-manager.js" defer></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1162,6 +1163,15 @@ if ($view === 'new') {
               timer=null;
             },1500);
           },
+          queued(message){
+            if(timer){ clearTimeout(timer); timer=null; }
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent='📦 离线保存'; }
+            if(tipEl){
+              tipEl.textContent=message || '离线草稿已保存';
+              tipEl.classList.add('show');
+              tipEl.classList.remove('dirty');
+            }
+          },
           error(message){
             if(timer){ clearTimeout(timer); timer=null; }
             if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
@@ -1188,30 +1198,110 @@ if ($view === 'new') {
       });
       mde.codemirror.on('change', renderMD); renderMD();
       (async function bootstrap(){
-        const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
-        const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
+        const headers={'X-Requested-With':'fetch'};
+        const offline=window.OfflineManager;
+        if(offline && !offline.isProbablyOnline()){
+          state.id=0;
+          $('#timeline').dataset.item='0';
+          return;
+        }
+        try{
+          const res=await fetch(location.href,{method:'POST',headers,body:new URLSearchParams([['action','create_draft']])});
+          const j=await res.json();
+          if(j && j.id){ state.id=j.id; $('#timeline').dataset.item=String(state.id); }
+        }catch(_){
+          state.id=0;
+          $('#timeline').dataset.item='0';
+        }
       })();
       async function saveAJAX(ev){
         ev.preventDefault();
+        const titleValue=$('#title').value.trim()||'未命名';
+        const categoryValue=$('#cat').value;
+        const descriptionValue=mde.value();
+        const hasExistingId=Number(state.id)>0;
+        const action=hasExistingId?'edit_item':'add_item';
         const fd=new FormData();
-        fd.append('action','edit_item');
-        fd.append('id', String(state.id));
-        fd.append('title',$('#title').value.trim()||'未命名');
-        fd.append('category_id',$('#cat').value);
-        fd.append('description', mde.value());
+        fd.append('action',action);
+        if(hasExistingId){ fd.append('id', String(state.id)); }
+        fd.append('title',titleValue);
+        fd.append('category_id',categoryValue);
+        fd.append('description',descriptionValue);
+        const headers={'X-Requested-With':'fetch'};
         saveFeedback.saving();
+        const offline=window.OfflineManager;
         try{
-          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!r.ok) throw new Error('保存失败');
-          saveFeedback.success();
+          if(offline){
+            const snapshotKey=`memo-offline::memo:${hasExistingId?state.id:'draft-new'}`;
+            const meta={
+              kind:'memo-save',
+              itemId:hasExistingId?state.id:null,
+              headers,
+              snapshotKey,
+              snapshotData:{title:titleValue,description:descriptionValue,category_id:categoryValue,updatedAt:Date.now()},
+              view:'new',
+              pendingAction:action
+            };
+            const result=await offline.sendForm(location.href, fd, meta);
+            if(result.status==='success'){
+              const json=await result.response.json().catch(()=>({ok:true}));
+              if(action==='add_item' && json && json.id){
+                state.id=json.id;
+                $('#timeline').dataset.item=String(state.id);
+              }
+              saveFeedback.success();
+            } else if(result.status==='queued'){
+              if(!hasExistingId){
+                if(!state.id){ state.id='draft-'+Date.now(); }
+                $('#timeline').dataset.item=String(state.id);
+              }
+              saveFeedback.queued('离线草稿已保存，联网后自动同步');
+            } else if(result.status==='unsupported'){
+              alert('离线状态下暂不支持此操作。');
+              saveFeedback.error('未保存');
+            } else if(result.status==='error' && result.response){
+              throw new Error('保存失败');
+            } else {
+              throw new Error('保存失败');
+            }
+          } else {
+            const r=await fetch(location.href,{method:'POST',body:fd,headers});
+            if(!r.ok) throw new Error('保存失败');
+            const json=await r.json().catch(()=>({ok:true}));
+            if(action==='add_item' && json && json.id){
+              state.id=json.id;
+              $('#timeline').dataset.item=String(state.id);
+            }
+            saveFeedback.success();
+          }
         }catch(err){
           alert(err.message||'保存失败');
           saveFeedback.error('未保存');
         }
         return false;
       }
-      $('#btn-insert-att-item').addEventListener('click',()=>$('#att-file-item').click());
+      window.addEventListener('offline:sync-success',event=>{
+        const detail=event.detail||{};
+        if(!detail.meta || detail.meta.kind!=='memo-save') return;
+        if(detail.meta.view!=='new') return;
+        if(detail.response && detail.response.id){
+          state.id=detail.response.id;
+          $('#timeline').dataset.item=String(state.id);
+        }
+      });
+      $('#btn-insert-att-item').addEventListener('click',()=>{
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          return;
+        }
+        $('#att-file-item').click();
+      });
       $('#att-file-item').addEventListener('change', async (e)=>{
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          e.target.value='';
+          return;
+        }
         const f=e.target.files[0]; if(!f) return;
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1266,6 +1356,10 @@ if ($view === 'new') {
       }
       async function addStepAJAX(ev){
         ev.preventDefault();
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持新增步骤，请联网后重试。');
+          return false;
+        }
         const title=$('#new-step-title').value.trim(); if(!title) return false;
         const fd=new FormData(); fd.append('action','add_step'); fd.append('item_id', String(state.id)); fd.append('title', title);
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1274,16 +1368,28 @@ if ($view === 'new') {
       }
       async function saveStepTitleAJAX(ev, stepId, form){
         ev.preventDefault(); const fd=new FormData(form);
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持编辑步骤，请联网后重试。');
+          return false;
+        }
         await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         return false;
       }
       async function saveStepNotesAJAX(ev, stepId){
         ev.preventDefault(); const f=$('#form-notes-'+stepId); const fd=new FormData(f); const ta=f.querySelector('textarea[name="notes"]');
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持编辑备注，请联网后重试。');
+          return false;
+        }
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok) $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(ta.value));
         return false;
       }
       async function toggleStep(stepId, done){
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持更新步骤状态。');
+          return;
+        }
         const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done?1:0);
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok){ const el=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(el){ el.classList.toggle('done', !!done); } }
@@ -1338,6 +1444,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>详情 · <?php echo h($it['title']); ?></title>
+    <script src="assets/offline-manager.js" defer></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1623,6 +1730,15 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
               timer=null;
             },1500);
           },
+          queued(message){
+            if(timer){ clearTimeout(timer); timer=null; }
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent='📦 离线保存'; }
+            if(tipEl){
+              tipEl.textContent=message || '离线草稿已保存';
+              tipEl.classList.add('show');
+              tipEl.classList.remove('dirty');
+            }
+          },
           error(message){
             if(timer){ clearTimeout(timer); timer=null; }
             if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
@@ -1656,18 +1772,58 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const btn=form.querySelector('button[type="submit"]');
         const feedback=createSaveFeedbackController(tip, btn);
         feedback.saving();
+        const headers={'X-Requested-With':'fetch'};
+        const titleValue=String(fd.get('title')||'');
+        const categoryValue=String(fd.get('category_id')||'');
+        const descriptionValue=mde.value();
+        const offline=window.OfflineManager;
         try{
-          const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('保存失败');
-          feedback.success();
+          if(offline){
+            const meta={
+              kind:'memo-save',
+              itemId:<?php echo (int)$it['id']; ?>,
+              headers,
+              snapshotKey:`memo-offline::memo:<?php echo (int)$it['id']; ?>`,
+              snapshotData:{id:<?php echo (int)$it['id']; ?>,title:titleValue,description:descriptionValue,category_id:categoryValue,updatedAt:Date.now()},
+              view:'detail'
+            };
+            const result=await offline.sendForm(location.href, fd, meta);
+            if(result.status==='success'){
+              feedback.success();
+            } else if(result.status==='queued'){
+              feedback.queued('离线草稿已保存，联网后自动同步');
+            } else if(result.status==='unsupported'){
+              alert('离线状态下暂不支持此操作。');
+              feedback.error('未保存');
+            } else if(result.status==='error'){
+              throw new Error('保存失败');
+            } else {
+              throw new Error('保存失败');
+            }
+          } else {
+            const res = await fetch(location.href,{method:'POST',body:fd,headers});
+            if(!res.ok) throw new Error('保存失败');
+            feedback.success();
+          }
         }catch(err){
           alert(err.message||'保存失败');
           feedback.error('未保存');
         }
         return false;
       }
-      document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
+      document.getElementById('btn-insert-att-item').addEventListener('click',()=>{
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          return;
+        }
+        document.getElementById('att-file-item').click();
+      });
       document.getElementById('att-file-item').addEventListener('change', async (e)=>{
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          e.target.value='';
+          return;
+        }
         const f=e.target.files[0]; if(!f) return;
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
         const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
@@ -1679,12 +1835,20 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       const stepMDE={};
       async function saveStepTitleAJAX(ev, stepId, form){
         ev.preventDefault(); const fd=new FormData(form);
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持编辑步骤，请联网后重试。');
+          return false;
+        }
         await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         return false;
       }
       async function saveStepNotesAJAX(ev, stepId){
         ev.preventDefault(); const form=document.getElementById('form-notes-'+stepId);
         const fd=new FormData(form); const ta=form.querySelector('textarea[name="notes"]');
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持编辑备注，请联网后重试。');
+          return false;
+        }
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(res.ok){ renderMDTo('step-md-view-'+stepId, ta.value); }
         return false;
@@ -1692,6 +1856,11 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       window.insertAttachmentToStep = async function(stepId){
         const input=document.getElementById('att-file-step-'+stepId);
         input.onchange = async (e)=>{
+          if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+            alert('离线状态下无法上传附件，联网后再试。');
+            e.target.value='';
+            return;
+          }
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
@@ -1705,6 +1874,10 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       };
       function addStepForm(ev){
         ev.preventDefault(); const f=ev.target; const fd=new FormData(f);
+        if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+          alert('离线状态下暂不支持新增步骤，请联网后重试。');
+          return false;
+        }
         fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}).then(()=>location.reload());
         return false;
       }
@@ -1722,6 +1895,10 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         box.addEventListener('drop',e=>{
           e.preventDefault(); if(!dragging) return; dragging=null;
           const ids=[...box.querySelectorAll('.tl-item[draggable]')].map(x=>x.dataset.id).join(',');
+          if(window.OfflineManager && !window.OfflineManager.isProbablyOnline()){
+            alert('离线状态下暂不支持调整步骤顺序。');
+            return;
+          }
           const fd=new FormData(); fd.append('action','reorder_steps'); fd.append('item_id', box.dataset.item); fd.append('order', ids);
           fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         });
@@ -1774,6 +1951,7 @@ if ($view === 'map_edit') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>思维导图编辑器 · <?php echo h($mind['title']); ?></title>
+    <script src="assets/offline-manager.js" defer></script>
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3524,6 +3702,9 @@ if ($view === 'map_edit') {
         return label.length>16 ? label.slice(0,15)+'…' : label;
       }
       async function uploadMindmapFile(file, nodeId){
+        if(offline && !offline.isProbablyOnline()){
+          throw new Error('离线状态下无法上传附件');
+        }
         const fd=new FormData();
         fd.append('action','upload_mindmap_asset');
         fd.append('map_id', String(currentMapId||0));
@@ -3801,6 +3982,8 @@ if ($view === 'map_edit') {
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
+      const offline=window.OfflineManager;
+      let offlineDraftTimer=null;
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
@@ -3915,6 +4098,29 @@ if ($view === 'map_edit') {
           else{ dockSaveButton.removeAttribute('data-state'); }
         }
       }
+      function currentMindmapSnapshot(){
+        const title=titleInput ? (titleInput.value.trim()||'未命名导图') : '未命名导图';
+        const rawData=jm ? jm.get_data('node_tree') : null;
+        let payload=null;
+        if(rawData){
+          try{ payload=JSON.parse(JSON.stringify(rawData)); }
+          catch(_){ payload=rawData; }
+        }
+        if(payload && payload.data){ enforceRightOrientation(payload.data); }
+        return { id: currentMapId || 0, title, content: payload, updatedAt: Date.now() };
+      }
+      async function persistOfflineMindmapDraft(){
+        if(!offline) return;
+        try{
+          const snapshot=currentMindmapSnapshot();
+          await offline.saveMindmapDraft(snapshot.id || currentMapId || 0, snapshot);
+        }catch(_){ }
+      }
+      function scheduleOfflineDraft(){
+        if(!offline) return;
+        if(offlineDraftTimer){ clearTimeout(offlineDraftTimer); }
+        offlineDraftTimer=setTimeout(()=>{ persistOfflineMindmapDraft(); }, 800);
+      }
       function markDirty(){
         dirty=true;
         if(saveState){
@@ -3922,6 +4128,7 @@ if ($view === 'map_edit') {
           saveState.classList.add('show','dirty');
         }
         setSaveButtonState('未保存',false,'dirty');
+        scheduleOfflineDraft();
       }
       function showSaving(){
         if(saveState){
@@ -3945,6 +4152,14 @@ if ($view === 'map_edit') {
             setSaveButtonState(null,false,null);
           }
         },1500);
+      }
+      function markQueued(){
+        dirty=false;
+        if(saveState){
+          saveState.textContent='离线草稿已保存';
+          saveState.classList.add('show','dirty');
+        }
+        setSaveButtonState('离线草稿', false,'queued');
       }
       function toggleSettings(forceShow){
         if(!settingsLayer) return;
@@ -4459,6 +4674,10 @@ if ($view === 'map_edit') {
       }
       async function attachFilesToNode(targetNode, files){
         if(!targetNode || !files || !files.length) return;
+        if(offline && !offline.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          return;
+        }
         const accepted=sanitizeAttachmentFiles(files);
         if(!accepted.length) return;
         const data=ensureNodeDataObject(targetNode);
@@ -4511,6 +4730,10 @@ if ($view === 'map_edit') {
           alert('请将文件拖放到具体的节点上以附加到该节点。');
           return;
         }
+        if(offline && !offline.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          return;
+        }
         commitInlineEditing();
         await attachFilesToNode(targetNode, files);
       }
@@ -4548,6 +4771,10 @@ if ($view === 'map_edit') {
         const node=ensureNode();
         if(!node){ alert('请先选择一个节点'); return; }
         if(!attachInput) return;
+        if(offline && !offline.isProbablyOnline()){
+          alert('离线状态下无法上传附件，联网后再试。');
+          return;
+        }
         attachInput.dataset.targetId=node.id;
         attachInput.value='';
         attachInput.click();
@@ -4578,6 +4805,10 @@ if ($view === 'map_edit') {
         attachInput.addEventListener('change',async e=>{
           const files=Array.from(e.target.files||[]);
           attachInput.value='';
+          if(offline && !offline.isProbablyOnline()){
+            alert('离线状态下无法上传附件，联网后再试。');
+            return;
+          }
           if(!files.length) return;
           const targetId=attachInput.dataset.targetId;
           const node=targetId ? jm.get_node(targetId) : ensureNode();
@@ -5105,7 +5336,12 @@ if ($view === 'map_edit') {
       async function saveMindmap(){
         commitInlineEditing();
         const title=titleInput.value.trim()||'未命名导图';
-        const currentData=jm.get_data('node_tree');
+        const rawData=jm.get_data('node_tree');
+        let currentData=null;
+        if(rawData){
+          try{ currentData=JSON.parse(JSON.stringify(rawData)); }
+          catch(_){ currentData=rawData; }
+        }
         if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
         const payload=JSON.stringify(currentData);
         const fd=new FormData();
@@ -5113,27 +5349,85 @@ if ($view === 'map_edit') {
         fd.append('id', String(currentMapId||0));
         fd.append('title', title);
         fd.append('content', payload);
+        const headers={'X-Requested-With':'fetch'};
         try{
           showSaving();
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('网络异常');
-          const json=await res.json();
-          if(!json.ok) throw new Error(json.error||'保存失败');
-          currentMapId=parseInt(json.id,10)||0;
-          document.getElementById('jsmind-container').dataset.mapId=currentMapId;
-          if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-          if(deleteMapForm){
-            const idInput=deleteMapForm.querySelector('input[name="id"]');
-            if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+          if(offline){
+            const meta={
+              kind:'mindmap-save',
+              mapId:currentMapId||0,
+              headers,
+              snapshotKey:offline.mindmapKey(currentMapId||0),
+              snapshotData:{id:currentMapId||0,title,content:currentData,updatedAt:Date.now()}
+            };
+            const result=await offline.sendForm(location.href, fd, meta);
+            if(result.status==='success'){
+              const json=await result.response.json();
+              if(!json.ok) throw new Error(json.error||'保存失败');
+              currentMapId=parseInt(json.id,10)||0;
+              document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+              if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+              if(deleteMapForm){
+                const idInput=deleteMapForm.querySelector('input[name="id"]');
+                if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+              }
+              history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+              initialData=JSON.parse(payload);
+              if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+              markSaved();
+            } else if(result.status==='queued'){
+              initialData=JSON.parse(payload);
+              if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+              markQueued();
+            } else if(result.status==='unsupported'){
+              alert('离线状态下暂不支持此操作。');
+              markDirty();
+            } else if(result.status==='error'){
+              throw new Error('保存失败');
+            } else {
+              throw new Error('保存失败');
+            }
+          } else {
+            const res=await fetch(location.href,{method:'POST',body:fd,headers});
+            if(!res.ok) throw new Error('网络异常');
+            const json=await res.json();
+            if(!json.ok) throw new Error(json.error||'保存失败');
+            currentMapId=parseInt(json.id,10)||0;
+            document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+            if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+            if(deleteMapForm){
+              const idInput=deleteMapForm.querySelector('input[name="id"]');
+              if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+            }
+            history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+            initialData=JSON.parse(payload);
+            if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+            markSaved();
           }
-          history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
-          initialData=JSON.parse(payload);
-          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-          markSaved();
         }catch(err){
           alert(err.message||'保存失败');
           markDirty();
         }
+      }
+      if(offline){
+        window.addEventListener('offline:sync-success',event=>{
+          const detail=event.detail||{};
+          if(!detail.meta || detail.meta.kind!=='mindmap-save') return;
+          const response=detail.response||{};
+          const syncedId=response && response.id ? parseInt(response.id,10) : (detail.meta.mapId||0);
+          if(syncedId){
+            currentMapId=syncedId;
+            const container=document.getElementById('jsmind-container');
+            if(container){ container.dataset.mapId=currentMapId; }
+            if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+            if(deleteMapForm){
+              const idInput=deleteMapForm.querySelector('input[name="id"]');
+              if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+            }
+            if(history && history.replaceState){ history.replaceState(null,'',`?view=map_edit&id=${syncedId}`); }
+          }
+          markSaved();
+        });
       }
       window.addEventListener('beforeunload',e=>{
         commitInlineEditing();
@@ -5160,6 +5454,7 @@ if ($view === 'maps') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>思维导图库</title>
+    <script src="assets/offline-manager.js" defer></script>
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5597,6 +5892,7 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>自适应备忘录 · 单文件</title>
+<script src="assets/offline-manager.js" defer></script>
 <meta name="color-scheme" content="dark"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
