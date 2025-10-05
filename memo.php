@@ -1022,6 +1022,9 @@ if ($view === 'new') {
         linear-gradient(120deg,rgba(201,168,106,.08),transparent 30%,rgba(201,168,106,.06) 70%,transparent 90%),
         #0A0C0E;
       }
+      body.is-ajax-loading{cursor:progress;}
+      body.is-ajax-loading .app{opacity:.55;transition:opacity var(--t-fast);}
+      body.is-ajax-loading .app *{pointer-events:none;}
       body::before{content:"";position:fixed;inset:0;background:
         linear-gradient(180deg,rgba(10,12,14,.45),rgba(10,12,14,.8)),
         url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"%3E%3Cpath fill="rgba(201,168,106,0.05)" d="M0 79h160v2H0zm79-79h2v160h-2z"/%3E%3C/svg%3E');
@@ -6054,11 +6057,17 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
-const itemsContainer=document.getElementById('items');
-const currentCategoryFilter=<?php echo json_encode((string)$cat); ?>;
-const memoImportButton=document.getElementById('btn-import-items');
-const memoImportInput=document.getElementById('memo-import-input');
-if(memoImportButton && memoImportInput){
+function getItemsContainer(){ return document.getElementById('items'); }
+function getCurrentCategoryFilter(){
+  const params=new URL(location.href).searchParams;
+  const cat=params.get('cat');
+  return cat && cat!=='' ? cat : 'all';
+}
+function bindImportHandlers(){
+  const memoImportButton=document.getElementById('btn-import-items');
+  const memoImportInput=document.getElementById('memo-import-input');
+  if(!memoImportButton || !memoImportInput || memoImportButton.dataset.bound==='1') return;
+  memoImportButton.dataset.bound='1';
   const importButtonLabel=memoImportButton.textContent;
   memoImportButton.addEventListener('click',()=>{ memoImportInput.click(); });
   memoImportInput.addEventListener('change',async ()=>{
@@ -6088,7 +6097,11 @@ if(memoImportButton && memoImportInput){
         summaryParts.push(`新增分类：${data.created_categories.join('、')}`);
       }
       alert(summaryParts.join('，'));
-      window.location.reload();
+      if(typeof loadMemoListPage==='function'){
+        loadMemoListPage(location.href,{push:false,scroll:true});
+      } else {
+        window.location.reload();
+      }
     }catch(err){
       alert(err instanceof Error ? err.message : '导入失败');
     }finally{
@@ -6099,6 +6112,7 @@ if(memoImportButton && memoImportInput){
   });
 }
 function ensureItemsEmptyState(){
+  const itemsContainer=getItemsContainer();
   if(!itemsContainer) return;
   const hasCard=itemsContainer.querySelector('article.item');
   const placeholder=itemsContainer.querySelector('.item-empty');
@@ -6166,10 +6180,30 @@ function sendOrder(){
   const fd=new FormData(); fd.append('action','reorder_items'); fd.append('order', ids);
   fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
 }
-const catModal = document.getElementById('cat-modal');
-document.getElementById('btn-cat-mgr').onclick = openCatModal;
-function openCatModal(){ catModal.style.display='flex'; renderCatRowsFromDOM(); }
-function closeCatModal(){ catModal.style.display='none'; }
+function getCatModal(){ return document.getElementById('cat-modal'); }
+function openCatModal(){
+  const modal=getCatModal();
+  if(!modal) return;
+  modal.style.display='flex';
+  renderCatRowsFromDOM();
+}
+function closeCatModal(){
+  const modal=getCatModal();
+  if(!modal) return;
+  modal.style.display='none';
+}
+function bindCatModal(){
+  const trigger=document.getElementById('btn-cat-mgr');
+  if(trigger && trigger.dataset.bound!=='1'){
+    trigger.addEventListener('click',e=>{ e.preventDefault(); openCatModal(); });
+    trigger.dataset.bound='1';
+  }
+  const modal=getCatModal();
+  if(modal && modal.dataset.bound!=='1'){
+    modal.addEventListener('click',e=>{ if(e.target===modal) closeCatModal(); });
+    modal.dataset.bound='1';
+  }
+}
 function renderCatRows(cats, counts){
   const box=document.getElementById('cat-rows'); box.innerHTML='';
   cats.forEach(c=>{
@@ -6231,56 +6265,164 @@ function refreshSidebarCats(cats, counts, total){
     link.innerHTML=`<span class="name">${escapeHtml(c.name)}</span><span class="count">${counts[c.id]||0}</span>`;
     list.appendChild(link);
   });
+  if(typeof setupAjaxNavigation==='function'){ setupAjaxNavigation(); }
 }
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
-if(itemsContainer){
-  itemsContainer.addEventListener('change', async (e)=>{
-    const t=e.target;
-    if(t.classList.contains('item-toggle')){
-      const card=t.closest('article.item'); if(!card) return;
-      const id=card.dataset.id; const done=t.checked?1:0;
-      const fd=new FormData(); fd.append('action','toggle_done'); fd.append('id', id); fd.append('done', done);
-      try{
-        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-        if(j && j.ok){
-          const newCategoryId=(j.category_id===null || typeof j.category_id==='undefined') ? '' : String(j.category_id);
-          card.dataset.categoryId=newCategoryId;
-          card.classList.toggle('done', !!j.done);
-          const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
-          const categoryBadge=card.querySelector('.meta .badge:not(.js-updated)');
-          if(categoryBadge && j.category_label){ categoryBadge.textContent=j.category_label; }
-          if(currentCategoryFilter==='all'){
-            if(j.done){
-              card.remove();
-              ensureItemsEmptyState();
-            }
-          } else if(currentCategoryFilter!==newCategoryId){
+async function handleItemsChange(e){
+  const container=getItemsContainer();
+  if(!container || !container.contains(e.target)) return;
+  const t=e.target;
+  if(t.classList.contains('item-toggle')){
+    const card=t.closest('article.item'); if(!card) return;
+    const id=card.dataset.id; const done=t.checked?1:0;
+    const fd=new FormData(); fd.append('action','toggle_done'); fd.append('id', id); fd.append('done', done);
+    try{
+      const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+      if(j && j.ok){
+        const newCategoryId=(j.category_id===null || typeof j.category_id==='undefined') ? '' : String(j.category_id);
+        card.dataset.categoryId=newCategoryId;
+        card.classList.toggle('done', !!j.done);
+        const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
+        const categoryBadge=card.querySelector('.meta .badge:not(.js-updated)');
+        if(categoryBadge && j.category_label){ categoryBadge.textContent=j.category_label; }
+        const currentCategoryFilter=getCurrentCategoryFilter();
+        if(currentCategoryFilter==='all'){
+          if(j.done){
             card.remove();
             ensureItemsEmptyState();
           }
-          try{
-            const {cats,counts,total}=await fetchCats();
-            refreshSidebarCats(cats,counts,total);
-          }catch(_){ }
+        } else if(currentCategoryFilter!==newCategoryId){
+          card.remove();
+          ensureItemsEmptyState();
         }
-      }catch(_){ }
+        try{
+          const {cats,counts,total}=await fetchCats();
+          refreshSidebarCats(cats,counts,total);
+        }catch(_){ }
+      }
+    }catch(_){ }
+  }
+  if(t.classList.contains('step-toggle')){
+    const row=t.closest('.tlrow'); if(!row) return;
+    const stepId=row.querySelector('input[name="id"]').value;
+    const done=t.checked?1:0;
+    const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
+    try{
+      const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+      if(j && j.ok){
+        row.classList.toggle('done', !!done);
+        const card=row.closest('article.item'); const badge=card && card.querySelector('.js-updated');
+        if(badge && j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
+      }
+    }catch(_){ }
+  }
+}
+document.addEventListener('change', handleItemsChange);
+function setupMemoListPage(){
+  bindImportHandlers();
+  bindCatModal();
+}
+window.setupMemoListPage=setupMemoListPage;
+setupMemoListPage();
+(function(){
+  function shouldHandleUrl(raw){
+    let target;
+    try{ target=new URL(raw, location.href); }
+    catch(_){ return false; }
+    if(target.origin!==location.origin) return false;
+    if(target.pathname!==location.pathname) return false;
+    if(target.searchParams.get('export')) return false;
+    if(target.searchParams.get('download')) return false;
+    if(target.searchParams.get('mindmap_asset')) return false;
+    const view=target.searchParams.get('view');
+    if(view && view!=='') return false;
+    return true;
+  }
+  async function loadListPage(url,{push=true,scroll=true,replace=false}={}){
+    if(!shouldHandleUrl(url)){ location.href=url; return; }
+    document.body.classList.add('is-ajax-loading');
+    try{
+      const res=await fetch(url,{headers:{'X-Requested-With':'fetch'}});
+      if(!res.ok){ throw new Error('Network error'); }
+      const html=await res.text();
+      const parser=new DOMParser();
+      const doc=parser.parseFromString(html,'text/html');
+      const newMain=doc.querySelector('.main');
+      const newSidebar=doc.querySelector('.sidebar');
+      if(!newMain || !newSidebar){ location.href=url; return; }
+      document.title=doc.title;
+      const main=document.querySelector('.main');
+      if(main){ main.innerHTML=newMain.innerHTML; }
+      const sidebar=document.querySelector('.sidebar');
+      if(sidebar){ sidebar.innerHTML=newSidebar.innerHTML; }
+      const newModal=doc.getElementById('cat-modal');
+      const modal=document.getElementById('cat-modal');
+      if(modal){
+        if(newModal){ modal.replaceWith(newModal); }
+        else { modal.remove(); }
+      } else if(newModal){
+        document.body.appendChild(newModal);
+      }
+      setupMemoListPage();
+      setupAjaxNavigation();
+      if(scroll){ window.scrollTo({top:0,behavior:'auto'}); }
+      if(replace){ history.replaceState({memoAjax:true},'',url); }
+      else if(push){ history.pushState({memoAjax:true},'',url); }
+    }catch(err){
+      console.error('AJAX navigation failed',err);
+      location.href=url;
+    }finally{
+      document.body.classList.remove('is-ajax-loading');
     }
-    if(t.classList.contains('step-toggle')){
-      const row=t.closest('.tlrow'); if(!row) return;
-      const stepId=row.querySelector('input[name="id"]').value;
-      const done=t.checked?1:0;
-      const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
-      try{
-        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-        if(j && j.ok){
-          row.classList.toggle('done', !!done);
-          const card=row.closest('article.item'); const badge=card && card.querySelector('.js-updated');
-          if(badge && j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
-        }
-      }catch(_){ }
+  }
+  function attachLink(link){
+    if(link.dataset.ajaxBound==='1') return;
+    link.addEventListener('click',event=>{
+      if(event.defaultPrevented) return;
+      if(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if(event.button!==0) return;
+      if(!shouldHandleUrl(link.href)) return;
+      event.preventDefault();
+      loadListPage(link.href,{push:true});
+    });
+    link.dataset.ajaxBound='1';
+  }
+  function attachSearchForm(form){
+    if(form.dataset.ajaxBound==='1') return;
+    form.addEventListener('submit',event=>{
+      event.preventDefault();
+      const url=new URL(form.action || location.href, location.href);
+      const params=new URLSearchParams(new FormData(form));
+      url.search=params.toString();
+      if(!shouldHandleUrl(url.toString())){
+        location.href=url.toString();
+        return;
+      }
+      loadListPage(url.toString(),{push:true});
+    });
+    form.dataset.ajaxBound='1';
+  }
+  function setupAjaxNavigation(){
+    document.querySelectorAll('.sidebar a[href], .toolbar a[href]').forEach(link=>{
+      if(shouldHandleUrl(link.href)) attachLink(link);
+    });
+    const searchForm=document.querySelector('.toolbar form.search');
+    if(searchForm) attachSearchForm(searchForm);
+  }
+  window.addEventListener('popstate',event=>{
+    if(shouldHandleUrl(location.href)){
+      loadListPage(location.href,{push:false,scroll:false,replace:true});
+    }else{
+      location.reload();
     }
   });
-}
+  window.setupAjaxNavigation=setupAjaxNavigation;
+  window.loadMemoListPage=loadListPage;
+  if(shouldHandleUrl(location.href)){
+    history.replaceState({memoAjax:true},'',location.href);
+  }
+  setupAjaxNavigation();
+})();
 </script>
 </body>
 </html>
