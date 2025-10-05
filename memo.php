@@ -848,6 +848,11 @@ if (is_post()) {
         $id=(int)$_POST['id']; $row=$pdo->query('SELECT item_id FROM steps WHERE id='.(int)$id)->fetch();
         $pdo->prepare('DELETE FROM steps WHERE id=?')->execute([$id]);
         if($row){ $pdo->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),(int)$row['item_id']]); }
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode(['ok'=>1,'item_id'=>$row ? (int)$row['item_id'] : null]);
+          exit;
+        }
         break;
       }
       case 'reorder_items': {
@@ -1146,38 +1151,46 @@ if ($view === 'new') {
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
         let timer=null;
-        const controller={
-          saving(){
-            if(timer){ clearTimeout(timer); timer=null; }
-            if(buttonEl){ buttonEl.disabled=true; buttonEl.textContent='⏳ 保存中...'; }
-            if(tipEl){ tipEl.textContent='保存中...'; tipEl.classList.add('show'); tipEl.classList.remove('dirty'); }
+        const cleanupTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+        const showTip=(text,{dirty,show}={})=>{
+          if(!tipEl) return;
+          if(typeof text==='string'){ tipEl.textContent=text; }
+          if(show===false){ tipEl.classList.remove('show'); }
+          else if(show!==undefined || text){ tipEl.classList.add('show'); }
+          if(dirty===true){ tipEl.classList.add('dirty'); }
+          else if(dirty===false){ tipEl.classList.remove('dirty'); }
+        };
+        return {
+          saving(message='保存中...', buttonLabel='⏳ 保存中...'){
+            cleanupTimer();
+            if(buttonEl){ buttonEl.disabled=true; buttonEl.textContent=buttonLabel || '⏳ 保存中...'; }
+            showTip(message,{dirty:false,show:true});
           },
-          success(){
-            if(timer){ clearTimeout(timer); }
-            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent='✅ 保存成功'; }
-            if(tipEl){ tipEl.textContent='保存成功'; tipEl.classList.add('show'); tipEl.classList.remove('dirty'); }
+          success(message='保存成功', buttonLabel='✅ 保存成功'){
+            cleanupTimer();
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=buttonLabel || '✅ 保存成功'; }
+            showTip(message,{dirty:false,show:true});
             timer=setTimeout(()=>{
               if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
-              if(tipEl){ tipEl.classList.remove('show'); tipEl.classList.remove('dirty'); }
+              showTip('',{show:false,dirty:false});
               timer=null;
             },1500);
           },
-          error(message){
-            if(timer){ clearTimeout(timer); timer=null; }
-            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
-            if(tipEl){
-              tipEl.textContent=message || '未保存';
-              tipEl.classList.add('show');
-              tipEl.classList.add('dirty');
-            }
+          error(message='未保存', buttonLabel){
+            cleanupTimer();
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=buttonLabel || defaultLabel; }
+            showTip(message,{dirty:true,show:true});
+          },
+          dirty(message='未保存'){
+            cleanupTimer();
+            showTip(message,{dirty:true,show:true});
           },
           reset(){
-            if(timer){ clearTimeout(timer); timer=null; }
+            cleanupTimer();
             if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
-            if(tipEl){ tipEl.classList.remove('show'); tipEl.classList.remove('dirty'); }
+            showTip('',{show:false,dirty:false});
           }
         };
-        return controller;
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       function renderMD(){ $('#md-view').innerHTML = safeHTML(mde.value()); }
@@ -1225,24 +1238,28 @@ if ($view === 'new') {
       function stepNodeHTML(s){
         const ts=new Date(s.created_at*1000).toISOString().slice(0,16).replace('T',' ');
         const checked=s.done? 'checked' : '';
+        const safeTitle=escapeHTML(s.title||'');
+        const notesHTML=s.notes?DOMPurify.sanitize(marked.parse(s.notes)):'<span class="placeholder-muted">无备注</span>';
         return `\
           <div class="tl-item ${s.done?'done':''}" draggable="true" data-id="${s.id}">\
             <span class="tl-dot"></span>\
             <div class="tl-head">\
               <span class="drag">⬍</span>\
-              <form onsubmit="return false" style="margin:0">\
-                <input type="hidden" name="id" value="${s.id}">\
+              <label style="display:flex;align-items:center;margin:0">\
                 <input type="checkbox" ${checked} onchange="toggleStep(${s.id}, this.checked)" title="完成">\
-              </form>\
-              <div style="font-weight:700;flex:1">${escapeHTML(s.title)} <span class="ts">${ts}</span></div>\
+              </label>\
+              <div class="tl-title" style="font-weight:700;flex:1">\
+                <span class="js-step-title">${safeTitle}</span> <span class="ts">${ts}</span>\
+              </div>\
               <details>\
                 <summary>编辑</summary>\
                 <div style="margin-top:6px;display:grid;gap:6px">\
                   <form onsubmit="return saveStepTitleAJAX(event, ${s.id}, this)" style="display:flex;gap:6px;flex-wrap:wrap">\
                     <input type="hidden" name="action" value="edit_step">\
                     <input type="hidden" name="id" value="${s.id}">\
-                    <input name="title" value="${escapeHTML(s.title)}" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">\
-                    <button class="btn">保存标题</button>\
+                    <input name="title" value="${safeTitle}" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">\
+                    <button class="btn" data-step-button="title-${s.id}">保存标题</button>\
+                    <span class="save-tip" data-step-tip="title-${s.id}">保存成功</span>\
                   </form>\
                   <form onsubmit="return saveStepNotesAJAX(event, ${s.id})" id="form-notes-${s.id}">\
                     <input type="hidden" name="action" value="edit_step_notes">\
@@ -1254,13 +1271,18 @@ if ($view === 'new') {
                         <button class="btn" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
                         <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>\
                       </div>\
-                      <button class="btn acc" type="submit">保存备注</button>\
+                      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">\
+                        <button class="btn acc" type="submit" data-step-button="notes-${s.id}">保存备注</button>\
+                        <span class="save-tip" data-step-tip="notes-${s.id}">保存成功</span>\
+                        <button class="btn danger" type="button" data-step-button="delete-${s.id}" onclick="return deleteStep(${s.id}, this)">删除子任务</button>\
+                        <span class="save-tip" data-step-tip="delete-${s.id}">已删除</span>\
+                      </div>\
                     </div>\
                   </form>\
                 </div>\
               </details>\
             </div>\
-            <div class="md-body" id="step-md-view-${s.id}">${s.notes?DOMPurify.sanitize(marked.parse(s.notes)):'<span class="placeholder-muted">无备注</span>'}</div>\
+            <div class="md-body" id="step-md-view-${s.id}">${notesHTML}</div>\
           </div>\
         `;
       }
@@ -1272,15 +1294,75 @@ if ($view === 'new') {
         const j=await r.json(); if(j.ok){ $('#new-step-title').value=''; $('#timeline').insertAdjacentHTML('beforeend', stepNodeHTML(j.step)); }
         return false;
       }
+      function getStepFeedback(stepId, kind){
+        const tip=document.querySelector(`[data-step-tip="${kind}-${stepId}"]`);
+        const btn=document.querySelector(`[data-step-button="${kind}-${stepId}"]`);
+        return createSaveFeedbackController(tip, btn);
+      }
       async function saveStepTitleAJAX(ev, stepId, form){
-        ev.preventDefault(); const fd=new FormData(form);
-        await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        ev.preventDefault();
+        const fd=new FormData(form);
+        const feedback=getStepFeedback(stepId,'title');
+        const titleInput=form.querySelector('input[name="title"]');
+        const titleValue=titleInput ? titleInput.value.trim() : '';
+        feedback.saving();
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('保存失败');
+          const json=await res.json().catch(()=>({}));
+          if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
+          const display=document.querySelector(`.tl-item[data-id="${stepId}"] .js-step-title`);
+          if(display){ display.textContent=titleValue || '未命名'; }
+          feedback.success();
+        }catch(err){
+          alert(err.message||'保存失败');
+          feedback.error('未保存');
+        }
         return false;
       }
       async function saveStepNotesAJAX(ev, stepId){
-        ev.preventDefault(); const f=$('#form-notes-'+stepId); const fd=new FormData(f); const ta=f.querySelector('textarea[name="notes"]');
-        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        if(r.ok) $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(ta.value));
+        ev.preventDefault();
+        const f=$('#form-notes-'+stepId);
+        if(!f) return false;
+        const fd=new FormData(f);
+        const ta=f.querySelector('textarea[name="notes"]');
+        const feedback=getStepFeedback(stepId,'notes');
+        feedback.saving();
+        try{
+          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!r.ok) throw new Error('保存失败');
+          const json=await r.json().catch(()=>({}));
+          if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
+          const val=ta?ta.value:'';
+          $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(val));
+          feedback.success();
+        }catch(err){
+          alert(err.message||'保存失败');
+          feedback.error('未保存');
+        }
+        return false;
+      }
+      async function deleteStep(stepId, buttonEl){
+        if(!confirm('确认删除该流程子任务？')) return false;
+        const fd=new FormData(); fd.append('action','delete_step'); fd.append('id', stepId);
+        const feedback=createSaveFeedbackController(
+          document.querySelector(`[data-step-tip="delete-${stepId}"]`),
+          buttonEl || document.querySelector(`[data-step-button="delete-${stepId}"]`)
+        );
+        feedback.saving('删除中...','⏳ 删除中...');
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('删除失败');
+          const json=await res.json().catch(()=>({ok:1}));
+          if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'删除失败'); }
+          feedback.success('已删除','✅ 已删除');
+          const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
+          if(node){ setTimeout(()=>{ node.remove(); }, 350); }
+          if(stepMDE[stepId]) delete stepMDE[stepId];
+        }catch(err){
+          alert(err.message||'删除失败');
+          feedback.error('删除失败');
+        }
         return false;
       }
       async function toggleStep(stepId, done){
@@ -1559,13 +1641,12 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
               <span class="tl-dot"></span>
               <div class="tl-head">
                 <span class="drag">⬍</span>
-                <form method="post" style="margin:0">
-                  <input type="hidden" name="action" value="toggle_step">
-                  <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
-                  <input type="hidden" name="done" value="<?php echo $s['done']?0:1; ?>">
-                  <input type="checkbox" <?php echo $s['done']?'checked':''; ?> onchange="this.form.submit()" title="完成">
-                </form>
-                <div style="font-weight:700;flex:1"><?php echo h($s['title']); ?> <span class="ts"><?php echo dt((int)$s['created_at']); ?></span></div>
+                <label style="display:flex;align-items:center;margin:0">
+                  <input type="checkbox" <?php echo $s['done']?'checked':''; ?> onchange="toggleStep(<?php echo $s['id']; ?>, this.checked)" title="完成">
+                </label>
+                <div class="tl-title" style="font-weight:700;flex:1">
+                  <span class="js-step-title"><?php echo h($s['title']); ?></span> <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
+                </div>
                 <details>
                   <summary>编辑</summary>
                   <div style="margin-top:6px;display:grid;gap:6px">
@@ -1573,7 +1654,8 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                       <input type="hidden" name="action" value="edit_step">
                       <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
                       <input name="title" value="<?php echo h($s['title']); ?>" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">
-                      <button class="btn">保存标题</button>
+                      <button class="btn" data-step-button="title-<?php echo $s['id']; ?>">保存标题</button>
+                      <span class="save-tip" data-step-tip="title-<?php echo $s['id']; ?>">保存成功</span>
                     </form>
                     <form method="post" onsubmit="return saveStepNotesAJAX(event, <?php echo $s['id']; ?>)" id="form-notes-<?php echo $s['id']; ?>">
                       <input type="hidden" name="action" value="edit_step_notes">
@@ -1585,7 +1667,12 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                           <button class="btn" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
                           <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                         </div>
-                        <button class="btn acc" type="submit">保存备注</button>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                          <button class="btn acc" type="submit" data-step-button="notes-<?php echo $s['id']; ?>">保存备注</button>
+                          <span class="save-tip" data-step-tip="notes-<?php echo $s['id']; ?>">保存成功</span>
+                          <button class="btn danger" type="button" data-step-button="delete-<?php echo $s['id']; ?>" onclick="return deleteStep(<?php echo $s['id']; ?>, this)">删除子任务</button>
+                          <span class="save-tip" data-step-tip="delete-<?php echo $s['id']; ?>">已删除</span>
+                        </div>
                       </div>
                     </form>
                   </div>
@@ -1607,35 +1694,44 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
         let timer=null;
+        const cleanupTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+        const showTip=(text,{dirty,show}={})=>{
+          if(!tipEl) return;
+          if(typeof text==='string'){ tipEl.textContent=text; }
+          if(show===false){ tipEl.classList.remove('show'); }
+          else if(show!==undefined || text){ tipEl.classList.add('show'); }
+          if(dirty===true){ tipEl.classList.add('dirty'); }
+          else if(dirty===false){ tipEl.classList.remove('dirty'); }
+        };
         return {
-          saving(){
-            if(timer){ clearTimeout(timer); timer=null; }
-            if(buttonEl){ buttonEl.disabled=true; buttonEl.textContent='⏳ 保存中...'; }
-            if(tipEl){ tipEl.textContent='保存中...'; tipEl.classList.add('show'); tipEl.classList.remove('dirty'); }
+          saving(message='保存中...', buttonLabel='⏳ 保存中...'){
+            cleanupTimer();
+            if(buttonEl){ buttonEl.disabled=true; buttonEl.textContent=buttonLabel || '⏳ 保存中...'; }
+            showTip(message,{dirty:false,show:true});
           },
-          success(){
-            if(timer){ clearTimeout(timer); }
-            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent='✅ 保存成功'; }
-            if(tipEl){ tipEl.textContent='保存成功'; tipEl.classList.add('show'); tipEl.classList.remove('dirty'); }
+          success(message='保存成功', buttonLabel='✅ 保存成功'){
+            cleanupTimer();
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=buttonLabel || '✅ 保存成功'; }
+            showTip(message,{dirty:false,show:true});
             timer=setTimeout(()=>{
               if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
-              if(tipEl){ tipEl.classList.remove('show'); tipEl.classList.remove('dirty'); }
+              showTip('',{show:false,dirty:false});
               timer=null;
             },1500);
           },
-          error(message){
-            if(timer){ clearTimeout(timer); timer=null; }
-            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
-            if(tipEl){
-              tipEl.textContent=message || '未保存';
-              tipEl.classList.add('show');
-              tipEl.classList.add('dirty');
-            }
+          error(message='未保存', buttonLabel){
+            cleanupTimer();
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=buttonLabel || defaultLabel; }
+            showTip(message,{dirty:true,show:true});
+          },
+          dirty(message='未保存'){
+            cleanupTimer();
+            showTip(message,{dirty:true,show:true});
           },
           reset(){
-            if(timer){ clearTimeout(timer); timer=null; }
+            cleanupTimer();
             if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent=defaultLabel; }
-            if(tipEl){ tipEl.classList.remove('show'); tipEl.classList.remove('dirty'); }
+            showTip('',{show:false,dirty:false});
           }
         };
       }
@@ -1677,16 +1773,82 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         e.target.value='';
       });
       const stepMDE={};
+      function getStepFeedback(stepId, kind){
+        const tip=document.querySelector(`[data-step-tip="${kind}-${stepId}"]`);
+        const btn=document.querySelector(`[data-step-button="${kind}-${stepId}"]`);
+        return createSaveFeedbackController(tip, btn);
+      }
       async function saveStepTitleAJAX(ev, stepId, form){
-        ev.preventDefault(); const fd=new FormData(form);
-        await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        ev.preventDefault();
+        const fd=new FormData(form);
+        const feedback=getStepFeedback(stepId,'title');
+        const titleInput=form.querySelector('input[name="title"]');
+        const titleValue=titleInput ? titleInput.value.trim() : '';
+        feedback.saving();
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('保存失败');
+          const json=await res.json().catch(()=>({}));
+          if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
+          const display=document.querySelector(`.tl-item[data-id="${stepId}"] .js-step-title`);
+          if(display){ display.textContent=titleValue || '未命名'; }
+          feedback.success();
+        }catch(err){
+          alert(err.message||'保存失败');
+          feedback.error('未保存');
+        }
         return false;
       }
       async function saveStepNotesAJAX(ev, stepId){
-        ev.preventDefault(); const form=document.getElementById('form-notes-'+stepId);
-        const fd=new FormData(form); const ta=form.querySelector('textarea[name="notes"]');
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        if(res.ok){ renderMDTo('step-md-view-'+stepId, ta.value); }
+        ev.preventDefault();
+        const form=document.getElementById('form-notes-'+stepId);
+        if(!form) return false;
+        const fd=new FormData(form);
+        const ta=form.querySelector('textarea[name="notes"]');
+        const feedback=getStepFeedback(stepId,'notes');
+        feedback.saving();
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('保存失败');
+          const json=await res.json().catch(()=>({}));
+          if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
+          renderMDTo('step-md-view-'+stepId, ta?ta.value:'');
+          feedback.success();
+        }catch(err){
+          alert(err.message||'保存失败');
+          feedback.error('未保存');
+        }
+        return false;
+      }
+      async function deleteStep(stepId, buttonEl){
+        if(!confirm('确认删除该流程子任务？')) return false;
+        const fd=new FormData(); fd.append('action','delete_step'); fd.append('id', stepId);
+        const feedback=createSaveFeedbackController(
+          document.querySelector(`[data-step-tip="delete-${stepId}"]`),
+          buttonEl || document.querySelector(`[data-step-button="delete-${stepId}"]`)
+        );
+        feedback.saving('删除中...','⏳ 删除中...');
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('删除失败');
+          const json=await res.json().catch(()=>({ok:1}));
+          if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'删除失败'); }
+          feedback.success('已删除','✅ 已删除');
+          const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
+          if(node){ setTimeout(()=>{ node.remove(); }, 350); }
+          if(stepMDE[stepId]) delete stepMDE[stepId];
+        }catch(err){
+          alert(err.message||'删除失败');
+          feedback.error('删除失败');
+        }
+        return false;
+      }
+      async function toggleStep(stepId, done){
+        const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done?1:0);
+        try{
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(res.ok){ const card=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(card){ card.classList.toggle('done', !!done); } }
+        }catch(_){ }
         return false;
       }
       window.insertAttachmentToStep = async function(stepId){
