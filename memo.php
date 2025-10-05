@@ -159,6 +159,380 @@ function normalize_timestamp(mixed $value, ?int $fallback=null): int {
   return $fallback ?? now();
 }
 
+const OFFLINE_PING_PARAM = 'offline_ping';
+
+function render_offline_styles(): void {
+  ?>
+  <style>
+    .offline-banner{position:fixed;top:0;left:0;right:0;z-index:2000;display:flex;align-items:center;gap:12px;padding:10px 18px;background:linear-gradient(135deg,rgba(12,16,18,.95),rgba(21,26,30,.88));border-bottom:1px solid rgba(75,195,209,.35);box-shadow:0 12px 32px rgba(0,0,0,.55);color:#c8f7ff;font:500 13px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transform:translateY(-100%);transition:transform 220ms cubic-bezier(.22,.61,.36,1);pointer-events:none}
+    .offline-banner[data-visible="true"]{transform:translateY(0);pointer-events:auto}
+    .offline-banner .offline-icon{font-size:18px}
+    .offline-banner .offline-sync-btn{margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(75,195,209,.6);background:rgba(12,16,18,.65);color:#c8f7ff;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background 180ms ease,border-color 180ms ease,transform 180ms ease}
+    .offline-banner .offline-sync-btn:hover{background:rgba(75,195,209,.22);border-color:rgba(168,239,255,.85);transform:translateY(-1px)}
+    .offline-banner .offline-sync-btn:focus-visible{outline:2px solid rgba(168,239,255,.65);outline-offset:2px}
+    .offline-banner[data-mode="offline"]{background:linear-gradient(135deg,rgba(47,16,25,.95),rgba(32,10,18,.88));border-bottom-color:rgba(209,75,75,.5);color:#ffd9df}
+    .offline-banner[data-mode="recovering"]{background:linear-gradient(135deg,rgba(12,30,28,.95),rgba(10,22,20,.88));border-bottom-color:rgba(36,194,160,.5);color:#baf7e8}
+  </style>
+  <?php
+}
+
+function render_offline_banner(): void {
+  ?>
+  <div class="offline-banner" id="offline-banner" data-visible="false" data-mode="online" role="status" aria-live="polite">
+    <span class="offline-icon" aria-hidden="true">📡</span>
+    <span id="offline-banner-text">网络异常。</span>
+    <button type="button" class="offline-sync-btn" id="offline-sync-now" hidden>立即同步</button>
+  </div>
+  <script>
+    (function(){
+      if(window.offlineManager){
+        document.addEventListener('DOMContentLoaded',()=>{
+          window.offlineManager.attachBanner({
+            banner:document.getElementById('offline-banner'),
+            text:document.getElementById('offline-banner-text'),
+            button:document.getElementById('offline-sync-now')
+          });
+        });
+        return;
+      }
+      const manager = new (class OfflineManager{
+        constructor(){
+          this.pingUrl = new URL(window.location.href);
+          this.pingUrl.searchParams.set('<?php echo OFFLINE_PING_PARAM; ?>','1');
+          this.pingUrl.hash='';
+          this.pingFailures = 0;
+          this.pingTimer = null;
+          this.maxFailures = 3;
+          this.banner=null;
+          this.bannerText=null;
+          this.bannerButton=null;
+          this.pendingCount=0;
+          this.offline = !navigator.onLine;
+          this.db=null;
+          this.queueProcessing=false;
+          this.initialized=false;
+          this.init();
+        }
+        async init(){
+          try{
+            this.db=await this.openDB();
+          }catch(err){
+            console.warn('离线数据库初始化失败', err);
+          }
+          this.initialized=true;
+          this.refreshPendingCount();
+          this.startWatchers();
+          document.addEventListener('DOMContentLoaded',()=>{
+            this.attachBanner({
+              banner:document.getElementById('offline-banner'),
+              text:document.getElementById('offline-banner-text'),
+              button:document.getElementById('offline-sync-now')
+            });
+            this.updateBanner();
+          });
+        }
+        attachBanner(refs){
+          this.banner=refs.banner||this.banner;
+          this.bannerText=refs.text||this.bannerText;
+          this.bannerButton=refs.button||this.bannerButton;
+          if(this.bannerButton && !this.bannerButton.dataset.bound){
+            this.bannerButton.dataset.bound='1';
+            this.bannerButton.addEventListener('click',()=>{ this.processQueue(true); });
+          }
+          this.updateBanner();
+        }
+        async openDB(){
+          return await new Promise((resolve,reject)=>{
+            if(!window.indexedDB){
+              reject(new Error('IndexedDB 不可用'));
+              return;
+            }
+            const request=indexedDB.open('memo_offline',2);
+            request.onerror=()=>reject(request.error||new Error('无法打开 IndexedDB'));
+            request.onupgradeneeded=(event)=>{
+              const db=request.result;
+              if(!db.objectStoreNames.contains('drafts')){
+                db.createObjectStore('drafts',{keyPath:'id'});
+              }
+              if(!db.objectStoreNames.contains('queue')){
+                db.createObjectStore('queue',{keyPath:'id',autoIncrement:true});
+              }
+              if(!db.objectStoreNames.contains('meta')){
+                db.createObjectStore('meta',{keyPath:'key'});
+              }
+            };
+            request.onsuccess=()=>resolve(request.result);
+          });
+        }
+        startWatchers(){
+          window.addEventListener('online',()=>{
+            this.pingFailures=0;
+            this.setOffline(false);
+            this.evaluateConnectivity();
+          });
+          window.addEventListener('offline',()=>{
+            this.setOffline(true);
+          });
+          this.evaluateConnectivity();
+          if(this.pingTimer){ clearInterval(this.pingTimer); }
+          this.pingTimer=setInterval(()=>{ this.evaluateConnectivity(); },5000);
+        }
+        async evaluateConnectivity(){
+          const browserOnline=navigator.onLine;
+          let pingOk=false;
+          if(browserOnline){
+            pingOk=await this.ping();
+          }
+          if(!browserOnline || !pingOk){
+            if(!pingOk){ this.pingFailures++; }
+            this.setOffline(true);
+          }else{
+            this.pingFailures=0;
+            this.setOffline(false);
+            this.processQueue();
+          }
+        }
+        async ping(){
+          try{
+            const controller=new AbortController();
+            const timeout=setTimeout(()=>controller.abort(),3000);
+            const res=await fetch(this.pingUrl.toString(),{signal:controller.signal,cache:'no-store'});
+            clearTimeout(timeout);
+            return res && res.ok;
+          }catch(_){
+            return false;
+          }
+        }
+        setOffline(flag){
+          this.offline=!!flag;
+          if(this.offline){
+            localStorage.setItem('memo.offline','1');
+          }else{
+            localStorage.setItem('memo.offline','0');
+          }
+          this.updateBanner();
+        }
+        updateBanner(){
+          if(!this.banner) return;
+          if(this.offline){
+            this.banner.dataset.visible='true';
+            this.banner.dataset.mode='offline';
+            if(this.bannerText){
+              this.bannerText.textContent=this.pendingCount>0
+                ? `离线模式：有 ${this.pendingCount} 条待同步`
+                : '离线模式已启用，本地修改将在恢复联网后自动同步。';
+            }
+            if(this.bannerButton){ this.bannerButton.hidden=true; }
+          }else if(this.pendingCount>0){
+            this.banner.dataset.visible='true';
+            this.banner.dataset.mode='recovering';
+            if(this.bannerText){
+              this.bannerText.textContent=`已恢复连接，正在同步 ${this.pendingCount} 条本地修改…`;
+            }
+            if(this.bannerButton){
+              this.bannerButton.hidden=false;
+              this.bannerButton.textContent='立即同步';
+            }
+          }else{
+            this.banner.dataset.visible='false';
+            this.banner.dataset.mode='online';
+            if(this.bannerButton){ this.bannerButton.hidden=true; }
+          }
+        }
+        async refreshPendingCount(){
+          if(!this.db){ this.pendingCount=0; return; }
+          try{
+            const tx=this.db.transaction('queue','readonly');
+            const store=tx.objectStore('queue');
+            const countRequest=store.count();
+            const count=await new Promise((resolve,reject)=>{
+              countRequest.onsuccess=()=>resolve(countRequest.result||0);
+              countRequest.onerror=()=>reject(countRequest.error);
+            });
+            this.pendingCount=count;
+          }catch(_){
+            this.pendingCount=0;
+          }
+          this.updateBanner();
+        }
+        async saveMemoDraft(id,data){
+          if(!this.db) return;
+          const value={id:`memo:${id}`,data,updatedAt:Date.now()};
+          const tx=this.db.transaction('drafts','readwrite');
+          tx.objectStore('drafts').put(value);
+          await this.waitFor(tx);
+        }
+        async deleteMemoDraft(id){
+          if(!this.db) return;
+          const tx=this.db.transaction('drafts','readwrite');
+          tx.objectStore('drafts').delete(`memo:${id}`);
+          await this.waitFor(tx);
+        }
+        async loadMemoDraft(id){
+          if(!this.db) return null;
+          try{
+            const tx=this.db.transaction('drafts','readonly');
+            const store=tx.objectStore('drafts');
+            const req=store.get(`memo:${id}`);
+            const result=await new Promise((resolve,reject)=>{
+              req.onsuccess=()=>resolve(req.result||null);
+              req.onerror=()=>reject(req.error);
+            });
+            return result;
+          }catch(_){
+            return null;
+          }
+        }
+        async loadMindmapDraft(key){
+          if(!this.db) return null;
+          try{
+            const tx=this.db.transaction('drafts','readonly');
+            const store=tx.objectStore('drafts');
+            const req=store.get(`mindmap:${key}`);
+            const res=await new Promise((resolve,reject)=>{
+              req.onsuccess=()=>resolve(req.result||null);
+              req.onerror=()=>reject(req.error);
+            });
+            return res;
+          }catch(_){
+            return null;
+          }
+        }
+        async saveMindmapDraft(key,data){
+          if(!this.db) return;
+          const tx=this.db.transaction('drafts','readwrite');
+          tx.objectStore('drafts').put({id:`mindmap:${key}`,data,updatedAt:Date.now()});
+          await this.waitFor(tx);
+        }
+        async enqueue(record){
+          if(!this.db) return;
+          const tx=this.db.transaction('queue','readwrite');
+          tx.objectStore('queue').add({...record,createdAt:Date.now()});
+          await this.waitFor(tx);
+          await this.refreshPendingCount();
+          this.updateBanner();
+        }
+        async queueMemoSave(payload){
+          await this.enqueue({type:'memo.save',payload});
+        }
+        async queueMindmapSave(payload){
+          await this.enqueue({type:'mindmap.save',payload});
+        }
+        async waitFor(tx){
+          return await new Promise((resolve,reject)=>{
+            tx.oncomplete=()=>resolve(null);
+            tx.onabort=()=>reject(tx.error||new Error('事务失败'));
+            tx.onerror=()=>reject(tx.error||new Error('事务失败'));
+          });
+        }
+        async readAll(storeName){
+          if(!this.db) return [];
+          const tx=this.db.transaction(storeName,'readonly');
+          const store=tx.objectStore(storeName);
+          const req=store.getAll();
+          const rows=await new Promise((resolve,reject)=>{
+            req.onsuccess=()=>resolve(req.result||[]);
+            req.onerror=()=>reject(req.error);
+          });
+          await this.waitFor(tx);
+          return rows;
+        }
+        async removeQueue(id){
+          if(!this.db) return;
+          const tx=this.db.transaction('queue','readwrite');
+          tx.objectStore('queue').delete(id);
+          await this.waitFor(tx);
+        }
+        async processQueue(force=false){
+          if(!this.db) return;
+          if(this.queueProcessing) return;
+          if(this.offline && !force) return;
+          this.queueProcessing=true;
+          try{
+            const entries=await this.readAll('queue');
+            for(const entry of entries){
+              const success=await this.dispatch(entry);
+              if(success){
+                await this.removeQueue(entry.id);
+              }else{
+                if(this.offline && !force){
+                  break;
+                }
+              }
+            }
+          }finally{
+            this.queueProcessing=false;
+            await this.refreshPendingCount();
+          }
+        }
+        async dispatch(entry){
+          switch(entry.type){
+            case 'memo.save':
+              return this.syncMemo(entry.payload);
+            case 'mindmap.save':
+              return this.syncMindmap(entry.payload);
+            default:
+              return true;
+          }
+        }
+        async syncMemo(payload){
+          if(!payload || !payload.url){ return true; }
+          try{
+            const fd=new FormData();
+            fd.append('action','edit_item');
+            fd.append('id', String(payload.id));
+            fd.append('title', payload.data?.title || '未命名');
+            fd.append('category_id', payload.data?.category_id || '');
+            fd.append('description', payload.data?.description || '');
+            const res=await fetch(payload.url,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            if(!res.ok){ throw new Error('网络错误'); }
+            return true;
+          }catch(err){
+            console.warn('同步备忘录失败', err);
+            this.setOffline(true);
+            return false;
+          }
+        }
+        async syncMindmap(payload){
+          if(!payload || !payload.url){ return true; }
+          try{
+            const fd=new FormData();
+            fd.append('action','save_mindmap');
+            fd.append('id', String(payload.id||0));
+            fd.append('title', payload.title || '未命名导图');
+            fd.append('content', payload.content || '{}');
+            const res=await fetch(payload.url,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            if(!res.ok){ throw new Error('网络错误'); }
+            const json=await res.json().catch(()=>null);
+            if(json && json.id && payload.localKey && payload.localKey!==String(json.id)){
+              await this.deleteMindmapDraft(payload.localKey);
+            }
+            return json ? json.ok!==false : true;
+          }catch(err){
+            console.warn('同步思维导图失败', err);
+            this.setOffline(true);
+            return false;
+          }
+        }
+        async deleteMindmapDraft(key){
+          if(!this.db) return;
+          const tx=this.db.transaction('drafts','readwrite');
+          tx.objectStore('drafts').delete(`mindmap:${key}`);
+          await this.waitFor(tx);
+        }
+      })();
+      window.offlineManager=manager;
+    })();
+  </script>
+  <?php
+}
+
+if (isset($_GET[OFFLINE_PING_PARAM])) {
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode(['ok'=>1,'ts'=>now()]);
+  exit;
+}
+
 // —— 数据库 ——
 function db(): PDO {
   static $pdo;
@@ -968,6 +1342,7 @@ if ($view === 'new') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+    <?php render_offline_styles(); ?>
     <style>
       :root{
         --bg-void:#0A0C0E;
@@ -1085,6 +1460,7 @@ if ($view === 'new') {
     </style>
   </head>
   <body>
+    <?php render_offline_banner(); ?>
     <div class="scanlines" aria-hidden="true"></div>
     <div class="wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -1136,12 +1512,38 @@ if ($view === 'new') {
     <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const state = { id: 0 };
+      state.serverBacked = false;
       const saveTip = document.getElementById('save-tip');
       const saveButtonEl = document.querySelector('#new-form button[type="submit"]');
       const saveFeedback = createSaveFeedbackController(saveTip, saveButtonEl);
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      const offlineManager = window.offlineManager || null;
+      function collectEditorData(){
+        return {
+          title: ($('#title').value || '').trim(),
+          category_id: $('#cat').value || '',
+          description: mde ? mde.value() : ($('#md-editor').value || '')
+        };
+      }
+      function applyEditorDraft(data){
+        if(!data) return;
+        if(typeof data.title === 'string'){ $('#title').value = data.title; }
+        if(typeof data.category_id !== 'undefined'){ $('#cat').value = data.category_id; }
+        if(typeof data.description === 'string' && mde){
+          mde.value(data.description);
+          renderMD();
+        }
+      }
+      async function persistEditorDraft(){
+        if(!offlineManager || !state.id){ return; }
+        try{
+          await offlineManager.saveMemoDraft(state.id, collectEditorData());
+          localStorage.setItem('memo.offline.currentDraftId', String(state.id));
+        }catch(_){ }
+      }
+      const persistDraftThrottled = throttle(()=>{ persistEditorDraft(); }, 600);
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
@@ -1161,6 +1563,15 @@ if ($view === 'new') {
               if(tipEl){ tipEl.classList.remove('show'); tipEl.classList.remove('dirty'); }
               timer=null;
             },1500);
+          },
+          queued(message){
+            if(timer){ clearTimeout(timer); timer=null; }
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent='📡 待同步'; }
+            if(tipEl){
+              tipEl.textContent=message || '离线待同步';
+              tipEl.classList.add('show');
+              tipEl.classList.add('dirty');
+            }
           },
           error(message){
             if(timer){ clearTimeout(timer); timer=null; }
@@ -1186,33 +1597,98 @@ if ($view === 'new') {
         spellChecker:false, status:false,
         toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
       });
-      mde.codemirror.on('change', renderMD); renderMD();
+      mde.codemirror.on('change', ()=>{ renderMD(); if(offlineManager){ persistDraftThrottled(); } });
+      renderMD();
+      if(offlineManager){
+        $('#title').addEventListener('input', persistDraftThrottled);
+        $('#cat').addEventListener('change', persistDraftThrottled);
+      }
+      async function loadOfflineDraftIfAvailable(){
+        if(!offlineManager) return;
+        const storedId = localStorage.getItem('memo.offline.currentDraftId');
+        if(storedId && !state.id){
+          state.id = storedId;
+        }
+        if(!state.id) return;
+        const draft=await offlineManager.loadMemoDraft(state.id);
+        if(draft && draft.data){
+          applyEditorDraft(draft.data);
+        }
+      }
       (async function bootstrap(){
-        const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
-        const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
+        try{
+          const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
+          if(!res.ok) throw new Error('draft failed');
+          const j=await res.json();
+          if(!j || typeof j.id==='undefined') throw new Error('invalid draft');
+          state.id=j.id;
+          state.serverBacked=true;
+          $('#timeline').dataset.item=String(state.id);
+          localStorage.setItem('memo.offline.currentDraftId', String(state.id));
+          await loadOfflineDraftIfAvailable();
+        }catch(err){
+          if(offlineManager){
+            const storedId=localStorage.getItem('memo.offline.currentDraftId');
+            if(storedId){
+              state.id=storedId;
+              $('#timeline').dataset.item=String(state.id);
+              await loadOfflineDraftIfAvailable();
+              saveFeedback.queued('离线草稿');
+            }else{
+              alert('当前处于离线状态且没有可恢复的草稿，请联网后重试。');
+            }
+          } else {
+            alert('初始化失败，请检查网络连接');
+          }
+        }
       })();
       async function saveAJAX(ev){
         ev.preventDefault();
+        const payload=collectEditorData();
+        if(offlineManager && state.id){
+          await offlineManager.saveMemoDraft(state.id, payload);
+        }
         const fd=new FormData();
         fd.append('action','edit_item');
-        fd.append('id', String(state.id));
-        fd.append('title',$('#title').value.trim()||'未命名');
-        fd.append('category_id',$('#cat').value);
-        fd.append('description', mde.value());
+        fd.append('id', String(state.id||''));
+        fd.append('title', payload.title || '未命名');
+        fd.append('category_id', payload.category_id || '');
+        fd.append('description', payload.description || '');
+        if(offlineManager && offlineManager.offline){
+          await offlineManager.queueMemoSave({id: state.id, data: payload, url: location.href});
+          saveFeedback.queued('离线待同步');
+          return false;
+        }
         saveFeedback.saving();
         try{
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!r.ok) throw new Error('保存失败');
           saveFeedback.success();
         }catch(err){
-          alert(err.message||'保存失败');
-          saveFeedback.error('未保存');
+          if(offlineManager){
+            await offlineManager.queueMemoSave({id: state.id, data: payload, url: location.href});
+            saveFeedback.queued('离线待同步');
+          }else{
+            alert(err.message||'保存失败');
+            saveFeedback.error('未保存');
+          }
         }
         return false;
       }
-      $('#btn-insert-att-item').addEventListener('click',()=>$('#att-file-item').click());
+      $('#btn-insert-att-item').addEventListener('click',()=>{
+        if(offlineManager && offlineManager.offline){
+          alert('离线模式下暂不支持上传附件');
+          return;
+        }
+        $('#att-file-item').click();
+      });
       $('#att-file-item').addEventListener('change', async (e)=>{
         const f=e.target.files[0]; if(!f) return;
+        if(offlineManager && offlineManager.offline){
+          alert('离线模式下暂不支持上传附件');
+          e.target.value='';
+          return;
+        }
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -1266,6 +1742,10 @@ if ($view === 'new') {
       }
       async function addStepAJAX(ev){
         ev.preventDefault();
+        if(offlineManager && offlineManager.offline){
+          alert('离线模式下暂不支持管理子任务');
+          return false;
+        }
         const title=$('#new-step-title').value.trim(); if(!title) return false;
         const fd=new FormData(); fd.append('action','add_step'); fd.append('item_id', String(state.id)); fd.append('title', title);
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1273,17 +1753,22 @@ if ($view === 'new') {
         return false;
       }
       async function saveStepTitleAJAX(ev, stepId, form){
-        ev.preventDefault(); const fd=new FormData(form);
+        ev.preventDefault();
+        if(offlineManager && offlineManager.offline){ alert('离线模式下暂不支持管理子任务'); return false; }
+        const fd=new FormData(form);
         await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         return false;
       }
       async function saveStepNotesAJAX(ev, stepId){
-        ev.preventDefault(); const f=$('#form-notes-'+stepId); const fd=new FormData(f); const ta=f.querySelector('textarea[name="notes"]');
+        ev.preventDefault();
+        if(offlineManager && offlineManager.offline){ alert('离线模式下暂不支持管理子任务'); return false; }
+        const f=$('#form-notes-'+stepId); const fd=new FormData(f); const ta=f.querySelector('textarea[name="notes"]');
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok) $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(ta.value));
         return false;
       }
       async function toggleStep(stepId, done){
+        if(offlineManager && offlineManager.offline){ alert('离线模式下暂不支持管理子任务'); return; }
         const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done?1:0);
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok){ const el=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(el){ el.classList.toggle('done', !!done); } }
@@ -1293,6 +1778,11 @@ if ($view === 'new') {
         const inp=$('#att-file-step-'+stepId);
         inp.onchange=async e=>{
           const f=e.target.files[0]; if(!f) return;
+          if(offlineManager && offlineManager.offline){
+            alert('离线模式下暂不支持上传附件');
+            e.target.value='';
+            return;
+          }
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           const j=await r.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -1313,6 +1803,12 @@ if ($view === 'new') {
           if(!best) return; const r=best.getBoundingClientRect(); const after=e.clientY > r.top + r.height/2; best.parentNode.insertBefore(dragging, after?best.nextSibling:best);
         }, 30));
         box.addEventListener('drop',e=>{
+          if(offlineManager && offlineManager.offline){
+            e.preventDefault();
+            alert('离线模式下暂不支持调整子任务顺序');
+            dragging=null;
+            return;
+          }
           e.preventDefault(); if(!dragging) return; dragging=null;
           const ids=$$('.tl-item[draggable]').map(x=>x.dataset.id).join(','); if(!ids) return;
           const fd=new FormData(); fd.append('action','reorder_steps'); fd.append('item_id', box.dataset.item); fd.append('order', ids);
@@ -1343,6 +1839,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+    <?php render_offline_styles(); ?>
     <style>
       :root{
         --bg-void:#0A0C0E;
@@ -1478,6 +1975,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
 
   </head>
   <body>
+    <?php render_offline_banner(); ?>
     <div class="scanlines" aria-hidden="true"></div>
     <div class="wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
@@ -1603,6 +2101,38 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <script>
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      const offlineManager=window.offlineManager||null;
+      const itemId=<?php echo (int)$it['id']; ?>;
+      function collectItemData(){
+        const form=document.getElementById('item-form');
+        const titleInput=form?form.querySelector('input[name="title"]'):null;
+        const catSelect=form?form.querySelector('select[name="category_id"]'):null;
+        return {
+          title:titleInput ? titleInput.value.trim() : '',
+          category_id:catSelect ? (catSelect.value||'') : '',
+          description:mde ? mde.value() : ($('#md-editor')?.value||'')
+        };
+      }
+      function applyItemDraft(data){
+        if(!data) return;
+        const form=document.getElementById('item-form');
+        if(!form) return;
+        const titleInput=form.querySelector('input[name="title"]');
+        const catSelect=form.querySelector('select[name="category_id"]');
+        if(titleInput && typeof data.title==='string'){ titleInput.value=data.title; }
+        if(catSelect && typeof data.category_id!=='undefined'){ catSelect.value=data.category_id; }
+        if(typeof data.description==='string' && mde){
+          mde.value(data.description);
+          renderMDTo('md-view', data.description);
+        }
+      }
+      async function persistItemDraft(){
+        if(!offlineManager) return;
+        try{
+          await offlineManager.saveMemoDraft(itemId, collectItemData());
+        }catch(_){ }
+      }
+      const persistDraftThrottled=throttle(()=>{ persistItemDraft(); },600);
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
@@ -1622,6 +2152,15 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
               if(tipEl){ tipEl.classList.remove('show'); tipEl.classList.remove('dirty'); }
               timer=null;
             },1500);
+          },
+          queued(message){
+            if(timer){ clearTimeout(timer); timer=null; }
+            if(buttonEl){ buttonEl.disabled=false; buttonEl.textContent='📡 待同步'; }
+            if(tipEl){
+              tipEl.textContent=message || '离线待同步';
+              tipEl.classList.add('show');
+              tipEl.classList.add('dirty');
+            }
           },
           error(message){
             if(timer){ clearTimeout(timer); timer=null; }
@@ -1648,27 +2187,68 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
       });
       renderMDTo('md-view', mde.value());
-      mde.codemirror.on('change', ()=> renderMDTo('md-view', mde.value()));
+      mde.codemirror.on('change', ()=>{ renderMDTo('md-view', mde.value()); if(offlineManager){ persistDraftThrottled(); } });
+      if(offlineManager){
+        const form=document.getElementById('item-form');
+        if(form){
+          const titleInput=form.querySelector('input[name="title"]');
+          const catSelect=form.querySelector('select[name="category_id"]');
+          if(titleInput){ titleInput.addEventListener('input', persistDraftThrottled); }
+          if(catSelect){ catSelect.addEventListener('change', persistDraftThrottled); }
+        }
+        (async()=>{
+          const draft=await offlineManager.loadMemoDraft(itemId);
+          if(draft && draft.data){ applyItemDraft(draft.data); }
+        })();
+      }
       async function saveItemAJAX(ev, form){
         ev.preventDefault();
-        const fd = new FormData(form);
+        const payload=collectItemData();
+        if(offlineManager){ await offlineManager.saveMemoDraft(itemId, payload); }
+        const fd = new FormData();
+        fd.append('action','edit_item');
+        fd.append('id', String(itemId));
+        fd.append('title', payload.title || '未命名');
+        fd.append('category_id', payload.category_id || '');
+        fd.append('description', payload.description || '');
         const tip=form.querySelector('.save-tip') || document.getElementById('save-tip');
         const btn=form.querySelector('button[type="submit"]');
         const feedback=createSaveFeedbackController(tip, btn);
+        if(offlineManager && offlineManager.offline){
+          await offlineManager.queueMemoSave({id:itemId,data:payload,url:location.href});
+          feedback.queued('离线待同步');
+          return false;
+        }
         feedback.saving();
         try{
           const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!res.ok) throw new Error('保存失败');
           feedback.success();
         }catch(err){
-          alert(err.message||'保存失败');
-          feedback.error('未保存');
+          if(offlineManager){
+            await offlineManager.queueMemoSave({id:itemId,data:payload,url:location.href});
+            feedback.queued('离线待同步');
+          }else{
+            alert(err.message||'保存失败');
+            feedback.error('未保存');
+          }
         }
         return false;
       }
-      document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
+      document.getElementById('btn-insert-att-item').addEventListener('click',()=>{
+        if(offlineManager && offlineManager.offline){
+          alert('离线模式下暂不支持上传附件');
+          return;
+        }
+        document.getElementById('att-file-item').click();
+      });
       document.getElementById('att-file-item').addEventListener('change', async (e)=>{
         const f=e.target.files[0]; if(!f) return;
+        if(offlineManager && offlineManager.offline){
+          alert('离线模式下暂不支持上传附件');
+          e.target.value='';
+          return;
+        }
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
         const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
         if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -1678,12 +2258,16 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       });
       const stepMDE={};
       async function saveStepTitleAJAX(ev, stepId, form){
-        ev.preventDefault(); const fd=new FormData(form);
+        ev.preventDefault();
+        if(offlineManager && offlineManager.offline){ alert('离线模式下暂不支持管理子任务'); return false; }
+        const fd=new FormData(form);
         await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         return false;
       }
       async function saveStepNotesAJAX(ev, stepId){
-        ev.preventDefault(); const form=document.getElementById('form-notes-'+stepId);
+        ev.preventDefault();
+        if(offlineManager && offlineManager.offline){ alert('离线模式下暂不支持管理子任务'); return false; }
+        const form=document.getElementById('form-notes-'+stepId);
         const fd=new FormData(form); const ta=form.querySelector('textarea[name="notes"]');
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(res.ok){ renderMDTo('step-md-view-'+stepId, ta.value); }
@@ -1693,6 +2277,11 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const input=document.getElementById('att-file-step-'+stepId);
         input.onchange = async (e)=>{
           const f=e.target.files[0]; if(!f) return;
+          if(offlineManager && offlineManager.offline){
+            alert('离线模式下暂不支持上传附件');
+            e.target.value='';
+            return;
+          }
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
@@ -1704,7 +2293,9 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         input.click();
       };
       function addStepForm(ev){
-        ev.preventDefault(); const f=ev.target; const fd=new FormData(f);
+        ev.preventDefault();
+        if(offlineManager && offlineManager.offline){ alert('离线模式下暂不支持管理子任务'); return false; }
+        const f=ev.target; const fd=new FormData(f);
         fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}).then(()=>location.reload());
         return false;
       }
@@ -1720,6 +2311,12 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           if(!best) return; const r=best.getBoundingClientRect(); const after=e.clientY > r.top + r.height/2; best.parentNode.insertBefore(dragging, after?best.nextSibling:best);
         });
         box.addEventListener('drop',e=>{
+          if(offlineManager && offlineManager.offline){
+            e.preventDefault();
+            alert('离线模式下暂不支持调整子任务顺序');
+            dragging=null;
+            return;
+          }
           e.preventDefault(); if(!dragging) return; dragging=null;
           const ids=[...box.querySelectorAll('.tl-item[draggable]')].map(x=>x.dataset.id).join(',');
           const fd=new FormData(); fd.append('action','reorder_steps'); fd.append('item_id', box.dataset.item); fd.append('order', ids);
@@ -2008,11 +2605,13 @@ if ($view === 'map_edit') {
       .mind-settings .settings-actions{display:flex;justify-content:flex-end;gap:10px}
       .mind-settings .settings-actions button{padding:10px 14px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
       .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-      body.grid-off::after{opacity:0!important}
+     body.grid-off::after{opacity:0!important}
     </style>
+    <?php render_offline_styles(); ?>
 
   </head>
   <body>
+    <?php render_offline_banner(); ?>
     <div class="scanlines" aria-hidden="true"></div>
     <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
       <defs>
@@ -3376,6 +3975,7 @@ if ($view === 'map_edit') {
       }
       return;
     }
+    const offlineManager=window.offlineManager||null;
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
     overlay.id='drag-overlay';
     overlay.dataset.exportIgnore='true';
@@ -3524,6 +4124,7 @@ if ($view === 'map_edit') {
         return label.length>16 ? label.slice(0,15)+'…' : label;
       }
       async function uploadMindmapFile(file, nodeId){
+        if(offlineManager && offlineManager.offline){ throw new Error('离线模式下暂不支持上传附件'); }
         const fd=new FormData();
         fd.append('action','upload_mindmap_asset');
         fd.append('map_id', String(currentMapId||0));
@@ -3637,6 +4238,19 @@ if ($view === 'map_edit') {
       function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
       jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
+      if(offlineManager){
+        (async()=>{
+          const draft=await offlineManager.loadMindmapDraft(mindDraftKey);
+          if(draft && draft.data){
+            if(typeof draft.data.title==='string' && titleInput){ titleInput.value=draft.data.title; }
+            const savedContent=draft.data.content;
+            if(savedContent && typeof savedContent==='object'){
+              if(savedContent.data){ enforceRightOrientation(savedContent.data); }
+              try{ jm.show(savedContent); markDirty(); }catch(_){ }
+            }
+          }
+        })();
+      }
       jmContainer.appendChild(overlay);
       syncOverlaySize();
       if(!jm.get_selected_node() && initialData && initialData.data){
@@ -3897,6 +4511,19 @@ if ($view === 'map_edit') {
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
+      let mindDraftKey=currentMapId>0?`map:${currentMapId}`:'map:new';
+      async function persistMindmapDraftNow(){
+        if(!offlineManager) return;
+        try{
+          const data=jm.get_data('node_tree');
+          await offlineManager.saveMindmapDraft(mindDraftKey,{
+            id: currentMapId,
+            title: titleInput ? titleInput.value.trim() : '',
+            content: data
+          });
+        }catch(_){ }
+      }
+      const persistMindmapDraftThrottled=throttle(()=>{ persistMindmapDraftNow(); },800);
       const commandLog=[];
       window.__mindmapCommands=commandLog;
       let contextMenuState=null;
@@ -3922,6 +4549,7 @@ if ($view === 'map_edit') {
           saveState.classList.add('show','dirty');
         }
         setSaveButtonState('未保存',false,'dirty');
+        if(offlineManager){ persistMindmapDraftThrottled(); }
       }
       function showSaving(){
         if(saveState){
@@ -3945,6 +4573,14 @@ if ($view === 'map_edit') {
             setSaveButtonState(null,false,null);
           }
         },1500);
+      }
+      function markQueued(){
+        dirty=true;
+        if(saveState){
+          saveState.textContent='离线待同步';
+          saveState.classList.add('show','dirty');
+        }
+        setSaveButtonState('离线待同步', true,'queued');
       }
       function toggleSettings(forceShow){
         if(!settingsLayer) return;
@@ -4844,7 +5480,12 @@ if ($view === 'map_edit') {
           handleDroppedText(text, parent, e);
         }
       });
-      if(titleInput){ titleInput.addEventListener('input', markDirty); }
+      if(titleInput){
+        titleInput.addEventListener('input',()=>{
+          markDirty();
+          if(offlineManager){ persistMindmapDraftThrottled(); }
+        });
+      }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
           if(isContextMenuOpen() && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
@@ -5056,6 +5697,7 @@ if ($view === 'map_edit') {
         initialData=JSON.parse(JSON.stringify(cloned));
         if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
         currentMapId=0;
+        mindDraftKey='map:new';
         if(jmContainer){ jmContainer.dataset.mapId='0'; }
         if(deleteMapForm){
           const idInput=deleteMapForm.querySelector('input[name="id"]');
@@ -5114,6 +5756,14 @@ if ($view === 'map_edit') {
         fd.append('title', title);
         fd.append('content', payload);
         try{
+          if(offlineManager){
+            await offlineManager.saveMindmapDraft(mindDraftKey,{id:currentMapId,title,content:currentData});
+          }
+          if(offlineManager && offlineManager.offline){
+            await offlineManager.queueMindmapSave({id:currentMapId,title,content:payload,url:location.href,localKey:mindDraftKey});
+            markQueued();
+            return;
+          }
           showSaving();
           const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!res.ok) throw new Error('网络异常');
@@ -5126,17 +5776,26 @@ if ($view === 'map_edit') {
             const idInput=deleteMapForm.querySelector('input[name="id"]');
             if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
           }
+          mindDraftKey=currentMapId>0?`map:${currentMapId}`:'map:new';
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
           if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
           markSaved();
+          if(offlineManager){ await offlineManager.deleteMindmapDraft(mindDraftKey); }
         }catch(err){
-          alert(err.message||'保存失败');
-          markDirty();
+          if(offlineManager){
+            await offlineManager.queueMindmapSave({id:currentMapId,title,content:payload,url:location.href,localKey:mindDraftKey});
+            markQueued();
+            alert((err && err.message) ? `保存失败，已转为离线待同步：${err.message}` : '保存失败，已转为离线待同步');
+          }else{
+            alert(err.message||'保存失败');
+            markDirty();
+          }
         }
       }
       window.addEventListener('beforeunload',e=>{
         commitInlineEditing();
+        if(offlineManager){ persistMindmapDraftNow(); }
         if(blobUrlRegistry.size){
           blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
           blobUrlRegistry.clear();
@@ -5164,6 +5823,7 @@ if ($view === 'maps') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+    <?php render_offline_styles(); ?>
     <style>
       :root{
         --bg-void:#0A0C0E;
@@ -5260,8 +5920,9 @@ if ($view === 'maps') {
     </style>
 
   </head>
-<body>
-  <div class="scanlines" aria-hidden="true"></div>
+  <body>
+    <?php render_offline_banner(); ?>
+    <div class="scanlines" aria-hidden="true"></div>
   <div class="wrap">
       <div class="header">
         <div>
