@@ -6141,11 +6141,19 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .kbd{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;padding:2px 6px;border:1px dashed rgba(201,168,106,.35);border-radius:6px;background:rgba(15,19,22,.82);color:var(--text-dim);text-transform:uppercase;letter-spacing:.16em;box-shadow:0 0 12px rgba(201,168,106,.12)}
   mark{background:rgba(75,195,209,.2);color:inherit;padding:0 2px;border-radius:4px}
   .tinyline{position:relative;margin-left:12px;padding-left:18px;color:var(--text-muted)}
-  .tinyline::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,rgba(201,168,106,.65),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.25)}
+  .tinyline::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;border-radius:999px;background:linear-gradient(to bottom,rgba(201,168,106,.65),rgba(201,168,106,.18));box-shadow:0 0 18px rgba(227,198,139,.25),0 0 24px rgba(201,168,106,.22)}
   .tlrow{position:relative;margin:6px 0;padding-left:10px;display:flex;gap:8px;align-items:center}
   .tlrow.done .step-title{text-decoration:line-through;color:rgba(201,168,106,.7)}
-  .dot{position:absolute;left:-6px;top:8px;width:10px;height:10px;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.85));border-radius:50%;box-shadow:0 0 12px rgba(201,168,106,.5),0 0 24px rgba(201,168,106,.35)}
-  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
+  .dot{position:absolute;left:-6px;top:8px;width:10px;height:10px;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.85));border-radius:50%;box-shadow:0 0 12px rgba(201,168,106,.5),0 0 24px rgba(201,168,106,.35);will-change:filter,box-shadow}
+  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26);transition:border-color var(--transition),box-shadow var(--transition),opacity var(--transition)}
+  .dot::before{content:"";position:absolute;inset:1px;border-radius:inherit;background:radial-gradient(circle at 50% 50%,rgba(255,238,206,.85),rgba(201,168,106,.35));opacity:.9;filter:blur(.3px);pointer-events:none}
+  .tlrow:not(.done) .dot{animation:dotBreathe 3.2s ease-in-out infinite}
+  @keyframes dotBreathe{
+    0%,100%{filter:brightness(.7);box-shadow:0 0 8px rgba(201,168,106,.45),0 0 20px rgba(201,168,106,.3)}
+    50%{filter:brightness(1);box-shadow:0 0 14px rgba(201,168,106,.65),0 0 28px rgba(201,168,106,.38)}
+  }
+  .tlrow.done .dot{background:radial-gradient(circle at 50% 50%,rgba(198,250,222,.95),rgba(56,189,148,.85));box-shadow:0 0 16px rgba(56,189,148,.6),0 0 28px rgba(16,185,129,.45);filter:none;animation:none}
+  .tlrow.done .dot::after{border-color:rgba(56,189,148,.45);opacity:.9;box-shadow:0 0 18px rgba(16,185,129,.35)}
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
   .item-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
   .item-actions form{margin:0}
