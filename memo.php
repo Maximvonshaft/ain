@@ -29,7 +29,7 @@ const UPLOAD_DIR = __DIR__ . '/storage/uploads';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 const ALLOWED_UPLOAD_MIME_MAP = [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
-  'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip',
+  'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
   'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','text/csv'=>'csv','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
   'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg',
 ];
@@ -177,6 +177,86 @@ function highlight_text(string $text, string $term): string {
     }
   }
   return $out;
+}
+
+function build_file_preview_payload(array $file, string $downloadUrl, string $previewUrl, string $path): array {
+  $name=trim((string)($file['orig_name'] ?? ($file['name'] ?? '附件')));
+  $mime=(string)($file['mime'] ?? 'application/octet-stream');
+  $size=(int)($file['size'] ?? 0);
+  $payload=[
+    'ok'=>1,
+    'id'=>(int)($file['id'] ?? 0),
+    'name'=>$name !== '' ? $name : '附件',
+    'mime'=>$mime,
+    'size'=>$size,
+    'download_url'=>$downloadUrl,
+    'url'=>$previewUrl,
+    'type'=>'binary',
+  ];
+  $lowerMime=strtolower($mime);
+  if(str_starts_with($mime,'image/')){
+    $payload['type']='image';
+  } elseif(str_starts_with($mime,'video/')){
+    $payload['type']='video';
+  } elseif($mime==='application/pdf'){
+    $payload['type']='pdf';
+  } elseif(in_array($lowerMime,['application/zip','application/x-zip-compressed'],true)){
+    $payload['type']='zip';
+    if(class_exists('ZipArchive')){
+      $zip=new ZipArchive();
+      if($zip->open($path) === true){
+        $entries=[]; $total=$zip->numFiles; $limit=200;
+        for($i=0;$i<$total;$i++){
+          $stat=$zip->statIndex($i);
+          if(!$stat) continue;
+          if(count($entries) >= $limit){
+            $payload['truncated']=true;
+            break;
+          }
+          $entries[]=[
+            'name'=>$stat['name'],
+            'size'=>(int)($stat['size'] ?? 0),
+            'compressed_size'=>(int)($stat['comp_size'] ?? 0),
+          ];
+        }
+        $payload['entries']=$entries;
+        $payload['total_entries']=$total;
+        $zip->close();
+      } else {
+        $payload['error']='无法读取 ZIP 文件内容';
+      }
+    } else {
+      $payload['error']='服务器未启用 ZipArchive 扩展，无法解析 ZIP 文件';
+    }
+  } elseif(in_array($lowerMime,['application/x-rar-compressed','application/vnd.rar'],true)){
+    $payload['type']='rar';
+    if(class_exists('RarArchive')){
+      $rar=RarArchive::open($path);
+      if($rar){
+        $entriesObjects=$rar->getEntries();
+        $entries=[]; $limit=200; $idx=0;
+        foreach($entriesObjects as $entry){
+          if($idx++ >= $limit){
+            $payload['truncated']=true;
+            break;
+          }
+          $entries[]=[
+            'name'=>$entry->getName(),
+            'size'=>(int)$entry->getUnpackedSize(),
+            'compressed_size'=>(int)$entry->getPackedSize(),
+          ];
+        }
+        $payload['entries']=$entries;
+        $payload['total_entries']=is_array($entriesObjects) ? count($entriesObjects) : null;
+        $rar->close();
+      } else {
+        $payload['error']='无法读取 RAR 文件内容';
+      }
+    } else {
+      $payload['error']='服务器未启用 RAR 扩展，无法解析 RAR 文件';
+    }
+  }
+  return $payload;
 }
 
 
@@ -611,10 +691,12 @@ function json_cats(): void {
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
   $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$att['mime']; $isImage=in_array($mime,['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true);
+  $mime=$att['mime'];
   $filename=$att['orig_name'];
+  $forceInline=isset($_GET['inline']) && $_GET['inline']!=='0';
+  $inline=$forceInline || str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
   header('Content-Length: '.$att['size']); header('X-Content-Type-Options: nosniff');
-  if($isImage){ header('Content-Type: '.$mime); header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
+  if($inline){ header('Content-Type: '.$mime); header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
   else { header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
   readfile($path); exit;
 }
@@ -624,7 +706,8 @@ if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])
   $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
   $mime=$asset['mime'];
   $filename=$asset['orig_name'];
-  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
+  $forceInline=isset($_GET['inline']) && $_GET['inline']!=='0';
+  $inline=$forceInline || str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
   header('Content-Length: '.$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
   if($inline){ header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
   else { header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
@@ -1051,9 +1134,23 @@ if (is_post()) {
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
         if(is_ajax()){
           $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$mime,'markdown'=>$md,'size'=>$f['size']]); exit;
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'preview_url'=>$url.'&inline=1','mime'=>$mime,'markdown'=>$md,'size'=>$f['size'],'name'=>$orig]); exit;
         }
         break;
+      }
+      case 'preview_attachment': {
+        $id=(int)($_POST['id'] ?? 0);
+        if($id<=0) throw new RuntimeException('附件不存在');
+        $att=get_attachment($id);
+        if(!$att) throw new RuntimeException('附件不存在');
+        $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name'];
+        if(!is_file($path)) throw new RuntimeException('附件文件缺失');
+        $downloadUrl='?download='.$att['id'];
+        $previewUrl=$downloadUrl.(str_contains($downloadUrl,'?')?'&':'?').'inline=1';
+        $payload=build_file_preview_payload($att,$downloadUrl,$previewUrl,$path);
+        header('Content-Type: application/json');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
       }
       case 'upload_mindmap_asset': {
         if(empty($_FILES['file']) || ($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new RuntimeException('上传失败');
@@ -1068,9 +1165,23 @@ if (is_post()) {
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
         if(is_ajax()){
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id']]); exit;
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id'],'preview_url'=>'?mindmap_asset='.(int)$asset['id'].'&inline=1']); exit;
         }
         break;
+      }
+      case 'preview_mindmap_asset': {
+        $id=(int)($_POST['id'] ?? 0);
+        if($id<=0) throw new RuntimeException('附件不存在');
+        $asset=get_mindmap_asset($id);
+        if(!$asset) throw new RuntimeException('附件不存在');
+        $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name'];
+        if(!is_file($path)) throw new RuntimeException('附件文件缺失');
+        $downloadUrl='?mindmap_asset='.$asset['id'];
+        $previewUrl=$downloadUrl.(str_contains($downloadUrl,'?')?'&':'?').'inline=1';
+        $payload=build_file_preview_payload($asset,$downloadUrl,$previewUrl,$path);
+        header('Content-Type: application/json');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
       }
       case 'ping_cats': { if(is_ajax()) json_cats(); break; }
       case 'delete_attachment': {
@@ -1235,9 +1346,14 @@ if ($view === 'new') {
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
-      .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);background:rgba(10,14,16,.82);box-shadow:var(--shadow-1);padding:14px;display:grid;gap:10px;min-width:220px;max-width:280px}
+      .thumb::after{content:"";position:absolute;inset:8px;border-radius:calc(var(--r-sm) - 6px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
+      .thumb-media{position:relative;z-index:1;border-radius:12px;background:rgba(15,19,22,.8);padding:8px;display:flex;align-items:center;justify-content:center;min-height:120px}
+      .thumb-media img{display:block;max-width:100%;max-height:160px;border-radius:10px}
+      .thumb-actions{position:relative;z-index:1;display:flex;gap:8px;flex-wrap:wrap}
+      .thumb-actions .btn{flex:1;justify-content:center}
+      .thumb .att-meta{position:relative;z-index:1;color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif}
+      .thumb form{position:relative;z-index:1;margin:0;text-align:right}
       .att-meta{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
       .timeline{position:relative;margin-top:20px;margin-left:16px;padding-left:32px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.6),rgba(201,168,106,.1));box-shadow:0 0 18px rgba(227,198,139,.28)}
@@ -1304,9 +1420,65 @@ if ($view === 'new') {
         <div class="timeline" id="timeline" data-item="0"></div>
       </div>
     </div>
+    <div id="attachment-preview" class="attachment-preview-backdrop" data-open="false" aria-hidden="true">
+      <div class="attachment-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="attachment-preview-title">
+        <button type="button" class="attachment-preview-close" data-preview-close aria-label="关闭预览">×</button>
+        <div class="attachment-preview-header">
+          <div style="flex:1;min-width:0">
+            <div class="attachment-preview-title" id="attachment-preview-title">附件预览</div>
+            <div class="attachment-preview-meta" id="attachment-preview-meta"></div>
+          </div>
+          <a id="attachment-preview-download" class="btn btn-outline btn-small" href="#" target="_blank" rel="noopener">下载</a>
+        </div>
+        <div class="attachment-preview-body" id="attachment-preview-body"></div>
+      </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <script>
+      (function(){
+        if(window.AttachmentPreview) return;
+        const backdrop=document.getElementById('attachment-preview');
+        if(!backdrop) return;
+        const bodyEl=document.getElementById('attachment-preview-body');
+        const titleEl=document.getElementById('attachment-preview-title');
+        const metaEl=document.getElementById('attachment-preview-meta');
+        const downloadEl=document.getElementById('attachment-preview-download');
+        const closeBtn=backdrop.querySelector('[data-preview-close]');
+        const state={objectUrl:null};
+        function formatBytes(size){
+          if(!(size>=0)) return '';
+          const units=['B','KB','MB','GB','TB'];
+          let val=size; let idx=0;
+          while(val>=1024 && idx<units.length-1){ val/=1024; idx++; }
+          const fixed=val>=10 || idx===0 ? val.toFixed(0) : val.toFixed(1);
+          return `${fixed} ${units[idx]}`;
+        }
+        function revokeObjectUrl(){
+          if(state.objectUrl){ URL.revokeObjectURL(state.objectUrl); state.objectUrl=null; }
+        }
+        function clearBody(){ revokeObjectUrl(); if(bodyEl){ bodyEl.innerHTML=''; } }
+        function closePreview(){ backdrop.dataset.open='false'; backdrop.setAttribute('aria-hidden','true'); document.body.classList.remove('attachment-preview-open'); clearBody(); }
+        function ensureOpen(){ if(backdrop.dataset.open==='true') return; backdrop.dataset.open='true'; backdrop.setAttribute('aria-hidden','false'); document.body.classList.add('attachment-preview-open'); }
+        function setDownload(url,name){ if(!downloadEl) return; if(!url){ downloadEl.style.display='none'; downloadEl.removeAttribute('href'); downloadEl.removeAttribute('download'); return; } downloadEl.style.display='inline-flex'; downloadEl.href=url; if(name){ downloadEl.setAttribute('download', name); } else { downloadEl.removeAttribute('download'); } }
+        function buildMeta(data){ const parts=[]; if(data?.mime){ parts.push(data.mime); } if(typeof data?.size==='number' && data.size>=0){ parts.push(formatBytes(data.size)); } if((data?.type==='zip' || data?.type==='rar') && typeof data?.total_entries==='number'){ let text=`共 ${data.total_entries} 项`; if(data.truncated){ text+='（已截断，仅显示前 200 项）'; } parts.push(text); } return parts.join(' · '); }
+        function showLoading(){ clearBody(); titleEl.textContent='附件预览'; metaEl.textContent=''; setDownload(null,null); const loading=document.createElement('div'); loading.className='attachment-preview-empty'; loading.textContent='加载中…'; bodyEl.appendChild(loading); }
+        function showError(message){ clearBody(); const box=document.createElement('div'); box.className='attachment-preview-error'; box.textContent=message || '无法预览该附件'; bodyEl.appendChild(box); }
+        function appendErrorHint(text){ const hint=document.createElement('div'); hint.className='attachment-preview-error'; hint.style.marginTop='12px'; hint.textContent=text; bodyEl.appendChild(hint); }
+        function renderArchiveEntries(data){ const entries=Array.isArray(data.entries)?data.entries:[]; if(entries.length){ const list=document.createElement('ul'); list.className='attachment-preview-list'; entries.forEach(item=>{ const li=document.createElement('li'); li.className='attachment-preview-item'; const name=document.createElement('div'); name.className='name'; name.title=item.name || ''; name.textContent=item.name || '(未命名)'; const size=document.createElement('div'); size.className='size'; const parts=[]; if(typeof item.size==='number'){ parts.push(`解压 ${formatBytes(item.size)}`); } if(typeof item.compressed_size==='number' && item.compressed_size!==item.size){ parts.push(`压缩 ${formatBytes(item.compressed_size)}`); } size.textContent=parts.join(' · '); li.appendChild(name); li.appendChild(size); list.appendChild(li); }); bodyEl.appendChild(list); } else { const empty=document.createElement('div'); empty.className='attachment-preview-empty'; empty.textContent='压缩包为空或无法列出内容。'; bodyEl.appendChild(empty); } if(data.error){ appendErrorHint(data.error); } }
+        function renderPayload(data,{isBlob=false}={}){ clearBody(); const title=data?.name || '附件预览'; titleEl.textContent=title; metaEl.textContent=buildMeta(data); const downloadUrl=data?.download_url || data?.url || null; setDownload(downloadUrl,title); if(isBlob && data?.url){ state.objectUrl=data.url; } const type=data?.type || ''; if(type==='image'){ const img=document.createElement('img'); img.src=data.url; img.alt=title; img.loading='lazy'; bodyEl.appendChild(img); return; } if(type==='video'){ const video=document.createElement('video'); video.src=data.url; video.controls=true; video.preload='metadata'; video.style.maxHeight='60vh'; bodyEl.appendChild(video); return; } if(type==='pdf'){ const frame=document.createElement('iframe'); frame.src=data.url; frame.title=title; bodyEl.appendChild(frame); return; } if(type==='zip' || type==='rar'){ renderArchiveEntries(data); return; } const fallback=document.createElement('div'); fallback.className='attachment-preview-empty'; fallback.textContent='该文件类型暂不支持内联预览，请使用下载按钮打开。'; bodyEl.appendChild(fallback); if(data?.error){ appendErrorHint(data.error); } }
+        async function fetchPreviewPayload(action,id){ const fd=new FormData(); fd.append('action', action); fd.append('id', String(id)); const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}); if(!res.ok) throw new Error('网络异常'); const json=await res.json(); if(!json || json.ok===0 || json.ok===false){ throw new Error(json?.error || '无法预览该附件'); } return json; }
+        async function openAttachment(id){ ensureOpen(); showLoading(); try{ const payload=await fetchPreviewPayload('preview_attachment', id); renderPayload(payload); }catch(err){ showError(err.message || '无法预览该附件'); } }
+        async function openMindmapAsset(id){ ensureOpen(); showLoading(); try{ const payload=await fetchPreviewPayload('preview_mindmap_asset', id); renderPayload(payload); }catch(err){ showError(err.message || '无法预览该附件'); } }
+        function dataUrlToBlob(dataUrl){ if(typeof dataUrl!=='string') return null; const match=dataUrl.match(/^data:(.*?);base64,(.*)$/); if(!match) return null; const mime=match[1] || 'application/octet-stream'; const binary=atob(match[2].replace(/\s+/g,'')); const len=binary.length; const bytes=new Uint8Array(len); for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); } const blob=new Blob([bytes],{type:mime}); return {blob,mime}; }
+        function openInlineSource(descriptor){ if(!descriptor) return; ensureOpen(); let url=descriptor.url || ''; let mime=descriptor.mime || ''; let isBlob=false; if(descriptor.content){ const parsed=dataUrlToBlob(descriptor.content); if(parsed){ const objectUrl=URL.createObjectURL(parsed.blob); url=objectUrl; mime=parsed.mime; isBlob=true; } } if(!url){ closePreview(); return; } const type=mime.startsWith('image/')?'image':(mime.startsWith('video/')?'video':(mime==='application/pdf'?'pdf':'binary')); const payload={ ok:1, name:descriptor.name || descriptor.filename || '附件', mime:mime || descriptor.mime || '', size:typeof descriptor.size==='number'?descriptor.size:undefined, url:url, download_url=url, type:type }; renderPayload(payload,{isBlob}); }
+        function registerTriggers(root=document){ if(!root) return; root.querySelectorAll('[data-attachment-preview]').forEach(btn=>{ if(btn.dataset.previewBound==='1') return; btn.dataset.previewBound='1'; btn.addEventListener('click',evt=>{ evt.preventDefault(); const id=parseInt(btn.dataset.attachmentPreview,10); if(id>0){ openAttachment(id); } }); }); }
+        closeBtn?.addEventListener('click',closePreview);
+        backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
+        document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
+        window.AttachmentPreview={ openAttachment, openMindmapAsset, openInlineSource, close:closePreview, registerTriggers };
+        registerTriggers();
+      })();
       const state = { id: 0 };
       const saveTip = document.getElementById('save-tip');
       const saveButtonEl = document.querySelector('#new-form button[type="submit"]');
@@ -1314,6 +1486,61 @@ if ($view === 'new') {
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      function formatBytesInline(size){
+        if(!(size>=0)) return '';
+        const units=['B','KB','MB','GB'];
+        let value=size; let idx=0;
+        while(value>=1024 && idx<units.length-1){ value/=1024; idx++; }
+        const fixed=value>=10 || idx===0 ? value.toFixed(0) : value.toFixed(1);
+        return `${fixed} ${units[idx]}`;
+      }
+      function createThumbElement(data){
+        const wrap=document.createElement('div');
+        wrap.className='thumb';
+        wrap.dataset.attachmentId=String(data.id||'');
+        const media=document.createElement('div');
+        media.className='thumb-media';
+        if(data.mime && data.mime.startsWith('image/')){
+          const img=document.createElement('img');
+          img.src=data.preview_url || data.url;
+          img.alt=data.name || '附件预览';
+          img.loading='lazy';
+          media.appendChild(img);
+        } else {
+          const label=document.createElement('div');
+          label.className='att-meta';
+          label.style.textAlign='center';
+          label.textContent=(data.name||'附件')+(data.mime?` · ${data.mime}`:'');
+          media.appendChild(label);
+        }
+        wrap.appendChild(media);
+        const actions=document.createElement('div');
+        actions.className='thumb-actions';
+        const previewBtn=document.createElement('button');
+        previewBtn.type='button';
+        previewBtn.className='btn btn-outline btn-small';
+        previewBtn.textContent='预览';
+        previewBtn.dataset.attachmentPreview=String(data.id||'');
+        actions.appendChild(previewBtn);
+        const downloadLink=document.createElement('a');
+        downloadLink.className='btn btn-outline btn-small';
+        downloadLink.textContent='下载';
+        downloadLink.href=data.url;
+        downloadLink.target='_blank';
+        downloadLink.rel='noopener';
+        if(data.name){ downloadLink.setAttribute('download', data.name); }
+        actions.appendChild(downloadLink);
+        wrap.appendChild(actions);
+        const meta=document.createElement('div');
+        meta.className='att-meta';
+        const pieces=[];
+        if(data.name){ pieces.push(data.name); }
+        if(typeof data.size==='number'){ pieces.push(formatBytesInline(data.size)); }
+        meta.textContent=pieces.join(' · ');
+        wrap.appendChild(meta);
+        if(window.AttachmentPreview){ window.AttachmentPreview.registerTriggers(wrap); }
+        return wrap;
+      }
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
@@ -1416,7 +1643,8 @@ if ($view === 'new') {
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
         insertTextAtCursor(editorEl, j.markdown+"\n"); renderMD();
-        if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
+        const thumbs=document.getElementById('thumbs');
+        if(thumbs){ thumbs.prepend(createThumbElement(j)); }
         e.target.value='';
       });
       $('#btn-preview-toggle').onclick=()=>{ const split=$('#split'); split.insertBefore(split.lastElementChild,split.firstElementChild); };
@@ -1727,9 +1955,14 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
-      .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);background:rgba(10,14,16,.82);box-shadow:var(--shadow-1);padding:14px;display:grid;gap:10px;min-width:220px;max-width:320px}
+      .thumb::after{content:"";position:absolute;inset:8px;border-radius:calc(var(--r-sm) - 6px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
+      .thumb-media{position:relative;z-index:1;border-radius:12px;background:rgba(15,19,22,.8);padding:8px;display:flex;align-items:center;justify-content:center;min-height:120px}
+      .thumb-media img{display:block;max-width:100%;max-height:160px;border-radius:10px}
+      .thumb-actions{position:relative;z-index:1;display:flex;gap:8px;flex-wrap:wrap}
+      .thumb-actions .btn{flex:1;justify-content:center}
+      .thumb .att-meta{position:relative;z-index:1;color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif}
+      .thumb form{position:relative;z-index:1;margin:0;text-align:right}
       .timeline{position:relative;margin-top:22px;margin-left:18px;padding-left:34px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.58),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.24)}
       .tl-item{position:relative;margin:14px 0;padding:16px 20px 20px 26px;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-md);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));box-shadow:var(--shadow-1)}
@@ -1752,6 +1985,52 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .toast.error .icon{color:var(--accent-crimson)}
       .toast .body{flex:1;font:14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .toast button{background:none;border:0;color:inherit;cursor:pointer}
+      body.attachment-preview-open{overflow:hidden}
+      .attachment-preview-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.82);backdrop-filter:blur(20px);z-index:250}
+      .attachment-preview-backdrop[data-open="true"]{display:flex}
+      .attachment-preview-dialog{position:relative;width:min(960px,90vw);max-height:90vh;display:flex;flex-direction:column;gap:16px;padding:24px;border-radius:24px;background:linear-gradient(160deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.4);box-shadow:0 40px 80px rgba(0,0,0,.65)}
+      .attachment-preview-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(201,168,106,.45);background:rgba(12,16,18,.9);color:var(--gold-400);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+      .attachment-preview-close:hover{background:rgba(201,168,106,.12)}
+      .attachment-preview-header{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+      .attachment-preview-title{font:600 18px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.12em;text-transform:uppercase}
+      .attachment-preview-meta{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+      .attachment-preview-body{flex:1;min-height:200px;max-height:calc(90vh - 160px);overflow:auto;border:1px solid rgba(201,168,106,.22);border-radius:18px;padding:16px;background:rgba(12,16,18,.9);box-shadow:inset 0 0 22px rgba(0,0,0,.5)}
+      .attachment-preview-body img,.attachment-preview-body video{max-width:100%;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.6)}
+      .attachment-preview-body video{background:#000}
+      .attachment-preview-body iframe{width:100%;height:60vh;border:0;border-radius:12px;background:#111}
+      .attachment-preview-list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+      .attachment-preview-item{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.85);font:13px/1.5 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong)}
+      .attachment-preview-item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+      .attachment-preview-item .size{color:var(--text-muted);font-size:12px}
+      .attachment-preview-empty{color:var(--text-muted);text-align:center;padding:24px;font:13px/1.6 'Inter','Noto Sans SC',sans-serif}
+      .attachment-preview-error{color:#fca5a5;text-align:center;padding:18px;font:13px/1.6 'Inter','Noto Sans SC',sans-serif;border:1px solid rgba(239,68,68,.4);border-radius:14px;background:rgba(239,68,68,.08)}
+      @media (max-width:640px){
+        .attachment-preview-dialog{padding:18px;width:calc(100% - 24px)}
+        .attachment-preview-body{max-height:60vh}
+      }
+  body.attachment-preview-open{overflow:hidden}
+  .attachment-preview-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.82);backdrop-filter:blur(20px);z-index:250}
+  .attachment-preview-backdrop[data-open="true"]{display:flex}
+  .attachment-preview-dialog{position:relative;width:min(960px,90vw);max-height:90vh;display:flex;flex-direction:column;gap:16px;padding:24px;border-radius:24px;background:linear-gradient(160deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.4);box-shadow:0 40px 80px rgba(0,0,0,.65)}
+  .attachment-preview-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(201,168,106,.45);background:rgba(12,16,18,.9);color:var(--gold-400);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .attachment-preview-close:hover{background:rgba(201,168,106,.12)}
+  .attachment-preview-header{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  .attachment-preview-title{font:600 18px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.12em;text-transform:uppercase}
+  .attachment-preview-meta{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+  .attachment-preview-body{flex:1;min-height:200px;max-height:calc(90vh - 160px);overflow:auto;border:1px solid rgba(201,168,106,.22);border-radius:18px;padding:16px;background:rgba(12,16,18,.9);box-shadow:inset 0 0 22px rgba(0,0,0,.5)}
+  .attachment-preview-body img,.attachment-preview-body video{max-width:100%;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.6)}
+  .attachment-preview-body video{background:#000}
+  .attachment-preview-body iframe{width:100%;height:60vh;border:0;border-radius:12px;background:#111}
+  .attachment-preview-list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+  .attachment-preview-item{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.85);font:13px/1.5 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong)}
+  .attachment-preview-item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .attachment-preview-item .size{color:var(--text-muted);font-size:12px}
+  .attachment-preview-empty{color:var(--text-muted);text-align:center;padding:24px;font:13px/1.6 'Inter','Noto Sans SC',sans-serif}
+  .attachment-preview-error{color:#fca5a5;text-align:center;padding:18px;font:13px/1.6 'Inter','Noto Sans SC',sans-serif;border:1px solid rgba(239,68,68,.4);border-radius:14px;background:rgba(239,68,68,.08)}
+  @media (max-width:640px){
+    .attachment-preview-dialog{padding:18px;width:calc(100% - 24px)}
+    .attachment-preview-body{max-height:60vh}
+  }
     </style>
 
   </head>
@@ -1802,17 +2081,21 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           <div class="preview">
             <div class="md-body" id="md-view"></div>
             <div class="thumbs" id="thumbs">
-              <?php if ($itemAtts): foreach ($itemAtts as $a): $isImg=in_array($a['mime'],['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true); ?>
-                <div class="thumb">
-                  <?php if ($isImg): ?>
-                    <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
-                  <?php else: ?>
-                    <div style="display:flex;gap:8px;align-items:center;padding:8px">
-                      <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
-                      <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
-                    </div>
-                  <?php endif; ?>
-                  <form method="post" style="padding:6px;text-align:right">
+              <?php if ($itemAtts): foreach ($itemAtts as $a): $isImg=str_starts_with((string)$a['mime'],'image/'); ?>
+                <div class="thumb" data-attachment-id="<?php echo $a['id']; ?>">
+                  <div class="thumb-media">
+                    <?php if ($isImg): ?>
+                      <img src="?download=<?php echo $a['id']; ?>&inline=1" alt="<?php echo h($a['orig_name']); ?>">
+                    <?php else: ?>
+                      <div class="att-meta" style="text-align:center"><?php echo h($a['orig_name']); ?><br><?php echo h($a['mime']); ?></div>
+                    <?php endif; ?>
+                  </div>
+                  <div class="thumb-actions">
+                    <button class="btn btn-outline btn-small" type="button" data-attachment-preview="<?php echo $a['id']; ?>">预览</button>
+                    <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>" target="_blank" rel="noopener">下载</a>
+                  </div>
+                  <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
+                  <form method="post" style="text-align:right">
                     <input type="hidden" name="action" value="delete_attachment">
                     <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
                     <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
@@ -1883,8 +2166,112 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <script>
+      (function(){
+        if(window.AttachmentPreview) return;
+        const backdrop=document.getElementById('attachment-preview');
+        if(!backdrop) return;
+        const bodyEl=document.getElementById('attachment-preview-body');
+        const titleEl=document.getElementById('attachment-preview-title');
+        const metaEl=document.getElementById('attachment-preview-meta');
+        const downloadEl=document.getElementById('attachment-preview-download');
+        const closeBtn=backdrop.querySelector('[data-preview-close]');
+        const state={objectUrl:null};
+        function formatBytes(size){
+          if(!(size>=0)) return '';
+          const units=['B','KB','MB','GB','TB'];
+          let val=size; let idx=0;
+          while(val>=1024 && idx<units.length-1){ val/=1024; idx++; }
+          const fixed=val>=10 || idx===0 ? val.toFixed(0) : val.toFixed(1);
+          return `${fixed} ${units[idx]}`;
+        }
+        function revokeObjectUrl(){ if(state.objectUrl){ URL.revokeObjectURL(state.objectUrl); state.objectUrl=null; } }
+        function clearBody(){ revokeObjectUrl(); if(bodyEl){ bodyEl.innerHTML=''; } }
+        function closePreview(){ backdrop.dataset.open='false'; backdrop.setAttribute('aria-hidden','true'); document.body.classList.remove('attachment-preview-open'); clearBody(); }
+        function ensureOpen(){ if(backdrop.dataset.open==='true') return; backdrop.dataset.open='true'; backdrop.setAttribute('aria-hidden','false'); document.body.classList.add('attachment-preview-open'); }
+        function setDownload(url,name){ if(!downloadEl) return; if(!url){ downloadEl.style.display='none'; downloadEl.removeAttribute('href'); downloadEl.removeAttribute('download'); return; } downloadEl.style.display='inline-flex'; downloadEl.href=url; if(name){ downloadEl.setAttribute('download', name); } else { downloadEl.removeAttribute('download'); } }
+        function buildMeta(data){ const parts=[]; if(data?.mime){ parts.push(data.mime); } if(typeof data?.size==='number' && data.size>=0){ parts.push(formatBytes(data.size)); } if((data?.type==='zip' || data?.type==='rar') && typeof data?.total_entries==='number'){ let text=`共 ${data.total_entries} 项`; if(data.truncated){ text+='（已截断，仅显示前 200 项）'; } parts.push(text); } return parts.join(' · '); }
+        function showLoading(){ clearBody(); titleEl.textContent='附件预览'; metaEl.textContent=''; setDownload(null,null); const loading=document.createElement('div'); loading.className='attachment-preview-empty'; loading.textContent='加载中…'; bodyEl.appendChild(loading); }
+        function showError(message){ clearBody(); const box=document.createElement('div'); box.className='attachment-preview-error'; box.textContent=message || '无法预览该附件'; bodyEl.appendChild(box); }
+        function appendErrorHint(text){ const hint=document.createElement('div'); hint.className='attachment-preview-error'; hint.style.marginTop='12px'; hint.textContent=text; bodyEl.appendChild(hint); }
+        function renderArchiveEntries(data){ const entries=Array.isArray(data.entries)?data.entries:[]; if(entries.length){ const list=document.createElement('ul'); list.className='attachment-preview-list'; entries.forEach(item=>{ const li=document.createElement('li'); li.className='attachment-preview-item'; const name=document.createElement('div'); name.className='name'; name.title=item.name || ''; name.textContent=item.name || '(未命名)'; const size=document.createElement('div'); size.className='size'; const parts=[]; if(typeof item.size==='number'){ parts.push(`解压 ${formatBytes(item.size)}`); } if(typeof item.compressed_size==='number' && item.compressed_size!==item.size){ parts.push(`压缩 ${formatBytes(item.compressed_size)}`); } size.textContent=parts.join(' · '); li.appendChild(name); li.appendChild(size); list.appendChild(li); }); bodyEl.appendChild(list); } else { const empty=document.createElement('div'); empty.className='attachment-preview-empty'; empty.textContent='压缩包为空或无法列出内容。'; bodyEl.appendChild(empty); } if(data.error){ appendErrorHint(data.error); } }
+        async function fetchPreviewPayload(action,id){ const fd=new FormData(); fd.append('action', action); fd.append('id', String(id)); const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}); if(!res.ok) throw new Error('网络异常'); const json=await res.json(); if(!json || json.ok===0 || json.ok===false){ throw new Error(json?.error || '无法预览该附件'); } return json; }
+        function renderPayload(data,{isBlob=false}={}){ clearBody(); const title=data?.name || '附件预览'; titleEl.textContent=title; metaEl.textContent=buildMeta(data); const downloadUrl=data?.download_url || data?.url || null; setDownload(downloadUrl,title); if(isBlob && data?.url){ state.objectUrl=data.url; } const type=data?.type || ''; if(type==='image'){ const img=document.createElement('img'); img.src=data.url; img.alt=title; img.loading='lazy'; bodyEl.appendChild(img); return; } if(type==='video'){ const video=document.createElement('video'); video.src=data.url; video.controls=true; video.preload='metadata'; video.style.maxHeight='60vh'; bodyEl.appendChild(video); return; } if(type==='pdf'){ const frame=document.createElement('iframe'); frame.src=data.url; frame.title=title; bodyEl.appendChild(frame); return; } if(type==='zip' || type==='rar'){ renderArchiveEntries(data); return; } const fallback=document.createElement('div'); fallback.className='attachment-preview-empty'; fallback.textContent='该文件类型暂不支持内联预览，请使用下载按钮打开。'; bodyEl.appendChild(fallback); if(data?.error){ appendErrorHint(data.error); } }
+        async function openAttachment(id){ ensureOpen(); showLoading(); try{ const payload=await fetchPreviewPayload('preview_attachment', id); renderPayload(payload); }catch(err){ showError(err.message || '无法预览该附件'); } }
+        async function openMindmapAsset(id){ ensureOpen(); showLoading(); try{ const payload=await fetchPreviewPayload('preview_mindmap_asset', id); renderPayload(payload); }catch(err){ showError(err.message || '无法预览该附件'); } }
+        function dataUrlToBlob(dataUrl){ if(typeof dataUrl!=='string') return null; const match=dataUrl.match(/^data:(.*?);base64,(.*)$/); if(!match) return null; const mime=match[1] || 'application/octet-stream'; const binary=atob(match[2].replace(/\s+/g,'')); const len=binary.length; const bytes=new Uint8Array(len); for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); } const blob=new Blob([bytes],{type:mime}); return {blob,mime}; }
+        function openInlineSource(descriptor){ if(!descriptor) return; ensureOpen(); let url=descriptor.url || ''; let mime=descriptor.mime || ''; let isBlob=false; if(descriptor.content){ const parsed=dataUrlToBlob(descriptor.content); if(parsed){ const objectUrl=URL.createObjectURL(parsed.blob); url=objectUrl; mime=parsed.mime; isBlob=true; } } if(!url){ closePreview(); return; } const type=mime.startsWith('image/')?'image':(mime.startsWith('video/')?'video':(mime==='application/pdf'?'pdf':'binary')); const payload={ ok:1, name:descriptor.name || descriptor.filename || '附件', mime:mime || descriptor.mime || '', size:typeof descriptor.size==='number'?descriptor.size:undefined, url:url, download_url=url, type:type }; renderPayload(payload,{isBlob}); }
+        function registerTriggers(root=document){ if(!root) return; root.querySelectorAll('[data-attachment-preview]').forEach(btn=>{ if(btn.dataset.previewBound==='1') return; btn.dataset.previewBound='1'; btn.addEventListener('click',evt=>{ evt.preventDefault(); const id=parseInt(btn.dataset.attachmentPreview,10); if(id>0){ openAttachment(id); } }); }); }
+        closeBtn?.addEventListener('click',closePreview);
+        backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
+        document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
+        window.AttachmentPreview={ openAttachment, openMindmapAsset, openInlineSource, close:closePreview, registerTriggers };
+        registerTriggers();
+      })();
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      function formatBytesInline(size){
+        if(!(size>=0)) return '';
+        const units=['B','KB','MB','GB'];
+        let value=size; let idx=0;
+        while(value>=1024 && idx<units.length-1){ value/=1024; idx++; }
+        const fixed=value>=10 || idx===0 ? value.toFixed(0) : value.toFixed(1);
+        return `${fixed} ${units[idx]}`;
+      }
+      function createDetailThumb(data){
+        const wrap=document.createElement('div');
+        wrap.className='thumb';
+        wrap.dataset.attachmentId=String(data.id||'');
+        const media=document.createElement('div');
+        media.className='thumb-media';
+        if(data.mime && data.mime.startsWith('image/')){
+          const img=document.createElement('img');
+          img.src=data.preview_url || data.url;
+          img.alt=data.name || '附件预览';
+          img.loading='lazy';
+          media.appendChild(img);
+        } else {
+          const label=document.createElement('div');
+          label.className='att-meta';
+          label.style.textAlign='center';
+          const parts=[];
+          if(data.name){ parts.push(data.name); }
+          if(data.mime){ parts.push(data.mime); }
+          label.textContent=parts.join(' · ') || '附件';
+          media.appendChild(label);
+        }
+        wrap.appendChild(media);
+        const actions=document.createElement('div');
+        actions.className='thumb-actions';
+        const previewBtn=document.createElement('button');
+        previewBtn.type='button';
+        previewBtn.className='btn btn-outline btn-small';
+        previewBtn.textContent='预览';
+        previewBtn.dataset.attachmentPreview=String(data.id||'');
+        actions.appendChild(previewBtn);
+        const downloadLink=document.createElement('a');
+        downloadLink.className='btn btn-outline btn-small';
+        downloadLink.textContent='下载';
+        downloadLink.href=data.url;
+        downloadLink.target='_blank';
+        downloadLink.rel='noopener';
+        if(data.name){ downloadLink.setAttribute('download', data.name); }
+        actions.appendChild(downloadLink);
+        wrap.appendChild(actions);
+        const meta=document.createElement('div');
+        meta.className='att-meta';
+        const pieces=[];
+        if(data.name){ pieces.push(data.name); }
+        if(typeof data.size==='number'){ pieces.push(formatBytesInline(data.size)); }
+        meta.textContent=pieces.join(' · ');
+        wrap.appendChild(meta);
+        const form=document.createElement('form');
+        form.method='post';
+        form.style.textAlign='right';
+        form.innerHTML=`<input type="hidden" name="action" value="delete_attachment"><input type="hidden" name="id" value="${data.id}"><button class="btn btn-danger btn-small" style="font-size:12px">删除</button>`;
+        wrap.appendChild(form);
+        if(window.AttachmentPreview){ window.AttachmentPreview.registerTriggers(wrap); }
+        return wrap;
+      }
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
@@ -1999,7 +2386,8 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           insertTextAtCursor(editorEl, j.markdown+"\n");
           renderEditorPreview();
           markItemDirty();
-          if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
+          const thumbs=document.getElementById('thumbs');
+          if(thumbs){ thumbs.prepend(createDetailThumb(j)); }
           e.target.value='';
         });
       }
@@ -3889,6 +4277,20 @@ if ($view === 'map_edit') {
       }
       function openMindmapAttachment(descriptor){
         if(!descriptor) return;
+        if(window.AttachmentPreview){
+          if(descriptor.assetId){
+            window.AttachmentPreview.openMindmapAsset(descriptor.assetId);
+            return;
+          }
+          if(descriptor.content){
+            window.AttachmentPreview.openInlineSource(descriptor);
+            return;
+          }
+          if(descriptor.url){
+            window.AttachmentPreview.openInlineSource(descriptor);
+            return;
+          }
+        }
         if(descriptor.assetId && descriptor.url){
           const win=window.open(descriptor.url,'_blank','noopener');
           if(!win){ window.location.href=descriptor.url; }
@@ -5786,10 +6188,10 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .mindmap-header h2{margin:0;font:600 20px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.16em;text-transform:uppercase;text-shadow:0 0 20px rgba(227,198,139,.24)}
   .mindmap-header-meta{margin-top:6px;color:var(--text-muted);font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
   .mindmap-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .mindmap-search{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.28);background:rgba(15,19,22,.82);box-shadow:inset 0 0 22px rgba(0,0,0,.4);max-width:460px}
-  .mindmap-search input{flex:1;border:0;background:transparent;color:var(--text-strong);font:15px/1.4 'Inter','Noto Sans SC',sans-serif;outline:none}
+  .mindmap-search{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.28);background:rgba(15,19,22,.82);box-shadow:inset 0 0 22px rgba(0,0,0,.4);width:min(100%,460px);min-width:0;flex:1}
+  .mindmap-search input{flex:1;border:0;background:transparent;color:var(--text-strong);font:15px/1.4 'Inter','Noto Sans SC',sans-serif;outline:none;min-width:0}
   .mindmap-search span{font-size:18px}
-  .mindmap-grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .mindmap-grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr))}
   .mindmap-card{position:relative;display:flex;flex-direction:column;gap:14px;min-height:240px;padding:20px;border-radius:20px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.94));border:1px solid rgba(201,168,106,.28);box-shadow:0 20px 48px rgba(0,0,0,.55);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
   .mindmap-card:hover{transform:translateY(-4px);border-color:rgba(201,168,106,.45);box-shadow:0 24px 60px rgba(0,0,0,.6)}
   .mindmap-card h3{margin:0;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.1em;text-transform:uppercase;overflow-wrap:anywhere;hyphens:auto}
@@ -6081,6 +6483,19 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   </main>
 </div>
 <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+<div id="attachment-preview" class="attachment-preview-backdrop" data-open="false" aria-hidden="true">
+  <div class="attachment-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="attachment-preview-title">
+    <button type="button" class="attachment-preview-close" data-preview-close aria-label="关闭预览">×</button>
+    <div class="attachment-preview-header">
+      <div style="flex:1;min-width:0">
+        <div class="attachment-preview-title" id="attachment-preview-title">附件预览</div>
+        <div class="attachment-preview-meta" id="attachment-preview-meta"></div>
+      </div>
+      <a id="attachment-preview-download" class="btn btn-outline btn-small" href="#" target="_blank" rel="noopener">下载</a>
+    </div>
+    <div class="attachment-preview-body" id="attachment-preview-body"></div>
+  </div>
+</div>
 <div id="cat-modal" class="modal-backdrop">
   <div class="modal-panel">
     <div class="modal-header">
@@ -6095,6 +6510,289 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   </div>
 </div>
 <script>
+(function(){
+  if(window.AttachmentPreview) return;
+  const backdrop=document.getElementById('attachment-preview');
+  if(!backdrop) return;
+  const bodyEl=document.getElementById('attachment-preview-body');
+  const titleEl=document.getElementById('attachment-preview-title');
+  const metaEl=document.getElementById('attachment-preview-meta');
+  const downloadEl=document.getElementById('attachment-preview-download');
+  const closeBtn=backdrop.querySelector('[data-preview-close]');
+  const state={objectUrl:null};
+
+  function formatBytes(size){
+    if(!(size>=0)) return '';
+    const units=['B','KB','MB','GB','TB'];
+    let val=size; let idx=0;
+    while(val>=1024 && idx<units.length-1){ val/=1024; idx++; }
+    const fixed=val>=10 || idx===0 ? val.toFixed(0) : val.toFixed(1);
+    return `${fixed} ${units[idx]}`;
+  }
+
+  function revokeObjectUrl(){
+    if(state.objectUrl){
+      URL.revokeObjectURL(state.objectUrl);
+      state.objectUrl=null;
+    }
+  }
+
+  function clearBody(){
+    revokeObjectUrl();
+    if(bodyEl){ bodyEl.innerHTML=''; }
+  }
+
+  function closePreview(){
+    backdrop.dataset.open='false';
+    backdrop.setAttribute('aria-hidden','true');
+    document.body.classList.remove('attachment-preview-open');
+    clearBody();
+  }
+
+  function ensureOpen(){
+    if(backdrop.dataset.open==='true') return;
+    backdrop.dataset.open='true';
+    backdrop.setAttribute('aria-hidden','false');
+    document.body.classList.add('attachment-preview-open');
+  }
+
+  function setDownload(url,name){
+    if(!downloadEl) return;
+    if(!url){
+      downloadEl.style.display='none';
+      downloadEl.removeAttribute('href');
+      downloadEl.removeAttribute('download');
+      return;
+    }
+    downloadEl.style.display='inline-flex';
+    downloadEl.href=url;
+    if(name){ downloadEl.setAttribute('download', name); }
+    else{ downloadEl.removeAttribute('download'); }
+  }
+
+  function buildMeta(data){
+    const parts=[];
+    if(data?.mime){ parts.push(data.mime); }
+    if(typeof data?.size==='number' && data.size>=0){ parts.push(formatBytes(data.size)); }
+    if((data?.type==='zip' || data?.type==='rar') && typeof data?.total_entries==='number'){
+      let text=`共 ${data.total_entries} 项`;
+      if(data.truncated){ text+='（已截断，仅显示前 200 项）'; }
+      parts.push(text);
+    }
+    return parts.join(' · ');
+  }
+
+  function showLoading(){
+    clearBody();
+    titleEl.textContent='附件预览';
+    metaEl.textContent='';
+    setDownload(null,null);
+    const loading=document.createElement('div');
+    loading.className='attachment-preview-empty';
+    loading.textContent='加载中…';
+    bodyEl.appendChild(loading);
+  }
+
+  function showError(message){
+    clearBody();
+    const box=document.createElement('div');
+    box.className='attachment-preview-error';
+    box.textContent=message || '无法预览该附件';
+    bodyEl.appendChild(box);
+  }
+
+  function appendErrorHint(text){
+    const hint=document.createElement('div');
+    hint.className='attachment-preview-error';
+    hint.style.marginTop='12px';
+    hint.textContent=text;
+    bodyEl.appendChild(hint);
+  }
+
+  function renderArchiveEntries(data){
+    const entries=Array.isArray(data.entries)?data.entries:[];
+    if(entries.length){
+      const list=document.createElement('ul');
+      list.className='attachment-preview-list';
+      entries.forEach(item=>{
+        const li=document.createElement('li');
+        li.className='attachment-preview-item';
+        const name=document.createElement('div');
+        name.className='name';
+        name.title=item.name || '';
+        name.textContent=item.name || '(未命名)';
+        const size=document.createElement('div');
+        size.className='size';
+        const parts=[];
+        if(typeof item.size==='number'){ parts.push(`解压 ${formatBytes(item.size)}`); }
+        if(typeof item.compressed_size==='number' && item.compressed_size!==item.size){ parts.push(`压缩 ${formatBytes(item.compressed_size)}`); }
+        size.textContent=parts.join(' · ');
+        li.appendChild(name);
+        li.appendChild(size);
+        list.appendChild(li);
+      });
+      bodyEl.appendChild(list);
+    } else {
+      const empty=document.createElement('div');
+      empty.className='attachment-preview-empty';
+      empty.textContent='压缩包为空或无法列出内容。';
+      bodyEl.appendChild(empty);
+    }
+    if(data.error){
+      appendErrorHint(data.error);
+    }
+  }
+
+  function renderPayload(data,{isBlob=false}={}){
+    clearBody();
+    const title=data?.name || '附件预览';
+    titleEl.textContent=title;
+    metaEl.textContent=buildMeta(data);
+    const downloadUrl=data?.download_url || data?.url || null;
+    setDownload(downloadUrl,title);
+    if(isBlob && data?.url){ state.objectUrl=data.url; }
+
+    const type=data?.type || '';
+    if(type==='image'){
+      const img=document.createElement('img');
+      img.src=data.url;
+      img.alt=title;
+      img.loading='lazy';
+      bodyEl.appendChild(img);
+      return;
+    }
+    if(type==='video'){
+      const video=document.createElement('video');
+      video.src=data.url;
+      video.controls=true;
+      video.preload='metadata';
+      video.style.maxHeight='60vh';
+      bodyEl.appendChild(video);
+      return;
+    }
+    if(type==='pdf'){
+      const frame=document.createElement('iframe');
+      frame.src=data.url;
+      frame.title=title;
+      bodyEl.appendChild(frame);
+      return;
+    }
+    if(type==='zip' || type==='rar'){
+      renderArchiveEntries(data);
+      return;
+    }
+    const fallback=document.createElement('div');
+    fallback.className='attachment-preview-empty';
+    fallback.textContent='该文件类型暂不支持内联预览，请使用下载按钮打开。';
+    bodyEl.appendChild(fallback);
+    if(data?.error){ appendErrorHint(data.error); }
+  }
+
+  async function fetchPreviewPayload(action,id){
+    const fd=new FormData();
+    fd.append('action', action);
+    fd.append('id', String(id));
+    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+    if(!res.ok) throw new Error('网络异常');
+    const json=await res.json();
+    if(!json || json.ok===0 || json.ok===false){ throw new Error(json?.error || '无法预览该附件'); }
+    return json;
+  }
+
+  async function openAttachment(id){
+    ensureOpen();
+    showLoading();
+    try{
+      const payload=await fetchPreviewPayload('preview_attachment', id);
+      renderPayload(payload);
+    }catch(err){
+      showError(err.message || '无法预览该附件');
+    }
+  }
+
+  async function openMindmapAsset(id){
+    ensureOpen();
+    showLoading();
+    try{
+      const payload=await fetchPreviewPayload('preview_mindmap_asset', id);
+      renderPayload(payload);
+    }catch(err){
+      showError(err.message || '无法预览该附件');
+    }
+  }
+
+  function dataUrlToBlob(dataUrl){
+    if(typeof dataUrl!=='string') return null;
+    const match=dataUrl.match(/^data:(.*?);base64,(.*)$/);
+    if(!match) return null;
+    const mime=match[1] || 'application/octet-stream';
+    const binary=atob(match[2].replace(/\s+/g,''));
+    const len=binary.length;
+    const bytes=new Uint8Array(len);
+    for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); }
+    const blob=new Blob([bytes],{type:mime});
+    return {blob,mime};
+  }
+
+  function openInlineSource(descriptor){
+    if(!descriptor) return;
+    ensureOpen();
+    let url=descriptor.url || '';
+    let mime=descriptor.mime || '';
+    let isBlob=false;
+    if(descriptor.content){
+      const parsed=dataUrlToBlob(descriptor.content);
+      if(parsed){
+        const objectUrl=URL.createObjectURL(parsed.blob);
+        url=objectUrl;
+        mime=parsed.mime;
+        isBlob=true;
+      }
+    }
+    if(!url){
+      closePreview();
+      return;
+    }
+    const type=mime.startsWith('image/')?'image':(mime.startsWith('video/')?'video':(mime==='application/pdf'?'pdf':'binary'));
+    const payload={
+      ok:1,
+      name:descriptor.name || descriptor.filename || '附件',
+      mime:mime || descriptor.mime || '',
+      size:typeof descriptor.size==='number'?descriptor.size:undefined,
+      url:url,
+      download_url:url,
+      type:type
+    };
+    renderPayload(payload,{isBlob});
+  }
+
+  function registerTriggers(root=document){
+    if(!root) return;
+    root.querySelectorAll('[data-attachment-preview]').forEach(btn=>{
+      if(btn.dataset.previewBound==='1') return;
+      btn.dataset.previewBound='1';
+      btn.addEventListener('click',evt=>{
+        evt.preventDefault();
+        const id=parseInt(btn.dataset.attachmentPreview,10);
+        if(id>0){ openAttachment(id); }
+      });
+    });
+  }
+
+  closeBtn?.addEventListener('click',closePreview);
+  backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
+  document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
+
+  window.AttachmentPreview={
+    openAttachment,
+    openMindmapAsset,
+    openInlineSource,
+    close:closePreview,
+    registerTriggers
+  };
+
+  registerTriggers();
+})();
 const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
 const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
 const newMenuToggle=document.getElementById('btn-new-menu');
