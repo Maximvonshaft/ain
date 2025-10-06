@@ -3795,6 +3795,17 @@ if ($view === 'map_edit') {
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      #drag-overlay{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:6}
+      #drag-overlay .ghost-trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
+      #drag-overlay .ghost-trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
+      #drag-overlay .ghost-trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
+      #drag-overlay .ghost-trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      #drag-overlay .ghost-target-ring{fill:none;stroke:rgba(227,198,139,.6);stroke-width:1.6;filter:url(#mindSoftGlow)}
+      .mind-insert-buttons{position:absolute;inset:0;pointer-events:none;z-index:7}
+      .mind-insert-buttons .insert-node-btn{position:absolute;left:0;top:0;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:999px;border:1px solid rgba(227,198,139,.62);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(227,198,139,.32);pointer-events:auto;cursor:pointer;opacity:.92;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background-color var(--transition),opacity var(--transition)}
+      .mind-insert-buttons .insert-node-btn[data-visible="false"]{opacity:0;pointer-events:none}
+      .mind-insert-buttons .insert-node-btn:hover{background:rgba(227,198,139,.16);border-color:rgba(227,198,139,.8);box-shadow:0 0 18px rgba(227,198,139,.46);opacity:1}
+      .mind-insert-buttons .insert-node-btn:focus-visible{outline:2px solid rgba(75,195,209,.5);outline-offset:2px}
       .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
       .mind-relations .relation-group{pointer-events:none}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -4738,6 +4749,9 @@ if ($view === 'map_edit') {
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
           this.container.appendChild(this.viewport);
+          this.insertButtonLayer=document.createElement('div');
+          this.insertButtonLayer.className='mind-insert-buttons';
+          this.container.appendChild(this.insertButtonLayer);
           this.sizeCache=new Map();
           this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
           if(!this.measureHost.classList.contains('mind-measure')){
@@ -4752,6 +4766,7 @@ if ($view === 'map_edit') {
           this.relations=[];
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
+          this.insertButtons=new Map();
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
@@ -5591,6 +5606,9 @@ if ($view === 'map_edit') {
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
           if(this.relationRegistry){ this.relationRegistry.clear(); }
+          if(this.insertButtons){
+            for(const entry of this.insertButtons.values()){ if(entry) entry.active=false; }
+          }
           if(!this.root) return;
           const walk=(node)=>{
             node.el=this.buildNodeElement(node,{forMeasure:false});
@@ -5626,6 +5644,7 @@ if ($view === 'map_edit') {
               node.linkHighlight=highlight;
               this.linkRegistry.set(node.id,{group,shadow,core,highlight});
               this.updateLinkPath(node);
+              this.ensureInsertButton(node);
             }
             if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
             if(node.expanded){
@@ -5635,6 +5654,16 @@ if ($view === 'map_edit') {
           walk(this.root);
           this.renderRelations();
           this.applyTransform(true);
+          if(this.insertButtons){
+            for(const [id, entry] of this.insertButtons.entries()){
+              if(!entry || !entry.active){
+                if(entry && entry.raf){ cancelAnimationFrame(entry.raf); }
+                if(entry && entry.button && entry.button.parentElement){ entry.button.remove(); }
+                this.insertButtons.delete(id);
+              }
+            }
+            this.updateAllInsertButtons(true);
+          }
         }
         renderRelations(){
           if(!this.relationLayer) return;
@@ -5715,6 +5744,166 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          this.updateInsertButtonPosition(node);
+        }
+        ensureInsertButton(node){
+          if(!node || !node.parent || !this.insertButtonLayer || !this.insertButtons) return;
+          const key=node.id;
+          let entry=this.insertButtons.get(key);
+          if(!entry){
+            const button=document.createElement('button');
+            button.type='button';
+            button.className='insert-node-btn';
+            button.textContent='+';
+            button.dataset.visible='false';
+            button.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              const parentId=button.dataset.parentId;
+              const childId=button.dataset.childId;
+              if(this.options && typeof this.options.onInsertBetween==='function' && parentId && childId){
+                this.options.onInsertBetween({parentId, childId});
+              }
+            });
+            this.insertButtonLayer.appendChild(button);
+            entry={button, raf:null, active:true};
+            this.insertButtons.set(key, entry);
+          }else{
+            entry.active=true;
+          }
+          const button=entry.button;
+          if(button){
+            button.dataset.parentId=node.parent.id;
+            button.dataset.childId=node.id;
+            const parentLabel=node.parent.topic || '父节点';
+            button.title=`在“${parentLabel}”与“${node.topic}”之间插入节点`;
+            button.setAttribute('aria-label',`在“${parentLabel}”与“${node.topic}”之间插入节点`);
+            button.dataset.visible='true';
+            this.updateInsertButtonPosition(node);
+          }
+        }
+        updateInsertButtonPosition(node, immediate=false){
+          if(!node || !this.insertButtons) return;
+          const entry=this.insertButtons.get(node.id);
+          if(!entry || !entry.button){ return; }
+          const perform=()=>{
+            if(!node.linkPath){ entry.button.dataset.visible='false'; return; }
+            const containerRect=this.container.getBoundingClientRect();
+            if(containerRect.width<=0 || containerRect.height<=0){ entry.button.dataset.visible='false'; return; }
+            let posX=null;
+            let posY=null;
+            try{
+              const total=node.linkPath.getTotalLength();
+              if(total>0){
+                const mid=node.linkPath.getPointAtLength(total/2);
+                const svg=node.linkPath.ownerSVGElement;
+                if(svg){
+                  const svgPoint=svg.createSVGPoint();
+                  svgPoint.x=mid.x;
+                  svgPoint.y=mid.y;
+                  const matrix=node.linkPath.getScreenCTM();
+                  if(matrix){
+                    const screen=svgPoint.matrixTransform(matrix);
+                    posX=screen.x - containerRect.left;
+                    posY=screen.y - containerRect.top;
+                  }
+                }
+              }
+            }catch(_){ }
+            if(posX==null || posY==null){
+              const pathRect=node.linkPath.getBoundingClientRect();
+              posX=pathRect.left + pathRect.width/2 - containerRect.left;
+              posY=pathRect.top + pathRect.height/2 - containerRect.top;
+            }
+            entry.button.style.left=`${posX}px`;
+            entry.button.style.top=`${posY}px`;
+            entry.button.dataset.visible='true';
+          };
+          if(immediate){
+            perform();
+          }else{
+            if(entry.raf){ cancelAnimationFrame(entry.raf); }
+            entry.raf=requestAnimationFrame(()=>{
+              entry.raf=null;
+              perform();
+            });
+          }
+        }
+        updateAllInsertButtons(immediate=false){
+          if(!this.insertButtons || !this.insertButtons.size) return;
+          const run=()=>{
+            for(const [id, entry] of this.insertButtons.entries()){
+              if(!entry || !entry.button) continue;
+              const node=this.nodes.get(id);
+              if(!node || !node.linkPath){
+                entry.button.dataset.visible='false';
+                continue;
+              }
+              this.updateInsertButtonPosition(node, true);
+            }
+          };
+          if(immediate){ run(); }
+          else{ requestAnimationFrame(run); }
+        }
+        updateSubtreeDepth(node, depth){
+          if(!node) return;
+          const stack=[{item:node, level:depth}];
+          while(stack.length){
+            const current=stack.pop();
+            const target=current.item;
+            if(!target) continue;
+            target.depth=current.level;
+            if(target.model){ target.model.depth=current.level; }
+            if(target.children && target.children.length){
+              for(const child of target.children){
+                if(child){ stack.push({item:child, level:current.level+1}); }
+              }
+            }
+          }
+        }
+        insert_node_between(parentId,childId,options){
+          const parent=this.get_node(parentId);
+          const child=this.get_node(childId);
+          if(!parent || !child || child.parent!==parent) return null;
+          const topicOption=options && typeof options.topic==='string' ? options.topic.trim() : '';
+          const topic=topicOption || '插入节点';
+          const data=options && options.data ? options.data : {};
+          const idOption=options && options.id ? options.id : null;
+          const modelChildren=this.ensureModelChildren(parent);
+          const childIndex=parent.children.indexOf(child);
+          const childModelIndex=modelChildren.findIndex(entry=>entry && entry.id===child.id);
+          const newNode=this.add_node(parent, idOption, topic, data);
+          if(!newNode) return null;
+          if(options && options.style && (options.style.background || options.style.foreground)){
+            this.set_node_color(newNode.id, options.style.background || null, options.style.foreground || null);
+          }
+          const newNodeIndex=parent.children.indexOf(newNode);
+          if(newNodeIndex!==-1){ parent.children.splice(newNodeIndex,1); }
+          if(childIndex>=0){ parent.children.splice(childIndex,0,newNode); }
+          else{ parent.children.push(newNode); }
+          const newModelIndex=modelChildren.indexOf(newNode.model);
+          if(newModelIndex!==-1){ modelChildren.splice(newModelIndex,1); }
+          if(childModelIndex>=0){ modelChildren.splice(childModelIndex,0,newNode.model); }
+          else{ modelChildren.push(newNode.model); }
+          const childIdxAfter=parent.children.indexOf(child);
+          if(childIdxAfter!==-1){ parent.children.splice(childIdxAfter,1); }
+          const childModelIdx=modelChildren.indexOf(child.model);
+          if(childModelIdx!==-1){ modelChildren.splice(childModelIdx,1); }
+          if(!Array.isArray(newNode.children)){ newNode.children=[]; }
+          newNode.children.push(child);
+          child.parent=newNode;
+          if(!newNode.model.children){ newNode.model.children=[]; }
+          newNode.model.children.push(child.model);
+          child.direction='right';
+          if(child.model){ child.model.direction='right'; }
+          newNode.expanded=true;
+          newNode.model.expanded=true;
+          this.updateSubtreeDepth(child, (newNode.depth||0)+1);
+          this.computeLayout();
+          this.render();
+          this.select_node(newNode.id);
+          this.emit(SimpleMind.event_type.update);
+          return newNode;
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -5873,6 +6062,7 @@ if ($view === 'map_edit') {
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
           this.viewport.style.transform=transform;
+          if(this.insertButtonLayer){ this.updateAllInsertButtons(); }
         }
         zoom(step){
           const prev=this.scale;
@@ -6010,11 +6200,46 @@ if ($view === 'map_edit') {
     overlay.setAttribute('width','100%');
     overlay.setAttribute('height','100%');
     overlay.setAttribute('viewBox','0 0 100 100');
-    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ghostLine.setAttribute('opacity','0');
+    overlay.style.position='absolute';
+    overlay.style.left='0';
+    overlay.style.top='0';
+    overlay.style.width='100%';
+    overlay.style.height='100%';
+    overlay.style.pointerEvents='none';
+    overlay.style.overflow='visible';
+    const overlayDefs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+    const ghostArrowMarker=document.createElementNS('http://www.w3.org/2000/svg','marker');
+    ghostArrowMarker.id='mindDragArrow';
+    ghostArrowMarker.setAttribute('markerWidth','12');
+    ghostArrowMarker.setAttribute('markerHeight','12');
+    ghostArrowMarker.setAttribute('refX','9');
+    ghostArrowMarker.setAttribute('refY','6');
+    ghostArrowMarker.setAttribute('orient','auto');
+    ghostArrowMarker.setAttribute('markerUnits','strokeWidth');
+    const ghostArrowPath=document.createElementNS('http://www.w3.org/2000/svg','path');
+    ghostArrowPath.setAttribute('d','M0 0 L12 6 L0 12 Z');
+    ghostArrowPath.setAttribute('fill','rgba(227,198,139,.92)');
+    ghostArrowPath.setAttribute('opacity','0.95');
+    ghostArrowMarker.appendChild(ghostArrowPath);
+    overlayDefs.appendChild(ghostArrowMarker);
+    overlay.appendChild(overlayDefs);
+    const ghostGroup=document.createElementNS('http://www.w3.org/2000/svg','g');
+    ghostGroup.classList.add('ghost-trace-group');
+    ghostGroup.setAttribute('opacity','0');
+    const ghostShadow=document.createElementNS('http://www.w3.org/2000/svg','path');
+    ghostShadow.classList.add('ghost-trace','shadow');
+    const ghostCore=document.createElementNS('http://www.w3.org/2000/svg','path');
+    ghostCore.classList.add('ghost-trace','core');
+    ghostCore.setAttribute('marker-end','url(#mindDragArrow)');
+    const ghostHighlight=document.createElementNS('http://www.w3.org/2000/svg','path');
+    ghostHighlight.classList.add('ghost-trace','highlight');
+    ghostGroup.appendChild(ghostShadow);
+    ghostGroup.appendChild(ghostCore);
+    ghostGroup.appendChild(ghostHighlight);
+    overlay.appendChild(ghostGroup);
     const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ghostRing.classList.add('ghost-target-ring');
     ghostRing.setAttribute('opacity','0');
-    overlay.appendChild(ghostLine);
     overlay.appendChild(ghostRing);
     const jm=new jsMind({
       container:'jsmind-container',
@@ -6259,6 +6484,7 @@ if ($view === 'map_edit') {
       function commitInlineEditing(){ finishInlineEditing(true); }
       function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
       jm.options.onInlineEdit=startInlineEditing;
+      jm.options.onInsertBetween=handleInsertBetweenRequest;
       jm.show(initialData);
       jmContainer.appendChild(overlay);
       syncOverlaySize();
@@ -6270,10 +6496,14 @@ if ($view === 'map_edit') {
         const width=Math.max(rect.width,1);
         const height=Math.max(rect.height,1);
         overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
+        if(typeof jm.updateAllInsertButtons==='function'){
+          jm.updateAllInsertButtons(true);
+        }
       }
       syncOverlaySize();
-      window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
-      document.addEventListener('scroll',()=>requestAnimationFrame(syncOverlaySize), true);
+      const scheduleOverlaySync=()=>requestAnimationFrame(syncOverlaySize);
+      window.addEventListener('resize',scheduleOverlaySync);
+      document.addEventListener('scroll',scheduleOverlaySync, true);
       const dragHandle=document.createElement('div');
       dragHandle.id='node-handle';
       dragHandle.textContent='+';
@@ -6307,6 +6537,7 @@ if ($view === 'map_edit') {
       function scheduleHandleRefresh(){
         requestAnimationFrame(()=>{
           updateHandlePosition();
+          if(typeof jm.updateAllInsertButtons==='function'){ jm.updateAllInsertButtons(true); }
           if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
         });
       }
@@ -6320,6 +6551,16 @@ if ($view === 'map_edit') {
         return {x:result.x, y:result.y};
       }
       function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
+      function clientPointFromSvg(point){
+        if(!point) return null;
+        const matrix=overlay.getScreenCTM();
+        if(!matrix){ return {x:point.x, y:point.y}; }
+        const svgPoint=overlay.createSVGPoint();
+        svgPoint.x=point.x;
+        svgPoint.y=point.y;
+        const result=svgPoint.matrixTransform(matrix);
+        return {x:result.x, y:result.y};
+      }
       function nodeCenterSvg(nodeId){
         if(!nodeId) return null;
         const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
@@ -6327,20 +6568,72 @@ if ($view === 'map_edit') {
         const rect=el.getBoundingClientRect();
         return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
       }
-      function showGhost(start,end){
+      function computeTargetAttachment(origin,targetId){
+        if(!origin || !targetId) return null;
+        const el=document.querySelector(`.jsmind-node[nodeid="${targetId}"]`);
+        if(!el) return null;
+        const rect=el.getBoundingClientRect();
+        if(rect.width<=0 || rect.height<=0) return null;
+        const sourceClient=clientPointFromSvg(origin);
+        if(!sourceClient) return null;
+        const centerClient={x:rect.left+rect.width/2,y:rect.top+rect.height/2};
+        const toSourceX=sourceClient.x - centerClient.x;
+        const toSourceY=sourceClient.y - centerClient.y;
+        const dist=Math.hypot(toSourceX,toSourceY);
+        const ringBase=()=>({
+          end:svgPointFromClient(centerClient.x, centerClient.y - Math.max(32, rect.height/2 + 16)),
+          ring:svgPointFromClient(centerClient.x, rect.top),
+          radius:Math.max(14, Math.min(22, Math.max(rect.width,rect.height)/3))
+        });
+        if(dist<1){ return ringBase(); }
+        const dirX=toSourceX/dist;
+        const dirY=toSourceY/dist;
+        const halfW=rect.width/2;
+        const halfH=rect.height/2;
+        const denomX=Math.abs(dirX)>1e-4?Math.abs(dirX):1e-4;
+        const denomY=Math.abs(dirY)>1e-4?Math.abs(dirY):1e-4;
+        const scaleX=halfW/denomX;
+        const scaleY=halfH/denomY;
+        const scale=Math.min(scaleX,scaleY);
+        const edgeClientX=centerClient.x + dirX*scale;
+        const edgeClientY=centerClient.y + dirY*scale;
+        const edgeVecX=edgeClientX - sourceClient.x;
+        const edgeVecY=edgeClientY - sourceClient.y;
+        const edgeLen=Math.hypot(edgeVecX,edgeVecY);
+        const paddingBase=Math.max(10, edgeLen*0.25);
+        const padding=Math.min(18, Math.max(8, paddingBase));
+        const safeLen=edgeLen>1e-3?edgeLen:1e-3;
+        const endClientX=edgeClientX - (edgeVecX/safeLen)*padding;
+        const endClientY=edgeClientY - (edgeVecY/safeLen)*padding;
+        const ringRadius=Math.max(14, Math.min(24, Math.max(rect.width,rect.height)/2.8));
+        return {
+          end:svgPointFromClient(endClientX,endClientY),
+          ring:svgPointFromClient(edgeClientX,edgeClientY),
+          radius:ringRadius
+        };
+      }
+      function showGhost(start,end,options){
         if(!start || !end){ hideGhost(); return; }
-        ghostLine.setAttribute('x1', start.x);
-        ghostLine.setAttribute('y1', start.y);
-        ghostLine.setAttribute('x2', end.x);
-        ghostLine.setAttribute('y2', end.y);
-        ghostLine.setAttribute('opacity','1');
-        ghostRing.setAttribute('cx', end.x);
-        ghostRing.setAttribute('cy', end.y);
-        ghostRing.setAttribute('r', 16);
+        const directionHint=(end.x-start.x)>=0?1:-1;
+        const route=buildTraceRoute(start,end,directionHint);
+        let pathData=buildChamferedPath(route, TRACE_CHAMFER);
+        if(!pathData){ pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`; }
+        ghostShadow.setAttribute('d', pathData);
+        ghostCore.setAttribute('d', pathData);
+        ghostHighlight.setAttribute('d', pathData);
+        ghostGroup.setAttribute('opacity','1');
+        const ringPoint=options && options.ring ? options.ring : end;
+        const radius=options && Number.isFinite(options.radius) ? options.radius : 16;
+        ghostRing.setAttribute('cx', ringPoint.x);
+        ghostRing.setAttribute('cy', ringPoint.y);
+        ghostRing.setAttribute('r', radius);
         ghostRing.setAttribute('opacity','1');
       }
       function hideGhost(){
-        ghostLine.setAttribute('opacity','0');
+        ghostGroup.setAttribute('opacity','0');
+        ghostShadow.removeAttribute('d');
+        ghostCore.removeAttribute('d');
+        ghostHighlight.removeAttribute('d');
         ghostRing.setAttribute('opacity','0');
       }
       dragHandle.addEventListener('pointerdown',e=>{
@@ -6353,7 +6646,7 @@ if ($view === 'map_edit') {
         dragHandle.classList.add('dragging');
         const initialPoint=eventToSvgPoint(e);
         pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
-        showGhost(origin, initialPoint);
+        showGhost(origin, initialPoint, {ring:initialPoint, radius:16});
       });
       function finishPointerDrag(evt, cancelled){
         if(!pointerDragState || evt.pointerId!==pointerDragState.pointerId) return;
@@ -6386,17 +6679,27 @@ if ($view === 'map_edit') {
       window.addEventListener('pointermove',e=>{
         if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
         const hovered=document.elementFromPoint(e.clientX, e.clientY);
-        let ringPoint=eventToSvgPoint(e);
+        let endPoint=eventToSvgPoint(e);
+        let attachmentOptions={ring:endPoint, radius:16};
         if(hovered){
           const targetEl=hovered.closest('.jsmind-node');
           if(targetEl){
             const targetId=targetEl.getAttribute('nodeid');
-            const center=nodeCenterSvg(targetId);
-            if(center) ringPoint=center;
+            const attachment=computeTargetAttachment(pointerDragState.origin, targetId);
+            if(attachment){
+              endPoint=attachment.end;
+              attachmentOptions={ring:attachment.ring, radius:attachment.radius};
+            }else{
+              const center=nodeCenterSvg(targetId);
+              if(center){
+                endPoint=center;
+                attachmentOptions={ring:center, radius:16};
+              }
+            }
           }
         }
-        pointerDragState.lastPoint=ringPoint;
-        showGhost(pointerDragState.origin, ringPoint);
+        pointerDragState.lastPoint=endPoint;
+        showGhost(pointerDragState.origin, endPoint, attachmentOptions);
       });
       window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
       window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
@@ -7150,6 +7453,46 @@ if ($view === 'map_edit') {
           });
         }
         return newNode;
+      }
+      function executeInsertBetweenCommand(input){
+        commitInlineEditing();
+        if(!input || !input.parentId || !input.childId) return null;
+        if(typeof jm.insert_node_between!=='function') return null;
+        const parent=jm.get_node(input.parentId);
+        const child=jm.get_node(input.childId);
+        if(!parent || !child || !child.parent || child.parent.id!==parent.id) return null;
+        const topic=typeof input.topic==='string' && input.topic.trim()?input.topic.trim():'插入节点';
+        const data=deepClone(input.data)||{};
+        const style=deepClone(input.style);
+        const newNode=jm.insert_node_between(parent.id, child.id, {topic, data, id:input.id, style});
+        if(!newNode) return null;
+        const command={
+          type:'insertNodeBetween',
+          id:newNode.id,
+          parentId:parent.id,
+          childId:child.id,
+          topic,
+          data:deepClone(input.data),
+          style:deepClone(input.style),
+          timestamp:Date.now(),
+          meta:deepClone(input.meta)
+        };
+        commandLog.push(command);
+        window.__mindmapCommands=commandLog;
+        markDirty();
+        scheduleHandleRefresh();
+        refreshInspector(jm.get_node(newNode.id));
+        if(typeof openInspectorPopover==='function'){ openInspectorPopover(newNode); }
+        return newNode;
+      }
+      function handleInsertBetweenRequest(payload){
+        if(!payload || !payload.parentId || !payload.childId) return;
+        executeInsertBetweenCommand({
+          parentId:payload.parentId,
+          childId:payload.childId,
+          topic:'插入节点',
+          meta:{source:'insert-between'}
+        });
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
       function isProbablyUrl(text){
