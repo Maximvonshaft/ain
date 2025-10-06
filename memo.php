@@ -159,6 +159,30 @@ function normalize_timestamp(mixed $value, ?int $fallback=null): int {
   return $fallback ?? now();
 }
 
+/**
+ * @param mixed $value
+ * @return int[]
+ */
+function parse_id_list(mixed $value): array {
+  $values=[];
+  if(is_array($value)){
+    $values=$value;
+  } elseif(is_string($value)){
+    $values=preg_split('/[\s,]+/',$value,-1,PREG_SPLIT_NO_EMPTY) ?: [];
+  } elseif(is_int($value) || is_float($value)){
+    $values=[(string)$value];
+  }
+  $ids=[];
+  foreach($values as $v){
+    if($v===null) continue;
+    $str=is_string($v) ? $v : (is_int($v) || is_float($v) ? (string)$v : '');
+    $str=trim($str);
+    if($str==='' || !ctype_digit($str)) continue;
+    $ids[]=(int)$str;
+  }
+  return array_values(array_unique($ids));
+}
+
 // —— 数据库 ——
 function db(): PDO {
   static $pdo;
@@ -451,6 +475,21 @@ function create_mindmap_asset_from_dataurl(string $data_url, string $name, ?int 
   return create_mindmap_asset($map_id,$node_uid,$safeName,$stored,$mime,$size,$session_key);
 }
 
+function extract_mindmap_asset_id(array $attachment): int {
+  if(isset($attachment['assetId']) && ctype_digit((string)$attachment['assetId'])){
+    return (int)$attachment['assetId'];
+  }
+  if(isset($attachment['id']) && ctype_digit((string)$attachment['id'])){
+    return (int)$attachment['id'];
+  }
+  if(isset($attachment['url']) && is_string($attachment['url'])){
+    if(preg_match('/mindmap_asset=(\d+)/',$attachment['url'],$m)){
+      return (int)$m[1];
+    }
+  }
+  return 0;
+}
+
 function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map_id, string $session_key): void {
   $asset_refs=[];
   if(!isset($payload['data']) || !is_array($payload['data'])) return;
@@ -462,41 +501,57 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
       $node['id']='node-'.bin2hex(random_bytes(4));
     }
     if(isset($node['data']) && is_array($node['data'])){
-      if(isset($node['data']['attachment']) && is_array($node['data']['attachment'])){
-        $attachment=&$node['data']['attachment'];
+      $attachmentsList=[];
+      if(isset($node['data']['attachments']) && is_array($node['data']['attachments'])){
+        $attachmentsList=$node['data']['attachments'];
+      } elseif(isset($node['data']['attachment']) && is_array($node['data']['attachment'])){
+        $attachmentsList=[$node['data']['attachment']];
+      }
+      $normalizedAttachments=[];
+      foreach($attachmentsList as $attachment){
+        if(!is_array($attachment)) continue;
         if(isset($attachment['content']) && is_string($attachment['content']) && str_starts_with($attachment['content'],'data:')){
           $asset=create_mindmap_asset_from_dataurl($attachment['content'],$attachment['name'] ?? ($node['topic'] ?? '附件'),$map_id,$node['id'],$session_key);
-          if($asset){
-            $asset_id=(int)$asset['id'];
-            $attachment=[
-              'assetId'=>$asset_id,
-              'name'=>$asset['orig_name'],
-              'size'=>(int)$asset['size'],
-              'mime'=>$asset['mime'],
-              'url'=>'?mindmap_asset='.$asset_id,
-            ];
-            $asset_refs[$asset_id]=$node['id'];
-          } else {
-            unset($node['data']['attachment']);
+          if(!$asset){
+            continue;
           }
-        } else {
-          $asset_id=(int)($attachment['assetId'] ?? ($attachment['id'] ?? 0));
-          if($asset_id>0){
-            $attachment['assetId']=$asset_id;
-            $attachment['name']=$attachment['name'] ?? ($node['topic'] ?? '附件');
-            $attachment['url']=$attachment['url'] ?? ('?mindmap_asset='.$asset_id);
-            $asset_refs[$asset_id]=$node['id'];
-          } else {
-            unset($node['data']['attachment']);
-          }
+          $asset_id=(int)$asset['id'];
+          $normalizedAttachments[]=[
+            'assetId'=>$asset_id,
+            'name'=>$asset['orig_name'],
+            'size'=>(int)$asset['size'],
+            'mime'=>$asset['mime'],
+            'url'=>'?mindmap_asset='.$asset_id,
+          ];
+          $asset_refs[$asset_id]=$node['id'];
+          continue;
         }
-        if(isset($node['data']['attachment'])){
-          unset($node['data']['attachment']['content'],$node['data']['attachment']['id']);
-          if(isset($node['data']['attachment']['type']) && !isset($node['data']['attachment']['mime'])){
-            $node['data']['attachment']['mime']=$node['data']['attachment']['type'];
-          }
-          unset($node['data']['attachment']['type']);
+        $asset_id=extract_mindmap_asset_id($attachment);
+        if($asset_id<=0){
+          continue;
         }
+        $downloadUrl='?mindmap_asset='.$asset_id;
+        $url=isset($attachment['url']) && is_string($attachment['url']) && $attachment['url']!=='' ? $attachment['url'] : $downloadUrl;
+        if(str_contains($url,'mindmap_asset=')){
+          $url=$downloadUrl;
+        }
+        $normalizedAttachments[]=[
+          'assetId'=>$asset_id,
+          'name'=>isset($attachment['name']) && is_string($attachment['name']) && $attachment['name']!=='' ? $attachment['name'] : ($node['topic'] ?? '附件'),
+          'size'=>isset($attachment['size']) ? (int)$attachment['size'] : 0,
+          'mime'=>isset($attachment['mime']) && is_string($attachment['mime']) ? $attachment['mime'] : (isset($attachment['type']) && is_string($attachment['type']) ? $attachment['type'] : 'application/octet-stream'),
+          'url'=>$url,
+        ];
+        $asset_refs[$asset_id]=$node['id'];
+      }
+      if($normalizedAttachments){
+        $node['data']['attachments']=$normalizedAttachments;
+        $node['data']['attachment']=$normalizedAttachments[0];
+      } else {
+        unset($node['data']['attachments'],$node['data']['attachment']);
+      }
+      if(isset($node['data']['attachment'])){
+        unset($node['data']['attachment']['content'],$node['data']['attachment']['id'],$node['data']['attachment']['type']);
       }
       if(isset($node['data']['url']) && !is_string($node['data']['url'])){
         unset($node['data']['url']);
@@ -787,6 +842,81 @@ if (is_post()) {
         }
         break;
       }
+      case 'bulk_action': {
+        $op=trim((string)($_POST['op'] ?? ''));
+        $ids=parse_id_list($_POST['ids'] ?? []);
+        if($op===''){ throw new RuntimeException('操作类型缺失'); }
+        if(!$ids){ throw new RuntimeException('未选择任何条目'); }
+        $nowt=now();
+        $results=[];
+        $pdo->beginTransaction();
+        try {
+          switch($op){
+            case 'complete': {
+              $doneCatId=ensure_done_category();
+              $fetch=$pdo->prepare('SELECT id, done, category_id, previous_category_id FROM items WHERE id=? LIMIT 1');
+              $update=$pdo->prepare('UPDATE items SET previous_category_id=?, category_id=?, done=1, updated_at=? WHERE id=?');
+              $touch=$pdo->prepare('UPDATE items SET updated_at=? WHERE id=?');
+              foreach($ids as $id){
+                $fetch->execute([$id]);
+                $row=$fetch->fetch();
+                if(!$row){ continue; }
+                $alreadyDone=(int)$row['done']===1;
+                $prevCat=null;
+                if($alreadyDone){
+                  $prevCat=$row['previous_category_id'] !== null ? (int)$row['previous_category_id'] : ($row['category_id'] !== null ? (int)$row['category_id'] : null);
+                } else {
+                  $prevCat=$row['category_id'] !== null ? (int)$row['category_id'] : null;
+                }
+                if($prevCat!==null && $prevCat<=0){ $prevCat=null; }
+                if(!$alreadyDone || (int)($row['category_id'] ?? 0)!==$doneCatId){
+                  $update->execute([$prevCat,$doneCatId,$nowt,$id]);
+                } else {
+                  $touch->execute([$nowt,$id]);
+                }
+                $results[]=[
+                  'id'=>$id,
+                  'done'=>1,
+                  'category_id'=>$doneCatId,
+                  'category_label'=>'已完成',
+                  'updated_at'=>$nowt,
+                ];
+              }
+              break;
+            }
+            case 'delete': {
+              $placeholders=implode(',',array_fill(0,count($ids),'?'));
+              $pdo->prepare("DELETE FROM items WHERE id IN ($placeholders)")->execute($ids);
+              foreach($ids as $id){ $results[]=['id'=>$id,'deleted'=>true]; }
+              break;
+            }
+            default:
+              throw new RuntimeException('不支持的批量操作');
+          }
+          $pdo->commit();
+        } catch(Throwable $err){
+          $pdo->rollBack();
+          throw $err;
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>1,'results'=>$results], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+      case 'export_selected': {
+        $ids=parse_id_list($_POST['ids'] ?? []);
+        if(!$ids){ throw new RuntimeException('未选择任何条目'); }
+        $placeholders=implode(',',array_fill(0,count($ids),'?'));
+        $sql="SELECT items.*, categories.name AS cat_name FROM items LEFT JOIN categories ON categories.id=items.category_id WHERE items.id IN ($placeholders) ORDER BY order_index ASC, updated_at DESC, id DESC";
+        $st=$pdo->prepare($sql);
+        $st->execute($ids);
+        $rows=$st->fetchAll();
+        foreach($rows as &$row){
+          $row['steps']=get_steps((int)$row['id']);
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok'=>1,'items'=>$rows], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
       case 'edit_item': {
         $id=(int)$_POST['id']; $title=trim((string)($_POST['title']??'')); if($title==='') throw new RuntimeException('标题必填');
         $desc=(string)($_POST['description']??''); $catId=(isset($_POST['category_id'])&&ctype_digit((string)$_POST['category_id']))?(int)$_POST['category_id']:null;
@@ -968,7 +1098,6 @@ if ($view === 'new') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>新建备忘录</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -982,9 +1111,13 @@ if ($view === 'new') {
         --gold-600:#C9A86A;
         --gold-500:#D1B274;
         --gold-400:#E3C68B;
+        --gold-3:#8E6B3D;
+        --gold-2:var(--gold-600);
+        --gold-1:var(--gold-400);
         --accent-emerald:#24C2A0;
         --accent-crimson:#D14B4B;
         --accent-cyan:#4BC3D1;
+        --accent-outline:rgba(201,168,106,.28);
         --text-strong:#E8E5DF;
         --text-dim:#A7A39A;
         --text-muted:#7A766E;
@@ -1040,12 +1173,16 @@ if ($view === 'new') {
       .wrap::before{content:"";position:absolute;inset:16px;border-radius:var(--r-lg);border:1px dashed rgba(201,168,106,.18);opacity:.65;pointer-events:none}
       .card{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));border:1px solid rgba(201,168,106,.28);border-radius:var(--r-lg);padding:24px;box-shadow:var(--shadow-1);backdrop-filter:blur(14px)}
       .card::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-lg) - 4px);box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;opacity:.9}
-      .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:var(--r-sm);border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;cursor:pointer;text-transform:uppercase;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 14px 32px rgba(227,198,139,.25),0 0 24px rgba(227,198,139,.18);overflow:hidden}
-      .btn::after{content:none}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 18px 36px rgba(227,198,139,.3),0 0 28px rgba(227,198,139,.24)}
-      .btn:active{transform:translateY(0);box-shadow:0 8px 20px rgba(227,198,139,.22)}
-      .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
-      .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:var(--r-sm);border:1px solid var(--accent-outline);background:rgba(227,198,139,.08);color:var(--gold-1);cursor:pointer;font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background-color var(--transition),color var(--transition);text-decoration:none;box-shadow:0 12px 28px rgba(0,0,0,.35)}
+  .btn:hover{transform:translateY(-1px);background:rgba(227,198,139,.16);box-shadow:0 18px 36px rgba(0,0,0,.42)}
+  .btn:active{transform:translateY(0);box-shadow:0 10px 20px rgba(0,0,0,.36)}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(230,192,137,.32),0 12px 28px rgba(0,0,0,.4)}
+  .btn-primary{background:linear-gradient(var(--gold-1),var(--gold-2));color:#1b1306;border-color:rgba(230,192,137,.55);box-shadow:0 18px 44px rgba(230,192,137,.22)}
+  .btn-primary:hover{box-shadow:0 22px 48px rgba(230,192,137,.3)}
+  .btn-ghost{background:transparent;color:var(--gold-1);border-color:var(--accent-outline)}
+  .btn-ghost:hover{background:rgba(230,192,137,.12)}
+  .btn-danger{border-color:rgba(248,113,113,.42);color:#fca5a5;background:transparent;box-shadow:none}
+  .btn-danger:hover{background:rgba(248,113,113,.14);color:#fecaca}
       .row{display:grid;grid-template-columns:2fr 1fr auto;gap:16px;margin-bottom:20px;align-items:center}
       .row input,.row select{padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 15px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;transition:border-color var(--transition),box-shadow var(--transition)}
       .row input::placeholder{color:var(--text-muted)}
@@ -1062,10 +1199,9 @@ if ($view === 'new') {
       .preview::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
-      .EasyMDEContainer .editor-toolbar{background:rgba(10,14,16,.82);border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md) var(--r-md) 0 0;color:var(--text-muted)}
-      .EasyMDEContainer .editor-toolbar a{color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;font-family:'Inter','Noto Sans SC',sans-serif}
-      .EasyMDEContainer .editor-toolbar a.active,.EasyMDEContainer .editor-toolbar a:hover{background:rgba(201,168,106,.16);color:var(--text-strong)}
-      .EasyMDEContainer .CodeMirror{border:1px solid rgba(201,168,106,.28);border-radius:0 0 var(--r-md) var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);min-height:280px;max-height:60vh;box-shadow:inset 0 0 24px rgba(0,0,0,.55)}
+      .editbox textarea{width:100%;min-height:280px;max-height:60vh;padding:14px 16px;border-radius:var(--r-md);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.82);color:var(--text-strong);font:500 15px/1.6 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em;resize:vertical;box-shadow:inset 0 0 24px rgba(0,0,0,.55);transition:border-color var(--transition),box-shadow var(--transition)}
+      .editbox textarea::placeholder{color:var(--text-muted)}
+      .editbox textarea:focus{outline:none;border-color:rgba(227,198,139,.65);box-shadow:inset 0 0 24px rgba(0,0,0,.55),0 0 0 3px rgba(227,198,139,.18)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
       .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
@@ -1138,7 +1274,6 @@ if ($view === 'new') {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const state = { id: 0 };
       const saveTip = document.getElementById('save-tip');
@@ -1193,13 +1328,26 @@ if ($view === 'new') {
         };
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
-      function renderMD(){ $('#md-view').innerHTML = safeHTML(mde.value()); }
-      const mde = new EasyMDE({
-        element: document.getElementById('md-editor'),
-        spellChecker:false, status:false,
-        toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
-      });
-      mde.codemirror.on('change', renderMD); renderMD();
+      const mdInput=document.getElementById('md-editor');
+      function renderMD(){ $('#md-view').innerHTML = safeHTML(mdInput ? mdInput.value : ''); }
+      function insertTextAtCursor(el, text){
+        if(!el) return;
+        const start=el.selectionStart ?? el.value.length;
+        const end=el.selectionEnd ?? start;
+        const before=el.value.slice(0,start);
+        const after=el.value.slice(end);
+        el.value=before + text + after;
+        const cursor=start + text.length;
+        if(typeof el.setSelectionRange==='function'){ el.setSelectionRange(cursor,cursor); }
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+      if(mdInput){
+        mdInput.addEventListener('input',()=>{
+          renderMD();
+          saveFeedback.dirty();
+        });
+      }
+      renderMD();
       (async function bootstrap(){
         const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
         const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
@@ -1211,7 +1359,7 @@ if ($view === 'new') {
         fd.append('id', String(state.id));
         fd.append('title',$('#title').value.trim()||'未命名');
         fd.append('category_id',$('#cat').value);
-        fd.append('description', mde.value());
+        fd.append('description', mdInput ? mdInput.value : '');
         saveFeedback.saving();
         try{
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1229,7 +1377,9 @@ if ($view === 'new') {
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
-        mde.codemirror.replaceSelection(j.markdown+"\n"); renderMD();
+        insertTextAtCursor(mdInput, j.markdown+"\n");
+        renderMD();
+        if(mdInput){ mdInput.focus(); }
         if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
         e.target.value='';
       });
@@ -1358,7 +1508,6 @@ if ($view === 'new') {
           feedback.success('已删除','✅ 已删除');
           const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
           if(node){ setTimeout(()=>{ node.remove(); }, 350); }
-          if(stepMDE[stepId]) delete stepMDE[stepId];
         }catch(err){
           alert(err.message||'删除失败');
           feedback.error('删除失败');
@@ -1370,20 +1519,34 @@ if ($view === 'new') {
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok){ const el=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(el){ el.classList.toggle('done', !!done); } }
       }
-      const stepMDE={};
       window.insertAttachmentToStep = async function(stepId){
         const inp=$('#att-file-step-'+stepId);
+        if(!inp) return;
         inp.onchange=async e=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           const j=await r.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
-          if(!stepMDE[stepId]) stepMDE[stepId]=new EasyMDE({ element: document.getElementById('md-step-'+stepId), spellChecker:false, status:false });
-          stepMDE[stepId].codemirror.replaceSelection(j.markdown+"\n"); const val=stepMDE[stepId].value(); $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(val));
+          const ta=document.getElementById('md-step-'+stepId);
+          insertTextAtCursor(ta, j.markdown+"\n");
+          if(ta){
+            $('#step-md-view-'+stepId).innerHTML = safeHTML(ta.value);
+            ta.focus();
+          }
           e.target.value='';
         };
         inp.click();
       };
+      const timelineBox=$('#timeline');
+      if(timelineBox){
+        timelineBox.addEventListener('input',e=>{
+          if(e.target && e.target.matches('textarea[name="notes"]')){
+            const id=(e.target.id||'').replace('md-step-','');
+            if(id){ $('#step-md-view-'+id).innerHTML = safeHTML(e.target.value); }
+            saveFeedback.dirty();
+          }
+        });
+      }
       (function(){ // DnD steps
         const box=$('#timeline'); let dragging=null;
         box.addEventListener('dragstart',e=>{ const t=e.target.closest('.tl-item[draggable]'); if(!t) return; dragging=t; e.dataTransfer.effectAllowed='move'; });
@@ -1420,7 +1583,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>详情 · <?php echo h($it['title']); ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1526,10 +1688,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .section label{display:block;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase}
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
-      .EasyMDEContainer .editor-toolbar{background:rgba(10,14,16,.82);border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md) var(--r-md) 0 0;color:var(--text-muted)}
-      .EasyMDEContainer .editor-toolbar a{color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;font-family:'Inter','Noto Sans SC',sans-serif}
-      .EasyMDEContainer .editor-toolbar a.active,.EasyMDEContainer .editor-toolbar a:hover{background:rgba(201,168,106,.18);color:var(--text-strong)}
-      .EasyMDEContainer .CodeMirror{border:1px solid rgba(201,168,106,.28);border-radius:0 0 var(--r-md) var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);min-height:280px;max-height:60vh;box-shadow:inset 0 0 24px rgba(0,0,0,.55)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
       .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
@@ -1686,7 +1844,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
@@ -1737,17 +1894,28 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       function renderMDTo(id, md){ const el=document.getElementById(id); if(el) el.innerHTML=safeHTML(md); }
-      const mde = new EasyMDE({
-        element: document.getElementById('md-editor'),
-        spellChecker:false, status:false,
-        autosave:{enabled:true, uniqueId:'memo-item-<?php echo $it['id']; ?>', delay:800},
-        toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
-      });
-      renderMDTo('md-view', mde.value());
-      mde.codemirror.on('change', ()=> renderMDTo('md-view', mde.value()));
+      const mdInput=document.getElementById('md-editor');
+      function insertTextAtCursor(el, text){
+        if(!el) return;
+        const start=el.selectionStart ?? el.value.length;
+        const end=el.selectionEnd ?? start;
+        const before=el.value.slice(0,start);
+        const after=el.value.slice(end);
+        el.value=before + text + after;
+        const cursor=start + text.length;
+        if(typeof el.setSelectionRange==='function'){ el.setSelectionRange(cursor,cursor); }
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+      renderMDTo('md-view', mdInput ? mdInput.value : '');
+      if(mdInput){
+        mdInput.addEventListener('input',()=>{
+          renderMDTo('md-view', mdInput.value);
+        });
+      }
       async function saveItemAJAX(ev, form){
         ev.preventDefault();
         const fd = new FormData(form);
+        if(mdInput){ fd.set('description', mdInput.value); }
         const tip=form.querySelector('.save-tip') || document.getElementById('save-tip');
         const btn=form.querySelector('button[type="submit"]');
         const feedback=createSaveFeedbackController(tip, btn);
@@ -1768,11 +1936,14 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
         const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
         if(!j.ok){ alert(j.error||'上传失败'); return; }
-        mde.codemirror.replaceSelection(j.markdown+"\n"); mde.codemirror.focus();
+        insertTextAtCursor(mdInput, j.markdown+"\n");
+        if(mdInput){
+          renderMDTo('md-view', mdInput.value);
+          mdInput.focus();
+        }
         if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
         e.target.value='';
       });
-      const stepMDE={};
       function getStepFeedback(stepId, kind){
         const tip=document.querySelector(`[data-step-tip="${kind}-${stepId}"]`);
         const btn=document.querySelector(`[data-step-button="${kind}-${stepId}"]`);
@@ -1836,7 +2007,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           feedback.success('已删除','✅ 已删除');
           const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
           if(node){ setTimeout(()=>{ node.remove(); }, 350); }
-          if(stepMDE[stepId]) delete stepMDE[stepId];
         }catch(err){
           alert(err.message||'删除失败');
           feedback.error('删除失败');
@@ -1853,18 +2023,31 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       }
       window.insertAttachmentToStep = async function(stepId){
         const input=document.getElementById('att-file-step-'+stepId);
+        if(!input) return;
         input.onchange = async (e)=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
-          if(!stepMDE[stepId]){ stepMDE[stepId]=new EasyMDE({ element: document.getElementById('md-step-'+stepId), spellChecker:false, status:false }); }
-          stepMDE[stepId].codemirror.replaceSelection(j.markdown+"\n");
-          const val=stepMDE[stepId].value(); renderMDTo('step-md-view-'+stepId, val);
+          const ta=document.getElementById('md-step-'+stepId);
+          insertTextAtCursor(ta, j.markdown+"\n");
+          if(ta){
+            renderMDTo('step-md-view-'+stepId, ta.value);
+            ta.focus();
+          }
           e.target.value='';
         };
         input.click();
       };
+      const detailTimeline=document.getElementById('timeline');
+      if(detailTimeline){
+        detailTimeline.addEventListener('input',e=>{
+          if(e.target && e.target.matches('textarea[name="notes"]')){
+            const id=(e.target.id||'').replace('md-step-','');
+            if(id){ renderMDTo('step-md-view-'+id, e.target.value); }
+          }
+        });
+      }
       function addStepForm(ev){
         ev.preventDefault(); const f=ev.target; const fd=new FormData(f);
         fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}).then(()=>location.reload());
@@ -5743,11 +5926,30 @@ if ($view === 'maps') {
 
 // —— 首页 ——
 $pdo=db(); [$cats,$counts]=get_categories();
-$cat=$_GET['cat'] ?? 'all'; $q=trim((string)($_GET['q'] ?? '')); $params=[]; $where=[];
-if($cat==='all'){
-  $where[]='done = 0';
-}
+$cat=$_GET['cat'] ?? 'all';
+$filter=$_GET['filter'] ?? 'active';
+$q=trim((string)($_GET['q'] ?? ''));
+$params=[]; $where=[];
 if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
+switch($filter){
+  case 'all':
+    break;
+  case 'completed':
+    $where[]='done = 1';
+    break;
+  case 'recent':
+    $where[]='updated_at >= :recent_since';
+    $params[':recent_since']=now()-7*24*3600;
+    break;
+  case 'with_attachments':
+    $where[]='EXISTS (SELECT 1 FROM attachments WHERE attachments.item_id = items.id)';
+    $where[]='done = 0';
+    break;
+  default:
+    $filter='active';
+    $where[]='done = 0';
+    break;
+}
 if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
 $sql='SELECT * FROM items'; if($where) $sql.=' WHERE '.implode(' AND ',$where); $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
 $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
@@ -5766,38 +5968,36 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
 <style>
   :root{
     --bg-void:#0A0C0E;
-    --bg-elev-1:#0F1316;
-    --bg-elev-2:#151A1E;
-    --gold-700:#AA8C54;
-    --gold-600:#C9A86A;
-    --gold-500:#D1B274;
-    --gold-400:#E3C68B;
-    --accent-emerald:#24C2A0;
-    --accent-crimson:#D14B4B;
-    --accent-cyan:#4BC3D1;
-    --text-strong:#E8E5DF;
-    --text-muted:#A7A39A;
-    --text-dim:#7A766E;
-    --divider:rgba(201,168,106,.2);
-    --text:var(--text-strong);
-    --bg:var(--bg-void);
-    --panel:rgba(21,26,30,.9);
+    --bg-elev-1:#111417;
+    --bg-elev-2:#181C20;
+    --bg-panel:rgba(18,20,23,.94);
+    --gold-1:#E6C089;
+    --gold-2:#CFA66B;
+    --gold-3:#8E6B3D;
+    --gold-400:var(--gold-1);
+    --gold-500:var(--gold-2);
+    --gold-600:var(--gold-3);
+    --text-strong:#ECE9E1;
+    --text-muted:rgba(236,233,225,.68);
+    --text-soft:rgba(236,233,225,.42);
+    --divider:rgba(207,166,107,.22);
+    --accent-primary:var(--gold-2);
+    --accent-primary-strong:var(--gold-1);
+    --accent-outline:rgba(230,192,137,.28);
+    --danger:#f87171;
+    --danger-soft:rgba(248,113,113,.18);
     --sidebar-width:clamp(240px,26vw,320px);
-    --panel-strong:rgba(15,19,22,.94);
-    --grid:rgba(201,168,106,.12);
-    --grid-strong:rgba(201,168,106,.18);
-    --glow:var(--gold-500);
-    --glow-soft:rgba(227,198,139,.28);
-    --glow-strong:rgba(227,198,139,.42);
-    --danger:var(--accent-crimson);
-    --danger-soft:rgba(209,75,75,.32);
-    --accent:var(--gold-400);
-    --accent-soft:rgba(227,198,139,.18);
-    --border:rgba(201,168,106,.36);
-    --border-soft:rgba(201,168,106,.2);
-    --shadow:0 24px 60px rgba(0,0,0,.72);
+    --panel:rgba(14,17,20,.85);
+    --panel-strong:var(--bg-panel);
+    --shadow:0 24px 60px rgba(0,0,0,.7);
     --grid-size:72px;
-    --transition:300ms cubic-bezier(.22,.61,.36,1);
+    --transition:260ms cubic-bezier(.22,.61,.36,1);
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:10px;
+    --r-lg:var(--radius-lg);
+    --r-md:var(--radius-md);
+    --r-sm:var(--radius-sm);
   }
   *,*::before,*::after{box-sizing:border-box}
   html,body{margin:0;min-height:100vh;background:var(--bg-void);color:var(--text-strong);font:16px/1.65 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow-x:hidden}
@@ -5825,15 +6025,17 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);opacity:.85}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
-  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 16px 34px rgba(227,198,139,.24),0 0 24px rgba(227,198,139,.18);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-  .btn::after{content:none}
-  .btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 30px rgba(227,198,139,.24)}
-  .btn:hover::after{content:none}
-  .btn:active{transform:translateY(0);box-shadow:0 10px 24px rgba(227,198,139,.22)}
-  .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
-  .btn.danger{color:#2b0909;border-color:rgba(255,156,156,.8);background:linear-gradient(135deg,rgba(255,156,156,.85),rgba(209,75,75,.72));box-shadow:0 16px 34px rgba(209,75,75,.24)}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:var(--r-sm);border:1px solid var(--accent-outline);background:rgba(230,192,137,.08);color:var(--gold-1);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 12px 28px rgba(0,0,0,.35);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background-color var(--transition),color var(--transition)}
+  .btn:hover{transform:translateY(-1px);background:rgba(230,192,137,.16);box-shadow:0 18px 36px rgba(0,0,0,.42)}
+  .btn:active{transform:translateY(0);box-shadow:0 10px 20px rgba(0,0,0,.36)}
   .btn.small{padding:8px 12px;border-radius:12px;font-size:11px}
-  .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 3px rgba(227,198,139,.25)}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(230,192,137,.32),0 12px 28px rgba(0,0,0,.4)}
+  .btn-primary{background:linear-gradient(var(--gold-1),var(--gold-2));color:#1b1306;border-color:rgba(230,192,137,.55);box-shadow:0 18px 44px rgba(230,192,137,.22)}
+  .btn-primary:hover{box-shadow:0 22px 48px rgba(230,192,137,.3)}
+  .btn-ghost{background:transparent;color:var(--gold-1);border-color:var(--accent-outline)}
+  .btn-ghost:hover{background:rgba(230,192,137,.12)}
+  .btn-danger{border-color:rgba(248,113,113,.42);color:#fca5a5;background:transparent;box-shadow:none}
+  .btn-danger:hover{background:rgba(248,113,113,.14);color:#fecaca}
   .section-title{font:600 12px/1 'Cinzel','Noto Serif SC',serif;text-transform:uppercase;letter-spacing:.24em;color:var(--gold-400);margin:14px 0 8px;text-shadow:0 0 14px rgba(227,198,139,.24)}
   .cat-list{display:flex;flex-direction:column;gap:8px}
   .cat{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:linear-gradient(140deg,rgba(15,19,22,.88),rgba(10,12,14,.88));border:1px solid var(--border-soft);box-shadow:inset 0 0 0 1px rgba(201,168,106,.06);transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition)}
@@ -5853,40 +6055,67 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   .search button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.42);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.18em;cursor:pointer;transition:background var(--transition),box-shadow var(--transition),border-color var(--transition)}
   .search button:hover{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.6);box-shadow:0 0 18px rgba(227,198,139,.22)}
   .actions-row{display:flex;gap:10px;flex-wrap:wrap}
-  .items{display:grid;gap:16px;position:relative;grid-template-columns:repeat(3,minmax(0,1fr))}
-  .item{position:relative;padding:18px 16px;border-radius:18px;background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:10px;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
-  .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
-  .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger),0 0 20px rgba(209,75,75,.4)}
-  .item:hover{transform:translateY(-4px);box-shadow:0 0 28px rgba(201,168,106,.28),0 26px 50px rgba(0,0,0,.6);border-color:rgba(201,168,106,.52)}
-  .item.done{background:linear-gradient(155deg,rgba(26,24,18,.9),rgba(18,16,12,.94));border-color:rgba(227,198,139,.55);box-shadow:0 0 28px rgba(201,168,106,.38),0 24px 58px rgba(0,0,0,.7)}
-  .item-empty{grid-column:1/-1;text-align:center;padding:40px 24px;background:linear-gradient(150deg,rgba(15,19,22,.88),rgba(10,12,14,.9));border:1px dashed rgba(201,168,106,.28);box-shadow:none;color:var(--text-muted);letter-spacing:.12em}
-  .item-empty::after,.item-empty::before{display:none}
-  .item.done::after{display:none}
-  .item.done::before{opacity:1;border-style:double;border-color:rgba(201,168,106,.45);box-shadow:0 0 32px rgba(227,198,139,.3)}
-  .item-title{font:600 16px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 16px rgba(227,198,139,.24);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;letter-spacing:.08em}
-  .item.done .item-title,.item.done .item-desc,.item.done .tinyline{text-decoration:line-through;color:rgba(227,198,139,.75)}
-  .item-desc{color:var(--text-dim);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
-  .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.22em;padding:4px 10px;border-radius:999px;border:1px dashed rgba(201,168,106,.35);background:rgba(201,168,106,.08);color:var(--text-dim);box-shadow:inset 0 0 12px rgba(201,168,106,.05)}
-  .kbd{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;padding:2px 6px;border:1px dashed rgba(201,168,106,.35);border-radius:6px;background:rgba(15,19,22,.82);color:var(--text-dim);text-transform:uppercase;letter-spacing:.16em;box-shadow:0 0 12px rgba(201,168,106,.12)}
-  .tinyline{position:relative;margin-left:12px;padding-left:18px;color:var(--text-muted)}
-  .tinyline::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,rgba(201,168,106,.65),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.25)}
-  .tlrow{position:relative;margin:6px 0;padding-left:10px;display:flex;gap:8px;align-items:center}
-  .tlrow.done .step-title{text-decoration:line-through;color:rgba(201,168,106,.7)}
-  .dot{position:absolute;left:-6px;top:8px;width:10px;height:10px;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.85));border-radius:50%;box-shadow:0 0 12px rgba(201,168,106,.5),0 0 24px rgba(201,168,106,.35)}
-  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
-  .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
-  .item-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .search{display:flex;align-items:center;gap:10px;flex:1;min-width:260px}
+  .search input{flex:1;padding:12px 14px;border-radius:var(--r-sm);border:1px solid rgba(230,192,137,.24);background:rgba(15,18,21,.82);color:var(--text-strong);font:500 15px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.02em}
+  .search input::placeholder{color:var(--text-soft)}
+  .search input:focus{outline:none;border-color:rgba(230,192,137,.45);box-shadow:0 0 0 2px rgba(230,192,137,.18)}
+  .toolbar-controls{display:flex;gap:10px;flex-wrap:wrap}
+  .bulk-bar{margin-bottom:16px;display:flex;align-items:center;gap:14px;padding:12px 16px;border:1px solid var(--accent-outline);background:rgba(14,17,20,.78);border-radius:var(--r-md);box-shadow:0 18px 40px rgba(0,0,0,.55)}
+  .bulk-bar[hidden]{display:none}
+  .bulk-actions{display:flex;gap:10px;flex-wrap:wrap}
+  .bulk-summary{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}
+  .bulk-dismiss{margin-left:auto}
+  .items{display:grid;gap:20px;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start}
+  .item{position:relative;display:flex;flex-direction:column;gap:16px;padding:20px;border-radius:var(--r-lg);background:linear-gradient(155deg,rgba(18,21,24,.92),rgba(11,14,16,.9));border:1px solid rgba(230,192,137,.2);box-shadow:var(--shadow);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
+  .item::before{content:"";position:absolute;inset:12px;border-radius:calc(var(--r-lg) - 6px);border:1px dashed rgba(230,192,137,.14);opacity:.8;pointer-events:none}
+  .item:hover{transform:translateY(-4px);border-color:rgba(230,192,137,.38);box-shadow:0 26px 54px rgba(0,0,0,.68)}
+  .item.done{background:linear-gradient(160deg,rgba(25,22,17,.92),rgba(15,14,12,.9));border-color:rgba(230,192,137,.28)}
+  .item.is-selected{border-color:var(--gold-1);box-shadow:0 0 0 3px rgba(230,192,137,.25),0 26px 54px rgba(0,0,0,.72)}
+  .item-empty{grid-column:1/-1;text-align:center;padding:48px 24px;border:1px dashed rgba(230,192,137,.28);border-radius:var(--r-lg);background:rgba(14,17,20,.6);color:var(--text-soft)}
+  .item-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .item-header-main{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+  .item-select{width:20px;height:20px;border-radius:50%;border:1px solid var(--accent-outline);background:transparent;cursor:pointer;position:relative;transition:border-color var(--transition),background-color var(--transition)}
+  .item-select::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--gold-1);opacity:0;transition:opacity var(--transition)}
+  .item-select[aria-pressed="true"],.item.is-selected .item-select{border-color:var(--gold-1)}
+  .item-select[aria-pressed="true"]::after,.item.is-selected .item-select::after{opacity:1}
+  .item-title-block{flex:1;min-width:0}
+  .item-title{margin:0;font:600 18px/1.45 'Cinzel','Noto Serif SC',serif;color:var(--gold-1);letter-spacing:.05em}
+  .item-meta-line{display:flex;gap:10px;flex-wrap:wrap;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-soft)}
+  .item-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid rgba(230,192,137,.25);background:rgba(230,192,137,.08)}
+  .item-meta-right{font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-soft)}
+  .item-desc{color:var(--text-muted);white-space:pre-wrap;line-height:1.6}
+  .item-timeline{position:relative;padding-left:22px;display:grid;gap:10px}
+  .item-timeline::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:linear-gradient(to bottom,rgba(230,192,137,.55),rgba(230,192,137,.08))}
+  .tlrow{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:6px 10px;border-radius:var(--r-sm);background:rgba(15,18,21,.58)}
+  .tlrow-main{display:flex;align-items:center;gap:8px}
+  .tlrow.done{opacity:.65;text-decoration:line-through}
+  .dot{position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--gold-1),var(--gold-2));box-shadow:0 0 14px rgba(230,192,137,.35)}
+  .tlrow.done .dot{background:rgba(230,192,137,.18);box-shadow:none}
+  .step-title{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+  .ts{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-soft);letter-spacing:.12em;text-transform:uppercase}
+  .item-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .item-status{font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-1)}
+  .item-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
   .item-actions form{margin:0}
-  .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
-  .item-actions .status-tip{color:var(--gold-400)}
-  .item-actions .note-tip{margin-right:0}
-  .item-actions a{background:rgba(201,168,106,.12);border:1px solid rgba(201,168,106,.32);padding:8px 12px;border-radius:12px;color:var(--gold-400);text-transform:uppercase;letter-spacing:.14em;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;transition:var(--transition)}
-  .item-actions a:hover{box-shadow:0 0 18px rgba(201,168,106,.3)}
   .move-controls{display:flex;gap:6px}
   .move-controls.mobile{display:none}
-  .err{background:rgba(209,75,75,.16);color:rgba(255,214,214,.92);border:1px solid rgba(209,75,75,.45);border-radius:16px;box-shadow:0 0 20px rgba(209,75,75,.24);padding:10px 14px}
+  .btn-icon .icon{font-size:12px}
+  .btn-icon .label{transition:opacity var(--transition)}
+  .item-delete{margin:0}
+  body[data-density="compact"] .items{gap:16px}
+  body[data-density="compact"] .item{padding:16px;gap:12px}
+  body[data-density="compact"] .item-title{font-size:16px}
+  body[data-density="compact"] .btn-icon .label{display:none}
+  body[data-density="compact"] .item-timeline{gap:6px}
+  .search-hit{background:rgba(230,192,137,.18);color:var(--gold-1);padding:0 2px;border-radius:4px}
+  .quick-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 24px}
+  .quick-filter{display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;border:1px solid var(--accent-outline);color:var(--gold-1);text-transform:uppercase;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;transition:var(--transition)}
+  .quick-filter:hover{background:rgba(230,192,137,.12)}
+  .quick-filter.active{background:linear-gradient(135deg,var(--gold-1),var(--gold-2));color:#111;border-color:rgba(230,192,137,.45)}
+  .err{background:rgba(248,113,113,.14);color:#fcdada;border:1px solid rgba(248,113,113,.4);border-radius:var(--r-md);padding:12px 16px;box-shadow:0 12px 28px rgba(248,113,113,.18)}
   .flash-message{margin-bottom:12px;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
-  .shortcuts{margin-top:14px;color:var(--text-dim);font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase}
+  .shortcuts{margin-top:14px;color:var(--text-soft);font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase}
   .modal-backdrop{position:fixed;inset:0;background:rgba(3,6,8,.76);backdrop-filter:blur(16px);display:none;align-items:center;justify-content:center;padding:16px;z-index:120}
   .modal-panel{background:linear-gradient(150deg,rgba(15,19,22,.92),rgba(10,12,14,.94));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 32px 64px rgba(0,0,0,.68),0 0 34px rgba(201,168,106,.16);padding:18px;max-width:520px;width:100%;display:grid;gap:14px;position:relative}
   .modal-panel::before{content:"";position:absolute;inset:10px;border-radius:18px;border:1px dashed rgba(201,168,106,.24);opacity:.85;pointer-events:none;box-shadow:inset 0 0 22px rgba(201,168,106,.08)}
@@ -5927,21 +6156,29 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
       <h1>自适应备忘录 · Memo</h1>
     </div>
     <div class="controls">
-      <a class="btn acc" href="?view=new">＋ 新建备忘录</a>
-      <button class="btn" id="btn-cat-mgr">分类管理</button>
-      <a class="btn" href="?view=maps">思维导图</a>
+      <a class="btn btn-primary" href="?view=new">＋ 新建备忘录</a>
+      <button class="btn btn-ghost" id="btn-cat-mgr">分类管理</button>
+      <a class="btn btn-ghost" href="?view=maps">思维导图</a>
     </div>
     <div class="section-title">分类 · Categories</div>
     <div class="cat-list" id="cat-list">
-      <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
+      <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&filter=<?php echo urlencode($filter); ?>&q=<?php echo urlencode($q); ?>">
         <span class="name">全部 · All</span><span class="count"><?php echo $all_total; ?></span>
       </a>
       <?php foreach ($cats as $c): ?>
-      <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>">
+      <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&filter=<?php echo urlencode($filter); ?>&q=<?php echo urlencode($q); ?>">
         <span class="name"><?php echo h($c['name']); ?></span>
         <span class="count"><?php echo (int)($counts[$c['id']] ?? 0); ?></span>
       </a>
       <?php endforeach; ?>
+    </div>
+    <div class="section-title">快速筛选</div>
+    <div class="quick-filters">
+      <a class="quick-filter <?php echo $filter==='active'?'active':''; ?>" href="?cat=<?php echo h((string)$cat); ?>&filter=active&q=<?php echo urlencode($q); ?>">未完成</a>
+      <a class="quick-filter <?php echo $filter==='all'?'active':''; ?>" href="?cat=<?php echo h((string)$cat); ?>&filter=all&q=<?php echo urlencode($q); ?>">全部</a>
+      <a class="quick-filter <?php echo $filter==='with_attachments'?'active':''; ?>" href="?cat=<?php echo h((string)$cat); ?>&filter=with_attachments&q=<?php echo urlencode($q); ?>">含附件</a>
+      <a class="quick-filter <?php echo $filter==='recent'?'active':''; ?>" href="?cat=<?php echo h((string)$cat); ?>&filter=recent&q=<?php echo urlencode($q); ?>">近7天更新</a>
+      <a class="quick-filter <?php echo $filter==='completed'?'active':''; ?>" href="?cat=<?php echo h((string)$cat); ?>&filter=completed&q=<?php echo urlencode($q); ?>">已完成</a>
     </div>
     <div class="footer">
       <div>✅ 勾选完成</div>
@@ -5955,16 +6192,29 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
       <div class="err flash-message"><?php echo h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
     <?php endif; ?>
     <div class="toolbar">
-      <form class="search" method="get" style="flex:1">
+      <form class="search" method="get">
         <input type="hidden" name="cat" value="<?php echo h((string)$cat); ?>">
+        <input type="hidden" name="filter" value="<?php echo h($filter); ?>">
         <input name="q" value="<?php echo h($q); ?>" placeholder="搜索标题/内容 · Search"/>
-        <button>搜索</button>
+        <button class="btn btn-primary btn-search" type="submit">搜索</button>
       </form>
-      <div class="actions-row">
-        <button class="btn small" type="button" id="btn-import-items">导入 JSON</button>
-        <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
-        <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
+      <div class="toolbar-controls">
+        <button class="btn btn-ghost" type="button" id="density-toggle" aria-pressed="false">舒适模式</button>
+        <button class="btn btn-ghost" type="button" id="btn-import-items">导入 JSON</button>
+        <a class="btn btn-ghost" href="?cat=<?php echo h((string)$cat); ?>&filter=<?php echo urlencode($filter); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
+        <a class="btn btn-ghost" href="?cat=<?php echo h((string)$cat); ?>&filter=<?php echo urlencode($filter); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
       </div>
+    </div>
+    <div class="bulk-bar" id="bulk-bar" hidden>
+      <div class="bulk-summary">已选择 <span id="bulk-count">0</span> 项</div>
+      <div class="bulk-actions">
+        <button class="btn btn-primary" data-bulk="complete">完成</button>
+        <button class="btn btn-ghost" data-bulk="move-left">左移</button>
+        <button class="btn btn-ghost" data-bulk="move-right">右移</button>
+        <button class="btn btn-ghost" data-bulk="export">导出</button>
+        <button class="btn btn-danger" data-bulk="delete">删除</button>
+      </div>
+      <button class="btn btn-ghost bulk-dismiss" type="button" id="bulk-clear">清除</button>
     </div>
     <input id="memo-import-input" type="file" accept="application/json" hidden>
     <div class="items" id="items">
@@ -5972,59 +6222,74 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
         <div class="item item-empty">没有条目 · No items</div>
       <?php endif; ?>
       <?php foreach ($items as $it): ?>
-        <?php $steps_time=get_steps_by_time((int)$it['id']); ?>
+        <?php
+          $steps_time=get_steps_by_time((int)$it['id']);
+          $categoryLabel='未分类';
+          if($it['category_id']){
+            foreach($cats as $c){ if($c['id']==$it['category_id']){ $categoryLabel=$c['name']; break; } }
+          }
+        ?>
         <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>">
-          <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
-            <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
-              <input type="hidden" name="action" value="toggle_done">
-              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
-              <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
-            </form>
-            <div style="flex:1">
-              <div class="item-title"><?php echo h($it['title']); ?></div>
-              <?php if ($it['description']!==''): ?>
-                <div class="item-desc"><?php echo nl2br(h($it['description'])); ?></div>
-              <?php endif; ?>
-              <?php if ($steps_time): ?>
-              <div class="tinyline" aria-label="时间轴">
-                <?php foreach($steps_time as $s): ?>
-                  <div class="tlrow <?php echo $s['done']?'done':''; ?>">
-                    <span class="dot"></span>
-                    <form method="post" class="form-toggle-step" onsubmit="return false" style="margin:0;display:inline-block">
+          <header class="item-header">
+            <div class="item-header-main">
+              <button type="button" class="item-select" aria-pressed="false" title="批量选择"></button>
+              <form method="post" class="form-toggle-item" onsubmit="return false">
+                <input type="hidden" name="action" value="toggle_done">
+                <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+                <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
+              </form>
+              <div class="item-title-block">
+                <h3 class="item-title"><?php echo h($it['title']); ?></h3>
+                <div class="item-meta-line">
+                  <span class="item-badge"><?php echo h($categoryLabel); ?></span>
+                  <span class="item-meta js-updated" data-ts="<?php echo (int)$it['updated_at']; ?>">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+                </div>
+              </div>
+            </div>
+            <div class="item-meta-right">
+              <span class="item-meta" data-ts="<?php echo (int)$it['created_at']; ?>">创建 <?php echo dt((int)$it['created_at']); ?></span>
+            </div>
+          </header>
+          <?php if ($it['description']!==''): ?>
+            <div class="item-desc"><?php echo nl2br(h($it['description'])); ?></div>
+          <?php endif; ?>
+          <?php if ($steps_time): ?>
+            <div class="item-timeline" aria-label="时间轴">
+              <?php foreach($steps_time as $s): ?>
+                <div class="tlrow <?php echo $s['done']?'done':''; ?>">
+                  <span class="dot"></span>
+                  <div class="tlrow-main">
+                    <form method="post" class="form-toggle-step" onsubmit="return false">
                       <input type="hidden" name="action" value="toggle_step">
                       <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
                       <input type="checkbox" class="step-toggle" <?php echo $s['done']?'checked':''; ?> title="完成">
                     </form>
                     <span class="step-title"><?php echo h($s['title']); ?></span>
-                    <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
                   </div>
-                <?php endforeach; ?>
+                  <span class="ts" data-ts="<?php echo (int)$s['created_at']; ?>"><?php echo dt((int)$s['created_at']); ?></span>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+          <footer class="item-footer">
+            <div class="item-status <?php echo $it['done']?'is-done':'is-open'; ?>"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></div>
+            <div class="item-actions">
+              <div class="move-controls desktop">
+                <button class="btn btn-ghost btn-icon" type="button" title="左移" data-move="left" data-id="<?php echo $it['id']; ?>"><span class="icon" aria-hidden="true">←</span><span class="label">左移</span></button>
+                <button class="btn btn-ghost btn-icon" type="button" title="右移" data-move="right" data-id="<?php echo $it['id']; ?>"><span class="icon" aria-hidden="true">→</span><span class="label">右移</span></button>
               </div>
-              <?php endif; ?>
-              <div class="meta meta-inline">
-                <span class="badge"><?php echo $it['category_id'] ? h(array_values(array_filter($cats,fn($c)=>$c['id']==$it['category_id']))[0]['name'] ?? '未分类') : '未分类'; ?></span>
-                <span class="badge js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+              <div class="move-controls mobile">
+                <button class="btn btn-ghost btn-icon" type="button" title="上移" data-move="up" data-id="<?php echo $it['id']; ?>"><span class="icon" aria-hidden="true">↑</span><span class="label">上移</span></button>
+                <button class="btn btn-ghost btn-icon" type="button" title="下移" data-move="down" data-id="<?php echo $it['id']; ?>"><span class="icon" aria-hidden="true">↓</span><span class="label">下移</span></button>
               </div>
+              <a class="btn btn-ghost btn-icon" href="?view=item&id=<?php echo $it['id']; ?>" title="详情"><span class="icon" aria-hidden="true">↗</span><span class="label">详情</span></a>
+              <form method="post" onsubmit="return confirm('确认删除该备忘录？');" class="item-delete">
+                <input type="hidden" name="action" value="delete_item">
+                <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+                <button class="btn btn-danger" type="submit">删除</button>
+              </form>
             </div>
-          </div>
-          <div class="item-actions">
-            <span class="tip status-tip"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></span>
-            <span class="tip note-tip">↔ 按钮调整排序</span>
-            <div class="move-controls desktop">
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
-            </div>
-            <div class="move-controls mobile">
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
-            </div>
-            <a class="btn small" href="?view=item&id=<?php echo $it['id']; ?>">详情</a>
-            <form method="post" onsubmit="return confirm('确认删除该备忘录？');" style="margin:0">
-              <input type="hidden" name="action" value="delete_item">
-              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
-              <button class="btn small danger" type="submit">删除</button>
-            </form>
-          </div>
+          </footer>
         </article>
       <?php endforeach; ?>
     </div>
@@ -6056,8 +6321,231 @@ window.addEventListener('keydown',e=>{
 });
 const itemsContainer=document.getElementById('items');
 const currentCategoryFilter=<?php echo json_encode((string)$cat); ?>;
+const currentFilter=<?php echo json_encode($filter); ?>;
 const memoImportButton=document.getElementById('btn-import-items');
 const memoImportInput=document.getElementById('memo-import-input');
+const densityToggle=document.getElementById('density-toggle');
+const bulkBar=document.getElementById('bulk-bar');
+const bulkCount=document.getElementById('bulk-count');
+const bulkClear=document.getElementById('bulk-clear');
+const bulkActions=bulkBar ? bulkBar.querySelector('.bulk-actions') : null;
+const selectedItems=new Set();
+let lastSelectedId=null;
+
+function buildTimestamp(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function applyDensityMode(mode){
+  const normalized=mode==='compact'?'compact':'cozy';
+  document.body.dataset.density=normalized;
+  if(densityToggle){
+    const compact=normalized==='compact';
+    densityToggle.setAttribute('aria-pressed',compact?'true':'false');
+    densityToggle.textContent=compact?'紧凑模式':'舒适模式';
+  }
+}
+const storedDensity=localStorage.getItem('memo-density') || 'cozy';
+applyDensityMode(storedDensity);
+if(densityToggle){
+  densityToggle.addEventListener('click',()=>{
+    const next=document.body.dataset.density==='compact'?'cozy':'compact';
+    applyDensityMode(next);
+    localStorage.setItem('memo-density',next);
+  });
+}
+
+function setCardSelected(card, selected){
+  if(!card) return;
+  const id=card.dataset.id;
+  if(!id) return;
+  if(selected){ selectedItems.add(id); }
+  else { selectedItems.delete(id); }
+  card.classList.toggle('is-selected', selected);
+  const toggleBtn=card.querySelector('.item-select');
+  if(toggleBtn){ toggleBtn.setAttribute('aria-pressed', selected ? 'true' : 'false'); }
+}
+function clearSelection(){
+  if(!itemsContainer) return;
+  itemsContainer.querySelectorAll('article.item.is-selected').forEach(el=>setCardSelected(el,false));
+  lastSelectedId=null;
+  updateBulkBar();
+}
+function updateBulkBar(){
+  if(!bulkBar) return;
+  const count=selectedItems.size;
+  bulkBar.hidden=count===0;
+  if(bulkCount){ bulkCount.textContent=String(count); }
+}
+
+if(bulkClear){ bulkClear.addEventListener('click', clearSelection); }
+
+if(bulkActions){
+  bulkActions.addEventListener('click', async e=>{
+    const btn=e.target.closest('button[data-bulk]');
+    if(!btn) return;
+    e.preventDefault();
+    if(selectedItems.size===0) return;
+    const action=btn.dataset.bulk;
+    try{
+      switch(action){
+        case 'complete': {
+          const data=await performBulkAction('complete');
+          if(!data) return;
+          const results=Array.isArray(data.results)?data.results:[];
+          results.forEach(r=>{
+            const id=String(r.id);
+            const card=itemsContainer ? itemsContainer.querySelector(`article.item[data-id="${id}"]`) : null;
+            if(!card) return;
+            const newCategoryId=(r.category_id===null || typeof r.category_id==='undefined') ? '' : String(r.category_id);
+            card.dataset.categoryId=newCategoryId;
+            card.classList.add('done');
+            setCardSelected(card,false);
+            const toggle=card.querySelector('.item-toggle');
+            if(toggle){ toggle.checked=true; }
+            const badge=card.querySelector('.item-badge');
+            if(badge && r.category_label){ badge.textContent=r.category_label; }
+            const updated=card.querySelector('.js-updated');
+            if(updated && r.updated_at){
+              updated.textContent='更新 '+fmt(r.updated_at);
+              updated.dataset.ts=String(r.updated_at);
+            }
+            if(currentCategoryFilter==='all' && currentFilter==='active'){
+              card.remove();
+            } else if(currentCategoryFilter!=='all' && currentCategoryFilter!==newCategoryId){
+              card.remove();
+            }
+          });
+          ensureItemsEmptyState();
+          try{
+            const {cats,counts,total}=await fetchCats();
+            refreshSidebarCats(cats,counts,total);
+          }catch(_){ }
+          lastSelectedId=null;
+          updateBulkBar();
+          break;
+        }
+        case 'delete': {
+          if(!window.confirm('确认删除所选备忘录？')) return;
+          const data=await performBulkAction('delete');
+          if(!data) return;
+          const results=Array.isArray(data.results)?data.results:[];
+          results.forEach(r=>{
+            const id=String(r.id);
+            const card=itemsContainer ? itemsContainer.querySelector(`article.item[data-id="${id}"]`) : null;
+            if(card){
+              setCardSelected(card,false);
+              card.remove();
+            }
+          });
+          ensureItemsEmptyState();
+          try{
+            const {cats,counts,total}=await fetchCats();
+            refreshSidebarCats(cats,counts,total);
+          }catch(_){ }
+          lastSelectedId=null;
+          updateBulkBar();
+          break;
+        }
+        case 'move-left': {
+          moveSelection('left');
+          break;
+        }
+        case 'move-right': {
+          moveSelection('right');
+          break;
+        }
+        case 'export': {
+          const ids=getSelectedIds();
+          if(!ids.length) return;
+          const payload=await exportSelectedPayload(ids);
+          if(!payload.length){
+            alert('没有可导出的内容');
+            return;
+          }
+          const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.href=url;
+          a.download=`memo-selected-${buildTimestamp()}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(()=>URL.revokeObjectURL(url),1200);
+          break;
+        }
+        default:
+          break;
+      }
+    }catch(err){
+      alert(err instanceof Error ? err.message : '操作失败');
+    }
+  });
+}
+
+function getSelectedIds(){
+  return Array.from(selectedItems);
+}
+
+async function performBulkAction(op){
+  const ids=getSelectedIds();
+  if(!ids.length) return null;
+  const fd=new FormData();
+  fd.append('action','bulk_action');
+  fd.append('op',op);
+  fd.append('ids',ids.join(','));
+  const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok || !data || !data.ok){
+    const message=data && data.error ? data.error : '批量操作失败';
+    throw new Error(message);
+  }
+  return data;
+}
+
+async function exportSelectedPayload(ids){
+  const fd=new FormData();
+  fd.append('action','export_selected');
+  fd.append('ids',ids.join(','));
+  const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok || !data || !data.ok){
+    const message=data && data.error ? data.error : '导出失败';
+    throw new Error(message);
+  }
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+function getSelectedCards(){
+  if(!itemsContainer) return [];
+  return Array.from(itemsContainer.querySelectorAll('article.item')).filter(card=>selectedItems.has(card.dataset.id));
+}
+
+function moveSelection(direction){
+  if(!itemsContainer) return;
+  const cards=getSelectedCards();
+  if(!cards.length) return;
+  const ordered=(direction==='right' || direction==='down') ? cards.slice().reverse() : cards;
+  ordered.forEach(card=>{
+    moveCard(card.dataset.id, direction, {skipPersist:true});
+  });
+  sendOrder();
+}
+
+const searchInput=document.querySelector('.search input[name="q"]');
+const currentQuery=searchInput ? searchInput.value.trim() : '';
+if(currentQuery){
+  const escaped=currentQuery.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  if(escaped){
+    const pattern=new RegExp(escaped,'gi');
+    document.querySelectorAll('.item-title,.item-desc').forEach(node=>{
+      const html=node.innerHTML;
+      node.innerHTML=html.replace(pattern,match=>`<mark class="search-hit">${match}</mark>`);
+    });
+  }
+}
 if(memoImportButton && memoImportInput){
   const importButtonLabel=memoImportButton.textContent;
   memoImportButton.addEventListener('click',()=>{ memoImportInput.click(); });
@@ -6118,7 +6606,8 @@ function getColumnCount(){
   if(window.matchMedia('(max-width: 1200px)').matches) return 2;
   return 3;
 }
-function moveCard(id, direction){
+function moveCard(id, direction, opts){
+  opts = opts || {};
   const grid=$('#items'); if(!grid) return;
   const cards=$$('article.item');
   const index=cards.findIndex(card=>card.dataset.id===String(id));
@@ -6159,7 +6648,7 @@ function moveCard(id, direction){
   }else{
     grid.insertBefore(card, target);
   }
-  sendOrder();
+  if(!opts.skipPersist){ sendOrder(); }
 }
 function sendOrder(){
   const ids=$$('article.item').map(x=>x.dataset.id).join(',');
@@ -6215,25 +6704,64 @@ async function delCat(id, name){
   return false;
 }
 function refreshSidebarCats(cats, counts, total){
-  const qParam=new URL(location.href).searchParams.get('q')||'';
-  const urlCat=(new URL(location.href)).searchParams.get('cat')||'all';
+  const url=new URL(location.href);
+  const qParam=url.searchParams.get('q')||'';
+  const urlCat=url.searchParams.get('cat')||'all';
+  const filter=url.searchParams.get('filter')||currentFilter||'active';
   const list=document.getElementById('cat-list'); list.innerHTML='';
   const all=document.createElement('a');
   all.className='cat'+(urlCat==='all'?' active':'');
-  all.href='?cat=all&q='+encodeURIComponent(qParam);
+  all.href='?cat=all&filter='+encodeURIComponent(filter)+'&q='+encodeURIComponent(qParam);
   all.innerHTML='<span class="name">全部 · All</span><span class="count">'+(total??0)+'</span>';
   list.appendChild(all);
   cats.forEach(c=>{
     const link=document.createElement('a');
     link.className='cat'+(String(urlCat)===String(c.id)?' active':'');
     link.dataset.id=c.id;
-    link.href='?cat='+c.id+'&q='+encodeURIComponent(qParam);
+    link.href='?cat='+c.id+'&filter='+encodeURIComponent(filter)+'&q='+encodeURIComponent(qParam);
     link.innerHTML=`<span class="name">${escapeHtml(c.name)}</span><span class="count">${counts[c.id]||0}</span>`;
     list.appendChild(link);
   });
 }
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 if(itemsContainer){
+  itemsContainer.addEventListener('click',e=>{
+    const selectBtn=e.target.closest('.item-select');
+    if(selectBtn){
+      e.preventDefault();
+      const card=selectBtn.closest('article.item');
+      if(!card) return;
+      const id=card.dataset.id;
+      if(!id) return;
+      const targetState=!(selectBtn.getAttribute('aria-pressed')==='true');
+      if(e.shiftKey && lastSelectedId){
+        const cards=Array.from(itemsContainer.querySelectorAll('article.item'));
+        const currentIndex=cards.findIndex(el=>el.dataset.id===id);
+        const lastIndex=cards.findIndex(el=>el.dataset.id===lastSelectedId);
+        if(currentIndex>-1 && lastIndex>-1){
+          const [start,end]=currentIndex<lastIndex?[currentIndex,lastIndex]:[lastIndex,currentIndex];
+          for(let i=start;i<=end;i++){ setCardSelected(cards[i], targetState); }
+          lastSelectedId=id;
+          updateBulkBar();
+          return;
+        }
+      }
+      setCardSelected(card,targetState);
+      lastSelectedId=targetState?id:null;
+      updateBulkBar();
+      return;
+    }
+    const moveBtn=e.target.closest('[data-move][data-id]');
+    if(moveBtn){
+      e.preventDefault();
+      const id=moveBtn.dataset.id;
+      const dir=moveBtn.dataset.move;
+      if(id && dir){
+        moveCard(id, dir, {skipPersist:true});
+        sendOrder();
+      }
+    }
+  });
   itemsContainer.addEventListener('change', async (e)=>{
     const t=e.target;
     if(t.classList.contains('item-toggle')){
@@ -6247,14 +6775,13 @@ if(itemsContainer){
           card.dataset.categoryId=newCategoryId;
           card.classList.toggle('done', !!j.done);
           const badge=card.querySelector('.js-updated'); if(badge&&j.updated_at) badge.textContent='更新 '+fmt(j.updated_at);
-          const categoryBadge=card.querySelector('.meta .badge:not(.js-updated)');
+          const categoryBadge=card.querySelector('.item-badge');
           if(categoryBadge && j.category_label){ categoryBadge.textContent=j.category_label; }
-          if(currentCategoryFilter==='all'){
-            if(j.done){
-              card.remove();
-              ensureItemsEmptyState();
-            }
-          } else if(currentCategoryFilter!==newCategoryId){
+          if(selectedItems.has(id) && j.done){ selectedItems.delete(id); updateBulkBar(); }
+          if(currentCategoryFilter==='all' && currentFilter==='active' && j.done){
+            card.remove();
+            ensureItemsEmptyState();
+          } else if(currentCategoryFilter!==newCategoryId && currentCategoryFilter!=='all'){
             card.remove();
             ensureItemsEmptyState();
           }
@@ -6266,11 +6793,11 @@ if(itemsContainer){
       }catch(_){ }
     }
     if(t.classList.contains('step-toggle')){
-      const row=t.closest('.tlrow'); if(!row) return;
-      const stepId=row.querySelector('input[name="id"]').value;
-      const done=t.checked?1:0;
-      const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
-      try{
+          const row=t.closest('.tlrow'); if(!row) return;
+          const stepId=row.querySelector('input[name="id"]').value;
+          const done=t.checked?1:0;
+          const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
+          try{
         const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
         if(j && j.ok){
           row.classList.toggle('done', !!done);
