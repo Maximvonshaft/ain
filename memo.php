@@ -3802,6 +3802,11 @@ if ($view === 'map_edit') {
       .mind-relations .relation-core{stroke:rgba(75,195,209,.85);stroke-width:1.7;stroke-dasharray:8 10;filter:url(#mindSoftGlow)}
       .mind-relations .relation-highlight{stroke:rgba(255,255,255,.4);stroke-width:0.9;opacity:.6}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
+      .mind-link-inserts{position:absolute;inset:0;pointer-events:none;z-index:6}
+      .link-insert-btn{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:999px;border:1px solid rgba(201,168,106,.48);background:rgba(201,168,106,.16);color:var(--gold-400);font:600 18px/1 'Cinzel','Noto Serif SC',serif;box-shadow:0 0 18px rgba(227,198,139,.25);cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:transform var(--transition),background var(--transition),border-color var(--transition),box-shadow var(--transition)}
+      .link-insert-btn:hover{background:rgba(201,168,106,.24);border-color:rgba(227,198,139,.68);box-shadow:0 0 24px rgba(227,198,139,.35);transform:translate(-50%,-50%) scale(1.05)}
+      .link-insert-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .link-insert-btn span{pointer-events:none}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.18)}
@@ -3926,6 +3931,9 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <marker id="mindLinkArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+          <path d="M0 1 L10 6 L0 11 Z" fill="url(#mindGoldTrace)" />
+        </marker>
         <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
           <path d="M0 0 L12 6 L0 12 Z" fill="rgba(75,195,209,.9)" />
         </marker>
@@ -4737,6 +4745,9 @@ if ($view === 'map_edit') {
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
+          this.insertLayer=document.createElement('div');
+          this.insertLayer.className='mind-link-inserts';
+          this.viewport.appendChild(this.insertLayer);
           this.container.appendChild(this.viewport);
           this.sizeCache=new Map();
           this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
@@ -4752,6 +4763,8 @@ if ($view === 'map_edit') {
           this.relations=[];
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
+          this.insertButtons=new Map();
+          this.insertBetweenHandler=typeof this.options.onInsertBetween==='function'?this.options.onInsertBetween:null;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
@@ -5591,6 +5604,8 @@ if ($view === 'map_edit') {
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
           if(this.relationRegistry){ this.relationRegistry.clear(); }
+          if(this.insertLayer){ this.insertLayer.innerHTML=''; }
+          if(this.insertButtons){ this.insertButtons.clear(); }
           if(!this.root) return;
           const walk=(node)=>{
             node.el=this.buildNodeElement(node,{forMeasure:false});
@@ -5715,6 +5730,78 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          this.updateInsertHandle(node, route);
+        }
+        removeInsertHandle(node){
+          if(!node || !this.insertButtons) return;
+          const btn=this.insertButtons.get(node.id);
+          if(btn && btn.parentElement){ btn.remove(); }
+          if(this.insertButtons.has(node.id)){ this.insertButtons.delete(node.id); }
+          if(node.insertHandle){ node.insertHandle=null; }
+        }
+        updateInsertHandle(node, route){
+          if(!this.insertLayer || !this.insertButtons){ return; }
+          if(!node || !node.parent){ this.removeInsertHandle(node); return; }
+          if(!Array.isArray(route) || route.length<2){ this.removeInsertHandle(node); return; }
+          const segments=[];
+          let total=0;
+          for(let i=1;i<route.length;i++){
+            const prev=route[i-1];
+            const curr=route[i];
+            if(!prev || !curr) continue;
+            const length=Math.hypot(curr.x-prev.x, curr.y-prev.y);
+            if(!(length>0)) continue;
+            segments.push({start:prev,end:curr,length});
+            total+=length;
+          }
+          if(!segments.length || !(total>0)){ this.removeInsertHandle(node); return; }
+          let targetDistance=total/2;
+          let point=segments[segments.length-1].end;
+          for(const seg of segments){
+            if(targetDistance<=seg.length){
+              const ratio=seg.length?targetDistance/seg.length:0;
+              point={
+                x:seg.start.x + (seg.end.x-seg.start.x)*ratio,
+                y:seg.start.y + (seg.end.y-seg.start.y)*ratio
+              };
+              break;
+            }
+            targetDistance-=seg.length;
+          }
+          if(!point){ point=segments[segments.length-1].end; }
+          const parent=node.parent;
+          if(!parent){ this.removeInsertHandle(node); return; }
+          let btn=this.insertButtons.get(node.id);
+          const labelParent=parent.topic || '父节点';
+          const labelChild=node.topic || '子节点';
+          const ariaLabel=`在 ${labelParent} 与 ${labelChild} 之间插入节点`;
+          if(!btn){
+            btn=document.createElement('button');
+            btn.type='button';
+            btn.className='link-insert-btn';
+            btn.innerHTML='<span aria-hidden="true">＋</span>';
+            btn.title=ariaLabel;
+            btn.setAttribute('aria-label',ariaLabel);
+            btn.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              if(this.insertBetweenHandler){
+                this.insertBetweenHandler({parentId:parent.id, childId:node.id});
+              }
+            });
+            btn.addEventListener('pointerdown',evt=>evt.stopPropagation());
+            btn.addEventListener('mousedown',evt=>evt.stopPropagation());
+            this.insertLayer.appendChild(btn);
+            this.insertButtons.set(node.id, btn);
+            node.insertHandle=btn;
+          }else{
+            btn.title=ariaLabel;
+            btn.setAttribute('aria-label',ariaLabel);
+          }
+          btn.dataset.parentId=parent.id;
+          btn.dataset.childId=node.id;
+          btn.style.left=`${point.x}px`;
+          btn.style.top=`${point.y}px`;
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -6012,8 +6099,17 @@ if ($view === 'map_edit') {
     overlay.setAttribute('viewBox','0 0 100 100');
     const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
     ghostLine.setAttribute('opacity','0');
+    ghostLine.setAttribute('stroke','url(#mindGoldTrace)');
+    ghostLine.setAttribute('stroke-width','2.2');
+    ghostLine.setAttribute('stroke-linecap','round');
+    ghostLine.setAttribute('filter','url(#mindSoftGlow)');
+    ghostLine.setAttribute('marker-end','url(#mindLinkArrow)');
     const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
     ghostRing.setAttribute('opacity','0');
+    ghostRing.setAttribute('stroke','rgba(227,198,139,.8)');
+    ghostRing.setAttribute('stroke-width','1.4');
+    ghostRing.setAttribute('fill','rgba(227,198,139,.18)');
+    ghostRing.setAttribute('filter','url(#mindSoftGlow)');
     overlay.appendChild(ghostLine);
     overlay.appendChild(ghostRing);
     const jm=new jsMind({
@@ -6022,6 +6118,7 @@ if ($view === 'map_edit') {
         theme:'fresh-blue',
         support_html:true,
         mode:'full',
+        onInsertBetween:handleInsertBetweenRequest,
       });
       const blobUrlRegistry=new Set();
       const externalScriptCache=new Map();
@@ -6319,6 +6416,16 @@ if ($view === 'map_edit') {
         const result=pt.matrixTransform(matrix.inverse());
         return {x:result.x, y:result.y};
       }
+      function svgPointToClient(point){
+        if(!point) return {x:0,y:0};
+        const matrix=overlay.getScreenCTM();
+        if(!matrix){ return {x:point.x, y:point.y}; }
+        const pt=overlay.createSVGPoint();
+        pt.x=point.x;
+        pt.y=point.y;
+        const result=pt.matrixTransform(matrix);
+        return {x:result.x, y:result.y};
+      }
       function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
       function nodeCenterSvg(nodeId){
         if(!nodeId) return null;
@@ -6327,16 +6434,51 @@ if ($view === 'map_edit') {
         const rect=el.getBoundingClientRect();
         return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
       }
-      function showGhost(start,end){
+      function nodeClientRect(nodeId){
+        if(!nodeId) return null;
+        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+        return el ? el.getBoundingClientRect() : null;
+      }
+      function nodeCenterClient(nodeId){
+        const rect=nodeClientRect(nodeId);
+        if(!rect) return null;
+        return {x:rect.left + rect.width/2, y:rect.top + rect.height/2};
+      }
+      function edgePointFromRect(rect, originPoint){
+        if(!rect || !originPoint) return null;
+        const centerX=rect.left + rect.width/2;
+        const centerY=rect.top + rect.height/2;
+        let dx=originPoint.x - centerX;
+        let dy=originPoint.y - centerY;
+        if(dx===0 && dy===0){ dx=0.0001; dy=0.0001; }
+        const halfW=Math.max(1, rect.width/2);
+        const halfH=Math.max(1, rect.height/2);
+        const absDx=Math.abs(dx);
+        const absDy=Math.abs(dy);
+        let scale;
+        if(absDx/halfW > absDy/halfH){
+          scale=halfW/(absDx||1);
+        }else{
+          scale=halfH/(absDy||1);
+        }
+        return {
+          x:centerX + dx*scale,
+          y:centerY + dy*scale
+        };
+      }
+      function showGhost(start,end,options={}){
         if(!start || !end){ hideGhost(); return; }
+        const ringPoint=options.ringCenter || end;
+        const ringRadiusValue=options.ringRadius!=null?options.ringRadius:16;
+        const radius=Math.max(4, ringRadiusValue);
         ghostLine.setAttribute('x1', start.x);
         ghostLine.setAttribute('y1', start.y);
         ghostLine.setAttribute('x2', end.x);
         ghostLine.setAttribute('y2', end.y);
         ghostLine.setAttribute('opacity','1');
-        ghostRing.setAttribute('cx', end.x);
-        ghostRing.setAttribute('cy', end.y);
-        ghostRing.setAttribute('r', 16);
+        ghostRing.setAttribute('cx', ringPoint.x);
+        ghostRing.setAttribute('cy', ringPoint.y);
+        ghostRing.setAttribute('r', radius);
         ghostRing.setAttribute('opacity','1');
       }
       function hideGhost(){
@@ -6347,12 +6489,13 @@ if ($view === 'map_edit') {
         if(!handleSource){ return; }
         e.preventDefault();
         const origin=nodeCenterSvg(handleSource.id);
+        const originClient=nodeCenterClient(handleSource.id) || (origin ? svgPointToClient(origin) : null);
         if(!origin){ return; }
         syncOverlaySize();
         dragHandle.setPointerCapture(e.pointerId);
         dragHandle.classList.add('dragging');
         const initialPoint=eventToSvgPoint(e);
-        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
+        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin, originClient };
         showGhost(origin, initialPoint);
       });
       function finishPointerDrag(evt, cancelled){
@@ -6385,18 +6528,56 @@ if ($view === 'map_edit') {
       }
       window.addEventListener('pointermove',e=>{
         if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
+        const originSvg=pointerDragState.origin;
+        if(!originSvg){ return; }
         const hovered=document.elementFromPoint(e.clientX, e.clientY);
-        let ringPoint=eventToSvgPoint(e);
+        const originClient=pointerDragState.originClient || svgPointToClient(originSvg);
+        let linePoint=eventToSvgPoint(e);
+        let ringPoint=linePoint;
+        let ringRadius=16;
+        let hoveredId=null;
         if(hovered){
           const targetEl=hovered.closest('.jsmind-node');
           if(targetEl){
             const targetId=targetEl.getAttribute('nodeid');
-            const center=nodeCenterSvg(targetId);
-            if(center) ringPoint=center;
+            hoveredId=targetId||null;
+            const rect=targetEl.getBoundingClientRect();
+            if(rect){
+              const centerClient={x:rect.left + rect.width/2, y:rect.top + rect.height/2};
+              ringPoint=svgPointFromClient(centerClient.x, centerClient.y);
+              ringRadius=Math.max(20, Math.max(rect.width, rect.height)/2 + 12);
+              if(targetId && targetId!==pointerDragState.sourceId){
+                const referenceOrigin=originClient || {x:e.clientX, y:e.clientY};
+                const edgeClient=edgePointFromRect(rect, referenceOrigin);
+                if(edgeClient){
+                  const dx=referenceOrigin.x - centerClient.x;
+                  const dy=referenceOrigin.y - centerClient.y;
+                  const distance=Math.hypot(dx,dy);
+                  const edgeDistance=Math.hypot(edgeClient.x-centerClient.x, edgeClient.y-centerClient.y);
+                  if(distance>0 && edgeDistance>0){
+                    const ux=dx/distance;
+                    const uy=dy/distance;
+                    const clearanceBase=18;
+                    const maxClearance=Math.max(0, edgeDistance-4);
+                    const clearance=Math.min(clearanceBase, maxClearance);
+                    const adjustedClient={
+                      x:edgeClient.x + ux*clearance,
+                      y:edgeClient.y + uy*clearance
+                    };
+                    linePoint=svgPointFromClient(adjustedClient.x, adjustedClient.y);
+                  }else{
+                    linePoint=svgPointFromClient(edgeClient.x, edgeClient.y);
+                  }
+                }
+              }
+            }
           }
         }
-        pointerDragState.lastPoint=ringPoint;
-        showGhost(pointerDragState.origin, ringPoint);
+        pointerDragState.lastPoint=linePoint;
+        pointerDragState.lastRingCenter=ringPoint;
+        pointerDragState.lastRingRadius=ringRadius;
+        pointerDragState.hoveredId=hoveredId;
+        showGhost(originSvg, linePoint, {ringCenter:ringPoint, ringRadius:ringRadius});
       });
       window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
       window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
@@ -7150,6 +7331,71 @@ if ($view === 'map_edit') {
           });
         }
         return newNode;
+      }
+      function handleInsertBetweenRequest(payload){
+        if(!payload || !payload.parentId || !payload.childId) return;
+        commitInlineEditing();
+        const parent=jm.get_node(payload.parentId);
+        const child=jm.get_node(payload.childId);
+        if(!parent || !child || child.parent!==parent) return;
+        if(!Array.isArray(parent.children) || !parent.children.length) return;
+        const childIndex=parent.children.indexOf(child);
+        if(childIndex===-1) return;
+        const parentModelChildren=Array.isArray(parent.model && parent.model.children)?parent.model.children:[];
+        const childModelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===child.id);
+        const newNode=executeCreateNodeCommand({
+          parentId:parent.id,
+          topic:'新节点',
+          meta:{source:'insert-between', parentId:parent.id, childId:child.id}
+        });
+        if(!newNode) return;
+        const parentChildren=parent.children;
+        const newNodeIndex=parentChildren.indexOf(newNode);
+        if(newNodeIndex>-1){ parentChildren.splice(newNodeIndex,1); }
+        if(childIndex>-1 && parentChildren[childIndex]===child){ parentChildren.splice(childIndex,1); }
+        else{
+          const refreshedIndex=parent.children.indexOf(child);
+          if(refreshedIndex>-1){ parentChildren.splice(refreshedIndex,1); }
+        }
+        const parentModelChildrenList=Array.isArray(parent.model && parent.model.children)?parent.model.children:[];
+        const newModelIndex=parentModelChildrenList.findIndex(entry=>entry && entry.id===newNode.id);
+        if(newModelIndex>-1){ parentModelChildrenList.splice(newModelIndex,1); }
+        if(childModelIndex>-1 && parentModelChildrenList[childModelIndex] && parentModelChildrenList[childModelIndex].id===child.id){
+          parentModelChildrenList.splice(childModelIndex,1);
+        }else{
+          const refreshedModelIndex=parentModelChildrenList.findIndex(entry=>entry && entry.id===child.id);
+          if(refreshedModelIndex>-1){ parentModelChildrenList.splice(refreshedModelIndex,1); }
+        }
+        const insertIndex=childIndex>=0?Math.min(childIndex,parentChildren.length):parentChildren.length;
+        const modelInsertIndex=childModelIndex>=0?Math.min(childModelIndex,parentModelChildrenList.length):Math.min(insertIndex,parentModelChildrenList.length);
+        parentChildren.splice(insertIndex,0,newNode);
+        parentModelChildrenList.splice(modelInsertIndex,0,newNode.model);
+        newNode.children=[child];
+        newNode.model.children=[child.model];
+        newNode.direction=child.direction;
+        newNode.dir=child.dir;
+        if(newNode.model){ newNode.model.direction=child.model && child.model.direction ? child.model.direction : child.direction; }
+        child.parent=newNode;
+        const updateDepth=(node, depth)=>{
+          if(!node) return;
+          node.depth=depth;
+          if(node.model){ node.model.depth=depth; }
+          if(node.children && node.children.length){
+            node.children.forEach(childNode=>updateDepth(childNode, depth+1));
+          }
+        };
+        updateDepth(newNode, (parent.depth||0)+1);
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(newNode.id);
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const current=jm.get_node(newNode.id);
+          if(current){
+            startInlineEditing(current);
+            refreshInspector(current);
+          }
+        });
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
       function isProbablyUrl(text){
