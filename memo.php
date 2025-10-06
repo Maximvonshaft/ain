@@ -3790,6 +3790,10 @@ if ($view === 'map_edit') {
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:none;overflow:visible}
+      .mind-link-controls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
+      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;border:1px solid rgba(201,168,106,.6);background:rgba(201,168,106,.18);color:var(--gold-300);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.4);transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition)}
+      .mind-link-controls .edge-insert-btn:hover{background:rgba(201,168,106,.28);border-color:rgba(227,198,139,.85);box-shadow:0 12px 26px rgba(0,0,0,.48)}
+      .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.85);outline-offset:2px}
       .mind-links .trace-group{pointer-events:none}
       .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
@@ -3798,9 +3802,9 @@ if ($view === 'map_edit') {
       .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
       .mind-relations .relation-group{pointer-events:none}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-      .mind-relations .relation-shadow{stroke:rgba(75,195,209,.28);stroke-width:2.4;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-core{stroke:rgba(75,195,209,.85);stroke-width:1.7;stroke-dasharray:8 10;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-highlight{stroke:rgba(255,255,255,.4);stroke-width:0.9;opacity:.6}
+      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
@@ -3927,7 +3931,7 @@ if ($view === 'map_edit') {
           </feMerge>
         </filter>
         <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
-          <path d="M0 0 L12 6 L0 12 Z" fill="rgba(75,195,209,.9)" />
+          <path d="M0 0 L12 6 L0 12 Z" fill="#E3C68B" />
         </marker>
       </defs>
     </svg>
@@ -4723,6 +4727,9 @@ if ($view === 'map_edit') {
           this.relationLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.relationLayer.classList.add('mind-relations');
           this.viewport.appendChild(this.relationLayer);
+          this.linkControlLayer=document.createElement('div');
+          this.linkControlLayer.className='mind-link-controls';
+          this.viewport.appendChild(this.linkControlLayer);
           this.guideLayer=document.createElement('div');
           this.guideLayer.className='mind-guides';
           this.guideLayer.style.position='absolute';
@@ -5024,6 +5031,81 @@ if ($view === 'map_edit') {
           this.select_node(newId);
           this.emit(SimpleMind.event_type.update);
           return node;
+        }
+        insert_node_between(parentId, childId, options){
+          const parent=typeof parentId==='string'?this.get_node(parentId):parentId;
+          const child=typeof childId==='string'?this.get_node(childId):childId;
+          if(!parent || !child || child.parent!==parent) return null;
+          const childIndex=parent.children?parent.children.indexOf(child):-1;
+          if(childIndex===-1) return null;
+          let newId=null;
+          if(options && typeof options.id==='string' && options.id.trim()!==''){ newId=options.id.trim(); }
+          if(!newId){
+            do { newId='node-'+Math.random().toString(36).slice(2,10); }
+            while(this.nodes.has(newId));
+          }
+          const topic=(options && typeof options.topic==='string' && options.topic.trim()!=='')?options.topic.trim():'新节点';
+          const normalized=normalizeNodeData(options && options.data ? options.data : {});
+          const style=options && options.style ? JSON.parse(JSON.stringify(options.style)) : null;
+          const meta=options && options.meta ? JSON.parse(JSON.stringify(options.meta)) : null;
+          const direction=child.direction || child.dir || parent.direction || 'right';
+          const newModel={
+            id:newId,
+            topic:topic,
+            data:normalized,
+            children:[],
+            direction:direction,
+            expanded:true,
+          };
+          if(style){ newModel.style=JSON.parse(JSON.stringify(style)); }
+          if(meta){ newModel.meta=JSON.parse(JSON.stringify(meta)); }
+          const newNode={
+            id:newId,
+            topic:topic,
+            data:normalized,
+            parent:parent,
+            children:[],
+            direction:direction,
+            expanded:true,
+            isroot:false,
+            style:style,
+            meta:meta,
+            model:newModel,
+            depth:(parent.depth||0)+1,
+          };
+          const parentModelChildren=this.ensureModelChildren(parent);
+          const modelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===child.id);
+          const insertIndex=modelIndex===-1?parentModelChildren.length:modelIndex;
+          parentModelChildren.splice(insertIndex,0,newModel);
+          if(!Array.isArray(parent.children)){ parent.children=[]; }
+          parent.children.splice(childIndex,0,newNode);
+          const removeIndex=parent.children.indexOf(child);
+          if(removeIndex!==-1){ parent.children.splice(removeIndex,1); }
+          const removeModelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===child.id);
+          if(removeModelIndex!==-1){ parentModelChildren.splice(removeModelIndex,1); }
+          newModel.children=newModel.children||[];
+          if(child.model){ newModel.children.push(child.model); }
+          else{
+            newModel.children.push({id:child.id,topic:child.topic,data:child.data,children:[]});
+          }
+          newNode.children.push(child);
+          child.parent=newNode;
+          const updateDepths=(node, depth)=>{
+            if(!node) return;
+            node.depth=depth;
+            if(node.model){ node.model.depth=depth; }
+            if(node.children && node.children.length){
+              node.children.forEach(kid=>updateDepths(kid, depth+1));
+            }
+          };
+          updateDepths(newNode, (parent.depth||0)+1);
+          updateDepths(child, (newNode.depth||0)+1);
+          this.nodes.set(newId,newNode);
+          this.computeLayout();
+          this.render();
+          this.select_node(newId);
+          this.emit(SimpleMind.event_type.update);
+          return this.nodes.get(newId) || null;
         }
         remove_node(id){
           const node=this.nodes.get(id);
@@ -5438,6 +5520,10 @@ if ($view === 'map_edit') {
             this.relationLayer.style.width=`${this.bounds.width}px`;
             this.relationLayer.style.height=`${this.bounds.height}px`;
           }
+          if(this.linkControlLayer){
+            this.linkControlLayer.style.width=`${this.bounds.width}px`;
+            this.linkControlLayer.style.height=`${this.bounds.height}px`;
+          }
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
@@ -5587,6 +5673,7 @@ if ($view === 'map_edit') {
         render(){
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          if(this.linkControlLayer){ this.linkControlLayer.innerHTML=''; }
           if(this.relationLayer){ while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); } }
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
@@ -5634,6 +5721,7 @@ if ($view === 'map_edit') {
           };
           walk(this.root);
           this.renderRelations();
+          this.updateEdgeButtonScale();
           this.applyTransform(true);
         }
         renderRelations(){
@@ -5715,6 +5803,92 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          const routePoints=(Array.isArray(route) && route.length>=2)?route:[start,end];
+          this.positionEdgeInsertButton(node, routePoints);
+        }
+        ensureEdgeInsertButton(node){
+          if(!node || !node.parent || !this.linkControlLayer) return null;
+          if(node.edgeButton && !node.edgeButton.isConnected){ node.edgeButton=null; }
+          let btn=node.edgeButton||null;
+          if(!btn){
+            btn=document.createElement('button');
+            btn.type='button';
+            btn.className='edge-insert-btn';
+            btn.textContent='＋';
+            btn.title='在该连线上插入节点';
+            btn.setAttribute('aria-label','在该连线上插入节点');
+            btn.dataset.parent=node.parent.id;
+            btn.dataset.child=node.id;
+            const stopPropagation=evt=>{ if(evt){ evt.stopPropagation(); } };
+            btn.addEventListener('pointerdown',stopPropagation);
+            btn.addEventListener('mousedown',stopPropagation);
+            btn.addEventListener('touchstart',stopPropagation,{passive:true});
+            btn.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              if(typeof this.options.onInsertBetween==='function'){
+                try{ this.options.onInsertBetween(node.parent, node); }
+                catch(err){ console.error(err); }
+              }
+            });
+            this.linkControlLayer.appendChild(btn);
+            node.edgeButton=btn;
+          }
+          btn.dataset.parent=node.parent.id;
+          btn.dataset.child=node.id;
+          return btn;
+        }
+        computeRouteMidpoint(points){
+          if(!Array.isArray(points) || !points.length) return null;
+          let total=0;
+          for(let i=1;i<points.length;i++){
+            const prev=points[i-1];
+            const current=points[i];
+            total+=Math.hypot(current.x-prev.x, current.y-prev.y);
+          }
+          if(total<=0){
+            const first=points[0];
+            return first?{x:first.x,y:first.y}:null;
+          }
+          let traversed=0;
+          const halfway=total/2;
+          for(let i=1;i<points.length;i++){
+            const prev=points[i-1];
+            const current=points[i];
+            const segment=Math.hypot(current.x-prev.x, current.y-prev.y);
+            if(segment<=0){
+              continue;
+            }
+            if(traversed+segment>=halfway){
+              const ratio=(halfway-traversed)/segment;
+              return {
+                x:prev.x + (current.x-prev.x)*ratio,
+                y:prev.y + (current.y-prev.y)*ratio,
+              };
+            }
+            traversed+=segment;
+          }
+          const last=points[points.length-1];
+          return last?{x:last.x,y:last.y}:null;
+        }
+        positionEdgeInsertButton(node, points){
+          if(!node || !node.parent || !Array.isArray(points) || points.length<2) return;
+          const btn=this.ensureEdgeInsertButton(node);
+          if(!btn) return;
+          const mid=this.computeRouteMidpoint(points);
+          if(!mid){ btn.hidden=true; return; }
+          btn.hidden=false;
+          btn.style.left=`${mid.x}px`;
+          btn.style.top=`${mid.y}px`;
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          btn.style.setProperty('--edge-scale', (1/scale).toFixed(3));
+        }
+        updateEdgeButtonScale(){
+          if(!this.linkControlLayer) return;
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const factor=(1/scale).toFixed(3);
+          const buttons=this.linkControlLayer.querySelectorAll('.edge-insert-btn');
+          buttons.forEach(btn=>btn.style.setProperty('--edge-scale', factor));
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -5725,20 +5899,38 @@ if ($view === 'map_edit') {
           if(!fromNode || !toNode) return;
           if(!fromNode.anchors) this.updateAnchors(fromNode);
           if(!toNode.anchors) this.updateAnchors(toNode);
-          const start=fromNode.anchors ? fromNode.anchors.center : null;
-          const end=toNode.anchors ? toNode.anchors.center : null;
-          if(!start || !end) return;
-          const dx=end.x-start.x;
-          const dy=end.y-start.y;
+          const startCenter=fromNode.anchors ? fromNode.anchors.center : null;
+          const endCenter=toNode.anchors ? toNode.anchors.center : null;
+          if(!startCenter || !endCenter) return;
+          const startInner=this.computeNodeBoundaryPoint(fromNode, {x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y}, 6);
+          const endInner=this.computeNodeBoundaryPoint(toNode, {x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y}, 6);
+          if(!startInner || !endInner) return;
+          let vector={x:endInner.x-startInner.x,y:endInner.y-startInner.y};
+          let segmentLength=Math.hypot(vector.x, vector.y);
+          if(segmentLength<0.001){
+            vector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
+            segmentLength=Math.hypot(vector.x, vector.y);
+            if(segmentLength<0.001) return;
+            startInner={x:startCenter.x,y:startCenter.y};
+            endInner={x:endCenter.x,y:endCenter.y};
+          }
+          const norm={x:vector.x/segmentLength,y:vector.y/segmentLength};
+          const arrowBase=Math.min(24, Math.max(8, segmentLength*0.18));
+          const arrowOffset=Math.min(segmentLength*0.45, arrowBase);
+          const startOffset=relation.bidirectional ? arrowOffset : 0;
+          const startPoint={x:startInner.x - norm.x*startOffset,y:startInner.y - norm.y*startOffset};
+          const endPoint={x:endInner.x + norm.x*arrowOffset,y:endInner.y + norm.y*arrowOffset};
+          const dx=endPoint.x-startPoint.x;
+          const dy=endPoint.y-startPoint.y;
           const distance=Math.hypot(dx,dy) || 1;
           const normalX=distance?-dy/distance:0;
           const normalY=distance?dx/distance:0;
           const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=start.x + dx*0.25 + normalX*offset;
-          const ctrl1y=start.y + dy*0.25 + normalY*offset;
-          const ctrl2x=start.x + dx*0.75 - normalX*offset;
-          const ctrl2y=start.y + dy*0.75 - normalY*offset;
-          const pathData=`M${start.x} ${start.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${end.x} ${end.y}`;
+          const ctrl1x=startPoint.x + dx*0.25 + normalX*offset;
+          const ctrl1y=startPoint.y + dy*0.25 + normalY*offset;
+          const ctrl2x=startPoint.x + dx*0.75 - normalX*offset;
+          const ctrl2y=startPoint.y + dy*0.75 - normalY*offset;
+          const pathData=`M${startPoint.x} ${startPoint.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${endPoint.x} ${endPoint.y}`;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
@@ -5746,6 +5938,31 @@ if ($view === 'map_edit') {
           if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
           else{ entry.core.removeAttribute('marker-start'); }
           entry.relation=relation;
+        }
+        computeNodeBoundaryPoint(node, directionVector, padding){
+          if(!node || !directionVector) return null;
+          const width=Math.max(1, node.width || (node.el?node.el.offsetWidth:0) || 0);
+          const height=Math.max(1, node.height || (node.el?node.el.offsetHeight:0) || 0);
+          const halfW=width/2 + (padding||0);
+          const halfH=height/2 + (padding||0);
+          let dx=typeof directionVector.x==='number'?directionVector.x:0;
+          let dy=typeof directionVector.y==='number'?directionVector.y:0;
+          const tiny=1e-6;
+          if(Math.abs(dx)<tiny && Math.abs(dy)<tiny){
+            return {x:node.absX,y:node.absY};
+          }
+          if(Math.abs(dx)<tiny){ dx=dx>=0?tiny:-tiny; }
+          if(Math.abs(dy)<tiny){ dy=dy>=0?tiny:-tiny; }
+          const absDx=Math.abs(dx);
+          const absDy=Math.abs(dy);
+          let scale;
+          if(absDx<tiny){ scale=halfH/absDy; }
+          else if(absDy<tiny){ scale=halfW/absDx; }
+          else{ scale=Math.min(halfW/absDx, halfH/absDy); }
+          return {
+            x:node.absX + dx*scale,
+            y:node.absY + dy*scale,
+          };
         }
         updateRelationsForNode(node){
           if(!node || !this.relationRegistry || !this.relationRegistry.size) return;
@@ -5873,6 +6090,7 @@ if ($view === 'map_edit') {
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
           this.viewport.style.transform=transform;
+          this.updateEdgeButtonScale();
         }
         zoom(step){
           const prev=this.scale;
@@ -6022,6 +6240,7 @@ if ($view === 'map_edit') {
         theme:'fresh-blue',
         support_html:true,
         mode:'full',
+        onInsertBetween:(parent, child)=>handleInsertBetweenNodes(parent, child),
       });
       const blobUrlRegistry=new Set();
       const externalScriptCache=new Map();
@@ -7277,6 +7496,22 @@ if ($view === 'map_edit') {
         }
         commitInlineEditing();
         await attachFilesToNode(targetNode, files);
+      }
+      function handleInsertBetweenNodes(parentNode, childNode){
+        if(!parentNode || !childNode || typeof jm.insert_node_between!=='function') return;
+        commitInlineEditing();
+        const created=jm.insert_node_between(parentNode.id, childNode.id, {topic:'新节点'});
+        if(!created) return;
+        markDirty();
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const latest=jm.get_node(created.id);
+          if(latest){
+            jm.select_node(latest.id);
+            refreshInspector(latest);
+            startInlineEditing(latest);
+          }
+        });
       }
       function addSiblingNode(){
         const node=ensureNode();
