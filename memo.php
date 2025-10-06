@@ -126,6 +126,20 @@ function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POS
 function is_ajax(): bool { return !empty($_SERVER['HTTP_X_REQUESTED_WITH']); }
 function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
 function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
+function attachment_icon_for_mime(string $mime, string $name=''): string {
+  $lower=strtolower($mime);
+  $nameLower=strtolower($name);
+  if($lower!=='' && str_starts_with($lower,'image/')) return '🖼';
+  if(str_starts_with($lower,'video/') || preg_match('/\.(mp4|webm|ogv|mov|m4v|avi|mkv)$/i',$nameLower)) return '🎬';
+  if(str_starts_with($lower,'audio/') || preg_match('/\.(mp3|wav|flac|aac|m4a|ogg)$/i',$nameLower)) return '🎵';
+  if(str_contains($lower,'word') || preg_match('/\.(docx?|rtf)$/i',$nameLower)) return '📝';
+  if(str_contains($lower,'sheet') || preg_match('/\.(xlsx?|csv)$/i',$nameLower)) return '📊';
+  if(str_contains($lower,'presentation') || preg_match('/\.(pptx?|key)$/i',$nameLower)) return '📽';
+  if(str_contains($lower,'pdf') || str_ends_with($nameLower,'.pdf')) return '📄';
+  if(str_contains($lower,'zip') || str_ends_with($nameLower,'.zip')) return '🗜';
+  if(str_contains($lower,'rar') || str_ends_with($nameLower,'.rar')) return '📦';
+  return '📎';
+}
 function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
 
 if(!function_exists('array_is_list')){
@@ -1233,22 +1247,26 @@ if ($view === 'new') {
       .editbox textarea{width:100%;min-height:260px;padding:14px;border-radius:var(--r-md);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.82);color:var(--text-strong);font:500 15px/1.6 'Noto Sans SC','Inter',sans-serif;letter-spacing:.03em;resize:vertical;transition:border-color var(--transition),box-shadow var(--transition)}
       .editbox textarea::placeholder{color:var(--text-muted)}
       .editbox textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.24)}
-      .preview{max-height:60vh;overflow:auto;background-image:linear-gradient(120deg,rgba(201,168,106,.06),transparent 55%)}
-      .preview::-webkit-scrollbar{width:8px}
-      .preview::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
-      .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
-      .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
-      .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1);flex:1 1 240px;max-width:260px}
-      .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb-preview-box{padding:12px;display:flex;align-items:center;justify-content:center;background:rgba(9,12,14,.7)}
-      .thumb-link{display:block;width:100%}
-      .thumb img{display:block;width:100%;height:auto;max-height:180px;object-fit:contain}
-      .thumb-placeholder{width:100%;padding:36px 0;border:0;background:none;color:var(--gold-400);font-size:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform var(--transition)}
-      .thumb-placeholder:hover{transform:scale(1.05)}
-      .thumb-info{padding:10px 12px 12px;display:grid;gap:8px}
-      .thumb-buttons{display:flex;gap:8px;flex-wrap:wrap}
-      .thumb form{margin:0}
+      .preview{display:flex;flex-direction:column;gap:16px;max-height:60vh;overflow:hidden;background-image:linear-gradient(120deg,rgba(201,168,106,.06),transparent 55%)}
+      .attachment-panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+      .attachment-panel-title{margin:0;font:600 15px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400)}
+      .attachment-panel-hint{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-count{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase}
+      .attachment-list{flex:1 1 auto;display:flex;flex-direction:column;gap:12px;overflow:auto;padding-right:4px}
+      .attachment-list::-webkit-scrollbar{width:8px}
+      .attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
+      .attachment-empty{padding:24px;border:1px dashed rgba(201,168,106,.26);border-radius:12px;color:var(--text-muted);text-align:center;font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.06em;background:rgba(10,14,16,.6)}
+      .attachment-row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:14px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);box-shadow:inset 0 0 0 1px rgba(201,168,106,.12)}
+      .attachment-row-main{display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0}
+      .attachment-icon-button{border:1px solid rgba(201,168,106,.36);background:rgba(15,19,22,.86);color:var(--gold-400);border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:transform var(--transition),border-color var(--transition)}
+      .attachment-icon-button:hover{transform:translateY(-1px);border-color:rgba(201,168,106,.52)}
+      .attachment-row-info{display:grid;gap:6px;flex:1;min-width:0}
+      .attachment-name-button{background:none;border:0;padding:0;margin:0;text-align:left;font:600 15px/1.5 'Noto Sans SC','Inter',sans-serif;color:var(--text-strong);cursor:pointer;word-break:break-word}
+      .attachment-name-button:hover{text-decoration:underline}
+      .attachment-meta{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      .attachment-row-actions form{margin:0}
+      .attachment-row-actions .btn{min-width:0}
       .att-meta{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
       .timeline{position:relative;margin-top:20px;margin-left:16px;padding-left:32px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.6),rgba(201,168,106,.1));box-shadow:0 0 18px rgba(227,198,139,.28)}
@@ -1300,8 +1318,16 @@ if ($view === 'new') {
               </div>
             </div>
             <div class="preview">
-              <div class="md-body" id="md-view"><span style="color:var(--text-dim)">预览区域</span></div>
-              <div class="thumbs" id="thumbs"></div>
+              <div class="attachment-panel-header">
+                <div>
+                  <h3 class="attachment-panel-title">附件列表</h3>
+                  <div class="attachment-count" data-attachment-count>暂无附件</div>
+                </div>
+                <div class="attachment-panel-hint">使用左侧「插入附件到备注」按钮上传或拖放文件。</div>
+              </div>
+              <div class="attachment-list is-empty" id="attachment-list">
+                <div class="attachment-empty" data-role="empty">暂无附件，使用左侧按钮上传或拖放文件。</div>
+              </div>
             </div>
           </div>
         </form>
@@ -1410,45 +1436,653 @@ if ($view === 'new') {
           div.textContent=message||'预览失败';
           showContent(div);
         };
-        const showList=entries=>{
-          const list=document.createElement('ul');
-          list.className='attachment-preview-list';
-          entries.forEach(entry=>{
-            const li=document.createElement('li');
-            const label=document.createElement('span');
-            label.textContent=entry.label;
-            li.appendChild(label);
-            if(entry.size){
-              const sizeSpan=document.createElement('span');
-              sizeSpan.className='entry-size';
-              sizeSpan.textContent=entry.size;
-              li.appendChild(sizeSpan);
-            }
-            list.appendChild(li);
-          });
-          showContent(list);
-        };
         const renderMedia=(type,url,mime)=>{
-          const el=type==='video'?document.createElement('video'):type==='pdf'?document.createElement('iframe'):document.createElement('img');
-          if(type==='video'){
+          const el=type==='video'?document.createElement('video'):
+            type==='pdf'?document.createElement('iframe'):
+            type==='audio'?document.createElement('audio'):
+            document.createElement('img');
+          if(type==='video' || type==='audio'){
             el.controls=true;
             el.preload='metadata';
           }
           if(type==='pdf'){ el.type=mime||'application/pdf'; }
           el.src=url;
           if(type==='video'){ el.classList.add('attachment-preview-video'); }
+          if(type==='audio'){ el.classList.add('attachment-preview-audio'); }
           if(type==='pdf'){ el.setAttribute('title','PDF 预览'); }
           showContent(el);
         };
         const detectType=source=>{
           const mime=(source.mime||'').toLowerCase();
           const name=(source.name||'').toLowerCase();
+          const hasExt=ext=>name.endsWith(ext);
           if(mime.startsWith('image/')) return 'image';
-          if(mime==='video/mp4' || (mime.startsWith('video/') && name.endsWith('.mp4'))) return 'video';
-          if(mime==='application/pdf' || name.endsWith('.pdf')) return 'pdf';
-          if(mime.includes('zip') || name.endsWith('.zip')) return 'zip';
-          if(mime.includes('rar') || name.endsWith('.rar')) return 'rar';
+          if(mime.startsWith('video/') || ['.mp4','.webm','.ogv','.mov','.m4v','.avi','.mkv'].some(hasExt)) return 'video';
+          if(mime.startsWith('audio/') || ['.mp3','.wav','.flac','.aac','.m4a','.ogg','.oga','.opus'].some(hasExt)) return 'audio';
+          if(mime==='application/pdf' || hasExt('.pdf')) return 'pdf';
+          if(mime.includes('wordprocessingml') || hasExt('.docx')) return 'docx';
+          if(mime==='application/msword' || hasExt('.doc')) return 'doc';
+          if(mime.includes('spreadsheetml') || hasExt('.xlsx')) return 'xlsx';
+          if(mime==='application/vnd.ms-excel' || hasExt('.xls')) return 'xls';
+          if(mime.startsWith('text/') || ['.txt','.md','.csv','.json','.log'].some(hasExt)) return 'text';
+          if(mime.includes('zip') || hasExt('.zip')) return 'zip';
+          if(mime.includes('rar') || hasExt('.rar')) return 'rar';
           return 'other';
+        };
+        const buildArchiveTree=entries=>{
+          const normalizePath=path=>String(path||'').replace(/^[\\/]+/,'').replace(/\\/g,'/').trim();
+          const createNode=(name,parent)=>({ name, parent, dirs:new Map(), files:[], path:parent ? parent.path.concat(name) : [] });
+          const root=createNode('', null);
+          root.path=[];
+          const ensureDir=(node, segment)=>{
+            if(!node.dirs.has(segment)){
+              node.dirs.set(segment, createNode(segment,node));
+            }
+            return node.dirs.get(segment);
+          };
+          entries.forEach(entry=>{
+            const clean=normalizePath(entry.path || entry.name || '');
+            if(!clean) return;
+            const segments=clean.split('/').filter(Boolean);
+            if(!segments.length) return;
+            if(entry.directory){
+              let dirNode=root;
+              segments.forEach(segment=>{ dirNode=ensureDir(dirNode, segment); });
+            }
+            let node=root;
+            segments.forEach((segment, idx)=>{
+              const isLast=idx===segments.length-1;
+              if(isLast && !entry.directory){
+                node.files.push({ name: segment, size: entry.size || 0 });
+              }else{
+                node=ensureDir(node, segment);
+              }
+            });
+          });
+          const computeSizes=node=>{
+            let total=0;
+            node.files.forEach(file=>{ total+=file.size||0; });
+            node.dirs.forEach(child=>{ total+=computeSizes(child); });
+            node.totalSize=total;
+            return total;
+          };
+          computeSizes(root);
+          return root;
+        };
+        const createArchiveBrowser=(entries, archiveType='压缩包')=>{
+          const root=buildArchiveTree(entries);
+          const container=document.createElement('div');
+          container.className='archive-browser';
+          const header=document.createElement('div');
+          header.className='archive-browser-header';
+          const title=document.createElement('div');
+          title.className='archive-browser-title';
+          title.textContent=`${(archiveType||'压缩包').toUpperCase()} 内容`;
+          header.appendChild(title);
+          container.appendChild(header);
+          const breadcrumb=document.createElement('div');
+          breadcrumb.className='archive-browser-breadcrumb';
+          container.appendChild(breadcrumb);
+          const list=document.createElement('div');
+          list.className='archive-browser-list';
+          container.appendChild(list);
+          let current=root;
+          const renderBreadcrumb=()=>{
+            breadcrumb.innerHTML='';
+            const chain=[];
+            let pointer=current;
+            while(pointer){ chain.unshift(pointer); pointer=pointer.parent; }
+            chain.forEach((node, idx)=>{
+              if(idx>0){
+                const sep=document.createElement('span');
+                sep.className='archive-breadcrumb-sep';
+                sep.textContent='/';
+                breadcrumb.appendChild(sep);
+              }
+              if(idx===chain.length-1){
+                const span=document.createElement('span');
+                span.className='archive-breadcrumb-current';
+                span.textContent=node===root?'根目录':(node.name||'子目录');
+                breadcrumb.appendChild(span);
+              }else{
+                const btn=document.createElement('button');
+                btn.type='button';
+                btn.className='archive-breadcrumb-link';
+                btn.textContent=node===root?'根目录':(node.name||'子目录');
+                btn.addEventListener('click',()=>{ current=node; render(); });
+                breadcrumb.appendChild(btn);
+              }
+            });
+          };
+          const renderList=()=>{
+            list.innerHTML='';
+            const dirs=Array.from(current.dirs.values()).sort((a,b)=>a.name.localeCompare(b.name,'zh-Hans'));
+            const files=current.files.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hans'));
+            if(current!==root){
+              const up=document.createElement('button');
+              up.type='button';
+              up.className='archive-entry archive-entry-up';
+              up.textContent='⬅ 返回上级';
+              up.addEventListener('click',()=>{ if(current.parent){ current=current.parent; render(); } });
+              list.appendChild(up);
+            }
+            if(!dirs.length && !files.length){
+              const empty=document.createElement('div');
+              empty.className='archive-empty';
+              empty.textContent='该目录为空。';
+              list.appendChild(empty);
+              return;
+            }
+            dirs.forEach(dir=>{
+              const row=document.createElement('button');
+              row.type='button';
+              row.className='archive-entry archive-entry-dir';
+              const nameSpan=document.createElement('span');
+              nameSpan.className='archive-entry-name';
+              nameSpan.textContent=`📁 ${dir.name||'子目录'}`;
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='archive-entry-size';
+              sizeSpan.textContent=dir.totalSize ? formatBytes(dir.totalSize) : '';
+              row.appendChild(nameSpan);
+              row.appendChild(sizeSpan);
+              row.addEventListener('click',()=>{ current=dir; render(); });
+              list.appendChild(row);
+            });
+            files.forEach(file=>{
+              const row=document.createElement('div');
+              row.className='archive-entry archive-entry-file';
+              const nameSpan=document.createElement('span');
+              nameSpan.className='archive-entry-name';
+              nameSpan.textContent=`📄 ${file.name}`;
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='archive-entry-size';
+              sizeSpan.textContent=file.size ? formatBytes(file.size) : '';
+              row.appendChild(nameSpan);
+              row.appendChild(sizeSpan);
+              list.appendChild(row);
+            });
+          };
+          const render=()=>{ renderBreadcrumb(); renderList(); };
+          render();
+          return container;
+        };
+        const showArchiveEntries=(entries, archiveType)=>{
+          const browser=createArchiveBrowser(entries, archiveType);
+          showContent(browser);
+        };
+        const loadTextPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='读取文本…';
+          try{
+            const buffer=await loadBuffer(source);
+            let text='';
+            try{
+              text=new TextDecoder('utf-8',{fatal:false}).decode(new Uint8Array(buffer));
+            }catch(_){
+              text=new TextDecoder().decode(new Uint8Array(buffer));
+            }
+            const pre=document.createElement('pre');
+            pre.className='text-preview';
+            pre.textContent=text;
+            showContent(pre);
+          }catch(err){ throw err; }
+        };
+        const loadDocxPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='解析文档…';
+          try{
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
+            if(!window.mammoth) throw new Error('解析库未加载');
+            const result=await window.mammoth.convertToHtml({arrayBuffer:buffer});
+            const div=document.createElement('div');
+            div.className='docx-preview';
+            div.innerHTML=result && result.value ? result.value : '<p>（空文档）</p>';
+            showContent(div);
+          }catch(err){ throw err; }
+        };
+        const loadSpreadsheetPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='解析表格…';
+          try{
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+            if(!window.XLSX) throw new Error('解析库未加载');
+            const workbook=window.XLSX.read(new Uint8Array(buffer),{type:'array'});
+            const wrapper=document.createElement('div');
+            wrapper.className='sheet-preview';
+            if(!workbook.SheetNames.length){
+              const empty=document.createElement('div');
+              empty.className='archive-empty';
+              empty.textContent='表格为空。';
+              wrapper.appendChild(empty);
+            }else{
+              workbook.SheetNames.forEach((sheetName,index)=>{
+                const sheet=workbook.Sheets[sheetName];
+                const section=document.createElement('section');
+                section.className='sheet-preview-sheet';
+                const heading=document.createElement('h3');
+                heading.textContent=`工作表 ${index+1}: ${sheetName}`;
+                section.appendChild(heading);
+                const tableContainer=document.createElement('div');
+                tableContainer.className='sheet-preview-table';
+                tableContainer.innerHTML=window.XLSX.utils.sheet_to_html(sheet,{header:'',footer:''});
+                section.appendChild(tableContainer);
+                wrapper.appendChild(section);
+              });
+            }
+            showContent(wrapper);
+          }catch(err){ throw err; }
+        };
+        const buildArchiveTree=entries=>{
+          const normalizePath=path=>String(path||'').replace(/^[\\/]+/,'').replace(/\\/g,'/').trim();
+          const createNode=(name,parent)=>({ name, parent, dirs:new Map(), files:[], path:parent ? parent.path.concat(name) : [] });
+          const root=createNode('', null);
+          root.path=[];
+          const ensureDir=(node, segment)=>{
+            if(!node.dirs.has(segment)){
+              node.dirs.set(segment, createNode(segment,node));
+            }
+            return node.dirs.get(segment);
+          };
+          entries.forEach(entry=>{
+            const clean=normalizePath(entry.path || entry.name || '');
+            if(!clean) return;
+            const segments=clean.split('/').filter(Boolean);
+            if(!segments.length) return;
+            if(entry.directory){
+              let dirNode=root;
+              segments.forEach(segment=>{ dirNode=ensureDir(dirNode, segment); });
+            }
+            let node=root;
+            segments.forEach((segment, idx)=>{
+              const isLast=idx===segments.length-1;
+              if(isLast && !entry.directory){
+                node.files.push({ name: segment, size: entry.size || 0 });
+              }else{
+                node=ensureDir(node, segment);
+              }
+            });
+          });
+          const computeSizes=node=>{
+            let total=0;
+            node.files.forEach(file=>{ total+=file.size||0; });
+            node.dirs.forEach(child=>{ total+=computeSizes(child); });
+            node.totalSize=total;
+            return total;
+          };
+          computeSizes(root);
+          return root;
+        };
+        const createArchiveBrowser=(entries, archiveType='压缩包')=>{
+          const root=buildArchiveTree(entries);
+          const container=document.createElement('div');
+          container.className='archive-browser';
+          const header=document.createElement('div');
+          header.className='archive-browser-header';
+          const title=document.createElement('div');
+          title.className='archive-browser-title';
+          title.textContent=`${(archiveType||'压缩包').toUpperCase()} 内容`;
+          header.appendChild(title);
+          container.appendChild(header);
+          const breadcrumb=document.createElement('div');
+          breadcrumb.className='archive-browser-breadcrumb';
+          container.appendChild(breadcrumb);
+          const list=document.createElement('div');
+          list.className='archive-browser-list';
+          container.appendChild(list);
+          let current=root;
+          const renderBreadcrumb=()=>{
+            breadcrumb.innerHTML='';
+            const chain=[];
+            let pointer=current;
+            while(pointer){ chain.unshift(pointer); pointer=pointer.parent; }
+            chain.forEach((node, idx)=>{
+              if(idx>0){
+                const sep=document.createElement('span');
+                sep.className='archive-breadcrumb-sep';
+                sep.textContent='/';
+                breadcrumb.appendChild(sep);
+              }
+              if(idx===chain.length-1){
+                const span=document.createElement('span');
+                span.className='archive-breadcrumb-current';
+                span.textContent=node===root?'根目录':(node.name||'子目录');
+                breadcrumb.appendChild(span);
+              }else{
+                const btn=document.createElement('button');
+                btn.type='button';
+                btn.className='archive-breadcrumb-link';
+                btn.textContent=node===root?'根目录':(node.name||'子目录');
+                btn.addEventListener('click',()=>{ current=node; render(); });
+                breadcrumb.appendChild(btn);
+              }
+            });
+          };
+          const renderList=()=>{
+            list.innerHTML='';
+            const dirs=Array.from(current.dirs.values()).sort((a,b)=>a.name.localeCompare(b.name,'zh-Hans'));
+            const files=current.files.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hans'));
+            if(current!==root){
+              const up=document.createElement('button');
+              up.type='button';
+              up.className='archive-entry archive-entry-up';
+              up.textContent='⬅ 返回上级';
+              up.addEventListener('click',()=>{ if(current.parent){ current=current.parent; render(); } });
+              list.appendChild(up);
+            }
+            if(!dirs.length && !files.length){
+              const empty=document.createElement('div');
+              empty.className='archive-empty';
+              empty.textContent='该目录为空。';
+              list.appendChild(empty);
+              return;
+            }
+            dirs.forEach(dir=>{
+              const row=document.createElement('button');
+              row.type='button';
+              row.className='archive-entry archive-entry-dir';
+              const nameSpan=document.createElement('span');
+              nameSpan.className='archive-entry-name';
+              nameSpan.textContent=`📁 ${dir.name||'子目录'}`;
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='archive-entry-size';
+              sizeSpan.textContent=dir.totalSize ? formatBytes(dir.totalSize) : '';
+              row.appendChild(nameSpan);
+              row.appendChild(sizeSpan);
+              row.addEventListener('click',()=>{ current=dir; render(); });
+              list.appendChild(row);
+            });
+            files.forEach(file=>{
+              const row=document.createElement('div');
+              row.className='archive-entry archive-entry-file';
+              const nameSpan=document.createElement('span');
+              nameSpan.className='archive-entry-name';
+              nameSpan.textContent=`📄 ${file.name}`;
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='archive-entry-size';
+              sizeSpan.textContent=file.size ? formatBytes(file.size) : '';
+              row.appendChild(nameSpan);
+              row.appendChild(sizeSpan);
+              list.appendChild(row);
+            });
+          };
+          const render=()=>{ renderBreadcrumb(); renderList(); };
+          render();
+          return container;
+        };
+        const showArchiveEntries=(entries, archiveType)=>{
+          const browser=createArchiveBrowser(entries, archiveType);
+          showContent(browser);
+        };
+        const loadTextPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='读取文本…';
+          try{
+            const buffer=await loadBuffer(source);
+            let text='';
+            try{
+              text=new TextDecoder('utf-8',{fatal:false}).decode(new Uint8Array(buffer));
+            }catch(_){
+              text=new TextDecoder().decode(new Uint8Array(buffer));
+            }
+            const pre=document.createElement('pre');
+            pre.className='text-preview';
+            pre.textContent=text;
+            showContent(pre);
+          }catch(err){ throw err; }
+        };
+        const loadDocxPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='解析文档…';
+          try{
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
+            if(!window.mammoth) throw new Error('解析库未加载');
+            const result=await window.mammoth.convertToHtml({arrayBuffer:buffer});
+            const div=document.createElement('div');
+            div.className='docx-preview';
+            div.innerHTML=result && result.value ? result.value : '<p>（空文档）</p>';
+            showContent(div);
+          }catch(err){ throw err; }
+        };
+        const loadSpreadsheetPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='解析表格…';
+          try{
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+            if(!window.XLSX) throw new Error('解析库未加载');
+            const workbook=window.XLSX.read(new Uint8Array(buffer),{type:'array'});
+            const wrapper=document.createElement('div');
+            wrapper.className='sheet-preview';
+            if(!workbook.SheetNames.length){
+              const empty=document.createElement('div');
+              empty.className='archive-empty';
+              empty.textContent='表格为空。';
+              wrapper.appendChild(empty);
+            }else{
+              workbook.SheetNames.forEach((sheetName,index)=>{
+                const sheet=workbook.Sheets[sheetName];
+                const section=document.createElement('section');
+                section.className='sheet-preview-sheet';
+                const heading=document.createElement('h3');
+                heading.textContent=`工作表 ${index+1}: ${sheetName}`;
+                section.appendChild(heading);
+                const tableContainer=document.createElement('div');
+                tableContainer.className='sheet-preview-table';
+                tableContainer.innerHTML=window.XLSX.utils.sheet_to_html(sheet,{header:'',footer:''});
+                section.appendChild(tableContainer);
+                wrapper.appendChild(section);
+              });
+            }
+            showContent(wrapper);
+          }catch(err){ throw err; }
+        };
+        const buildArchiveTree=entries=>{
+          const normalizePath=path=>String(path||'').replace(/^[\\/]+/,'').replace(/\\/g,'/').trim();
+          const createNode=(name,parent)=>({ name, parent, dirs:new Map(), files:[], path:parent ? parent.path.concat(name) : [] });
+          const root=createNode('', null);
+          root.path=[];
+          const ensureDir=(node, segment)=>{
+            if(!node.dirs.has(segment)){
+              node.dirs.set(segment, createNode(segment,node));
+            }
+            return node.dirs.get(segment);
+          };
+          entries.forEach(entry=>{
+            const clean=normalizePath(entry.path || entry.name || '');
+            if(!clean) return;
+            const segments=clean.split('/').filter(Boolean);
+            if(!segments.length) return;
+            if(entry.directory){
+              let dirNode=root;
+              segments.forEach(segment=>{ dirNode=ensureDir(dirNode, segment); });
+            }
+            let node=root;
+            segments.forEach((segment, idx)=>{
+              const isLast=idx===segments.length-1;
+              if(isLast && !entry.directory){
+                node.files.push({ name: segment, size: entry.size || 0 });
+              }else{
+                node=ensureDir(node, segment);
+              }
+            });
+          });
+          const computeSizes=node=>{
+            let total=0;
+            node.files.forEach(file=>{ total+=file.size||0; });
+            node.dirs.forEach(child=>{ total+=computeSizes(child); });
+            node.totalSize=total;
+            return total;
+          };
+          computeSizes(root);
+          return root;
+        };
+        const createArchiveBrowser=(entries, archiveType='压缩包')=>{
+          const root=buildArchiveTree(entries);
+          const container=document.createElement('div');
+          container.className='archive-browser';
+          const header=document.createElement('div');
+          header.className='archive-browser-header';
+          const title=document.createElement('div');
+          title.className='archive-browser-title';
+          title.textContent=`${(archiveType||'压缩包').toUpperCase()} 内容`;
+          header.appendChild(title);
+          container.appendChild(header);
+          const breadcrumb=document.createElement('div');
+          breadcrumb.className='archive-browser-breadcrumb';
+          container.appendChild(breadcrumb);
+          const list=document.createElement('div');
+          list.className='archive-browser-list';
+          container.appendChild(list);
+          let current=root;
+          const renderBreadcrumb=()=>{
+            breadcrumb.innerHTML='';
+            const chain=[];
+            let pointer=current;
+            while(pointer){ chain.unshift(pointer); pointer=pointer.parent; }
+            chain.forEach((node, idx)=>{
+              if(idx>0){
+                const sep=document.createElement('span');
+                sep.className='archive-breadcrumb-sep';
+                sep.textContent='/';
+                breadcrumb.appendChild(sep);
+              }
+              if(idx===chain.length-1){
+                const span=document.createElement('span');
+                span.className='archive-breadcrumb-current';
+                span.textContent=node===root?'根目录':(node.name||'子目录');
+                breadcrumb.appendChild(span);
+              }else{
+                const btn=document.createElement('button');
+                btn.type='button';
+                btn.className='archive-breadcrumb-link';
+                btn.textContent=node===root?'根目录':(node.name||'子目录');
+                btn.addEventListener('click',()=>{ current=node; render(); });
+                breadcrumb.appendChild(btn);
+              }
+            });
+          };
+          const renderList=()=>{
+            list.innerHTML='';
+            const dirs=Array.from(current.dirs.values()).sort((a,b)=>a.name.localeCompare(b.name,'zh-Hans'));
+            const files=current.files.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hans'));
+            if(current!==root){
+              const up=document.createElement('button');
+              up.type='button';
+              up.className='archive-entry archive-entry-up';
+              up.textContent='⬅ 返回上级';
+              up.addEventListener('click',()=>{ if(current.parent){ current=current.parent; render(); } });
+              list.appendChild(up);
+            }
+            if(!dirs.length && !files.length){
+              const empty=document.createElement('div');
+              empty.className='archive-empty';
+              empty.textContent='该目录为空。';
+              list.appendChild(empty);
+              return;
+            }
+            dirs.forEach(dir=>{
+              const row=document.createElement('button');
+              row.type='button';
+              row.className='archive-entry archive-entry-dir';
+              const nameSpan=document.createElement('span');
+              nameSpan.className='archive-entry-name';
+              nameSpan.textContent=`📁 ${dir.name||'子目录'}`;
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='archive-entry-size';
+              sizeSpan.textContent=dir.totalSize ? formatBytes(dir.totalSize) : '';
+              row.appendChild(nameSpan);
+              row.appendChild(sizeSpan);
+              row.addEventListener('click',()=>{ current=dir; render(); });
+              list.appendChild(row);
+            });
+            files.forEach(file=>{
+              const row=document.createElement('div');
+              row.className='archive-entry archive-entry-file';
+              const nameSpan=document.createElement('span');
+              nameSpan.className='archive-entry-name';
+              nameSpan.textContent=`📄 ${file.name}`;
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='archive-entry-size';
+              sizeSpan.textContent=file.size ? formatBytes(file.size) : '';
+              row.appendChild(nameSpan);
+              row.appendChild(sizeSpan);
+              list.appendChild(row);
+            });
+          };
+          const render=()=>{ renderBreadcrumb(); renderList(); };
+          render();
+          return container;
+        };
+        const showArchiveEntries=(entries, archiveType)=>{
+          const browser=createArchiveBrowser(entries, archiveType);
+          showContent(browser);
+        };
+        const loadTextPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='读取文本…';
+          try{
+            const buffer=await loadBuffer(source);
+            let text='';
+            try{
+              text=new TextDecoder('utf-8',{fatal:false}).decode(new Uint8Array(buffer));
+            }catch(_){
+              text=new TextDecoder().decode(new Uint8Array(buffer));
+            }
+            const pre=document.createElement('pre');
+            pre.className='text-preview';
+            pre.textContent=text;
+            showContent(pre);
+          }catch(err){ throw err; }
+        };
+        const loadDocxPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='解析文档…';
+          try{
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
+            if(!window.mammoth) throw new Error('解析库未加载');
+            const result=await window.mammoth.convertToHtml({arrayBuffer:buffer});
+            const div=document.createElement('div');
+            div.className='docx-preview';
+            div.innerHTML=result && result.value ? result.value : '<p>（空文档）</p>';
+            showContent(div);
+          }catch(err){ throw err; }
+        };
+        const loadSpreadsheetPreview=async source=>{
+          const {loadingEl}=ensureElements();
+          loadingEl.textContent='解析表格…';
+          try{
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+            if(!window.XLSX) throw new Error('解析库未加载');
+            const workbook=window.XLSX.read(new Uint8Array(buffer),{type:'array'});
+            const wrapper=document.createElement('div');
+            wrapper.className='sheet-preview';
+            if(!workbook.SheetNames.length){
+              const empty=document.createElement('div');
+              empty.className='archive-empty';
+              empty.textContent='表格为空。';
+              wrapper.appendChild(empty);
+            }else{
+              workbook.SheetNames.forEach((sheetName,index)=>{
+                const sheet=workbook.Sheets[sheetName];
+                const section=document.createElement('section');
+                section.className='sheet-preview-sheet';
+                const heading=document.createElement('h3');
+                heading.textContent=`工作表 ${index+1}: ${sheetName}`;
+                section.appendChild(heading);
+                const tableContainer=document.createElement('div');
+                tableContainer.className='sheet-preview-table';
+                tableContainer.innerHTML=window.XLSX.utils.sheet_to_html(sheet,{header:'',footer:''});
+                section.appendChild(tableContainer);
+                wrapper.appendChild(section);
+              });
+            }
+            showContent(wrapper);
+          }catch(err){ throw err; }
         };
         const normalizeSource=input=>{
           if(!input) return {kind:'url',url:'',name:'附件',mime:'',size:null,downloadName:null};
@@ -1515,58 +2149,88 @@ if ($view === 'new') {
           scriptCache.set(url,promise);
           return promise;
         };
-        const loadZipPreview=async source=>{
+        const loadZipPreview=async (source,password)=>{
           const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析压缩包…';
+          loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+          let reader=null;
           try{
             const buffer=await loadBuffer(source);
-            await ensureScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
-            if(!window.JSZip) throw new Error('解析库未加载');
-            const zip=await window.JSZip.loadAsync(buffer);
-            const entries=[];
-            zip.forEach((relativePath,file)=>{
-              entries.push({
-                label:(file.dir?'📁 ':'📄 ')+relativePath,
-                size:file._data && typeof file._data.uncompressedSize==='number'?formatBytes(file._data.uncompressedSize):''
-              });
-            });
+            await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
+            if(!window.zip || !window.zip.ZipReader) throw new Error('解析库未加载');
+            if(typeof window.zip.configure==='function'){ window.zip.configure({useWebWorkers:false}); }
+            reader=new window.zip.ZipReader(new window.zip.BlobReader(new Blob([buffer])), { password: password || undefined });
+            const entries=await reader.getEntries();
+            await reader.close();
+            reader=null;
             if(!entries.length){
               showError('压缩包为空。');
               return;
             }
-            entries.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans'));
-            showList(entries);
+            const normalized=entries.map(entry=>({
+              path: entry.filename || entry.name || '',
+              directory: !!entry.directory,
+              size: entry.uncompressedSize || 0
+            })).filter(item=>item.path);
+            showArchiveEntries(normalized,'zip');
           }catch(err){
+            if(reader){ try{ await reader.close(); }catch(_){ /* ignore */ } }
+            const message=(err && err.message ? String(err.message) : '').toLowerCase();
+            if(!password && /password|encrypt/.test(message)){
+              const input=prompt('ZIP 压缩包已加密，请输入密码预览：');
+              if(input!==null){
+                const trimmed=input.trim();
+                if(trimmed===''){ alert('密码不能为空'); showError('无法解析压缩包：密码不能为空。'); return; }
+                await loadZipPreview(source, trimmed);
+                return;
+              }
+              showError('已取消预览。');
+              return;
+            }
             throw err;
           }
         };
-        const loadRarPreview=async source=>{
+        const loadRarPreview=async (source,password)=>{
           const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析压缩包…';
+          loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+          let extractor=null;
           try{
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
             if(!api || typeof api.createExtractorFromData!=='function') throw new Error('解析库未加载');
-            const extractor=await api.createExtractorFromData({data:buffer});
+            extractor=await api.createExtractorFromData({data:buffer,password:password||undefined});
             const list=extractor && typeof extractor.getFileList==='function' ? extractor.getFileList() : null;
             const headers=list && Array.isArray(list.fileHeaders) ? list.fileHeaders : [];
-            const entries=headers.map(header=>{
-              const name=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '未知文件');
+            const normalized=headers.map(header=>{
+              const rawName=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '');
+              const clean=String(rawName||'').replace(/^[\\/]+/,'').replace(/\\/g,'/');
+              if(!clean) return null;
               const dirFlag=header && header.flags ? (header.flags.directory || header.flags.DIRECTORY || header.flags.folder) : false;
-              const isDir=!!dirFlag || /[\\/]$/.test(name);
-              const sizeValue=header && typeof header.uncompressedSize==='number'?header.uncompressedSize:(header && typeof header.size==='number'?header.size:null);
-              return {label:(isDir?'📁 ':'📄 ')+name, size:sizeValue?formatBytes(sizeValue):''};
-            });
+              const isDir=!!dirFlag || /[\\/]$/.test(rawName||'');
+              const sizeValue=typeof header.uncompressedSize==='number'?header.uncompressedSize:(typeof header.size==='number'?header.size:0);
+              return {path:clean,directory:isDir,size:sizeValue};
+            }).filter(Boolean);
             if(typeof extractor.free==='function') extractor.free();
-            else if(typeof extractor.delete==='function') extractor.delete();
-            if(!entries.length){
+            else if(typeof extractor.close==='function') extractor.close();
+            if(!normalized.length){
               showError('压缩包为空。');
               return;
             }
-            entries.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans'));
-            showList(entries);
+            showArchiveEntries(normalized,'rar');
           }catch(err){
+            if(extractor && typeof extractor.free==='function'){ try{ extractor.free(); }catch(_){ /* ignore */ } }
+            const message=(err && err.message ? String(err.message) : '').toLowerCase();
+            if(!password && /password|encrypt/.test(message)){
+              const input=prompt('RAR 压缩包已加密，请输入密码预览：');
+              if(input!==null){
+                const trimmed=input.trim();
+                if(trimmed===''){ alert('密码不能为空'); showError('无法解析压缩包：密码不能为空。'); return; }
+                await loadRarPreview(source, trimmed);
+                return;
+              }
+              showError('已取消预览。');
+              return;
+            }
             throw err;
           }
         };
@@ -1586,15 +2250,27 @@ if ($view === 'new') {
           const downloadHref=setDownloadLink(downloadBtn, source);
           loadingEl.textContent='载入中…';
           const type=detectType(source);
-          if(type==='image' || type==='video' || type==='pdf'){
-            const url=type==='image' && source.kind==='url' ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
+          if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
+            let url=source.url;
+            if(source.kind==='blob' || !url){ url=downloadHref; }
             if(!url){ showError('附件缺少可用地址'); return; }
             renderMedia(type,url,source.mime);
             return;
           }
-          const handleError=err=>{ console.error(err); showError(type==='other'?'暂不支持该文件类型的在线预览，请使用下载按钮。':('无法解析 '+(type==='zip'?'ZIP':'RAR')+'：'+(err && err.message?err.message:''))); };
-          if(type==='zip'){ loadZipPreview(source).then(()=>{}).catch(handleError); return; }
-          if(type==='rar'){ loadRarPreview(source).then(()=>{}).catch(handleError); return; }
+          const handleError=err=>{
+            console.error(err);
+            if(type==='zip' || type==='rar'){
+              showError('无法解析 '+(type==='zip'?'ZIP':'RAR')+'：'+(err && err.message?err.message:''));
+            }else{
+              showError(err && err.message ? err.message : '预览失败');
+            }
+          };
+          if(type==='text'){ loadTextPreview(source).catch(handleError); return; }
+          if(type==='docx'){ loadDocxPreview(source).catch(handleError); return; }
+          if(type==='xlsx' || type==='xls'){ loadSpreadsheetPreview(source).catch(handleError); return; }
+          if(type==='doc'){ showError('暂不支持旧版 Word 文档在线预览，请下载后查看。'); return; }
+          if(type==='zip'){ loadZipPreview(source).catch(handleError); return; }
+          if(type==='rar'){ loadRarPreview(source).catch(handleError); return; }
           showError('暂不支持该文件类型的在线预览，请使用下载按钮。');
         };
         window.AttachmentPreview={
@@ -1625,13 +2301,19 @@ if ($view === 'new') {
         const decimals=value>=100 || idx===0 ? 0 : 1;
         return value.toFixed(decimals)+' '+units[idx];
       }
-      function attachmentIconForMime(mime){
+      function attachmentIconForMime(mime,name){
         const lower=(mime||'').toLowerCase();
-        if(lower.startsWith('image/')) return '🖼';
-        if(lower==='video/mp4' || lower.startsWith('video/')) return '🎬';
-        if(lower==='application/pdf') return '📄';
-        if(lower.includes('zip')) return '🗜';
-        if(lower.includes('rar')) return '📦';
+        const file=(name||'').toLowerCase();
+        const hasExt=(exts)=>exts.some(ext=>file.endsWith(ext));
+        if(lower.startsWith('image/') || hasExt(['.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp','.ico','.avif','.heic','.heif'])) return '🖼';
+        if(lower.startsWith('video/') || hasExt(['.mp4','.webm','.ogv','.mov','.m4v','.avi','.mkv'])) return '🎬';
+        if(lower.startsWith('audio/') || hasExt(['.mp3','.wav','.flac','.aac','.m4a','.ogg','.oga','.opus'])) return '🎵';
+        if(lower.includes('word') || hasExt(['.doc','.docx','.rtf'])) return '📝';
+        if(lower.includes('sheet') || hasExt(['.xls','.xlsx','.csv'])) return '📊';
+        if(lower.includes('presentation') || hasExt(['.ppt','.pptx','.key'])) return '📽';
+        if(lower.includes('pdf') || file.endsWith('.pdf')) return '📄';
+        if(lower.includes('zip') || file.endsWith('.zip')) return '🗜';
+        if(lower.includes('rar') || file.endsWith('.rar')) return '📦';
         return '📎';
       }
       function applyPreviewDataset(el,data){
@@ -1663,49 +2345,68 @@ if ($view === 'new') {
           });
         });
       }
+      function updateAttachmentListState(){
+        const list=document.getElementById('attachment-list');
+        if(!list) return;
+        const count=list.querySelectorAll('.attachment-row').length;
+        document.querySelectorAll('[data-attachment-count]').forEach(el=>{
+          el.textContent=count ? `${count} 个附件` : '暂无附件';
+        });
+        let empty=list.querySelector('.attachment-empty');
+        if(!count){
+          if(!empty){
+            empty=document.createElement('div');
+            empty.className='attachment-empty';
+            empty.dataset.role='empty';
+            empty.textContent='暂无附件，使用左侧按钮上传或拖放文件。';
+            list.appendChild(empty);
+          }
+          list.classList.add('is-empty');
+        }else{
+          if(empty) empty.remove();
+          list.classList.remove('is-empty');
+        }
+      }
       function addAttachmentThumb(info){
         if(!info || !info.url) return;
-        const root=document.getElementById('thumbs');
-        if(!root) return;
-        const container=document.createElement('div');
-        container.className='thumb';
-        if(info.id!=null) container.dataset.attachmentId=String(info.id);
-        const previewBox=document.createElement('div');
-        previewBox.className='thumb-preview-box';
+        const list=document.getElementById('attachment-list');
+        if(!list) return;
         const name=sanitizeAttachmentName(info.name || info.originalName || '附件');
         const mime=info.mime || '';
         const sizeValue=typeof info.size==='number'?info.size:parseInt(info.size,10);
         const previewData={url:info.url,name,mime,size:!Number.isNaN(sizeValue)&&sizeValue>0?String(sizeValue):''};
-        if((mime||'').toLowerCase().startsWith('image/')){
-          const link=document.createElement('a');
-          link.className='thumb-link';
-          link.href=info.url;
-          link.title=name;
-          applyPreviewDataset(link,previewData);
-          const img=document.createElement('img');
-          img.src=info.url;
-          img.alt='';
-          link.appendChild(img);
-          previewBox.appendChild(link);
-        }else{
-          const placeholder=document.createElement('button');
-          placeholder.type='button';
-          placeholder.className='thumb-placeholder';
-          placeholder.textContent=attachmentIconForMime(mime);
-          placeholder.setAttribute('aria-label','预览附件');
-          applyPreviewDataset(placeholder,previewData);
-          previewBox.appendChild(placeholder);
-        }
-        container.appendChild(previewBox);
+        const row=document.createElement('div');
+        row.className='attachment-row';
+        if(info.id!=null) row.dataset.attachmentId=String(info.id);
+        const main=document.createElement('div');
+        main.className='attachment-row-main';
+        const iconButton=document.createElement('button');
+        iconButton.type='button';
+        iconButton.className='attachment-icon-button';
+        iconButton.setAttribute('aria-label','预览附件');
+        iconButton.textContent=attachmentIconForMime(mime,name);
+        applyPreviewDataset(iconButton,previewData);
+        main.appendChild(iconButton);
         const infoBox=document.createElement('div');
-        infoBox.className='thumb-info';
+        infoBox.className='attachment-row-info';
+        const nameButton=document.createElement('button');
+        nameButton.type='button';
+        nameButton.className='attachment-name-button';
+        nameButton.textContent=name;
+        nameButton.title=name;
+        applyPreviewDataset(nameButton,previewData);
+        infoBox.appendChild(nameButton);
         const meta=document.createElement('div');
-        meta.className='att-meta';
-        const sizeText=!Number.isNaN(sizeValue) && sizeValue>0 ? humanBytes(sizeValue) : '';
-        meta.textContent=sizeText ? `${name} · ${sizeText}` : name;
+        meta.className='attachment-meta';
+        const metaParts=[];
+        if(mime) metaParts.push(mime);
+        if(!Number.isNaN(sizeValue) && sizeValue>0) metaParts.push(humanBytes(sizeValue));
+        meta.textContent=metaParts.length ? metaParts.join(' · ') : '—';
         infoBox.appendChild(meta);
+        main.appendChild(infoBox);
+        row.appendChild(main);
         const actions=document.createElement('div');
-        actions.className='thumb-buttons';
+        actions.className='attachment-row-actions';
         const previewBtn=document.createElement('button');
         previewBtn.type='button';
         previewBtn.className='btn btn-primary btn-small attachment-preview-button';
@@ -1718,12 +2419,12 @@ if ($view === 'new') {
         downloadLink.setAttribute('download','');
         downloadLink.textContent='下载';
         actions.appendChild(downloadLink);
-        infoBox.appendChild(actions);
-        container.appendChild(infoBox);
-        root.prepend(container);
-        bindAttachmentPreviewTargets(container);
+        row.appendChild(actions);
+        list.prepend(row);
+        bindAttachmentPreviewTargets(row);
+        updateAttachmentListState();
       }
-      registerAttachmentPreviewReady(()=>bindAttachmentPreviewTargets());
+      registerAttachmentPreviewReady(()=>{ bindAttachmentPreviewTargets(); updateAttachmentListState(); });
 
       const state = { id: 0 };
       const saveTip = document.getElementById('save-tip');
@@ -1779,7 +2480,10 @@ if ($view === 'new') {
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
       const editorEl=document.getElementById('md-editor');
-      function renderMD(){ $('#md-view').innerHTML = safeHTML(editorEl.value||''); }
+      function renderMD(){
+        const view=document.getElementById('md-view');
+        if(view){ view.innerHTML = safeHTML(editorEl.value||''); }
+      }
       function markDirty(){ saveFeedback.dirty('未保存'); }
       function insertTextAtCursor(textarea, text){
         if(!textarea) return;
@@ -2133,21 +2837,32 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .editbox select:focus,
       .editbox textarea:focus{border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.22);outline:none}
       .editbox textarea{min-height:260px;border-radius:var(--r-md)}
-      .preview{max-height:60vh;overflow:auto;background-image:linear-gradient(120deg,rgba(201,168,106,.06),transparent 55%)}
-      .preview::-webkit-scrollbar{width:8px}
-      .preview::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
-      .md-body{color:var(--text-dim)}
-      .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 18px 36px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.12)}
+      .preview{display:flex;flex-direction:column;gap:16px;max-height:60vh;overflow:hidden;background-image:linear-gradient(120deg,rgba(201,168,106,.06),transparent 55%)}
+      .attachment-panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+      .attachment-panel-title{margin:0;font:600 16px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400)}
+      .attachment-panel-hint{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-count{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase}
+      .attachment-list{flex:1 1 auto;display:flex;flex-direction:column;gap:12px;overflow:auto;padding-right:4px}
+      .attachment-list::-webkit-scrollbar{width:8px}
+      .attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
+      .attachment-empty{padding:24px;border:1px dashed rgba(201,168,106,.26);border-radius:12px;color:var(--text-muted);text-align:center;font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.06em;background:rgba(10,14,16,.6)}
+      .attachment-row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:14px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);box-shadow:inset 0 0 0 1px rgba(201,168,106,.12)}
+      .attachment-row-main{display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0}
+      .attachment-icon-button{border:1px solid rgba(201,168,106,.36);background:rgba(15,19,22,.86);color:var(--gold-400);border-radius:12px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;transition:transform var(--transition),border-color var(--transition)}
+      .attachment-icon-button:hover{transform:translateY(-1px);border-color:rgba(201,168,106,.52)}
+      .attachment-row-info{display:grid;gap:6px;flex:1;min-width:0}
+      .attachment-name-button{background:none;border:0;padding:0;margin:0;text-align:left;font:600 15px/1.5 'Noto Sans SC','Inter',sans-serif;color:var(--text-strong);cursor:pointer;word-break:break-word}
+      .attachment-name-button:hover{text-decoration:underline}
+      .attachment-meta{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      .attachment-row-actions form{margin:0}
+      .attachment-row-actions .btn{min-width:0}
       .section{margin-top:28px;padding-top:20px;border-top:1px solid var(--divider)}
       .section h2{margin:0 0 12px;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em}
       .section h3{margin:12px 0 10px;font:600 15px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);text-transform:uppercase;letter-spacing:.14em}
       .section label{display:block;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase}
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
-      .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
-      .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
       .timeline{position:relative;margin-top:22px;margin-left:18px;padding-left:34px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.58),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.24)}
       .tl-item{position:relative;margin:14px 0;padding:16px 20px 20px 26px;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-md);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));box-shadow:var(--shadow-1)}
@@ -2238,41 +2953,46 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
             </form>
           </div>
           <div class="preview">
-            <div class="md-body" id="md-view"></div>
-            <div class="thumbs" id="thumbs">
-              <?php if ($itemAtts): foreach ($itemAtts as $a):
+            <?php $attachmentCount = is_array($itemAtts) ? count($itemAtts) : 0; ?>
+            <div class="attachment-panel-header">
+              <div>
+                <h3 class="attachment-panel-title">附件列表</h3>
+                <div class="attachment-count" data-attachment-count><?php echo $attachmentCount ? ($attachmentCount.' 个附件') : '暂无附件'; ?></div>
+              </div>
+              <div class="attachment-panel-hint">附件将与备忘录一同保存，可直接点击名称或按钮进行预览与下载。</div>
+            </div>
+            <div class="attachment-list<?php echo $attachmentCount ? '' : ' is-empty'; ?>" id="attachment-list">
+              <?php if ($attachmentCount): foreach ($itemAtts as $a):
                 $mime=(string)$a['mime'];
-                $isImg=in_array($mime,['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true);
-                $isVideo=$mime==='video/mp4';
-                $isPdf=$mime==='application/pdf';
-                $isZip=in_array($mime,['application/zip','application/x-zip-compressed'],true);
-                $isRar=in_array($mime,['application/x-rar-compressed','application/vnd.rar'],true);
-                $icon=$isVideo?'🎬':($isPdf?'📄':($isZip?'🗜':($isRar?'📦':'📎')));
                 $downloadUrl='?download='.$a['id'];
-                $previewAttrs='data-attachment-preview="true" data-url="'.$downloadUrl.'" data-name="'.h($a['orig_name']).'" data-mime="'.h($mime).'" data-size="'.(int)$a['size'].'"';
+                $safeName=h($a['orig_name']);
+                $metaParts=[];
+                if ($mime !== '') { $metaParts[] = h($mime); }
+                $sizeValue=(int)$a['size'];
+                if ($sizeValue > 0) { $metaParts[] = bytes_h($sizeValue); }
+                $previewAttrs='data-attachment-preview="true" data-url="'.$downloadUrl.'" data-name="'.$safeName.'" data-mime="'.h($mime).'" data-size="'.$sizeValue.'"';
               ?>
-                <div class="thumb" data-attachment-id="<?php echo $a['id']; ?>">
-                  <div class="thumb-preview-box">
-                    <?php if ($isImg): ?>
-                      <a class="thumb-link" href="<?php echo $downloadUrl; ?>" title="<?php echo h($a['orig_name']); ?>" <?php echo $previewAttrs; ?>><img src="<?php echo $downloadUrl; ?>" alt=""></a>
-                    <?php else: ?>
-                      <button class="thumb-placeholder" type="button" aria-label="预览附件" <?php echo $previewAttrs; ?>><?php echo $icon; ?></button>
-                    <?php endif; ?>
-                  </div>
-                  <div class="thumb-info">
-                    <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
-                    <div class="thumb-buttons">
-                      <button class="btn btn-primary btn-small attachment-preview-button" type="button" <?php echo $previewAttrs; ?>>预览</button>
-                      <a class="btn btn-outline btn-small" href="<?php echo $downloadUrl; ?>" download>下载</a>
+                <div class="attachment-row" data-attachment-id="<?php echo $a['id']; ?>">
+                  <div class="attachment-row-main">
+                    <button class="attachment-icon-button" type="button" aria-label="预览附件" <?php echo $previewAttrs; ?>><?php echo attachment_icon_for_mime($mime, $a['orig_name']); ?></button>
+                    <div class="attachment-row-info">
+                      <button class="attachment-name-button" type="button" title="<?php echo $safeName; ?>" <?php echo $previewAttrs; ?>><?php echo $safeName; ?></button>
+                      <div class="attachment-meta"><?php echo $metaParts ? implode(' · ', $metaParts) : '—'; ?></div>
                     </div>
                   </div>
-                  <form method="post" style="padding:6px;text-align:right">
-                    <input type="hidden" name="action" value="delete_attachment">
-                    <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
-                    <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
-                  </form>
+                  <div class="attachment-row-actions">
+                    <button class="btn btn-primary btn-small attachment-preview-button" type="button" <?php echo $previewAttrs; ?>>预览</button>
+                    <a class="btn btn-outline btn-small" href="<?php echo $downloadUrl; ?>" download>下载</a>
+                    <form method="post">
+                      <input type="hidden" name="action" value="delete_attachment">
+                      <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
+                      <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
+                    </form>
+                  </div>
                 </div>
-              <?php endforeach; endif; ?>
+              <?php endforeach; else: ?>
+                <div class="attachment-empty" data-role="empty">暂无附件，使用左侧按钮上传或拖放文件。</div>
+              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -2429,44 +3149,37 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           div.textContent=message||'预览失败';
           showContent(div);
         };
-        const showList=entries=>{
-          const list=document.createElement('ul');
-          list.className='attachment-preview-list';
-          entries.forEach(entry=>{
-            const li=document.createElement('li');
-            const label=document.createElement('span');
-            label.textContent=entry.label;
-            li.appendChild(label);
-            if(entry.size){
-              const sizeSpan=document.createElement('span');
-              sizeSpan.className='entry-size';
-              sizeSpan.textContent=entry.size;
-              li.appendChild(sizeSpan);
-            }
-            list.appendChild(li);
-          });
-          showContent(list);
-        };
         const renderMedia=(type,url,mime)=>{
-          const el=type==='video'?document.createElement('video'):type==='pdf'?document.createElement('iframe'):document.createElement('img');
-          if(type==='video'){
+          const el=type==='video'?document.createElement('video'):
+            type==='pdf'?document.createElement('iframe'):
+            type==='audio'?document.createElement('audio'):
+            document.createElement('img');
+          if(type==='video' || type==='audio'){
             el.controls=true;
             el.preload='metadata';
           }
           if(type==='pdf'){ el.type=mime||'application/pdf'; }
           el.src=url;
           if(type==='video'){ el.classList.add('attachment-preview-video'); }
+          if(type==='audio'){ el.classList.add('attachment-preview-audio'); }
           if(type==='pdf'){ el.setAttribute('title','PDF 预览'); }
           showContent(el);
         };
         const detectType=source=>{
           const mime=(source.mime||'').toLowerCase();
           const name=(source.name||'').toLowerCase();
+          const hasExt=ext=>name.endsWith(ext);
           if(mime.startsWith('image/')) return 'image';
-          if(mime==='video/mp4' || (mime.startsWith('video/') && name.endsWith('.mp4'))) return 'video';
-          if(mime==='application/pdf' || name.endsWith('.pdf')) return 'pdf';
-          if(mime.includes('zip') || name.endsWith('.zip')) return 'zip';
-          if(mime.includes('rar') || name.endsWith('.rar')) return 'rar';
+          if(mime.startsWith('video/') || ['.mp4','.webm','.ogv','.mov','.m4v','.avi','.mkv'].some(hasExt)) return 'video';
+          if(mime.startsWith('audio/') || ['.mp3','.wav','.flac','.aac','.m4a','.ogg','.oga','.opus'].some(hasExt)) return 'audio';
+          if(mime==='application/pdf' || hasExt('.pdf')) return 'pdf';
+          if(mime.includes('wordprocessingml') || hasExt('.docx')) return 'docx';
+          if(mime==='application/msword' || hasExt('.doc')) return 'doc';
+          if(mime.includes('spreadsheetml') || hasExt('.xlsx')) return 'xlsx';
+          if(mime==='application/vnd.ms-excel' || hasExt('.xls')) return 'xls';
+          if(mime.startsWith('text/') || ['.txt','.md','.csv','.json','.log'].some(hasExt)) return 'text';
+          if(mime.includes('zip') || hasExt('.zip')) return 'zip';
+          if(mime.includes('rar') || hasExt('.rar')) return 'rar';
           return 'other';
         };
         const normalizeSource=input=>{
@@ -2534,58 +3247,88 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           scriptCache.set(url,promise);
           return promise;
         };
-        const loadZipPreview=async source=>{
+        const loadZipPreview=async (source,password)=>{
           const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析压缩包…';
+          loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+          let reader=null;
           try{
             const buffer=await loadBuffer(source);
-            await ensureScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
-            if(!window.JSZip) throw new Error('解析库未加载');
-            const zip=await window.JSZip.loadAsync(buffer);
-            const entries=[];
-            zip.forEach((relativePath,file)=>{
-              entries.push({
-                label:(file.dir?'📁 ':'📄 ')+relativePath,
-                size:file._data && typeof file._data.uncompressedSize==='number'?formatBytes(file._data.uncompressedSize):''
-              });
-            });
+            await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
+            if(!window.zip || !window.zip.ZipReader) throw new Error('解析库未加载');
+            if(typeof window.zip.configure==='function'){ window.zip.configure({useWebWorkers:false}); }
+            reader=new window.zip.ZipReader(new window.zip.BlobReader(new Blob([buffer])), { password: password || undefined });
+            const entries=await reader.getEntries();
+            await reader.close();
+            reader=null;
             if(!entries.length){
               showError('压缩包为空。');
               return;
             }
-            entries.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans'));
-            showList(entries);
+            const normalized=entries.map(entry=>({
+              path: entry.filename || entry.name || '',
+              directory: !!entry.directory,
+              size: entry.uncompressedSize || 0
+            })).filter(item=>item.path);
+            showArchiveEntries(normalized,'zip');
           }catch(err){
+            if(reader){ try{ await reader.close(); }catch(_){ /* ignore */ } }
+            const message=(err && err.message ? String(err.message) : '').toLowerCase();
+            if(!password && /password|encrypt/.test(message)){
+              const input=prompt('ZIP 压缩包已加密，请输入密码预览：');
+              if(input!==null){
+                const trimmed=input.trim();
+                if(trimmed===''){ alert('密码不能为空'); showError('无法解析压缩包：密码不能为空。'); return; }
+                await loadZipPreview(source, trimmed);
+                return;
+              }
+              showError('已取消预览。');
+              return;
+            }
             throw err;
           }
         };
-        const loadRarPreview=async source=>{
+        const loadRarPreview=async (source,password)=>{
           const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析压缩包…';
+          loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+          let extractor=null;
           try{
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
             if(!api || typeof api.createExtractorFromData!=='function') throw new Error('解析库未加载');
-            const extractor=await api.createExtractorFromData({data:buffer});
+            extractor=await api.createExtractorFromData({data:buffer,password:password||undefined});
             const list=extractor && typeof extractor.getFileList==='function' ? extractor.getFileList() : null;
             const headers=list && Array.isArray(list.fileHeaders) ? list.fileHeaders : [];
-            const entries=headers.map(header=>{
-              const name=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '未知文件');
+            const normalized=headers.map(header=>{
+              const rawName=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '');
+              const clean=String(rawName||'').replace(/^[\\/]+/,'').replace(/\\/g,'/');
+              if(!clean) return null;
               const dirFlag=header && header.flags ? (header.flags.directory || header.flags.DIRECTORY || header.flags.folder) : false;
-              const isDir=!!dirFlag || /[\\/]$/.test(name);
-              const sizeValue=header && typeof header.uncompressedSize==='number'?header.uncompressedSize:(header && typeof header.size==='number'?header.size:null);
-              return {label:(isDir?'📁 ':'📄 ')+name, size:sizeValue?formatBytes(sizeValue):''};
-            });
+              const isDir=!!dirFlag || /[\\/]$/.test(rawName||'');
+              const sizeValue=typeof header.uncompressedSize==='number'?header.uncompressedSize:(typeof header.size==='number'?header.size:0);
+              return {path:clean,directory:isDir,size:sizeValue};
+            }).filter(Boolean);
             if(typeof extractor.free==='function') extractor.free();
-            else if(typeof extractor.delete==='function') extractor.delete();
-            if(!entries.length){
+            else if(typeof extractor.close==='function') extractor.close();
+            if(!normalized.length){
               showError('压缩包为空。');
               return;
             }
-            entries.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans'));
-            showList(entries);
+            showArchiveEntries(normalized,'rar');
           }catch(err){
+            if(extractor && typeof extractor.free==='function'){ try{ extractor.free(); }catch(_){ /* ignore */ } }
+            const message=(err && err.message ? String(err.message) : '').toLowerCase();
+            if(!password && /password|encrypt/.test(message)){
+              const input=prompt('RAR 压缩包已加密，请输入密码预览：');
+              if(input!==null){
+                const trimmed=input.trim();
+                if(trimmed===''){ alert('密码不能为空'); showError('无法解析压缩包：密码不能为空。'); return; }
+                await loadRarPreview(source, trimmed);
+                return;
+              }
+              showError('已取消预览。');
+              return;
+            }
             throw err;
           }
         };
@@ -2605,15 +3348,27 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           const downloadHref=setDownloadLink(downloadBtn, source);
           loadingEl.textContent='载入中…';
           const type=detectType(source);
-          if(type==='image' || type==='video' || type==='pdf'){
-            const url=type==='image' && source.kind==='url' ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
+          if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
+            let url=source.url;
+            if(source.kind==='blob' || !url){ url=downloadHref; }
             if(!url){ showError('附件缺少可用地址'); return; }
             renderMedia(type,url,source.mime);
             return;
           }
-          const handleError=err=>{ console.error(err); showError(type==='other'?'暂不支持该文件类型的在线预览，请使用下载按钮。':('无法解析 '+(type==='zip'?'ZIP':'RAR')+'：'+(err && err.message?err.message:''))); };
-          if(type==='zip'){ loadZipPreview(source).then(()=>{}).catch(handleError); return; }
-          if(type==='rar'){ loadRarPreview(source).then(()=>{}).catch(handleError); return; }
+          const handleError=err=>{
+            console.error(err);
+            if(type==='zip' || type==='rar'){
+              showError('无法解析 '+(type==='zip'?'ZIP':'RAR')+'：'+(err && err.message?err.message:''));
+            }else{
+              showError(err && err.message ? err.message : '预览失败');
+            }
+          };
+          if(type==='text'){ loadTextPreview(source).catch(handleError); return; }
+          if(type==='docx'){ loadDocxPreview(source).catch(handleError); return; }
+          if(type==='xlsx' || type==='xls'){ loadSpreadsheetPreview(source).catch(handleError); return; }
+          if(type==='doc'){ showError('暂不支持旧版 Word 文档在线预览，请下载后查看。'); return; }
+          if(type==='zip'){ loadZipPreview(source).catch(handleError); return; }
+          if(type==='rar'){ loadRarPreview(source).catch(handleError); return; }
           showError('暂不支持该文件类型的在线预览，请使用下载按钮。');
         };
         window.AttachmentPreview={
@@ -2644,13 +3399,19 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         const decimals=value>=100 || idx===0 ? 0 : 1;
         return value.toFixed(decimals)+' '+units[idx];
       }
-      function attachmentIconForMime(mime){
+      function attachmentIconForMime(mime,name){
         const lower=(mime||'').toLowerCase();
-        if(lower.startsWith('image/')) return '🖼';
-        if(lower==='video/mp4' || lower.startsWith('video/')) return '🎬';
-        if(lower==='application/pdf') return '📄';
-        if(lower.includes('zip')) return '🗜';
-        if(lower.includes('rar')) return '📦';
+        const file=(name||'').toLowerCase();
+        const hasExt=(exts)=>exts.some(ext=>file.endsWith(ext));
+        if(lower.startsWith('image/') || hasExt(['.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp','.ico','.avif','.heic','.heif'])) return '🖼';
+        if(lower.startsWith('video/') || hasExt(['.mp4','.webm','.ogv','.mov','.m4v','.avi','.mkv'])) return '🎬';
+        if(lower.startsWith('audio/') || hasExt(['.mp3','.wav','.flac','.aac','.m4a','.ogg','.oga','.opus'])) return '🎵';
+        if(lower.includes('word') || hasExt(['.doc','.docx','.rtf'])) return '📝';
+        if(lower.includes('sheet') || hasExt(['.xls','.xlsx','.csv'])) return '📊';
+        if(lower.includes('presentation') || hasExt(['.ppt','.pptx','.key'])) return '📽';
+        if(lower.includes('pdf') || file.endsWith('.pdf')) return '📄';
+        if(lower.includes('zip') || file.endsWith('.zip')) return '🗜';
+        if(lower.includes('rar') || file.endsWith('.rar')) return '📦';
         return '📎';
       }
       function applyPreviewDataset(el,data){
@@ -2682,49 +3443,68 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           });
         });
       }
+      function updateAttachmentListState(){
+        const list=document.getElementById('attachment-list');
+        if(!list) return;
+        const count=list.querySelectorAll('.attachment-row').length;
+        document.querySelectorAll('[data-attachment-count]').forEach(el=>{
+          el.textContent=count ? `${count} 个附件` : '暂无附件';
+        });
+        let empty=list.querySelector('.attachment-empty');
+        if(!count){
+          if(!empty){
+            empty=document.createElement('div');
+            empty.className='attachment-empty';
+            empty.dataset.role='empty';
+            empty.textContent='暂无附件，使用左侧按钮上传或拖放文件。';
+            list.appendChild(empty);
+          }
+          list.classList.add('is-empty');
+        }else{
+          if(empty) empty.remove();
+          list.classList.remove('is-empty');
+        }
+      }
       function addAttachmentThumb(info){
         if(!info || !info.url) return;
-        const root=document.getElementById('thumbs');
-        if(!root) return;
-        const container=document.createElement('div');
-        container.className='thumb';
-        if(info.id!=null) container.dataset.attachmentId=String(info.id);
-        const previewBox=document.createElement('div');
-        previewBox.className='thumb-preview-box';
+        const list=document.getElementById('attachment-list');
+        if(!list) return;
         const name=sanitizeAttachmentName(info.name || info.originalName || '附件');
         const mime=info.mime || '';
         const sizeValue=typeof info.size==='number'?info.size:parseInt(info.size,10);
         const previewData={url:info.url,name,mime,size:!Number.isNaN(sizeValue)&&sizeValue>0?String(sizeValue):''};
-        if((mime||'').toLowerCase().startsWith('image/')){
-          const link=document.createElement('a');
-          link.className='thumb-link';
-          link.href=info.url;
-          link.title=name;
-          applyPreviewDataset(link,previewData);
-          const img=document.createElement('img');
-          img.src=info.url;
-          img.alt='';
-          link.appendChild(img);
-          previewBox.appendChild(link);
-        }else{
-          const placeholder=document.createElement('button');
-          placeholder.type='button';
-          placeholder.className='thumb-placeholder';
-          placeholder.textContent=attachmentIconForMime(mime);
-          placeholder.setAttribute('aria-label','预览附件');
-          applyPreviewDataset(placeholder,previewData);
-          previewBox.appendChild(placeholder);
-        }
-        container.appendChild(previewBox);
+        const row=document.createElement('div');
+        row.className='attachment-row';
+        if(info.id!=null) row.dataset.attachmentId=String(info.id);
+        const main=document.createElement('div');
+        main.className='attachment-row-main';
+        const iconButton=document.createElement('button');
+        iconButton.type='button';
+        iconButton.className='attachment-icon-button';
+        iconButton.setAttribute('aria-label','预览附件');
+        iconButton.textContent=attachmentIconForMime(mime,name);
+        applyPreviewDataset(iconButton,previewData);
+        main.appendChild(iconButton);
         const infoBox=document.createElement('div');
-        infoBox.className='thumb-info';
+        infoBox.className='attachment-row-info';
+        const nameButton=document.createElement('button');
+        nameButton.type='button';
+        nameButton.className='attachment-name-button';
+        nameButton.textContent=name;
+        nameButton.title=name;
+        applyPreviewDataset(nameButton,previewData);
+        infoBox.appendChild(nameButton);
         const meta=document.createElement('div');
-        meta.className='att-meta';
-        const sizeText=!Number.isNaN(sizeValue) && sizeValue>0 ? humanBytes(sizeValue) : '';
-        meta.textContent=sizeText ? `${name} · ${sizeText}` : name;
+        meta.className='attachment-meta';
+        const metaParts=[];
+        if(mime) metaParts.push(mime);
+        if(!Number.isNaN(sizeValue) && sizeValue>0) metaParts.push(humanBytes(sizeValue));
+        meta.textContent=metaParts.length ? metaParts.join(' · ') : '—';
         infoBox.appendChild(meta);
+        main.appendChild(infoBox);
+        row.appendChild(main);
         const actions=document.createElement('div');
-        actions.className='thumb-buttons';
+        actions.className='attachment-row-actions';
         const previewBtn=document.createElement('button');
         previewBtn.type='button';
         previewBtn.className='btn btn-primary btn-small attachment-preview-button';
@@ -2737,12 +3517,24 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         downloadLink.setAttribute('download','');
         downloadLink.textContent='下载';
         actions.appendChild(downloadLink);
-        infoBox.appendChild(actions);
-        container.appendChild(infoBox);
-        root.prepend(container);
-        bindAttachmentPreviewTargets(container);
+        if(info.deleteUrl){
+          const form=document.createElement('form');
+          form.method='post';
+          form.innerHTML='<input type="hidden" name="action" value="delete_attachment"><input type="hidden" name="id" value="'+String(info.id||'')+'">';
+          const delBtn=document.createElement('button');
+          delBtn.className='btn btn-danger btn-small';
+          delBtn.type='submit';
+          delBtn.style.fontSize='12px';
+          delBtn.textContent='删除';
+          form.appendChild(delBtn);
+          actions.appendChild(form);
+        }
+        row.appendChild(actions);
+        list.prepend(row);
+        bindAttachmentPreviewTargets(row);
+        updateAttachmentListState();
       }
-      registerAttachmentPreviewReady(()=>bindAttachmentPreviewTargets());
+      registerAttachmentPreviewReady(()=>{ bindAttachmentPreviewTargets(); updateAttachmentListState(); });
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
       function createSaveFeedbackController(tipEl, buttonEl){
@@ -3553,44 +4345,37 @@ if ($view === 'map_edit') {
           div.textContent=message||'预览失败';
           showContent(div);
         };
-        const showList=entries=>{
-          const list=document.createElement('ul');
-          list.className='attachment-preview-list';
-          entries.forEach(entry=>{
-            const li=document.createElement('li');
-            const label=document.createElement('span');
-            label.textContent=entry.label;
-            li.appendChild(label);
-            if(entry.size){
-              const sizeSpan=document.createElement('span');
-              sizeSpan.className='entry-size';
-              sizeSpan.textContent=entry.size;
-              li.appendChild(sizeSpan);
-            }
-            list.appendChild(li);
-          });
-          showContent(list);
-        };
         const renderMedia=(type,url,mime)=>{
-          const el=type==='video'?document.createElement('video'):type==='pdf'?document.createElement('iframe'):document.createElement('img');
-          if(type==='video'){
+          const el=type==='video'?document.createElement('video'):
+            type==='pdf'?document.createElement('iframe'):
+            type==='audio'?document.createElement('audio'):
+            document.createElement('img');
+          if(type==='video' || type==='audio'){
             el.controls=true;
             el.preload='metadata';
           }
           if(type==='pdf'){ el.type=mime||'application/pdf'; }
           el.src=url;
           if(type==='video'){ el.classList.add('attachment-preview-video'); }
+          if(type==='audio'){ el.classList.add('attachment-preview-audio'); }
           if(type==='pdf'){ el.setAttribute('title','PDF 预览'); }
           showContent(el);
         };
         const detectType=source=>{
           const mime=(source.mime||'').toLowerCase();
           const name=(source.name||'').toLowerCase();
+          const hasExt=ext=>name.endsWith(ext);
           if(mime.startsWith('image/')) return 'image';
-          if(mime==='video/mp4' || (mime.startsWith('video/') && name.endsWith('.mp4'))) return 'video';
-          if(mime==='application/pdf' || name.endsWith('.pdf')) return 'pdf';
-          if(mime.includes('zip') || name.endsWith('.zip')) return 'zip';
-          if(mime.includes('rar') || name.endsWith('.rar')) return 'rar';
+          if(mime.startsWith('video/') || ['.mp4','.webm','.ogv','.mov','.m4v','.avi','.mkv'].some(hasExt)) return 'video';
+          if(mime.startsWith('audio/') || ['.mp3','.wav','.flac','.aac','.m4a','.ogg','.oga','.opus'].some(hasExt)) return 'audio';
+          if(mime==='application/pdf' || hasExt('.pdf')) return 'pdf';
+          if(mime.includes('wordprocessingml') || hasExt('.docx')) return 'docx';
+          if(mime==='application/msword' || hasExt('.doc')) return 'doc';
+          if(mime.includes('spreadsheetml') || hasExt('.xlsx')) return 'xlsx';
+          if(mime==='application/vnd.ms-excel' || hasExt('.xls')) return 'xls';
+          if(mime.startsWith('text/') || ['.txt','.md','.csv','.json','.log'].some(hasExt)) return 'text';
+          if(mime.includes('zip') || hasExt('.zip')) return 'zip';
+          if(mime.includes('rar') || hasExt('.rar')) return 'rar';
           return 'other';
         };
         const normalizeSource=input=>{
@@ -3658,58 +4443,88 @@ if ($view === 'map_edit') {
           scriptCache.set(url,promise);
           return promise;
         };
-        const loadZipPreview=async source=>{
+        const loadZipPreview=async (source,password)=>{
           const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析压缩包…';
+          loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+          let reader=null;
           try{
             const buffer=await loadBuffer(source);
-            await ensureScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
-            if(!window.JSZip) throw new Error('解析库未加载');
-            const zip=await window.JSZip.loadAsync(buffer);
-            const entries=[];
-            zip.forEach((relativePath,file)=>{
-              entries.push({
-                label:(file.dir?'📁 ':'📄 ')+relativePath,
-                size:file._data && typeof file._data.uncompressedSize==='number'?formatBytes(file._data.uncompressedSize):''
-              });
-            });
+            await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
+            if(!window.zip || !window.zip.ZipReader) throw new Error('解析库未加载');
+            if(typeof window.zip.configure==='function'){ window.zip.configure({useWebWorkers:false}); }
+            reader=new window.zip.ZipReader(new window.zip.BlobReader(new Blob([buffer])), { password: password || undefined });
+            const entries=await reader.getEntries();
+            await reader.close();
+            reader=null;
             if(!entries.length){
               showError('压缩包为空。');
               return;
             }
-            entries.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans'));
-            showList(entries);
+            const normalized=entries.map(entry=>({
+              path: entry.filename || entry.name || '',
+              directory: !!entry.directory,
+              size: entry.uncompressedSize || 0
+            })).filter(item=>item.path);
+            showArchiveEntries(normalized,'zip');
           }catch(err){
+            if(reader){ try{ await reader.close(); }catch(_){ /* ignore */ } }
+            const message=(err && err.message ? String(err.message) : '').toLowerCase();
+            if(!password && /password|encrypt/.test(message)){
+              const input=prompt('ZIP 压缩包已加密，请输入密码预览：');
+              if(input!==null){
+                const trimmed=input.trim();
+                if(trimmed===''){ alert('密码不能为空'); showError('无法解析压缩包：密码不能为空。'); return; }
+                await loadZipPreview(source, trimmed);
+                return;
+              }
+              showError('已取消预览。');
+              return;
+            }
             throw err;
           }
         };
-        const loadRarPreview=async source=>{
+        const loadRarPreview=async (source,password)=>{
           const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析压缩包…';
+          loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+          let extractor=null;
           try{
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
             if(!api || typeof api.createExtractorFromData!=='function') throw new Error('解析库未加载');
-            const extractor=await api.createExtractorFromData({data:buffer});
+            extractor=await api.createExtractorFromData({data:buffer,password:password||undefined});
             const list=extractor && typeof extractor.getFileList==='function' ? extractor.getFileList() : null;
             const headers=list && Array.isArray(list.fileHeaders) ? list.fileHeaders : [];
-            const entries=headers.map(header=>{
-              const name=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '未知文件');
+            const normalized=headers.map(header=>{
+              const rawName=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '');
+              const clean=String(rawName||'').replace(/^[\\/]+/,'').replace(/\\/g,'/');
+              if(!clean) return null;
               const dirFlag=header && header.flags ? (header.flags.directory || header.flags.DIRECTORY || header.flags.folder) : false;
-              const isDir=!!dirFlag || /[\\/]$/.test(name);
-              const sizeValue=header && typeof header.uncompressedSize==='number'?header.uncompressedSize:(header && typeof header.size==='number'?header.size:null);
-              return {label:(isDir?'📁 ':'📄 ')+name, size:sizeValue?formatBytes(sizeValue):''};
-            });
+              const isDir=!!dirFlag || /[\\/]$/.test(rawName||'');
+              const sizeValue=typeof header.uncompressedSize==='number'?header.uncompressedSize:(typeof header.size==='number'?header.size:0);
+              return {path:clean,directory:isDir,size:sizeValue};
+            }).filter(Boolean);
             if(typeof extractor.free==='function') extractor.free();
-            else if(typeof extractor.delete==='function') extractor.delete();
-            if(!entries.length){
+            else if(typeof extractor.close==='function') extractor.close();
+            if(!normalized.length){
               showError('压缩包为空。');
               return;
             }
-            entries.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans'));
-            showList(entries);
+            showArchiveEntries(normalized,'rar');
           }catch(err){
+            if(extractor && typeof extractor.free==='function'){ try{ extractor.free(); }catch(_){ /* ignore */ } }
+            const message=(err && err.message ? String(err.message) : '').toLowerCase();
+            if(!password && /password|encrypt/.test(message)){
+              const input=prompt('RAR 压缩包已加密，请输入密码预览：');
+              if(input!==null){
+                const trimmed=input.trim();
+                if(trimmed===''){ alert('密码不能为空'); showError('无法解析压缩包：密码不能为空。'); return; }
+                await loadRarPreview(source, trimmed);
+                return;
+              }
+              showError('已取消预览。');
+              return;
+            }
             throw err;
           }
         };
@@ -3729,15 +4544,27 @@ if ($view === 'map_edit') {
           const downloadHref=setDownloadLink(downloadBtn, source);
           loadingEl.textContent='载入中…';
           const type=detectType(source);
-          if(type==='image' || type==='video' || type==='pdf'){
-            const url=type==='image' && source.kind==='url' ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
+          if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
+            let url=source.url;
+            if(source.kind==='blob' || !url){ url=downloadHref; }
             if(!url){ showError('附件缺少可用地址'); return; }
             renderMedia(type,url,source.mime);
             return;
           }
-          const handleError=err=>{ console.error(err); showError(type==='other'?'暂不支持该文件类型的在线预览，请使用下载按钮。':('无法解析 '+(type==='zip'?'ZIP':'RAR')+'：'+(err && err.message?err.message:''))); };
-          if(type==='zip'){ loadZipPreview(source).then(()=>{}).catch(handleError); return; }
-          if(type==='rar'){ loadRarPreview(source).then(()=>{}).catch(handleError); return; }
+          const handleError=err=>{
+            console.error(err);
+            if(type==='zip' || type==='rar'){
+              showError('无法解析 '+(type==='zip'?'ZIP':'RAR')+'：'+(err && err.message?err.message:''));
+            }else{
+              showError(err && err.message ? err.message : '预览失败');
+            }
+          };
+          if(type==='text'){ loadTextPreview(source).catch(handleError); return; }
+          if(type==='docx'){ loadDocxPreview(source).catch(handleError); return; }
+          if(type==='xlsx' || type==='xls'){ loadSpreadsheetPreview(source).catch(handleError); return; }
+          if(type==='doc'){ showError('暂不支持旧版 Word 文档在线预览，请下载后查看。'); return; }
+          if(type==='zip'){ loadZipPreview(source).catch(handleError); return; }
+          if(type==='rar'){ loadRarPreview(source).catch(handleError); return; }
           showError('暂不支持该文件类型的在线预览，请使用下载按钮。');
         };
         window.AttachmentPreview={
@@ -6958,7 +7785,7 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .mindmap-card:hover{transform:translateY(-4px);border-color:rgba(201,168,106,.45);box-shadow:0 24px 60px rgba(0,0,0,.6)}
   .mindmap-card h3{margin:0;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.1em;text-transform:uppercase;overflow-wrap:anywhere;hyphens:auto}
   .mindmap-card-meta{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-  .mindmap-card pre{margin:0;background:rgba(15,19,22,.85);border:1px solid rgba(201,168,106,.24);padding:12px;border-radius:14px;max-height:150px;overflow:auto;font:12px/1.6 'JetBrains Mono','Fira Code',monospace;color:var(--text-strong);box-shadow:inset 0 0 18px rgba(0,0,0,.45)}
+  .mindmap-card pre{margin:0;background:rgba(15,19,22,.85);border:1px solid rgba(201,168,106,.24);padding:12px;border-radius:14px;max-height:150px;overflow:auto;font:12px/1.6 'JetBrains Mono','Fira Code',monospace;color:var(--text-strong);box-shadow:inset 0 0 18px rgba(0,0,0,.45);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
   .mindmap-card-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto}
   .mindmap-empty{padding:40px;border:1px dashed rgba(201,168,106,.32);border-radius:20px;text-align:center;color:var(--text-muted);background:rgba(15,19,22,.82)}
   .mindmap-empty strong{display:block;margin-bottom:8px;color:var(--gold-400);font-size:16px;letter-spacing:.12em;text-transform:uppercase}
