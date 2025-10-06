@@ -321,6 +321,23 @@ function attachments_for_item(int $item_id): array {
   $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
 }
 
+function attachments_for_steps(array $step_ids): array {
+  if(empty($step_ids)) return [];
+  $pdo=db();
+  $ids=array_values(array_filter(array_map('intval',$step_ids))); if(empty($ids)) return [];
+  $in=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE step_id IN ($in) ORDER BY id DESC");
+  $st->execute($ids);
+  $map=[];
+  while($row=$st->fetch()){
+    $sid=(int)($row['step_id'] ?? 0);
+    if($sid<=0) continue;
+    if(!isset($map[$sid])) $map[$sid]=[];
+    $map[$sid][]=$row;
+  }
+  return $map;
+}
+
 function get_mindmap_asset(int $id): ?array {
   $pdo=db();
   $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE id=? LIMIT 1');
@@ -881,7 +898,7 @@ if (is_post()) {
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
         if(is_ajax()){
           $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$mime,'markdown'=>$md,'size'=>$f['size']]); exit;
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$mime,'markdown'=>$md,'size'=>$f['size'],'name'=>$orig]); exit;
         }
         break;
       }
@@ -968,7 +985,6 @@ if ($view === 'new') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>新建备忘录</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1062,11 +1078,14 @@ if ($view === 'new') {
       .preview::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
-      .EasyMDEContainer .editor-toolbar{background:rgba(10,14,16,.82);border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md) var(--r-md) 0 0;color:var(--text-muted)}
-      .EasyMDEContainer .editor-toolbar a{color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;font-family:'Inter','Noto Sans SC',sans-serif}
-      .EasyMDEContainer .editor-toolbar a.active,.EasyMDEContainer .editor-toolbar a:hover{background:rgba(201,168,106,.16);color:var(--text-strong)}
-      .EasyMDEContainer .CodeMirror{border:1px solid rgba(201,168,106,.28);border-radius:0 0 var(--r-md) var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);min-height:280px;max-height:60vh;box-shadow:inset 0 0 24px rgba(0,0,0,.55)}
+      textarea.md-textarea{width:100%;min-height:280px;padding:14px 16px;border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);font:500 15px/1.7 'Noto Sans SC','Inter',sans-serif;resize:vertical;box-shadow:inset 0 0 24px rgba(0,0,0,.55);transition:border-color var(--transition),box-shadow var(--transition)}
+      textarea.md-textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 24px rgba(0,0,0,.55)}
+      textarea.md-textarea.md-textarea--compact{min-height:140px;padding:12px 14px;font-size:14px;line-height:1.65}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
+      .thumbs.step-attachments{margin-top:12px}
+      .thumbs.step-attachments:empty{display:none}
+      .thumbs.step-attachments{margin-top:12px}
+      .thumbs.step-attachments:empty{display:none}
       .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
       .thumb img{display:block;max-width:220px;max-height:150px}
@@ -1110,7 +1129,7 @@ if ($view === 'new') {
           </div>
           <div class="split" id="split">
             <div class="editbox">
-              <textarea id="md-editor" name="description" placeholder="描述 · 支持 Markdown"></textarea>
+              <textarea id="md-editor" name="description" class="md-textarea" placeholder="描述 · 支持 Markdown"></textarea>
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
                 <div>
                   <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
@@ -1138,7 +1157,6 @@ if ($view === 'new') {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const state = { id: 0 };
       const saveTip = document.getElementById('save-tip');
@@ -1193,13 +1211,63 @@ if ($view === 'new') {
         };
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
-      function renderMD(){ $('#md-view').innerHTML = safeHTML(mde.value()); }
-      const mde = new EasyMDE({
-        element: document.getElementById('md-editor'),
-        spellChecker:false, status:false,
-        toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
-      });
-      mde.codemirror.on('change', renderMD); renderMD();
+      function insertTextAtCursor(textarea, text){
+        if(!textarea || typeof textarea.value!=='string') return;
+        const start=textarea.selectionStart ?? textarea.value.length;
+        const end=textarea.selectionEnd ?? start;
+        const before=textarea.value.slice(0,start);
+        const after=textarea.value.slice(end);
+        textarea.value=before+text+after;
+        const pos=start+text.length;
+        if(typeof textarea.selectionStart==='number'){ textarea.selectionStart=textarea.selectionEnd=pos; }
+        textarea.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+      function formatSize(bytes){
+        const num=Number(bytes);
+        if(!num || Number.isNaN(num) || num<=0) return '';
+        const units=['B','KB','MB','GB','TB'];
+        let value=num, idx=0;
+        while(value>=1024 && idx<units.length-1){ value/=1024; idx++; }
+        const fixed=value>=10 || Math.round(value)===value ? value.toFixed(0) : value.toFixed(1);
+        return fixed.replace(/\.0$/,'')+units[idx];
+      }
+      function deleteFormHTML(id){
+        return `<form method="post" style="padding:6px;text-align:right"><input type="hidden" name="action" value="delete_attachment"><input type="hidden" name="id" value="${id}"><button class="btn" style="font-size:12px">删除</button></form>`;
+      }
+      function attachmentCardHTML(att){
+        if(!att) return '';
+        const id=att.id ?? '';
+        const url=att.url || '#';
+        const mime=att.mime || '';
+        const name=escapeHTML(att.name || att.orig_name || '附件');
+        const sizeRaw=att.size ?? att.filesize ?? att.file_size ?? null;
+        const sizeLabel=formatSize(sizeRaw);
+        const meta=sizeLabel?` · ${sizeLabel}`:'';
+        if(mime.startsWith('image/')){
+          return `<div class="thumb" data-attachment-id="${id}"><a href="${url}" target="_blank" title="${name}"><img src="${url}" alt=""></a>${deleteFormHTML(id)}</div>`;
+        }
+        return `<div class="thumb" data-attachment-id="${id}"><div style="display:flex;gap:8px;align-items:center;padding:8px"><a class="btn" href="${url}" target="_blank">下载附件</a><div class="att-meta">${name}${meta}</div></div>${deleteFormHTML(id)}</div>`;
+      }
+      function renderStepAttachmentsList(attList){
+        if(!Array.isArray(attList) || !attList.length) return '';
+        return attList.map(attachmentCardHTML).join('');
+      }
+      function appendStepAttachment(stepId, att){
+        const box=document.getElementById('step-atts-'+stepId);
+        if(box){ box.insertAdjacentHTML('afterbegin', attachmentCardHTML(att)); }
+      }
+      function renderStepMarkdown(stepId, md){
+        const el=document.getElementById('step-md-view-'+stepId);
+        if(el) el.innerHTML = safeHTML(md||'');
+      }
+      function registerStepTextarea(stepId){
+        const ta=document.getElementById('md-step-'+stepId);
+        if(ta){ ta.addEventListener('input', ()=>renderStepMarkdown(stepId, ta.value)); }
+      }
+      const mdEditor=document.getElementById('md-editor');
+      function renderMD(){ if(mdEditor) $('#md-view').innerHTML = safeHTML(mdEditor.value||''); }
+      if(mdEditor){ mdEditor.addEventListener('input', renderMD); }
+      renderMD();
       (async function bootstrap(){
         const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
         const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
@@ -1211,7 +1279,7 @@ if ($view === 'new') {
         fd.append('id', String(state.id));
         fd.append('title',$('#title').value.trim()||'未命名');
         fd.append('category_id',$('#cat').value);
-        fd.append('description', mde.value());
+        fd.append('description', mdEditor ? mdEditor.value : '');
         saveFeedback.saving();
         try{
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1229,8 +1297,10 @@ if ($view === 'new') {
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
-        mde.codemirror.replaceSelection(j.markdown+"\n"); renderMD();
-        if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
+        if(mdEditor){ insertTextAtCursor(mdEditor, j.markdown+"\n"); }
+        renderMD();
+        const thumbs=document.getElementById('thumbs');
+        if(thumbs){ thumbs.insertAdjacentHTML('afterbegin', attachmentCardHTML(j)); }
         e.target.value='';
       });
       $('#btn-preview-toggle').onclick=()=>{ const split=$('#split'); split.insertBefore(split.lastElementChild,split.firstElementChild); };
@@ -1264,7 +1334,7 @@ if ($view === 'new') {
                   <form onsubmit="return saveStepNotesAJAX(event, ${s.id})" id="form-notes-${s.id}">\
                     <input type="hidden" name="action" value="edit_step_notes">\
                     <input type="hidden" name="id" value="${s.id}">\
-                    <textarea id="md-step-${s.id}" name="notes" style="min-height:120px">${escapeHTML(s.notes||'')}</textarea>\
+                    <textarea id="md-step-${s.id}" name="notes" class="md-textarea md-textarea--compact">${escapeHTML(s.notes||'')}</textarea>\
                     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">\
                       <div>\
                         <input id="att-file-step-${s.id}" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">\
@@ -1283,6 +1353,7 @@ if ($view === 'new') {
               </details>\
             </div>\
             <div class="md-body" id="step-md-view-${s.id}">${notesHTML}</div>\
+            <div class="thumbs step-attachments" id="step-atts-${s.id}">${renderStepAttachmentsList(s.attachments||[])}</div>\
           </div>\
         `;
       }
@@ -1291,9 +1362,13 @@ if ($view === 'new') {
         const title=$('#new-step-title').value.trim(); if(!title) return false;
         const fd=new FormData(); fd.append('action','add_step'); fd.append('item_id', String(state.id)); fd.append('title', title);
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        const j=await r.json(); if(j.ok){ $('#new-step-title').value=''; $('#timeline').insertAdjacentHTML('beforeend', stepNodeHTML(j.step)); }
+        const j=await r.json(); if(j.ok){ $('#new-step-title').value=''; $('#timeline').insertAdjacentHTML('beforeend', stepNodeHTML(j.step)); registerStepTextarea(j.step.id); }
         return false;
       }
+      document.querySelectorAll('textarea[id^="md-step-"]').forEach(ta=>{
+        const id=Number(ta.id.replace('md-step-',''));
+        if(id) registerStepTextarea(id);
+      });
       function getStepFeedback(stepId, kind){
         const tip=document.querySelector(`[data-step-tip="${kind}-${stepId}"]`);
         const btn=document.querySelector(`[data-step-button="${kind}-${stepId}"]`);
@@ -1334,7 +1409,7 @@ if ($view === 'new') {
           const json=await r.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
           const val=ta?ta.value:'';
-          $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(val));
+          renderStepMarkdown(stepId, val);
           feedback.success();
         }catch(err){
           alert(err.message||'保存失败');
@@ -1358,7 +1433,6 @@ if ($view === 'new') {
           feedback.success('已删除','✅ 已删除');
           const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
           if(node){ setTimeout(()=>{ node.remove(); }, 350); }
-          if(stepMDE[stepId]) delete stepMDE[stepId];
         }catch(err){
           alert(err.message||'删除失败');
           feedback.error('删除失败');
@@ -1370,16 +1444,17 @@ if ($view === 'new') {
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok){ const el=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(el){ el.classList.toggle('done', !!done); } }
       }
-      const stepMDE={};
       window.insertAttachmentToStep = async function(stepId){
-        const inp=$('#att-file-step-'+stepId);
+        const inp=document.getElementById('att-file-step-'+stepId);
+        if(!inp) return;
         inp.onchange=async e=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           const j=await r.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
-          if(!stepMDE[stepId]) stepMDE[stepId]=new EasyMDE({ element: document.getElementById('md-step-'+stepId), spellChecker:false, status:false });
-          stepMDE[stepId].codemirror.replaceSelection(j.markdown+"\n"); const val=stepMDE[stepId].value(); $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(val));
+          const ta=document.getElementById('md-step-'+stepId);
+          if(ta){ insertTextAtCursor(ta, j.markdown+"\n"); renderStepMarkdown(stepId, ta.value); ta.focus(); }
+          appendStepAttachment(stepId, j);
           e.target.value='';
         };
         inp.click();
@@ -1411,7 +1486,10 @@ if ($view === 'new') {
 // 详情页
 if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) {
   $it=get_item((int)$_GET['id']); if(!$it){ http_response_code(404); echo 'Not Found'; exit; }
-  $steps=get_steps((int)$it['id']); $itemAtts=attachments_for_item((int)$it['id']); [$cats,$_counts]=get_categories();
+  $steps=get_steps((int)$it['id']);
+  $itemAtts=attachments_for_item((int)$it['id']);
+  $stepAttMap=attachments_for_steps(array_map(fn($row)=>$row['id']??0,$steps));
+  [$cats,$_counts]=get_categories();
   $doneView = $it['done'] ? 'done-view' : '';
   ?>
   <!doctype html>
@@ -1420,7 +1498,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>详情 · <?php echo h($it['title']); ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1526,10 +1603,9 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .section label{display:block;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase}
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
-      .EasyMDEContainer .editor-toolbar{background:rgba(10,14,16,.82);border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md) var(--r-md) 0 0;color:var(--text-muted)}
-      .EasyMDEContainer .editor-toolbar a{color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;font-family:'Inter','Noto Sans SC',sans-serif}
-      .EasyMDEContainer .editor-toolbar a.active,.EasyMDEContainer .editor-toolbar a:hover{background:rgba(201,168,106,.18);color:var(--text-strong)}
-      .EasyMDEContainer .CodeMirror{border:1px solid rgba(201,168,106,.28);border-radius:0 0 var(--r-md) var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);min-height:280px;max-height:60vh;box-shadow:inset 0 0 24px rgba(0,0,0,.55)}
+      textarea.md-textarea{width:100%;min-height:280px;padding:14px 16px;border:1px solid rgba(201,168,106,.3);border-radius:var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);font:500 15px/1.7 'Noto Sans SC','Inter',sans-serif;resize:vertical;box-shadow:inset 0 0 24px rgba(0,0,0,.55);transition:border-color var(--transition),box-shadow var(--transition)}
+      textarea.md-textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 24px rgba(0,0,0,.55)}
+      textarea.md-textarea.md-textarea--compact{min-height:140px;padding:12px 14px;font-size:14px;line-height:1.65}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
       .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
@@ -1593,7 +1669,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                   <button class="btn acc" type="submit">保存</button><span id="save-tip" class="save-tip">保存成功</span>
                 </div>
               </div>
-              <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
+              <textarea id="md-editor" name="description" class="md-textarea"><?php echo h($it['description']); ?></textarea>
                 <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
                 <div>
                   <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
@@ -1660,7 +1736,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                     <form method="post" onsubmit="return saveStepNotesAJAX(event, <?php echo $s['id']; ?>)" id="form-notes-<?php echo $s['id']; ?>">
                       <input type="hidden" name="action" value="edit_step_notes">
                       <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
-                      <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
+                      <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" class="md-textarea md-textarea--compact"><?php echo h($s['notes'] ?? ''); ?></textarea>
                       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
                         <div>
                           <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
@@ -1679,6 +1755,26 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                 </details>
               </div>
               <div class="md-body" id="step-md-view-<?php echo $s['id']; ?>"></div>
+              <?php $stepAtts=$stepAttMap[$s['id']] ?? []; ?>
+              <div class="thumbs step-attachments" id="step-atts-<?php echo $s['id']; ?>">
+                <?php foreach ($stepAtts as $a): $isImg=str_starts_with((string)$a['mime'],'image/'); ?>
+                  <div class="thumb" data-attachment-id="<?php echo $a['id']; ?>">
+                    <?php if ($isImg): ?>
+                      <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
+                    <?php else: ?>
+                      <div style="display:flex;gap:8px;align-items:center;padding:8px">
+                        <a class="btn" href="?download=<?php echo $a['id']; ?>">下载附件</a>
+                        <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
+                      </div>
+                    <?php endif; ?>
+                    <form method="post" style="padding:6px;text-align:right">
+                      <input type="hidden" name="action" value="delete_attachment">
+                      <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
+                      <button class="btn" style="font-size:12px">删除</button>
+                    </form>
+                  </div>
+                <?php endforeach; ?>
+              </div>
             </div>
           <?php endforeach; ?>
         </div>
@@ -1686,7 +1782,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
@@ -1735,16 +1830,70 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           }
         };
       }
+      function escapeHTML(s){ return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
-      function renderMDTo(id, md){ const el=document.getElementById(id); if(el) el.innerHTML=safeHTML(md); }
-      const mde = new EasyMDE({
-        element: document.getElementById('md-editor'),
-        spellChecker:false, status:false,
-        autosave:{enabled:true, uniqueId:'memo-item-<?php echo $it['id']; ?>', delay:800},
-        toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
-      });
-      renderMDTo('md-view', mde.value());
-      mde.codemirror.on('change', ()=> renderMDTo('md-view', mde.value()));
+      function renderMDTo(id, md){ const el=document.getElementById(id); if(el) el.innerHTML=safeHTML(md||''); }
+      function insertTextAtCursor(textarea, text){
+        if(!textarea || typeof textarea.value!=='string') return;
+        const start=textarea.selectionStart ?? textarea.value.length;
+        const end=textarea.selectionEnd ?? start;
+        const before=textarea.value.slice(0,start);
+        const after=textarea.value.slice(end);
+        textarea.value=before+text+after;
+        const pos=start+text.length;
+        if(typeof textarea.selectionStart==='number'){ textarea.selectionStart=textarea.selectionEnd=pos; }
+        textarea.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+      function formatSize(bytes){
+        const num=Number(bytes);
+        if(!num || Number.isNaN(num) || num<=0) return '';
+        const units=['B','KB','MB','GB','TB'];
+        let value=num, idx=0;
+        while(value>=1024 && idx<units.length-1){ value/=1024; idx++; }
+        const fixed=value>=10 || Math.round(value)===value ? value.toFixed(0) : value.toFixed(1);
+        return fixed.replace(/\.0$/,'')+units[idx];
+      }
+      function deleteFormHTML(id){
+        return `<form method="post" style="padding:6px;text-align:right"><input type="hidden" name="action" value="delete_attachment"><input type="hidden" name="id" value="${id}"><button class="btn" style="font-size:12px">删除</button></form>`;
+      }
+      function attachmentCardHTML(att){
+        if(!att) return '';
+        const id=att.id ?? '';
+        const url=att.url || '#';
+        const mime=att.mime || '';
+        const name=escapeHTML(att.name || att.orig_name || '附件');
+        const sizeRaw=att.size ?? att.filesize ?? att.file_size ?? null;
+        const sizeLabel=formatSize(sizeRaw);
+        const meta=sizeLabel?` · ${sizeLabel}`:'';
+        if(mime.startsWith('image/')){
+          return `<div class="thumb" data-attachment-id="${id}"><a href="${url}" target="_blank" title="${name}"><img src="${url}" alt=""></a>${deleteFormHTML(id)}</div>`;
+        }
+        return `<div class="thumb" data-attachment-id="${id}"><div style="display:flex;gap:8px;align-items:center;padding:8px"><a class="btn" href="${url}" target="_blank">下载附件</a><div class="att-meta">${name}${meta}</div></div>${deleteFormHTML(id)}</div>`;
+      }
+      function appendStepAttachment(stepId, att){
+        const box=document.getElementById('step-atts-'+stepId);
+        if(box){ box.insertAdjacentHTML('afterbegin', attachmentCardHTML(att)); }
+      }
+      function renderStepMarkdown(stepId, md){ renderMDTo('step-md-view-'+stepId, md); }
+      function registerStepTextarea(stepId){
+        const ta=document.getElementById('md-step-'+stepId);
+        if(ta){ ta.addEventListener('input', ()=>renderStepMarkdown(stepId, ta.value)); }
+      }
+      let storage=null;
+      try{ storage=window.localStorage; }catch(_){ storage=null; }
+      const mdEditor=document.getElementById('md-editor');
+      const autosaveKey = mdEditor ? 'memo-item-<?php echo $it['id']; ?>' : null;
+      function renderMainMarkdown(){ renderMDTo('md-view', mdEditor ? mdEditor.value : ''); }
+      if(mdEditor){
+        if(storage && autosaveKey){
+          const cached=storage.getItem(autosaveKey);
+          if(cached && mdEditor.value.trim()===''){ mdEditor.value=cached; }
+        }
+        const autosave = storage && autosaveKey ? throttle(()=>storage.setItem(autosaveKey, mdEditor.value), 800) : null;
+        mdEditor.addEventListener('input', ()=>{ renderMainMarkdown(); if(autosave) autosave(); });
+      }
+      function clearAutosave(){ if(storage && autosaveKey){ storage.removeItem(autosaveKey); } }
+      renderMainMarkdown();
       async function saveItemAJAX(ev, form){
         ev.preventDefault();
         const fd = new FormData(form);
@@ -1755,6 +1904,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         try{
           const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!res.ok) throw new Error('保存失败');
+          clearAutosave();
           feedback.success();
         }catch(err){
           alert(err.message||'保存失败');
@@ -1762,17 +1912,26 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         }
         return false;
       }
-      document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
-      document.getElementById('att-file-item').addEventListener('change', async (e)=>{
-        const f=e.target.files[0]; if(!f) return;
-        const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
-        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-        if(!j.ok){ alert(j.error||'上传失败'); return; }
-        mde.codemirror.replaceSelection(j.markdown+"\n"); mde.codemirror.focus();
-        if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
-        e.target.value='';
+      const btnInsertItem=document.getElementById('btn-insert-att-item');
+      const inputItem=document.getElementById('att-file-item');
+      if(btnInsertItem && inputItem){
+        btnInsertItem.addEventListener('click',()=>inputItem.click());
+        inputItem.addEventListener('change', async (e)=>{
+          const f=e.target.files[0]; if(!f) return;
+          const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
+          const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+          if(!j.ok){ alert(j.error||'上传失败'); return; }
+          if(mdEditor){ insertTextAtCursor(mdEditor, j.markdown+"\n"); mdEditor.focus(); }
+          renderMainMarkdown();
+          const thumbs=document.getElementById('thumbs');
+          if(thumbs){ thumbs.insertAdjacentHTML('afterbegin', attachmentCardHTML(j)); }
+          e.target.value='';
+        });
+      }
+      document.querySelectorAll('textarea[id^="md-step-"]').forEach(ta=>{
+        const id=Number(ta.id.replace('md-step-',''));
+        if(id) registerStepTextarea(id);
       });
-      const stepMDE={};
       function getStepFeedback(stepId, kind){
         const tip=document.querySelector(`[data-step-tip="${kind}-${stepId}"]`);
         const btn=document.querySelector(`[data-step-button="${kind}-${stepId}"]`);
@@ -1812,7 +1971,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           if(!res.ok) throw new Error('保存失败');
           const json=await res.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
-          renderMDTo('step-md-view-'+stepId, ta?ta.value:'');
+          renderStepMarkdown(stepId, ta?ta.value:'');
           feedback.success();
         }catch(err){
           alert(err.message||'保存失败');
@@ -1836,7 +1995,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           feedback.success('已删除','✅ 已删除');
           const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
           if(node){ setTimeout(()=>{ node.remove(); }, 350); }
-          if(stepMDE[stepId]) delete stepMDE[stepId];
         }catch(err){
           alert(err.message||'删除失败');
           feedback.error('删除失败');
@@ -1853,14 +2011,15 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       }
       window.insertAttachmentToStep = async function(stepId){
         const input=document.getElementById('att-file-step-'+stepId);
+        if(!input) return;
         input.onchange = async (e)=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
-          if(!stepMDE[stepId]){ stepMDE[stepId]=new EasyMDE({ element: document.getElementById('md-step-'+stepId), spellChecker:false, status:false }); }
-          stepMDE[stepId].codemirror.replaceSelection(j.markdown+"\n");
-          const val=stepMDE[stepId].value(); renderMDTo('step-md-view-'+stepId, val);
+          const ta=document.getElementById('md-step-'+stepId);
+          if(ta){ insertTextAtCursor(ta, j.markdown+"\n"); renderStepMarkdown(stepId, ta.value); ta.focus(); }
+          appendStepAttachment(stepId, j);
           e.target.value='';
         };
         input.click();
@@ -1889,7 +2048,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         });
       })();
       <?php foreach ($steps as $s): ?>
-        renderMDTo('step-md-view-<?php echo $s['id']; ?>', <?php echo json_encode((string)($s['notes'] ?? ''), JSON_UNESCAPED_UNICODE); ?>);
+        renderStepMarkdown(<?php echo $s['id']; ?>, <?php echo json_encode((string)($s['notes'] ?? ''), JSON_UNESCAPED_UNICODE); ?>);
       <?php endforeach; ?>
     </script>
   </body>
