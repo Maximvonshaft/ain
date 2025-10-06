@@ -159,6 +159,27 @@ function normalize_timestamp(mixed $value, ?int $fallback=null): int {
   return $fallback ?? now();
 }
 
+function highlight_text(string $text, string $term): string {
+  $term=trim($term);
+  if($term==='') return h($text);
+  $pattern='/(?:'.preg_quote($term,'/').')/iu';
+  $parts=preg_split($pattern,$text);
+  if($parts===false || count($parts)===1){
+    return h($text);
+  }
+  $matches=[];
+  preg_match_all($pattern,$text,$matches);
+  $out='';
+  foreach($parts as $idx=>$part){
+    $out.=h($part);
+    if(isset($matches[0][$idx])){
+      $out.='<mark>'.h($matches[0][$idx]).'</mark>';
+    }
+  }
+  return $out;
+}
+
+
 // —— 数据库 ——
 function db(): PDO {
   static $pdo;
@@ -462,41 +483,63 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
       $node['id']='node-'.bin2hex(random_bytes(4));
     }
     if(isset($node['data']) && is_array($node['data'])){
+      $processAttachment=function($raw) use (&$asset_refs,$map_id,$session_key,$node){
+        if(!is_array($raw)) return null;
+        if(isset($raw['content']) && is_string($raw['content']) && str_starts_with($raw['content'],'data:')){
+          $asset=create_mindmap_asset_from_dataurl($raw['content'],$raw['name'] ?? ($node['topic'] ?? '附件'),$map_id,$node['id'],$session_key);
+          if(!$asset) return null;
+          $asset_id=(int)$asset['id'];
+          $asset_refs[$asset_id]=$node['id'];
+          return [
+            'assetId'=>$asset_id,
+            'name'=>$asset['orig_name'],
+            'size'=>(int)$asset['size'],
+            'mime'=>$asset['mime'],
+            'url'=>'?mindmap_asset='.$asset_id,
+          ];
+        }
+        $asset_id=(int)($raw['assetId'] ?? ($raw['id'] ?? 0));
+        if($asset_id<=0) return null;
+        $normalized=[
+          'assetId'=>$asset_id,
+          'name'=>$raw['name'] ?? ($node['topic'] ?? '附件'),
+          'size'=>(int)($raw['size'] ?? 0),
+          'mime'=>$raw['mime'] ?? ($raw['type'] ?? 'application/octet-stream'),
+          'url'=>$raw['url'] ?? ('?mindmap_asset='.$asset_id),
+        ];
+        $asset_refs[$asset_id]=$node['id'];
+        return $normalized;
+      };
+      $collected=[];
+      if(isset($node['data']['attachments']) && is_array($node['data']['attachments'])){
+        foreach($node['data']['attachments'] as $att){
+          $normalized=$processAttachment($att);
+          if($normalized){
+            $collected[$normalized['assetId']]=$normalized;
+          }
+        }
+      }
       if(isset($node['data']['attachment']) && is_array($node['data']['attachment'])){
-        $attachment=&$node['data']['attachment'];
-        if(isset($attachment['content']) && is_string($attachment['content']) && str_starts_with($attachment['content'],'data:')){
-          $asset=create_mindmap_asset_from_dataurl($attachment['content'],$attachment['name'] ?? ($node['topic'] ?? '附件'),$map_id,$node['id'],$session_key);
-          if($asset){
-            $asset_id=(int)$asset['id'];
-            $attachment=[
-              'assetId'=>$asset_id,
-              'name'=>$asset['orig_name'],
-              'size'=>(int)$asset['size'],
-              'mime'=>$asset['mime'],
-              'url'=>'?mindmap_asset='.$asset_id,
-            ];
-            $asset_refs[$asset_id]=$node['id'];
-          } else {
-            unset($node['data']['attachment']);
-          }
-        } else {
-          $asset_id=(int)($attachment['assetId'] ?? ($attachment['id'] ?? 0));
-          if($asset_id>0){
-            $attachment['assetId']=$asset_id;
-            $attachment['name']=$attachment['name'] ?? ($node['topic'] ?? '附件');
-            $attachment['url']=$attachment['url'] ?? ('?mindmap_asset='.$asset_id);
-            $asset_refs[$asset_id]=$node['id'];
-          } else {
-            unset($node['data']['attachment']);
+        $normalized=$processAttachment($node['data']['attachment']);
+        if($normalized){
+          $collected[$normalized['assetId']]=$normalized;
+        }
+      }
+      if($collected){
+        $attachments=array_values($collected);
+        $node['data']['attachments']=$attachments;
+        $node['data']['attachment']=$attachments[0];
+      } else {
+        unset($node['data']['attachments'],$node['data']['attachment']);
+      }
+      if(isset($node['data']['attachments'])){
+        foreach($node['data']['attachments'] as &$att){
+          unset($att['content'],$att['id'],$att['type']);
+          if(!isset($att['mime'])){
+            $att['mime']='application/octet-stream';
           }
         }
-        if(isset($node['data']['attachment'])){
-          unset($node['data']['attachment']['content'],$node['data']['attachment']['id']);
-          if(isset($node['data']['attachment']['type']) && !isset($node['data']['attachment']['mime'])){
-            $node['data']['attachment']['mime']=$node['data']['attachment']['type'];
-          }
-          unset($node['data']['attachment']['type']);
-        }
+        unset($att);
       }
       if(isset($node['data']['url']) && !is_string($node['data']['url'])){
         unset($node['data']['url']);
@@ -793,7 +836,126 @@ if (is_post()) {
         $pdo->prepare('UPDATE items SET title=?, description=?, category_id=?, updated_at=? WHERE id=?')->execute([$title,$desc,$catId,now(),$id]);
         if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1]); exit; } break;
       }
-      case 'delete_item': { $id=(int)$_POST['id']; $pdo->prepare('DELETE FROM items WHERE id=?')->execute([$id]); break; }
+      case 'delete_item': {
+        $id=(int)($_POST['id'] ?? 0);
+        if($id<=0){ throw new RuntimeException('未指定要删除的备忘录'); }
+        $item=$pdo->prepare('SELECT * FROM items WHERE id=? LIMIT 1');
+        $item->execute([$id]);
+        $row=$item->fetch();
+        if(!$row){ throw new RuntimeException('指定的备忘录不存在'); }
+        $steps=get_steps($id);
+        $attachments=attachments_for_item($id);
+        $pdo->beginTransaction();
+        try {
+          $pdo->prepare('DELETE FROM items WHERE id=?')->execute([$id]);
+          $pdo->commit();
+        } catch(Throwable $err){
+          $pdo->rollBack();
+          throw $err;
+        }
+        $token=bin2hex(random_bytes(10));
+        $expires=now()+180;
+        if(!isset($_SESSION['undo_deleted']) || !is_array($_SESSION['undo_deleted'])){
+          $_SESSION['undo_deleted']=[];
+        }
+        foreach($_SESSION['undo_deleted'] as $key=>$payload){
+          if(!is_array($payload) || ($payload['expires'] ?? 0) < now()){
+            unset($_SESSION['undo_deleted'][$key]);
+          }
+        }
+        $_SESSION['undo_deleted'][$token]=[
+          'expires'=>$expires,
+          'item'=>$row,
+          'steps'=>$steps,
+          'attachments'=>$attachments,
+        ];
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode([
+            'ok'=>1,
+            'undo_token'=>$token,
+            'title'=>$row['title'],
+            'expires'=>$expires,
+          ], JSON_UNESCAPED_UNICODE);
+          exit;
+        }
+        $_SESSION['flash']='已删除 “'.$row['title'].'”';
+        break;
+      }
+      case 'undo_delete_item': {
+        $token=(string)($_POST['token'] ?? '');
+        if($token===''){ throw new RuntimeException('未提供撤销凭据'); }
+        $stack=$_SESSION['undo_deleted'] ?? [];
+        if(!isset($stack[$token]) || !is_array($stack[$token])){
+          throw new RuntimeException('没有可撤销的备忘录');
+        }
+        $payload=$stack[$token];
+        if(($payload['expires'] ?? 0) < now()){
+          unset($_SESSION['undo_deleted'][$token]);
+          throw new RuntimeException('撤销请求已过期');
+        }
+        unset($_SESSION['undo_deleted'][$token]);
+        $item=$payload['item'] ?? null;
+        if(!$item){ throw new RuntimeException('无效的撤销数据'); }
+        $stepsData=is_array($payload['steps'] ?? null) ? $payload['steps'] : [];
+        $attachmentsData=is_array($payload['attachments'] ?? null) ? $payload['attachments'] : [];
+        $pdo->beginTransaction();
+        try {
+          $pdo->prepare('INSERT INTO items(id,title,description,done,category_id,order_index,created_at,updated_at,previous_category_id) VALUES(?,?,?,?,?,?,?,?,?)')
+            ->execute([
+              (int)$item['id'],
+              $item['title'],
+              $item['description'],
+              (int)$item['done'],
+              $item['category_id'] !== null ? (int)$item['category_id'] : null,
+              (int)$item['order_index'],
+              (int)$item['created_at'],
+              (int)$item['updated_at'],
+              $item['previous_category_id'] !== null ? (int)$item['previous_category_id'] : null,
+            ]);
+          if($stepsData){
+            $insertStep=$pdo->prepare('INSERT INTO steps(id,item_id,title,notes,done,order_index,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)');
+            foreach($stepsData as $step){
+              $insertStep->execute([
+                (int)$step['id'],
+                (int)$step['item_id'],
+                $step['title'],
+                $step['notes'],
+                (int)$step['done'],
+                (int)$step['order_index'],
+                (int)$step['created_at'],
+                (int)$step['updated_at'],
+              ]);
+            }
+          }
+          if($attachmentsData){
+            $insertAttachment=$pdo->prepare('INSERT INTO attachments(id,item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)');
+            foreach($attachmentsData as $att){
+              $insertAttachment->execute([
+                (int)$att['id'],
+                $att['item_id'] !== null ? (int)$att['item_id'] : null,
+                $att['step_id'] !== null ? (int)$att['step_id'] : null,
+                $att['orig_name'],
+                $att['stored_name'],
+                $att['mime'],
+                (int)$att['size'],
+                (int)$att['created_at'],
+              ]);
+            }
+          }
+          $pdo->commit();
+        } catch(Throwable $err){
+          $pdo->rollBack();
+          throw $err;
+        }
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode(['ok'=>1], JSON_UNESCAPED_UNICODE);
+          exit;
+        }
+        $_SESSION['flash']='已恢复 “'.$item['title'].'”';
+        break;
+      }
       case 'add_category': {
         $name=trim((string)($_POST['name']??'')); if($name==='') throw new RuntimeException('分类名必填');
         $pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)')->execute([$name,now()]);
@@ -968,7 +1130,6 @@ if ($view === 'new') {
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>新建备忘录</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1057,15 +1218,14 @@ if ($view === 'new') {
       }
       .editbox,.preview{position:relative;background:linear-gradient(180deg,rgba(21,26,30,.88),rgba(15,19,22,.92));border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md);padding:18px;min-height:280px;box-shadow:var(--shadow-1)}
       .editbox::before,.preview::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.18);opacity:.6;pointer-events:none}
+      .editbox textarea{width:100%;min-height:260px;padding:14px;border-radius:var(--r-md);border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.82);color:var(--text-strong);font:500 15px/1.6 'Noto Sans SC','Inter',sans-serif;letter-spacing:.03em;resize:vertical;transition:border-color var(--transition),box-shadow var(--transition)}
+      .editbox textarea::placeholder{color:var(--text-muted)}
+      .editbox textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.16),inset 0 0 0 1px rgba(227,198,139,.24)}
       .preview{max-height:60vh;overflow:auto;background-image:linear-gradient(120deg,rgba(201,168,106,.06),transparent 55%)}
       .preview::-webkit-scrollbar{width:8px}
       .preview::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
-      .EasyMDEContainer .editor-toolbar{background:rgba(10,14,16,.82);border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md) var(--r-md) 0 0;color:var(--text-muted)}
-      .EasyMDEContainer .editor-toolbar a{color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;font-family:'Inter','Noto Sans SC',sans-serif}
-      .EasyMDEContainer .editor-toolbar a.active,.EasyMDEContainer .editor-toolbar a:hover{background:rgba(201,168,106,.16);color:var(--text-strong)}
-      .EasyMDEContainer .CodeMirror{border:1px solid rgba(201,168,106,.28);border-radius:0 0 var(--r-md) var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);min-height:280px;max-height:60vh;box-shadow:inset 0 0 24px rgba(0,0,0,.55)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
       .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
@@ -1089,11 +1249,11 @@ if ($view === 'new') {
       .placeholder-muted{color:var(--text-muted)}
     </style>
   </head>
-  <body>
+  <body data-density="comfortable">
     <div class="scanlines" aria-hidden="true"></div>
     <div class="wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <a class="btn" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
+        <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
       </div>
       <div class="card">
         <form id="new-form" onsubmit="return saveAJAX(event)">
@@ -1104,7 +1264,7 @@ if ($view === 'new') {
               <?php foreach ($cats as $c): ?><option value="<?php echo $c['id']; ?>"><?php echo h($c['name']); ?></option><?php endforeach; ?>
             </select>
             <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
-              <button class="btn acc" type="submit">保存</button>
+              <button class="btn btn-primary" type="submit">保存</button>
               <span id="save-tip" class="save-tip">保存成功</span>
             </div>
           </div>
@@ -1114,10 +1274,10 @@ if ($view === 'new') {
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
                 <div>
                   <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
-                  <button class="btn" type="button" id="btn-insert-att-item">插入附件到备注</button>
+                  <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
                   <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                 </div>
-                <button class="btn" type="button" id="btn-preview-toggle">预览置顶/置底</button>
+                <button class="btn btn-ghost" type="button" id="btn-preview-toggle">预览置顶/置底</button>
               </div>
             </div>
             <div class="preview">
@@ -1130,7 +1290,7 @@ if ($view === 'new') {
           <div style="font-weight:800">流程子任务（时间轴）</div>
           <form id="add-step-form" onsubmit="return addStepAJAX(event)" style="display:flex;gap:6px;flex-wrap:wrap">
             <input id="new-step-title" placeholder="新增步骤 · Add step" style="flex:1;min-width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(6,25,14,.82);color:var(--text);letter-spacing:.08em">
-            <button class="btn acc" type="submit">添加</button>
+            <button class="btn btn-primary" type="submit">添加</button>
           </form>
         </div>
         <div class="timeline" id="timeline" data-item="0"></div>
@@ -1138,7 +1298,6 @@ if ($view === 'new') {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const state = { id: 0 };
       const saveTip = document.getElementById('save-tip');
@@ -1193,13 +1352,32 @@ if ($view === 'new') {
         };
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
-      function renderMD(){ $('#md-view').innerHTML = safeHTML(mde.value()); }
-      const mde = new EasyMDE({
-        element: document.getElementById('md-editor'),
-        spellChecker:false, status:false,
-        toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
+      const editorEl=document.getElementById('md-editor');
+      function renderMD(){ $('#md-view').innerHTML = safeHTML(editorEl.value||''); }
+      function markDirty(){ saveFeedback.dirty('未保存'); }
+      function insertTextAtCursor(textarea, text){
+        if(!textarea) return;
+        const start=textarea.selectionStart ?? textarea.value.length;
+        const end=textarea.selectionEnd ?? textarea.value.length;
+        const before=textarea.value.slice(0,start);
+        const after=textarea.value.slice(end);
+        textarea.value=before+text+after;
+        const pos=start+text.length;
+        if(typeof textarea.setSelectionRange==='function'){ textarea.setSelectionRange(pos,pos); }
+        textarea.dispatchEvent(new Event('input', {bubbles:true}));
+      }
+      if(editorEl){
+        editorEl.addEventListener('input', ()=>{ renderMD(); markDirty(); });
+        editorEl.addEventListener('change', markDirty);
+        renderMD();
+      }
+      ['#title','#cat'].forEach(sel=>{
+        const el=$(sel);
+        if(el){
+          el.addEventListener('input', markDirty);
+          el.addEventListener('change', markDirty);
+        }
       });
-      mde.codemirror.on('change', renderMD); renderMD();
       (async function bootstrap(){
         const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
         const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
@@ -1211,7 +1389,7 @@ if ($view === 'new') {
         fd.append('id', String(state.id));
         fd.append('title',$('#title').value.trim()||'未命名');
         fd.append('category_id',$('#cat').value);
-        fd.append('description', mde.value());
+        fd.append('description', editorEl ? editorEl.value : '');
         saveFeedback.saving();
         try{
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1229,7 +1407,7 @@ if ($view === 'new') {
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
-        mde.codemirror.replaceSelection(j.markdown+"\n"); renderMD();
+        insertTextAtCursor(editorEl, j.markdown+"\n"); renderMD();
         if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
         e.target.value='';
       });
@@ -1258,7 +1436,7 @@ if ($view === 'new') {
                     <input type="hidden" name="action" value="edit_step">\
                     <input type="hidden" name="id" value="${s.id}">\
                     <input name="title" value="${safeTitle}" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">\
-                    <button class="btn" data-step-button="title-${s.id}">保存标题</button>\
+                    <button class="btn btn-outline" data-step-button="title-${s.id}">保存标题</button>\
                     <span class="save-tip" data-step-tip="title-${s.id}">保存成功</span>\
                   </form>\
                   <form onsubmit="return saveStepNotesAJAX(event, ${s.id})" id="form-notes-${s.id}">\
@@ -1268,13 +1446,13 @@ if ($view === 'new') {
                     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">\
                       <div>\
                         <input id="att-file-step-${s.id}" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">\
-                        <button class="btn" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
+                        <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
                         <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>\
                       </div>\
                       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">\
-                        <button class="btn acc" type="submit" data-step-button="notes-${s.id}">保存备注</button>\
+                        <button class="btn btn-primary" type="submit" data-step-button="notes-${s.id}">保存备注</button>\
                         <span class="save-tip" data-step-tip="notes-${s.id}">保存成功</span>\
-                        <button class="btn danger" type="button" data-step-button="delete-${s.id}" onclick="return deleteStep(${s.id}, this)">删除子任务</button>\
+                        <button class="btn btn-danger" type="button" data-step-button="delete-${s.id}" onclick="return deleteStep(${s.id}, this)">删除子任务</button>\
                         <span class="save-tip" data-step-tip="delete-${s.id}">已删除</span>\
                       </div>\
                     </div>\
@@ -1358,7 +1536,6 @@ if ($view === 'new') {
           feedback.success('已删除','✅ 已删除');
           const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
           if(node){ setTimeout(()=>{ node.remove(); }, 350); }
-          if(stepMDE[stepId]) delete stepMDE[stepId];
         }catch(err){
           alert(err.message||'删除失败');
           feedback.error('删除失败');
@@ -1370,20 +1547,36 @@ if ($view === 'new') {
         const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         if(r.ok){ const el=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(el){ el.classList.toggle('done', !!done); } }
       }
-      const stepMDE={};
       window.insertAttachmentToStep = async function(stepId){
         const inp=$('#att-file-step-'+stepId);
+        if(!inp) return;
         inp.onchange=async e=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           const j=await r.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
-          if(!stepMDE[stepId]) stepMDE[stepId]=new EasyMDE({ element: document.getElementById('md-step-'+stepId), spellChecker:false, status:false });
-          stepMDE[stepId].codemirror.replaceSelection(j.markdown+"\n"); const val=stepMDE[stepId].value(); $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(val));
+          const textarea=document.getElementById('md-step-'+stepId);
+          if(textarea){
+            insertTextAtCursor(textarea, j.markdown+"\n");
+            $('#step-md-view-'+stepId).innerHTML = DOMPurify.sanitize(marked.parse(textarea.value));
+          }
           e.target.value='';
         };
         inp.click();
       };
+      const timelineEl=document.getElementById('timeline');
+      if(timelineEl){
+        timelineEl.addEventListener('input', e=>{
+          if(e.target && e.target.matches('textarea[name="notes"]')){
+            const textarea=e.target;
+            const id=textarea.id ? textarea.id.replace('md-step-','') : '';
+            if(id){
+              $('#step-md-view-'+id).innerHTML = DOMPurify.sanitize(marked.parse(textarea.value));
+            }
+            markDirty();
+          }
+        });
+      }
       (function(){ // DnD steps
         const box=$('#timeline'); let dragging=null;
         box.addEventListener('dragstart',e=>{ const t=e.target.closest('.tl-item[draggable]'); if(!t) return; dragging=t; e.dataTransfer.effectAllowed='move'; });
@@ -1420,7 +1613,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>详情 · <?php echo h($it['title']); ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
     <meta name="color-scheme" content="dark"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1526,10 +1718,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .section label{display:block;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase}
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
-      .EasyMDEContainer .editor-toolbar{background:rgba(10,14,16,.82);border:1px solid rgba(201,168,106,.28);border-radius:var(--r-md) var(--r-md) 0 0;color:var(--text-muted)}
-      .EasyMDEContainer .editor-toolbar a{color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;font-family:'Inter','Noto Sans SC',sans-serif}
-      .EasyMDEContainer .editor-toolbar a.active,.EasyMDEContainer .editor-toolbar a:hover{background:rgba(201,168,106,.18);color:var(--text-strong)}
-      .EasyMDEContainer .CodeMirror{border:1px solid rgba(201,168,106,.28);border-radius:0 0 var(--r-md) var(--r-md);background:rgba(12,16,18,.82);color:var(--text-strong);min-height:280px;max-height:60vh;box-shadow:inset 0 0 24px rgba(0,0,0,.55)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
       .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
@@ -1563,10 +1751,10 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <div class="scanlines" aria-hidden="true"></div>
     <div class="wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
-        <a class="btn" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
+        <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
         <form method="post" onsubmit="return confirm('确认删除？');">
           <input type="hidden" name="action" value="delete_item"><input type="hidden" name="id" value="<?php echo $it['id']; ?>">
-          <button class="btn danger">删除</button>
+          <button class="btn btn-danger">删除</button>
         </form>
       </div>
       <div class="card <?php echo $doneView; ?>">
@@ -1590,14 +1778,14 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                   <?php endforeach; ?>
                 </select>
                 <div style="display:flex;gap:8px;align-items:center">
-                  <button class="btn acc" type="submit">保存</button><span id="save-tip" class="save-tip">保存成功</span>
+                  <button class="btn btn-primary" type="submit">保存</button><span id="save-tip" class="save-tip">保存成功</span>
                 </div>
               </div>
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
                 <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
                 <div>
                   <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
-                  <button class="btn" type="button" id="btn-insert-att-item">插入附件到备注</button>
+                  <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
                   <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                 </div>
               </div>
@@ -1612,14 +1800,14 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                     <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
                   <?php else: ?>
                     <div style="display:flex;gap:8px;align-items:center;padding:8px">
-                      <a class="btn" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
+                      <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
                       <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
                     </div>
                   <?php endif; ?>
                   <form method="post" style="padding:6px;text-align:right">
                     <input type="hidden" name="action" value="delete_attachment">
                     <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
-                    <button class="btn" style="font-size:12px">删除</button>
+                    <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
                   </form>
                 </div>
               <?php endforeach; endif; ?>
@@ -1632,7 +1820,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
             <input type="hidden" name="action" value="add_step">
             <input type="hidden" name="item_id" value="<?php echo $it['id']; ?>">
             <input id="new-step-title" name="title" placeholder="新增步骤 · Add step" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(6,25,14,.82);color:var(--text);letter-spacing:.08em;flex:1;min-width:220px">
-            <button class="btn acc">添加</button>
+            <button class="btn btn-primary">添加</button>
           </form>
         </div>
         <div class="timeline" id="timeline" data-item="<?php echo $it['id']; ?>">
@@ -1654,7 +1842,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                       <input type="hidden" name="action" value="edit_step">
                       <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
                       <input name="title" value="<?php echo h($s['title']); ?>" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">
-                      <button class="btn" data-step-button="title-<?php echo $s['id']; ?>">保存标题</button>
+                      <button class="btn btn-outline" data-step-button="title-<?php echo $s['id']; ?>">保存标题</button>
                       <span class="save-tip" data-step-tip="title-<?php echo $s['id']; ?>">保存成功</span>
                     </form>
                     <form method="post" onsubmit="return saveStepNotesAJAX(event, <?php echo $s['id']; ?>)" id="form-notes-<?php echo $s['id']; ?>">
@@ -1664,13 +1852,13 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
                         <div>
                           <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
-                          <button class="btn" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
+                          <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
                           <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-                          <button class="btn acc" type="submit" data-step-button="notes-<?php echo $s['id']; ?>">保存备注</button>
+                          <button class="btn btn-primary" type="submit" data-step-button="notes-<?php echo $s['id']; ?>">保存备注</button>
                           <span class="save-tip" data-step-tip="notes-<?php echo $s['id']; ?>">保存成功</span>
-                          <button class="btn danger" type="button" data-step-button="delete-<?php echo $s['id']; ?>" onclick="return deleteStep(<?php echo $s['id']; ?>, this)">删除子任务</button>
+                          <button class="btn btn-danger" type="button" data-step-button="delete-<?php echo $s['id']; ?>" onclick="return deleteStep(<?php echo $s['id']; ?>, this)">删除子任务</button>
                           <span class="save-tip" data-step-tip="delete-<?php echo $s['id']; ?>">已删除</span>
                         </div>
                       </div>
@@ -1686,7 +1874,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
     <script>
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
@@ -1736,21 +1923,51 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         };
       }
       function safeHTML(md){ return DOMPurify.sanitize(marked.parse(md||'')); }
-      function renderMDTo(id, md){ const el=document.getElementById(id); if(el) el.innerHTML=safeHTML(md); }
-      const mde = new EasyMDE({
-        element: document.getElementById('md-editor'),
-        spellChecker:false, status:false,
-        autosave:{enabled:true, uniqueId:'memo-item-<?php echo $it['id']; ?>', delay:800},
-        toolbar:["bold","italic","heading","|","quote","unordered-list","ordered-list","code","link","image","table","|","preview","guide"]
+      const editorEl=document.getElementById('md-editor');
+      const mainTip=document.getElementById('save-tip');
+      const mainButton=document.querySelector('#item-form button[type="submit"]');
+      const mainFeedback=(mainTip && mainButton)?createSaveFeedbackController(mainTip, mainButton):null;
+      function renderEditorPreview(){
+        const view=document.getElementById('md-view');
+        if(view){ view.innerHTML=safeHTML(editorEl?editorEl.value:''); }
+      }
+      function markItemDirty(){
+        if(mainFeedback){ mainFeedback.dirty('未保存'); }
+        else if(mainTip){
+          mainTip.textContent='未保存';
+          mainTip.classList.add('show','dirty');
+        }
+      }
+      function insertTextAtCursor(textarea, text){
+        if(!textarea) return;
+        const start=textarea.selectionStart ?? textarea.value.length;
+        const end=textarea.selectionEnd ?? textarea.value.length;
+        const before=textarea.value.slice(0,start);
+        const after=textarea.value.slice(end);
+        textarea.value=before+text+after;
+        const pos=start+text.length;
+        if(typeof textarea.setSelectionRange==='function'){ textarea.setSelectionRange(pos,pos); }
+        textarea.dispatchEvent(new Event('input', {bubbles:true}));
+      }
+      if(editorEl){
+        editorEl.addEventListener('input', ()=>{ renderEditorPreview(); markItemDirty(); });
+        editorEl.addEventListener('change', markItemDirty);
+        renderEditorPreview();
+      }
+      const titleInput=document.querySelector('#item-form input[name="title"]');
+      const catSelect=document.querySelector('#item-form select[name="category_id"]');
+      [titleInput,catSelect].forEach(el=>{
+        if(el){
+          el.addEventListener('input', markItemDirty);
+          el.addEventListener('change', markItemDirty);
+        }
       });
-      renderMDTo('md-view', mde.value());
-      mde.codemirror.on('change', ()=> renderMDTo('md-view', mde.value()));
       async function saveItemAJAX(ev, form){
         ev.preventDefault();
         const fd = new FormData(form);
-        const tip=form.querySelector('.save-tip') || document.getElementById('save-tip');
-        const btn=form.querySelector('button[type="submit"]');
-        const feedback=createSaveFeedbackController(tip, btn);
+        const fallbackTip=form.querySelector('.save-tip') || mainTip;
+        const fallbackBtn=form.querySelector('button[type="submit"]') || mainButton;
+        const feedback=mainFeedback ?? createSaveFeedbackController(fallbackTip, fallbackBtn);
         feedback.saving();
         try{
           const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -1762,17 +1979,22 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         }
         return false;
       }
-      document.getElementById('btn-insert-att-item').addEventListener('click',()=>document.getElementById('att-file-item').click());
-      document.getElementById('att-file-item').addEventListener('change', async (e)=>{
-        const f=e.target.files[0]; if(!f) return;
-        const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
-        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-        if(!j.ok){ alert(j.error||'上传失败'); return; }
-        mde.codemirror.replaceSelection(j.markdown+"\n"); mde.codemirror.focus();
-        if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
-        e.target.value='';
-      });
-      const stepMDE={};
+      const insertButton=document.getElementById('btn-insert-att-item');
+      const itemFileInput=document.getElementById('att-file-item');
+      if(insertButton && itemFileInput){ insertButton.addEventListener('click',()=>itemFileInput.click()); }
+      if(itemFileInput){
+        itemFileInput.addEventListener('change', async (e)=>{
+          const f=e.target.files[0]; if(!f) return;
+          const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
+          const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+          if(!j.ok){ alert(j.error||'上传失败'); return; }
+          insertTextAtCursor(editorEl, j.markdown+"\n");
+          renderEditorPreview();
+          markItemDirty();
+          if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
+          e.target.value='';
+        });
+      }
       function getStepFeedback(stepId, kind){
         const tip=document.querySelector(`[data-step-tip="${kind}-${stepId}"]`);
         const btn=document.querySelector(`[data-step-button="${kind}-${stepId}"]`);
@@ -1812,7 +2034,8 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           if(!res.ok) throw new Error('保存失败');
           const json=await res.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
-          renderMDTo('step-md-view-'+stepId, ta?ta.value:'');
+          const target=document.getElementById('step-md-view-'+stepId);
+          if(target && ta){ target.innerHTML=safeHTML(ta.value); }
           feedback.success();
         }catch(err){
           alert(err.message||'保存失败');
@@ -1836,7 +2059,6 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           feedback.success('已删除','✅ 已删除');
           const node=document.querySelector(`.tl-item[data-id="${stepId}"]`);
           if(node){ setTimeout(()=>{ node.remove(); }, 350); }
-          if(stepMDE[stepId]) delete stepMDE[stepId];
         }catch(err){
           alert(err.message||'删除失败');
           feedback.error('删除失败');
@@ -1853,18 +2075,37 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       }
       window.insertAttachmentToStep = async function(stepId){
         const input=document.getElementById('att-file-step-'+stepId);
+        if(!input) return;
         input.onchange = async (e)=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
           const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
-          if(!stepMDE[stepId]){ stepMDE[stepId]=new EasyMDE({ element: document.getElementById('md-step-'+stepId), spellChecker:false, status:false }); }
-          stepMDE[stepId].codemirror.replaceSelection(j.markdown+"\n");
-          const val=stepMDE[stepId].value(); renderMDTo('step-md-view-'+stepId, val);
+          const textarea=document.getElementById('md-step-'+stepId);
+          if(textarea){
+            insertTextAtCursor(textarea, j.markdown+"\n");
+            const preview=document.getElementById('step-md-view-'+stepId);
+            if(preview){ preview.innerHTML=safeHTML(textarea.value); }
+          }
           e.target.value='';
         };
         input.click();
       };
+      const timelineBox=document.getElementById('timeline');
+      if(timelineBox){
+        timelineBox.addEventListener('input', e=>{
+          if(e.target && e.target.matches('textarea[name="notes"]')){
+            const textarea=e.target;
+            const id=textarea.id ? textarea.id.replace('md-step-','') : '';
+            if(id){
+              const preview=document.getElementById('step-md-view-'+id);
+              if(preview){ preview.innerHTML=safeHTML(textarea.value); }
+              const fb=getStepFeedback(Number(id),'notes');
+              if(fb && fb.dirty){ fb.dirty('未保存'); }
+            }
+          }
+        });
+      }
       function addStepForm(ev){
         ev.preventDefault(); const f=ev.target; const fd=new FormData(f);
         fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}).then(()=>location.reload());
@@ -1888,8 +2129,11 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         });
       })();
-      <?php foreach ($steps as $s): ?>
-        renderMDTo('step-md-view-<?php echo $s['id']; ?>', <?php echo json_encode((string)($s['notes'] ?? ''), JSON_UNESCAPED_UNICODE); ?>);
+      <?php foreach ($steps as $s): $notes = json_encode((string)($s['notes'] ?? ''), JSON_UNESCAPED_UNICODE); ?>
+        (function(){
+          const el=document.getElementById('step-md-view-<?php echo $s['id']; ?>');
+          if(el){ el.innerHTML=safeHTML(<?php echo $notes; ?>); }
+        })();
       <?php endforeach; ?>
     </script>
   </body>
@@ -5353,6 +5597,9 @@ if ($view === 'maps') {
       }
       *,*::before,*::after{box-sizing:border-box}
       html,body{margin:0;min-height:100vh;background:var(--bg-void);color:var(--text-strong);font:16px/1.65 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow-x:hidden}
+  body{--item-padding:18px 16px;--item-gap:12px;--item-radius:18px;--item-line:36px;--item-desc-lines:3;--item-grid-gap:20px;}
+  body[data-density='compact']{--item-padding:14px 14px;--item-gap:8px;--item-radius:16px;--item-line:28px;--item-desc-lines:2;--item-grid-gap:16px;}
+
       body{background:
         radial-gradient(1200px 700px at 70% -10%,rgba(227,198,139,.06),transparent 60%),
         linear-gradient(120deg,rgba(201,168,106,.08),transparent 30%,rgba(201,168,106,.06) 70%,transparent 90%),
@@ -5431,10 +5678,10 @@ if ($view === 'maps') {
           <div class="meta">集中管理所有导图，支持多版本协作、导入导出与快速检索。</div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <a class="btn" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回备忘录</a>
-          <button class="btn" type="button" id="btn-import-map">导入导图</button>
-          <button class="btn" type="button" id="btn-export-maps">导出全部</button>
-          <a class="btn acc" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit') ?>">＋ 新建导图</a>
+          <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回备忘录</a>
+          <button class="btn btn-outline" type="button" id="btn-import-map">导入导图</button>
+          <button class="btn btn-outline" type="button" id="btn-export-maps">导出全部</button>
+          <a class="btn btn-primary" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit') ?>">＋ 新建导图</a>
         </div>
       </div>
       <div class="search">
@@ -5459,11 +5706,11 @@ if ($view === 'maps') {
                 <pre>（暂无内容）</pre>
               <?php endif; ?>
               <div class="card-actions">
-                <a class="btn acc" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit&id='.$m['id']) ?>">编辑</a>
+                <a class="btn btn-primary" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit&id='.$m['id']) ?>">编辑</a>
                 <form method="post" onsubmit="return confirm('确认删除该导图？');">
                   <input type="hidden" name="action" value="delete_mindmap">
                   <input type="hidden" name="id" value="<?php echo $m['id']; ?>">
-                  <button class="btn danger" type="submit">删除</button>
+                  <button class="btn btn-danger" type="submit">删除</button>
                 </form>
               </div>
             </article>
@@ -5752,6 +5999,8 @@ if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%
 $sql='SELECT * FROM items'; if($where) $sql.=' WHERE '.implode(' AND ',$where); $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
 $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
 $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
+$categoryNames=[];
+foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
 ?>
 <!doctype html>
 <html lang="zh-Hans">
@@ -5768,17 +6017,17 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
     --bg-void:#0A0C0E;
     --bg-elev-1:#0F1316;
     --bg-elev-2:#151A1E;
-    --gold-700:#AA8C54;
-    --gold-600:#C9A86A;
-    --gold-500:#D1B274;
-    --gold-400:#E3C68B;
-    --accent-emerald:#24C2A0;
-    --accent-crimson:#D14B4B;
+    --gold-700:#8E6B3D;
+    --gold-600:#CFA66B;
+    --gold-500:#E6C089;
+    --gold-400:#F4D8A4;
+    --accent-emerald:#23C4A2;
+    --accent-crimson:#EF6D6D;
     --accent-cyan:#4BC3D1;
-    --text-strong:#E8E5DF;
-    --text-muted:#A7A39A;
-    --text-dim:#7A766E;
-    --divider:rgba(201,168,106,.2);
+    --text-strong:#F2EEE6;
+    --text-muted:#9F998E;
+    --text-dim:#716B61;
+    --divider:rgba(230,192,137,.2);
     --text:var(--text-strong);
     --bg:var(--bg-void);
     --panel:rgba(21,26,30,.9);
@@ -5801,6 +6050,9 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   }
   *,*::before,*::after{box-sizing:border-box}
   html,body{margin:0;min-height:100vh;background:var(--bg-void);color:var(--text-strong);font:16px/1.65 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow-x:hidden}
+  body{--item-padding:18px 16px;--item-gap:12px;--item-radius:18px;--item-line:36px;--item-desc-lines:3;--item-grid-gap:20px;}
+  body[data-density='compact']{--item-padding:14px 14px;--item-gap:8px;--item-radius:16px;--item-line:28px;--item-desc-lines:2;--item-grid-gap:16px;}
+
   body::before{content:"";position:fixed;inset:0;background:
     linear-gradient(180deg,rgba(10,12,14,.45),rgba(10,12,14,.82)),
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"%3E%3Cpath fill="rgba(201,168,106,0.05)" d="M0 79h160v2H0zm79-79h2v160h-2z"/%3E%3C/svg%3E');
@@ -5825,15 +6077,23 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);opacity:.85}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
-  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:0 16px 34px rgba(227,198,139,.24),0 0 24px rgba(227,198,139,.18);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);overflow:hidden}
-  .btn::after{content:none}
-  .btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 30px rgba(227,198,139,.24)}
-  .btn:hover::after{content:none}
-  .btn:active{transform:translateY(0);box-shadow:0 10px 24px rgba(227,198,139,.22)}
-  .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
-  .btn.danger{color:#2b0909;border-color:rgba(255,156,156,.8);background:linear-gradient(135deg,rgba(255,156,156,.85),rgba(209,75,75,.72));box-shadow:0 16px 34px rgba(209,75,75,.24)}
-  .btn.small{padding:8px 12px;border-radius:12px;font-size:11px}
-  .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 3px rgba(227,198,139,.25)}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:14px;border:1px solid transparent;background:transparent;color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:none;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background var(--transition),color var(--transition);cursor:pointer}
+  .btn::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(227,198,139,.08);opacity:0;transition:opacity var(--transition)}
+  .btn:hover::before{opacity:1}
+  .btn-primary,.btn.acc{background:linear-gradient(135deg,var(--gold-500),var(--gold-600));color:#1b1306;border-color:rgba(142,107,61,.75);box-shadow:0 16px 34px rgba(227,198,139,.24),0 0 24px rgba(227,198,139,.18)}
+  .btn-primary:hover,.btn.acc:hover{transform:translateY(-1px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 30px rgba(227,198,139,.24)}
+  .btn-outline{border:1px solid rgba(230,192,137,.4);background:rgba(15,19,22,.6);color:var(--gold-500);box-shadow:0 12px 28px rgba(0,0,0,.32)}
+  .btn-outline:hover{border-color:rgba(230,192,137,.65);color:var(--gold-400)}
+  .btn-ghost{border:1px solid rgba(230,192,137,.25);background:transparent;color:var(--gold-500)}
+  .btn-ghost:hover{background:rgba(230,192,137,.08);color:var(--gold-400)}
+  .btn-danger,.btn.danger{border:1px solid rgba(239,68,68,.35);color:#fca5a5;background:transparent;box-shadow:none}
+  .btn-danger:hover,.btn.danger:hover{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.5)}
+  .btn-small,.btn.small{padding:8px 12px;border-radius:12px;font-size:11px;letter-spacing:.18em}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(230,192,137,.5)}
+  .btn-icon{font-size:14px;line-height:1}
+  .btn-label{display:inline-flex}
+  .btn:active{transform:translateY(0);box-shadow:none}
+
   .section-title{font:600 12px/1 'Cinzel','Noto Serif SC',serif;text-transform:uppercase;letter-spacing:.24em;color:var(--gold-400);margin:14px 0 8px;text-shadow:0 0 14px rgba(227,198,139,.24)}
   .cat-list{display:flex;flex-direction:column;gap:8px}
   .cat{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:linear-gradient(140deg,rgba(15,19,22,.88),rgba(10,12,14,.88));border:1px solid var(--border-soft);box-shadow:inset 0 0 0 1px rgba(201,168,106,.06);transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition)}
@@ -5852,22 +6112,34 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   .search input::placeholder{color:var(--text-dim)}
   .search button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.42);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.18em;cursor:pointer;transition:background var(--transition),box-shadow var(--transition),border-color var(--transition)}
   .search button:hover{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.6);box-shadow:0 0 18px rgba(227,198,139,.22)}
-  .actions-row{display:flex;gap:10px;flex-wrap:wrap}
-  .items{display:grid;gap:16px;position:relative;grid-template-columns:repeat(3,minmax(0,1fr))}
-  .item{position:relative;padding:18px 16px;border-radius:18px;background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:10px;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
+  .actions-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .density-toggle{display:inline-flex;border-radius:12px;border:1px solid rgba(230,192,137,.28);overflow:hidden;background:rgba(15,19,22,.6);box-shadow:0 10px 24px rgba(0,0,0,.35)}
+  .density-toggle .btn{border:0;border-radius:0;box-shadow:none;font-size:11px;letter-spacing:.16em;padding:8px 14px;color:var(--text-dim)}
+  .density-toggle .btn::before{display:none}
+  .density-toggle .btn:hover{background:rgba(230,192,137,.08);color:var(--gold-400)}
+  .density-toggle .btn.active{background:rgba(230,192,137,.16);color:var(--gold-400);box-shadow:inset 0 0 0 1px rgba(230,192,137,.25)}
+  .items{display:grid;gap:var(--item-grid-gap);position:relative;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .item{position:relative;padding:var(--item-padding);border-radius:var(--item-radius);background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:var(--item-gap);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),opacity var(--transition)}
   .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
-  .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger),0 0 20px rgba(209,75,75,.4)}
+  .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 12px rgba(207,166,107,.5),0 0 22px rgba(142,107,61,.45)}
   .item:hover{transform:translateY(-4px);box-shadow:0 0 28px rgba(201,168,106,.28),0 26px 50px rgba(0,0,0,.6);border-color:rgba(201,168,106,.52)}
+  .item.item-removing{opacity:0;transform:translateY(12px)}
   .item.done{background:linear-gradient(155deg,rgba(26,24,18,.9),rgba(18,16,12,.94));border-color:rgba(227,198,139,.55);box-shadow:0 0 28px rgba(201,168,106,.38),0 24px 58px rgba(0,0,0,.7)}
   .item-empty{grid-column:1/-1;text-align:center;padding:40px 24px;background:linear-gradient(150deg,rgba(15,19,22,.88),rgba(10,12,14,.9));border:1px dashed rgba(201,168,106,.28);box-shadow:none;color:var(--text-muted);letter-spacing:.12em}
   .item-empty::after,.item-empty::before{display:none}
-  .item.done::after{display:none}
+  .item.done::after{background:transparent;box-shadow:none;border:1px solid rgba(230,192,137,.3)}
   .item.done::before{opacity:1;border-style:double;border-color:rgba(201,168,106,.45);box-shadow:0 0 32px rgba(227,198,139,.3)}
-  .item-title{font:600 16px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 16px rgba(227,198,139,.24);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;letter-spacing:.08em}
+  .item-title{font-weight:600;font-size:16px;line-height:var(--item-line);letter-spacing:.2px;color:var(--text-strong);text-shadow:0 0 14px rgba(227,198,139,.16);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
   .item.done .item-title,.item.done .item-desc,.item.done .tinyline{text-decoration:line-through;color:rgba(227,198,139,.75)}
-  .item-desc{color:var(--text-dim);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
-  .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.22em;padding:4px 10px;border-radius:999px;border:1px dashed rgba(201,168,106,.35);background:rgba(201,168,106,.08);color:var(--text-dim);box-shadow:inset 0 0 12px rgba(201,168,106,.05)}
+  .item-desc{color:var(--text-muted);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:var(--item-desc-lines);-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;font-size:13px;line-height:1.6;opacity:.88}
+  .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.22em;padding:4px 10px;border-radius:999px;border:1px solid rgba(230,192,137,.32);background:rgba(230,192,137,.08);color:var(--text-muted);box-shadow:inset 0 0 12px rgba(230,192,137,.05)}
+  .attachment-badge{background:rgba(75,195,209,.14);border-color:rgba(75,195,209,.38);color:#9fe8f1}
+  .item-meta{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:6px;font-size:12px;opacity:.75}
+  .item-meta .meta-left{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .item-meta .meta-right{margin-left:auto;text-align:right;display:flex;justify-content:flex-end;min-width:130px}
+  .item-meta .item-time{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;color:var(--text-dim);white-space:nowrap}
   .kbd{font:600 12px/1 'Inter','Noto Sans SC',sans-serif;padding:2px 6px;border:1px dashed rgba(201,168,106,.35);border-radius:6px;background:rgba(15,19,22,.82);color:var(--text-dim);text-transform:uppercase;letter-spacing:.16em;box-shadow:0 0 12px rgba(201,168,106,.12)}
+  mark{background:rgba(75,195,209,.2);color:inherit;padding:0 2px;border-radius:4px}
   .tinyline{position:relative;margin-left:12px;padding-left:18px;color:var(--text-muted)}
   .tinyline::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,rgba(201,168,106,.65),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.25)}
   .tlrow{position:relative;margin:6px 0;padding-left:10px;display:flex;gap:8px;align-items:center}
@@ -5875,18 +6147,19 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   .dot{position:absolute;left:-6px;top:8px;width:10px;height:10px;background:linear-gradient(135deg,rgba(201,168,106,.92),rgba(170,140,84,.85));border-radius:50%;box-shadow:0 0 12px rgba(201,168,106,.5),0 0 24px rgba(201,168,106,.35)}
   .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(201,168,106,.45);opacity:.8;box-shadow:0 0 16px rgba(227,198,139,.26)}
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
-  .item-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .item-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
   .item-actions form{margin:0}
   .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
   .item-actions .status-tip{color:var(--gold-400)}
   .item-actions .note-tip{margin-right:0}
-  .item-actions a{background:rgba(201,168,106,.12);border:1px solid rgba(201,168,106,.32);padding:8px 12px;border-radius:12px;color:var(--gold-400);text-transform:uppercase;letter-spacing:.14em;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;transition:var(--transition)}
-  .item-actions a:hover{box-shadow:0 0 18px rgba(201,168,106,.3)}
   .move-controls{display:flex;gap:6px}
   .move-controls.mobile{display:none}
   .err{background:rgba(209,75,75,.16);color:rgba(255,214,214,.92);border:1px solid rgba(209,75,75,.45);border-radius:16px;box-shadow:0 0 20px rgba(209,75,75,.24);padding:10px 14px}
   .flash-message{margin-bottom:12px;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
   .shortcuts{margin-top:14px;color:var(--text-dim);font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase}
+  .toast-container{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);display:grid;gap:12px;z-index:140;pointer-events:none}
+  .toast{display:flex;gap:12px;align-items:center;padding:14px 18px;border-radius:14px;background:rgba(15,19,22,.92);border:1px solid rgba(230,192,137,.32);box-shadow:0 20px 48px rgba(0,0,0,.55);color:var(--text-strong);min-width:260px;pointer-events:auto}
+  .toast-message{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
   .modal-backdrop{position:fixed;inset:0;background:rgba(3,6,8,.76);backdrop-filter:blur(16px);display:none;align-items:center;justify-content:center;padding:16px;z-index:120}
   .modal-panel{background:linear-gradient(150deg,rgba(15,19,22,.92),rgba(10,12,14,.94));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 32px 64px rgba(0,0,0,.68),0 0 34px rgba(201,168,106,.16);padding:18px;max-width:520px;width:100%;display:grid;gap:14px;position:relative}
   .modal-panel::before{content:"";position:absolute;inset:10px;border-radius:18px;border:1px dashed rgba(201,168,106,.24);opacity:.85;pointer-events:none;box-shadow:inset 0 0 22px rgba(201,168,106,.08)}
@@ -5897,6 +6170,11 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
   .modal-input{flex:1;min-width:200px;padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.86);color:var(--text-strong);letter-spacing:.08em}
   .modal-input::placeholder{color:var(--text-dim)}
   .modal-count{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+  body[data-density='compact'] .item-title{font-size:15px}
+  body[data-density='compact'] .item-desc{font-size:12px;opacity:.78}
+  body[data-density='compact'] .item-meta{margin-top:4px}
+  body[data-density='compact'] .btn-detail .btn-label{display:none}
+  body[data-density='compact'] .item-actions{gap:6px}
   @media (max-width:1200px){
     .items{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
@@ -5921,15 +6199,15 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
 <body>
   <div class="scanlines" aria-hidden="true"></div>
   <div class="app">
-  <aside class="sidebar">
+  <aside class="sidebar" role="region" aria-label="侧边栏导航">
     <div class="brand">
       <div class="logo" aria-hidden="true"></div>
       <h1>自适应备忘录 · Memo</h1>
     </div>
     <div class="controls">
-      <a class="btn acc" href="?view=new">＋ 新建备忘录</a>
-      <button class="btn" id="btn-cat-mgr">分类管理</button>
-      <a class="btn" href="?view=maps">思维导图</a>
+      <a class="btn btn-primary" href="?view=new">＋ 新建备忘录</a>
+      <button class="btn btn-outline" id="btn-cat-mgr">分类管理</button>
+      <a class="btn btn-outline" href="?view=maps">思维导图</a>
     </div>
     <div class="section-title">分类 · Categories</div>
     <div class="cat-list" id="cat-list">
@@ -5961,9 +6239,13 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
         <button>搜索</button>
       </form>
       <div class="actions-row">
-        <button class="btn small" type="button" id="btn-import-items">导入 JSON</button>
-        <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
-        <a class="btn small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
+        <div class="density-toggle" role="group" aria-label="显示密度">
+          <button class="btn btn-ghost btn-small density-option" type="button" data-density="comfortable">舒适</button>
+          <button class="btn btn-ghost btn-small density-option" type="button" data-density="compact">紧凑</button>
+        </div>
+        <button class="btn btn-outline btn-small" type="button" id="btn-import-items">导入 JSON</button>
+        <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
+        <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
       </div>
     </div>
     <input id="memo-import-input" type="file" accept="application/json" hidden>
@@ -5972,8 +6254,16 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
         <div class="item item-empty">没有条目 · No items</div>
       <?php endif; ?>
       <?php foreach ($items as $it): ?>
-        <?php $steps_time=get_steps_by_time((int)$it['id']); ?>
-        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>">
+        <?php
+          $steps_time=get_steps_by_time((int)$it['id']);
+          $attachments=attachments_for_item((int)$it['id']);
+          $titlePlain=(string)$it['title'];
+          $titleHtml = $q!=='' ? highlight_text($titlePlain, $q) : h($titlePlain);
+          $descRaw = (string)$it['description'];
+          $descHtml = $descRaw!=='' ? nl2br($q!=='' ? highlight_text($descRaw, $q) : h($descRaw)) : '';
+          $catLabel = $it['category_id'] ? ($categoryNames[(int)$it['category_id']] ?? '未分类') : '未分类';
+        ?>
+        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>" data-title="<?php echo h($titlePlain); ?>" data-updated="<?php echo dt((int)$it['updated_at']); ?>">
           <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
             <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
               <input type="hidden" name="action" value="toggle_done">
@@ -5981,9 +6271,9 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
               <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
             </form>
             <div style="flex:1">
-              <div class="item-title"><?php echo h($it['title']); ?></div>
-              <?php if ($it['description']!==''): ?>
-                <div class="item-desc"><?php echo nl2br(h($it['description'])); ?></div>
+              <div class="item-title"><?php echo $titleHtml; ?></div>
+              <?php if ($descHtml!==''): ?>
+                <div class="item-desc"><?php echo $descHtml; ?></div>
               <?php endif; ?>
               <?php if ($steps_time): ?>
               <div class="tinyline" aria-label="时间轴">
@@ -6001,9 +6291,16 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
                 <?php endforeach; ?>
               </div>
               <?php endif; ?>
-              <div class="meta meta-inline">
-                <span class="badge"><?php echo $it['category_id'] ? h(array_values(array_filter($cats,fn($c)=>$c['id']==$it['category_id']))[0]['name'] ?? '未分类') : '未分类'; ?></span>
-                <span class="badge js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+              <div class="meta meta-inline item-meta" aria-label="分类与更新时间">
+                <div class="meta-left">
+                  <span class="badge"><?php echo h($catLabel); ?></span>
+                  <?php if(!empty($attachments)): ?>
+                    <span class="badge attachment-badge">📎 <?php echo count($attachments); ?></span>
+                  <?php endif; ?>
+                </div>
+                <div class="meta-right">
+                  <span class="item-time js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+                </div>
               </div>
             </div>
           </div>
@@ -6011,18 +6308,21 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
             <span class="tip status-tip"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></span>
             <span class="tip note-tip">↔ 按钮调整排序</span>
             <div class="move-controls desktop">
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
+              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
+              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
             </div>
             <div class="move-controls mobile">
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
-              <button class="btn small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
+              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
+              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
             </div>
-            <a class="btn small" href="?view=item&id=<?php echo $it['id']; ?>">详情</a>
-            <form method="post" onsubmit="return confirm('确认删除该备忘录？');" style="margin:0">
+            <a class="btn btn-ghost btn-small btn-detail" href="?view=item&id=<?php echo $it['id']; ?>">
+              <span class="btn-icon" aria-hidden="true">✦</span>
+              <span class="btn-label">详情</span>
+            </a>
+            <form method="post" class="form-delete-item" style="margin:0">
               <input type="hidden" name="action" value="delete_item">
               <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
-              <button class="btn small danger" type="submit">删除</button>
+              <button class="btn btn-danger btn-small" type="submit">删除</button>
             </form>
           </div>
         </article>
@@ -6033,16 +6333,17 @@ $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetc
     </div>
   </main>
 </div>
+<div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
 <div id="cat-modal" class="modal-backdrop">
   <div class="modal-panel">
     <div class="modal-header">
       <div class="modal-title">分类管理</div>
-      <button class="btn small" onclick="closeCatModal()">关闭</button>
+      <button class="btn btn-outline btn-small" onclick="closeCatModal()">关闭</button>
     </div>
     <div id="cat-rows" class="modal-list"></div>
     <form onsubmit="return addCat(event)" class="modal-form">
       <input type="text" id="new-cat-name" class="modal-input" placeholder="新增分类名" required>
-      <button class="btn">新增</button>
+      <button class="btn btn-primary">新增</button>
     </form>
   </div>
 </div>
@@ -6058,6 +6359,86 @@ const itemsContainer=document.getElementById('items');
 const currentCategoryFilter=<?php echo json_encode((string)$cat); ?>;
 const memoImportButton=document.getElementById('btn-import-items');
 const memoImportInput=document.getElementById('memo-import-input');
+const toastContainer=document.getElementById('toast-container');
+const densityButtons=$$('.density-option');
+const deleteForms=$$('.form-delete-item');
+const DENSITY_KEY='memo-density';
+function safeStorageGet(key){ try{ return window.localStorage.getItem(key); }catch(_){ return null; }}
+function safeStorageSet(key,value){ try{ window.localStorage.setItem(key,value); }catch(_){ }}
+function applyDensity(mode,{persist=true}={}){
+  const value=mode==='compact'?'compact':'comfortable';
+  document.body.dataset.density=value;
+  densityButtons.forEach(btn=>{ btn.classList.toggle('active', btn.dataset.density===value); });
+  if(persist){ safeStorageSet(DENSITY_KEY,value); }
+}
+const initialDensity=safeStorageGet(DENSITY_KEY);
+applyDensity(initialDensity==='compact'?'compact':'comfortable',{persist:false});
+densityButtons.forEach(btn=>{ btn.addEventListener('click',()=>applyDensity(btn.dataset.density)); });
+function showToast(message, actions=[]){
+  if(!toastContainer) return;
+  const toast=document.createElement('div');
+  toast.className='toast';
+  const text=document.createElement('div');
+  text.className='toast-message';
+  text.textContent=message;
+  toast.appendChild(text);
+  actions.forEach(action=>{
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn btn-ghost btn-small';
+    btn.textContent=action && action.label ? action.label : '操作';
+    btn.addEventListener('click',()=>{
+      try{ if(action && typeof action.onClick==='function'){ action.onClick(); } }catch(_){ }
+      toast.remove();
+    });
+    toast.appendChild(btn);
+  });
+  toastContainer.appendChild(toast);
+  setTimeout(()=>{ if(toast.isConnected){ toast.remove(); } },5000);
+}
+async function undoDelete(token){
+  if(!token) return;
+  const fd=new FormData(); fd.append('action','undo_delete_item'); fd.append('token', token);
+  try{
+    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+    const data=await res.json().catch(()=>null);
+    if(!res.ok || !data || !data.ok){ throw new Error((data && data.error) ? data.error : `撤销失败（${res.status}）`); }
+    window.location.reload();
+  }catch(err){
+    alert(err instanceof Error ? err.message : '撤销失败');
+  }
+}
+deleteForms.forEach(form=>{
+  form.addEventListener('submit',ev=>{ ev.preventDefault(); handleDeleteForm(form); });
+});
+async function handleDeleteForm(form){
+  if(form.dataset.loading==='1') return;
+  form.dataset.loading='1';
+  const fd=new FormData(form);
+  const card=form.closest('article.item');
+  const title=card ? (card.dataset.title || '备忘录') : '备忘录';
+  try{
+    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+    const data=await res.json().catch(()=>null);
+    if(!res.ok || !data || !data.ok){
+      const msg=(data && data.error) ? data.error : `删除失败（${res.status}）`;
+      throw new Error(msg);
+    }
+    if(card){
+      card.classList.add('item-removing');
+      setTimeout(()=>{ if(card.isConnected){ card.remove(); ensureItemsEmptyState(); } },220);
+    }
+    showToast(`已删除 · ${title}`, data.undo_token ? [{label:'撤销', onClick:()=>undoDelete(data.undo_token)}] : []);
+    try{
+      const {cats,counts,total}=await fetchCats();
+      refreshSidebarCats(cats,counts,total);
+    }catch(_){ }
+  }catch(err){
+    alert(err instanceof Error ? err.message : '删除失败');
+  }finally{
+    form.dataset.loading='';
+  }
+}
 if(memoImportButton && memoImportInput){
   const importButtonLabel=memoImportButton.textContent;
   memoImportButton.addEventListener('click',()=>{ memoImportInput.click(); });
@@ -6178,8 +6559,8 @@ function renderCatRows(cats, counts){
       <form onsubmit="return saveCat(event, ${c.id})" class="modal-form">\
         <input type="text" name="name" value="${escapeHtml(c.name)}" class="modal-input"/>\
         <span class="modal-count">共 ${counts[c.id]||0}</span>\
-        <button class="btn small">保存</button>\
-        <button class="btn small danger" onclick="return delCat(${c.id}, '${escapeHtml(c.name)}')">删除</button>\
+        <button class="btn btn-outline btn-small">保存</button>\
+        <button class="btn btn-danger btn-small" onclick="return delCat(${c.id}, '${escapeHtml(c.name)}')">删除</button>\
       </form>`;
     box.appendChild(row);
   });
