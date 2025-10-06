@@ -3795,6 +3795,11 @@ if ($view === 'map_edit') {
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-link-inserts{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:6}
+      .link-insert-btn{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:999px;border:1.4px solid rgba(227,198,139,.62);background:rgba(227,198,139,.18);color:var(--gold-400);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(227,198,139,.32);cursor:pointer;pointer-events:auto;backdrop-filter:blur(12px);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background-color var(--transition)}
+      .link-insert-btn:hover{transform:translate(-50%,-50%) scale(1.08);border-color:rgba(227,198,139,.85);background:rgba(227,198,139,.26);box-shadow:0 0 24px rgba(227,198,139,.42)}
+      .link-insert-btn:focus-visible{outline:3px solid rgba(227,198,139,.45);outline-offset:2px}
+      .link-insert-btn[hidden]{display:none!important}
       .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
       .mind-relations .relation-group{pointer-events:none}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -3852,6 +3857,18 @@ if ($view === 'map_edit') {
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode="pending"] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
       @keyframes relationPulse{0%{opacity:.35}50%{opacity:.8}100%{opacity:.35}}
+      .link-insert-popover{position:fixed;z-index:190;padding:16px;border-radius:18px;border:1px solid rgba(227,198,139,.36);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 48px rgba(0,0,0,.58),0 0 28px rgba(227,198,139,.18);min-width:240px;display:grid;gap:12px;pointer-events:auto;transform:translate(-50%,-100%)}
+      .link-insert-popover[hidden]{display:none!important}
+      .link-insert-popover[data-placement="bottom"]{transform:translate(-50%,8%)}
+      .link-insert-popover h3{margin:0;font:600 15px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.14em;text-transform:uppercase;text-align:center}
+      .link-insert-popover label{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase}
+      .link-insert-popover input{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 14px/1.4 'Inter','Noto Sans SC',sans-serif}
+      .link-insert-popover input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 2px rgba(227,198,139,.25)}
+      .link-insert-popover .actions{display:flex;justify-content:flex-end;gap:10px}
+      .link-insert-popover .actions button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
+      .link-insert-popover .actions button:hover{border-color:rgba(227,198,139,.58);background:rgba(201,168,106,.14)}
+      .link-insert-popover .actions button.accent{background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;border-color:rgba(227,198,139,.68)}
+      .link-insert-popover .actions button.accent:hover{box-shadow:0 12px 28px rgba(227,198,139,.28)}
       .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);transition:transform .24s ease,opacity .24s ease}
       .node-popover[hidden]{display:none!important}
       .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px;touch-action:pan-y}
@@ -3926,6 +3943,9 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <marker id="mindDragArrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto" markerUnits="strokeWidth">
+          <path d="M0 0 L12 6 L0 12 Z" fill="rgba(227,198,139,.92)" />
+        </marker>
         <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
           <path d="M0 0 L12 6 L0 12 Z" fill="rgba(75,195,209,.9)" />
         </marker>
@@ -4005,6 +4025,17 @@ if ($view === 'map_edit') {
         </nav>
       </div>
       <div class="mind-relation-toast" id="mind-relation-toast" role="status" aria-live="polite"></div>
+      <div class="link-insert-popover" id="link-insert-popover" role="dialog" aria-modal="true" aria-labelledby="link-insert-heading" hidden>
+        <form id="link-insert-form" autocomplete="off">
+          <h3 id="link-insert-heading">插入节点</h3>
+          <label for="link-insert-title">节点标题</label>
+          <input id="link-insert-title" name="title" placeholder="请输入节点标题">
+          <div class="actions">
+            <button type="button" data-insert-cancel>取消</button>
+            <button type="submit" class="accent">创建</button>
+          </div>
+        </form>
+      </div>
     </div>
     <div class="mind-import-backdrop" id="mind-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="mind-import-title">
       <div class="mind-import-panel">
@@ -4660,6 +4691,39 @@ if ($view === 'map_edit') {
         }
         return d;
       }
+      function midpointAlongRoute(points){
+        if(!Array.isArray(points) || points.length<2) return null;
+        let total=0;
+        for(let i=1;i<points.length;i++){
+          const prev=points[i-1];
+          const current=points[i];
+          if(!prev || !current) continue;
+          total+=Math.hypot((current.x||0)-(prev.x||0),(current.y||0)-(prev.y||0));
+        }
+        if(total===0){
+          const first=points[0]||{x:0,y:0};
+          return {x:first.x||0,y:first.y||0};
+        }
+        const target=total/2;
+        let acc=0;
+        for(let i=1;i<points.length;i++){
+          const start=points[i-1];
+          const end=points[i];
+          if(!start || !end) continue;
+          const seg=Math.hypot((end.x||0)-(start.x||0),(end.y||0)-(start.y||0));
+          if(seg===0) continue;
+          if(acc+seg>=target){
+            const ratio=(target-acc)/seg;
+            return {
+              x:start.x + (end.x-start.x)*ratio,
+              y:start.y + (end.y-start.y)*ratio
+            };
+          }
+          acc+=seg;
+        }
+        const last=points[points.length-1]||{x:0,y:0};
+        return {x:last.x||0,y:last.y||0};
+      }
       function normalizeNodeData(value){
         if(!value || typeof value!=='object' || Array.isArray(value)) return {};
         const data=value;
@@ -4737,6 +4801,9 @@ if ($view === 'map_edit') {
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
+          this.insertLayer=document.createElement('div');
+          this.insertLayer.className='mind-link-inserts';
+          this.viewport.appendChild(this.insertLayer);
           this.container.appendChild(this.viewport);
           this.sizeCache=new Map();
           this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
@@ -5018,6 +5085,61 @@ if ($view === 'map_edit') {
           };
           node.model.direction='right';
           parent.children.push(node);
+          this.nodes.set(newId,node);
+          this.computeLayout();
+          this.render();
+          this.select_node(newId);
+          this.emit(SimpleMind.event_type.update);
+          return node;
+        }
+        insert_node_between(parentNode, childNode, options={}){
+          const parent=typeof parentNode==='string'?this.get_node(parentNode):parentNode;
+          const child=typeof childNode==='string'?this.get_node(childNode):childNode;
+          if(!parent || !child || child.parent!==parent) return null;
+          const children=this.ensureModelChildren(parent);
+          const childIndex=parent.children.indexOf(child);
+          const childModelIndex=children.findIndex(model=>model && model.id===child.id);
+          if(childIndex<0 || childModelIndex<0) return null;
+          const childModel=children[childModelIndex];
+          if(!childModel) return null;
+          const topicRaw=options && typeof options.topic==='string' ? options.topic.trim() : '';
+          const topic=topicRaw || '插入节点';
+          const dataRaw=(options && typeof options.data==='object' && options.data && !Array.isArray(options.data)) ? JSON.parse(JSON.stringify(options.data)) : {};
+          const normalized=normalizeNodeData(dataRaw);
+          const style=(options && typeof options.style==='object' && options.style)?JSON.parse(JSON.stringify(options.style)):null;
+          const meta=(options && typeof options.meta==='object' && options.meta)?JSON.parse(JSON.stringify(options.meta)):null;
+          const newId=(options && typeof options.id==='string' && options.id.trim()) ? options.id.trim() : 'node-'+Math.random().toString(36).slice(2,10);
+          const directionHint=child.direction || (child.model && child.model.direction) || (child.dir===-1?'left':'right');
+          children.splice(childModelIndex,1);
+          parent.children.splice(childIndex,1);
+          const model={
+            id:newId,
+            topic:topic,
+            data:normalized,
+            children:[childModel],
+            direction:directionHint || 'right',
+            expanded:true
+          };
+          if(style){ model.style=style; }
+          if(meta){ model.meta=meta; }
+          children.splice(childIndex,0,model);
+          const node={
+            id:newId,
+            topic:topic,
+            data:normalized,
+            parent:parent,
+            children:[child],
+            direction:model.direction,
+            expanded:true,
+            isroot:false,
+            style:style,
+            meta:meta,
+            model:model,
+            depth:(parent.depth||0)+1
+          };
+          node.dir=node.direction==='left'?-1:(node.direction==='center'?0:1);
+          child.parent=node;
+          parent.children.splice(childIndex,0,node);
           this.nodes.set(newId,node);
           this.computeLayout();
           this.render();
@@ -5440,6 +5562,10 @@ if ($view === 'map_edit') {
           }
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
+          if(this.insertLayer){
+            this.insertLayer.style.width=`${this.bounds.width}px`;
+            this.insertLayer.style.height=`${this.bounds.height}px`;
+          }
           this.viewport.style.width=`${this.bounds.width}px`;
           this.viewport.style.height=`${this.bounds.height}px`;
         }
@@ -5588,6 +5714,7 @@ if ($view === 'map_edit') {
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
           if(this.relationLayer){ while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); } }
+          if(this.insertLayer){ this.insertLayer.innerHTML=''; }
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
           if(this.relationRegistry){ this.relationRegistry.clear(); }
@@ -5604,6 +5731,7 @@ if ($view === 'map_edit') {
             this.sizeCache.set(node.id,{width:node.width,height:node.height});
             this.updateNodePosition(node);
             this.updateAnchors(node);
+            node.linkInsertButton=null;
             if(node.parent){
               const group=document.createElementNS('http://www.w3.org/2000/svg','g');
               group.classList.add('trace-group');
@@ -5625,6 +5753,18 @@ if ($view === 'map_edit') {
               node.linkPath=core;
               node.linkHighlight=highlight;
               this.linkRegistry.set(node.id,{group,shadow,core,highlight});
+              if(this.insertLayer){
+                const insertBtn=document.createElement('button');
+                insertBtn.type='button';
+                insertBtn.className='link-insert-btn';
+                insertBtn.textContent='+';
+                insertBtn.dataset.parentId=node.parent.id;
+                insertBtn.dataset.childId=node.id;
+                insertBtn.dataset.exportIgnore='true';
+                insertBtn.hidden=true;
+                this.insertLayer.appendChild(insertBtn);
+                node.linkInsertButton=insertBtn;
+              }
               this.updateLinkPath(node);
             }
             if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
@@ -5707,7 +5847,8 @@ if ($view === 'map_edit') {
             }
           }
           const start={x:baseStart.x,y:baseStart.y+portYOffset};
-          const route=buildTraceRoute(start,end,isLeft?-1:1);
+          const rawRoute=buildTraceRoute(start,end,isLeft?-1:1);
+          const route=(Array.isArray(rawRoute) && rawRoute.length>=2)?rawRoute:[start,end];
           let pathData=buildChamferedPath(route, TRACE_CHAMFER);
           if(!pathData){
             pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`;
@@ -5715,6 +5856,16 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          if(node.linkInsertButton){
+            const midpoint=midpointAlongRoute(route);
+            if(midpoint && Number.isFinite(midpoint.x) && Number.isFinite(midpoint.y)){
+              node.linkInsertButton.hidden=false;
+              node.linkInsertButton.style.left=`${midpoint.x}px`;
+              node.linkInsertButton.style.top=`${midpoint.y}px`;
+            }else{
+              node.linkInsertButton.hidden=true;
+            }
+          }
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -5873,6 +6024,7 @@ if ($view === 'map_edit') {
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
           this.viewport.style.transform=transform;
+          repositionLinkInsertPopover();
         }
         zoom(step){
           const prev=this.scale;
@@ -6010,11 +6162,42 @@ if ($view === 'map_edit') {
     overlay.setAttribute('width','100%');
     overlay.setAttribute('height','100%');
     overlay.setAttribute('viewBox','0 0 100 100');
-    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ghostLine.setAttribute('opacity','0');
+    overlay.style.position='absolute';
+    overlay.style.left='0';
+    overlay.style.top='0';
+    overlay.style.width='100%';
+    overlay.style.height='100%';
+    overlay.style.pointerEvents='none';
+    const ghostShadow=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostShadow.setAttribute('opacity','0');
+    ghostShadow.setAttribute('stroke','rgba(122,94,54,.55)');
+    ghostShadow.setAttribute('stroke-width','2.6');
+    ghostShadow.setAttribute('stroke-linecap','round');
+    ghostShadow.setAttribute('stroke-linejoin','round');
+    ghostShadow.setAttribute('filter','url(#mindSoftGlow)');
+    const ghostCore=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostCore.setAttribute('opacity','0');
+    ghostCore.setAttribute('stroke','url(#mindGoldTrace)');
+    ghostCore.setAttribute('stroke-width','1.9');
+    ghostCore.setAttribute('stroke-linecap','round');
+    ghostCore.setAttribute('stroke-linejoin','round');
+    ghostCore.setAttribute('filter','url(#mindSoftGlow)');
+    ghostCore.setAttribute('marker-end','url(#mindDragArrow)');
+    const ghostHighlight=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostHighlight.setAttribute('opacity','0');
+    ghostHighlight.setAttribute('stroke','rgba(255,242,218,.4)');
+    ghostHighlight.setAttribute('stroke-width','0.9');
+    ghostHighlight.setAttribute('stroke-linecap','round');
+    ghostHighlight.setAttribute('stroke-linejoin','round');
     const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
     ghostRing.setAttribute('opacity','0');
-    overlay.appendChild(ghostLine);
+    ghostRing.setAttribute('fill','rgba(227,198,139,.12)');
+    ghostRing.setAttribute('stroke','rgba(227,198,139,.68)');
+    ghostRing.setAttribute('stroke-width','1.6');
+    ghostRing.setAttribute('filter','url(#mindSoftGlow)');
+    overlay.appendChild(ghostShadow);
+    overlay.appendChild(ghostCore);
+    overlay.appendChild(ghostHighlight);
     overlay.appendChild(ghostRing);
     const jm=new jsMind({
       container:'jsmind-container',
@@ -6270,6 +6453,10 @@ if ($view === 'map_edit') {
         const width=Math.max(rect.width,1);
         const height=Math.max(rect.height,1);
         overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
+        overlay.setAttribute('width',`${width}`);
+        overlay.setAttribute('height',`${height}`);
+        overlay.style.width=`${width}px`;
+        overlay.style.height=`${height}px`;
       }
       syncOverlaySize();
       window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
@@ -6327,32 +6514,68 @@ if ($view === 'map_edit') {
         const rect=el.getBoundingClientRect();
         return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
       }
+      function nodeEdgePoint(nodeId, fromClient){
+        if(!nodeId || !fromClient) return null;
+        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+        if(!el) return null;
+        const rect=el.getBoundingClientRect();
+        const center={x:rect.left + rect.width/2, y:rect.top + rect.height/2};
+        let dx=fromClient.x - center.x;
+        let dy=fromClient.y - center.y;
+        if(Math.abs(dx)<0.001 && Math.abs(dy)<0.001){
+          return svgPointFromClient(center.x, center.y);
+        }
+        const halfW=rect.width/2;
+        const halfH=rect.height/2;
+        let scale;
+        if(dx===0){ scale=halfH/Math.abs(dy||1); }
+        else if(dy===0){ scale=halfW/Math.abs(dx||1); }
+        else{ scale=Math.min(halfW/Math.abs(dx), halfH/Math.abs(dy)); }
+        scale=Math.max(Math.min(scale,1),0);
+        let edgeX=center.x + dx*scale;
+        let edgeY=center.y + dy*scale;
+        const distance=Math.hypot(dx,dy);
+        if(distance>0){
+          const extend=Math.min(18, distance*0.85);
+          const factor=extend/distance;
+          edgeX+=dx*factor;
+          edgeY+=dy*factor;
+        }
+        return svgPointFromClient(edgeX, edgeY);
+      }
       function showGhost(start,end){
         if(!start || !end){ hideGhost(); return; }
-        ghostLine.setAttribute('x1', start.x);
-        ghostLine.setAttribute('y1', start.y);
-        ghostLine.setAttribute('x2', end.x);
-        ghostLine.setAttribute('y2', end.y);
-        ghostLine.setAttribute('opacity','1');
+        [ghostShadow,ghostCore,ghostHighlight].forEach(line=>{
+          line.setAttribute('x1', start.x);
+          line.setAttribute('y1', start.y);
+          line.setAttribute('x2', end.x);
+          line.setAttribute('y2', end.y);
+          line.setAttribute('opacity','1');
+        });
         ghostRing.setAttribute('cx', end.x);
         ghostRing.setAttribute('cy', end.y);
-        ghostRing.setAttribute('r', 16);
+        ghostRing.setAttribute('r', 12);
         ghostRing.setAttribute('opacity','1');
       }
       function hideGhost(){
-        ghostLine.setAttribute('opacity','0');
+        ghostShadow.setAttribute('opacity','0');
+        ghostCore.setAttribute('opacity','0');
+        ghostHighlight.setAttribute('opacity','0');
         ghostRing.setAttribute('opacity','0');
       }
       dragHandle.addEventListener('pointerdown',e=>{
         if(!handleSource){ return; }
         e.preventDefault();
         const origin=nodeCenterSvg(handleSource.id);
-        if(!origin){ return; }
+        const nodeEl=dragHandle.parentElement && dragHandle.parentElement.classList.contains('jsmind-node') ? dragHandle.parentElement : dragHandle.closest('.jsmind-node');
+        const nodeRect=nodeEl ? nodeEl.getBoundingClientRect() : null;
+        const originClient=nodeRect ? {x:nodeRect.left + nodeRect.width/2, y:nodeRect.top + nodeRect.height/2} : null;
+        if(!origin || !originClient){ return; }
         syncOverlaySize();
         dragHandle.setPointerCapture(e.pointerId);
         dragHandle.classList.add('dragging');
         const initialPoint=eventToSvgPoint(e);
-        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
+        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin, originClient };
         showGhost(origin, initialPoint);
       });
       function finishPointerDrag(evt, cancelled){
@@ -6391,8 +6614,16 @@ if ($view === 'map_edit') {
           const targetEl=hovered.closest('.jsmind-node');
           if(targetEl){
             const targetId=targetEl.getAttribute('nodeid');
-            const center=nodeCenterSvg(targetId);
-            if(center) ringPoint=center;
+            let edgePoint=null;
+            if(targetId && pointerDragState.originClient){
+              edgePoint=nodeEdgePoint(targetId, pointerDragState.originClient);
+            }
+            if(edgePoint){
+              ringPoint=edgePoint;
+            }else{
+              const center=nodeCenterSvg(targetId);
+              if(center) ringPoint=center;
+            }
           }
         }
         pointerDragState.lastPoint=ringPoint;
@@ -6435,6 +6666,10 @@ if ($view === 'map_edit') {
       const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
       const relationToast=document.getElementById('mind-relation-toast');
+      const linkInsertPopover=document.getElementById('link-insert-popover');
+      const linkInsertForm=document.getElementById('link-insert-form');
+      const linkInsertTitle=document.getElementById('link-insert-title');
+      const linkInsertCancel=linkInsertPopover ? linkInsertPopover.querySelector('[data-insert-cancel]') : null;
       let pendingImportPayload=null;
       let pendingImportFileName='';
       const foldAllMenuItem=null;
@@ -6447,6 +6682,7 @@ if ($view === 'map_edit') {
       const fisheyeToggle=document.getElementById('setting-fisheye');
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
+      let linkInsertState=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
@@ -6519,6 +6755,61 @@ if ($view === 'map_edit') {
         if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
         else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
+      function closeLinkInsertPopover(){
+        if(!linkInsertPopover || linkInsertPopover.hidden) return;
+        linkInsertPopover.hidden=true;
+        delete linkInsertPopover.dataset.placement;
+        const trigger=linkInsertState && linkInsertState.trigger;
+        linkInsertState=null;
+        if(trigger && trigger.isConnected && typeof trigger.focus==='function'){
+          requestAnimationFrame(()=>{
+            try{ trigger.focus({preventScroll:true}); }
+            catch(_){ trigger.focus(); }
+          });
+        }
+      }
+      function repositionLinkInsertPopover(){
+        if(!linkInsertPopover || linkInsertPopover.hidden || !linkInsertState) return;
+        const trigger=linkInsertState.trigger;
+        if(!trigger || !trigger.isConnected){ closeLinkInsertPopover(); return; }
+        const rect=trigger.getBoundingClientRect();
+        const left=rect.left + rect.width/2;
+        linkInsertPopover.style.left=`${Math.round(left)}px`;
+        linkInsertPopover.style.top=`${Math.round(rect.top)}px`;
+        requestAnimationFrame(()=>{
+          if(!linkInsertPopover || linkInsertPopover.hidden || !linkInsertState) return;
+          const popRect=linkInsertPopover.getBoundingClientRect();
+          const offset=16;
+          let placement='top';
+          let finalTop=rect.top;
+          if(rect.top - popRect.height - offset < 0){
+            finalTop=rect.bottom;
+            placement='bottom';
+          }
+          linkInsertPopover.style.left=`${Math.round(left)}px`;
+          linkInsertPopover.style.top=`${Math.round(finalTop)}px`;
+          linkInsertPopover.dataset.placement=placement;
+        });
+      }
+      function openLinkInsertPopover(parentId, childId, trigger){
+        if(!linkInsertPopover || !parentId || !childId) return;
+        linkInsertState={parentId, childId, trigger};
+        linkInsertPopover.hidden=false;
+        repositionLinkInsertPopover();
+        if(linkInsertTitle){
+          const childNode=jm.get_node(childId);
+          const suggested=childNode && childNode.topic ? childNode.topic : '中间节点';
+          linkInsertTitle.value=suggested;
+          requestAnimationFrame(()=>{
+            if(!linkInsertTitle) return;
+            try{ linkInsertTitle.focus({preventScroll:true}); }
+            catch(_){ linkInsertTitle.focus(); }
+            if(typeof linkInsertTitle.select==='function'){ linkInsertTitle.select(); }
+          });
+        }
+      }
+      window.addEventListener('resize',repositionLinkInsertPopover);
+      document.addEventListener('scroll',repositionLinkInsertPopover, true);
       const deleteMapForm=document.getElementById('delete-map-form');
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
@@ -6596,6 +6887,7 @@ if ($view === 'map_edit') {
         if(relationToastTimer){ clearTimeout(relationToastTimer); relationToastTimer=null; }
       }
       function startRelationMode(){
+        closeLinkInsertPopover();
         const node=ensureNode();
         if(!node){ alert('请先选择一个节点'); return false; }
         commitInlineEditing();
@@ -6611,6 +6903,7 @@ if ($view === 'map_edit') {
       function cancelRelationMode(notify=false){
         if(!relationMode) return;
         relationMode=null;
+        closeLinkInsertPopover();
         if(mindShell){ mindShell.removeAttribute('data-relation-mode'); }
         clearRelationHighlights();
         if(notify){ showRelationToast('已取消关联'); }
@@ -6795,6 +7088,7 @@ if ($view === 'map_edit') {
       }
       function openNodeContextMenu(node, anchor){
         if(!nodeContextMenu || !node) return;
+        closeLinkInsertPopover();
         try{ jm.select_node(node.id); }catch(_){ }
         contextMenuState={nodeId:node.id};
         nodeContextMenu.hidden=false;
@@ -6826,6 +7120,7 @@ if ($view === 'map_edit') {
       function isPopoverOpen(){ return popoverOpen; }
       function openInspectorPopover(node){
         if(!nodePopover || !node) return;
+        closeLinkInsertPopover();
         closeNodeContextMenu();
         popoverOpen=true;
         updatePopoverMode();
@@ -6871,6 +7166,12 @@ if ($view === 'map_edit') {
           if(e.target.closest('[data-pop-save]')){ e.preventDefault(); commitInlineEditing(); closeInspectorPopover(); }
         });
       }
+      document.addEventListener('pointerdown',e=>{
+        if(!linkInsertPopover || linkInsertPopover.hidden) return;
+        if(linkInsertPopover.contains(e.target)) return;
+        if(e.target.closest && e.target.closest('.link-insert-btn')) return;
+        closeLinkInsertPopover();
+      });
       if(relationList){
         relationList.addEventListener('click',e=>{
           const btn=e.target.closest('button[data-rel-id]');
@@ -6931,6 +7232,7 @@ if ($view === 'map_edit') {
       });
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){
+          if(linkInsertPopover && !linkInsertPopover.hidden){ closeLinkInsertPopover(); }
           if(relationMode){ cancelRelationMode(true); return; }
           if(popoverOpen){ closeInspectorPopover(); }
           if(isContextMenuOpen()){ closeNodeContextMenu(); }
@@ -6961,6 +7263,11 @@ if ($view === 'map_edit') {
       };
       if(jmContainer){
         jmContainer.addEventListener('pointerdown',e=>{
+          if(linkInsertPopover && !linkInsertPopover.hidden){
+            if(!(linkInsertPopover.contains(e.target) || (e.target.closest && e.target.closest('.link-insert-btn')))){
+              closeLinkInsertPopover();
+            }
+          }
           const nodeEl=e.target.closest('.jsmind-node');
           if(!nodeEl){ cancelLongPressState(); return; }
           if(e.pointerType && !['touch','pen'].includes(e.pointerType)){ cancelLongPressState(); return; }
@@ -7004,6 +7311,15 @@ if ($view === 'map_edit') {
         jmContainer.addEventListener('pointerup',finishLongPress);
         jmContainer.addEventListener('pointercancel',finishLongPress);
         jmContainer.addEventListener('click',e=>{
+          const insertBtn=e.target.closest && e.target.closest('.link-insert-btn');
+          if(insertBtn){
+            e.preventDefault();
+            e.stopPropagation();
+            if(relationMode){ cancelRelationMode(false); }
+            commitInlineEditing();
+            openLinkInsertPopover(insertBtn.dataset.parentId || '', insertBtn.dataset.childId || '', insertBtn);
+            return;
+          }
           if(!relationMode) return;
           const nodeEl=e.target.closest('.jsmind-node');
           if(!nodeEl) return;
@@ -7409,6 +7725,7 @@ if ($view === 'map_edit') {
       const handleMindAction=(action)=>{
         if(!action) return;
         closeMapIoMenu();
+        if(linkInsertPopover && !linkInsertPopover.hidden){ closeLinkInsertPopover(); }
         if(action!=='relation' && relationMode){ cancelRelationMode(false); }
         switch(action){
           case 'save': saveMindmap(); break;
@@ -7442,6 +7759,7 @@ if ($view === 'map_edit') {
         mapIoButton.addEventListener('click',e=>{
           e.preventDefault();
           e.stopPropagation();
+          if(linkInsertPopover && !linkInsertPopover.hidden){ closeLinkInsertPopover(); }
           toggleMapIoMenu();
         });
       }
@@ -7483,6 +7801,43 @@ if ($view === 'map_edit') {
         mapDeleteButton.addEventListener('click',e=>{
           e.preventDefault();
           handleMindAction('delete-map');
+        });
+      }
+      if(linkInsertCancel){
+        linkInsertCancel.addEventListener('click',e=>{ e.preventDefault(); closeLinkInsertPopover(); });
+      }
+      if(linkInsertForm){
+        linkInsertForm.addEventListener('submit',e=>{
+          e.preventDefault();
+          if(!linkInsertState){ closeLinkInsertPopover(); return; }
+          const parent=jm.get_node(linkInsertState.parentId);
+          const child=jm.get_node(linkInsertState.childId);
+          if(!parent || !child){ closeLinkInsertPopover(); return; }
+          commitInlineEditing();
+          const rawTitle=linkInsertTitle ? linkInsertTitle.value.trim() : '';
+          const finalTopic=rawTitle || '插入节点';
+          let newNode=null;
+          if(typeof jm.insert_node_between==='function'){
+            newNode=jm.insert_node_between(parent.id, child.id, {topic:finalTopic});
+          }
+          let insertedNode=null;
+          if(newNode){
+            commandLog.push({type:'insertBetween', id:newNode.id, parentId:parent.id, childId:child.id, topic:finalTopic, timestamp:Date.now(), meta:{source:'link-insert'}});
+            window.__mindmapCommands=commandLog;
+            markDirty();
+            scheduleHandleRefresh();
+            insertedNode=jm.get_node(newNode.id);
+          }
+          closeLinkInsertPopover();
+          if(newNode){
+            if(insertedNode){ refreshInspector(insertedNode); }
+            requestAnimationFrame(()=>{
+              const nodeRef=jm.get_node(newNode.id);
+              if(nodeRef){ startInlineEditing(nodeRef); }
+            });
+          }else{
+            alert('插入节点失败，请重试。');
+          }
         });
       }
       if(dock){
@@ -7624,6 +7979,9 @@ if ($view === 'map_edit') {
             }
             collapseInfoBar();
           }
+          if(type===jsMind.event_type.refresh || type===jsMind.event_type.update || type===jsMind.event_type.show || type===jsMind.event_type.select){
+            closeLinkInsertPopover();
+          }
           if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
@@ -7728,6 +8086,7 @@ if ($view === 'map_edit') {
         }
       }
       function openImportModeDialog(fileName, data){
+        closeLinkInsertPopover();
         pendingImportPayload=data;
         pendingImportFileName=fileName || '导图文件';
         if(importModalName){ importModalName.textContent=pendingImportFileName; }
