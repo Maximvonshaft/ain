@@ -29,7 +29,7 @@ const UPLOAD_DIR = __DIR__ . '/storage/uploads';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 const ALLOWED_UPLOAD_MIME_MAP = [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
-  'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip',
+  'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
   'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','text/csv'=>'csv','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
   'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg',
 ];
@@ -87,7 +87,7 @@ const DEFAULT_MINDMAP = [
         'direction' => 'right',
         'expanded' => true,
         'children' => [
-          ['id' => 'view-resources-attach', 'topic' => '上传附件（≤15MB 图片/PDF/ZIP/文本/视频）', 'children' => []],
+          ['id' => 'view-resources-attach', 'topic' => '上传附件（≤15MB 图片/PDF/ZIP/RAR/文本/视频）', 'children' => []],
           ['id' => 'view-resources-link', 'topic' => '新增链接素材', 'children' => []],
         ],
       ],
@@ -126,6 +126,179 @@ function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POS
 function is_ajax(): bool { return !empty($_SERVER['HTTP_X_REQUESTED_WITH']); }
 function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
 function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
+
+function attachment_type_label(string $type): string {
+  return match ($type) {
+    'image' => '图片',
+    'video' => '视频',
+    'pdf' => 'PDF',
+    'zip' => 'ZIP',
+    'rar' => 'RAR',
+    default => '附件',
+  };
+}
+
+function build_zip_preview(string $path, int $limit = 10): array {
+  if (!class_exists('ZipArchive')) {
+    return ['error' => '服务器未启用 ZipArchive 扩展'];
+  }
+  $zip = new ZipArchive();
+  if ($zip->open($path) !== true) {
+    return ['error' => '无法读取 ZIP 文件'];
+  }
+  $entries = [];
+  $visibleTotal = 0;
+  $total = $zip->numFiles;
+  for ($i = 0; $i < $total; $i++) {
+    $stat = $zip->statIndex($i);
+    if (!$stat) {
+      continue;
+    }
+    $name = (string)($stat['name'] ?? '');
+    if($name===''){
+      continue;
+    }
+    if(str_ends_with($name,'/')){
+      continue;
+    }
+    $visibleTotal++;
+    if(count($entries) < $limit){
+      $entries[] = [
+        'name' => $name,
+        'size' => (int)($stat['size'] ?? 0),
+      ];
+    }
+  }
+  $zip->close();
+  return [
+    'entries' => $entries,
+    'total' => $visibleTotal,
+    'more' => max(0, $visibleTotal - count($entries)),
+  ];
+}
+
+function build_rar_preview(string $path, int $limit = 10): array {
+  if (!class_exists('RarArchive') || !class_exists('RarEntry')) {
+    return ['error' => '服务器未启用 RAR 扩展'];
+  }
+  $rar = @RarArchive::open($path);
+  if (!$rar) {
+    return ['error' => '无法读取 RAR 文件'];
+  }
+  $entriesRaw = $rar->getEntries();
+  $rar->close();
+  if (!is_array($entriesRaw)) {
+    return ['error' => '无法解析 RAR 文件'];
+  }
+  $entries = [];
+  $count = 0;
+  $visibleTotal = 0;
+  foreach ($entriesRaw as $entry) {
+    if (!($entry instanceof RarEntry)) {
+      continue;
+    }
+    if ($entry->isDirectory()) {
+      continue;
+    }
+    $visibleTotal++;
+    $entries[] = [
+      'name' => (string)$entry->getName(),
+      'size' => (int)$entry->getUnpackedSize(),
+    ];
+    $count++;
+    if ($count >= $limit) {
+      break;
+    }
+  }
+  $total = $visibleTotal;
+  return [
+    'entries' => $entries,
+    'total' => $total,
+    'more' => max(0, $total - count($entries)),
+  ];
+}
+
+function render_attachment_preview(array $att, bool $withDelete = false): string {
+  $id = (int)($att['id'] ?? 0);
+  $name = (string)($att['orig_name'] ?? ('附件 #' . $id));
+  $mime = (string)($att['mime'] ?? 'application/octet-stream');
+  $size = bytes_h((int)($att['size'] ?? 0));
+  $url = '?download=' . $id;
+  $type = 'other';
+  if (str_starts_with($mime, 'image/')) {
+    $type = 'image';
+  } elseif (str_starts_with($mime, 'video/')) {
+    $type = 'video';
+  } elseif ($mime === 'application/pdf') {
+    $type = 'pdf';
+  } elseif (in_array($mime, ['application/zip', 'application/x-zip-compressed'], true)) {
+    $type = 'zip';
+  } elseif (in_array($mime, ['application/x-rar-compressed', 'application/vnd.rar'], true)) {
+    $type = 'rar';
+  }
+  $preview = null;
+  $path = UPLOAD_DIR . DIRECTORY_SEPARATOR . ($att['stored_name'] ?? '');
+  if (($type === 'zip' || $type === 'rar') && is_file($path)) {
+    $preview = $type === 'zip' ? build_zip_preview($path) : build_rar_preview($path);
+  }
+  ob_start();
+  ?>
+  <div class="attachment-card" data-type="<?= h($type); ?>" data-attachment-id="<?= $id; ?>">
+    <div class="attachment-preview-body">
+      <?php if ($type === 'image'): ?>
+        <a href="<?= h($url); ?>" target="_blank" rel="noopener">
+          <img src="<?= h($url); ?>" alt="<?= h($name); ?>">
+        </a>
+      <?php elseif ($type === 'video'): ?>
+        <video controls preload="metadata" src="<?= h($url); ?>"></video>
+      <?php elseif ($type === 'pdf'): ?>
+        <iframe src="<?= h($url); ?>#toolbar=0" title="<?= h($name); ?>"></iframe>
+      <?php elseif ($type === 'zip' || $type === 'rar'): ?>
+        <?php if (is_array($preview) && isset($preview['error'])): ?>
+          <div class="attachment-preview-message"><?= h($preview['error']); ?></div>
+        <?php elseif (is_array($preview)): ?>
+          <?php if (!empty($preview['entries'])): ?>
+            <ul class="attachment-archive-list">
+              <?php foreach ($preview['entries'] as $entry): ?>
+                <li>
+                  <span class="archive-name" title="<?= h((string)($entry['name'] ?? '')); ?>"><?= h((string)($entry['name'] ?? '')); ?></span>
+                  <span class="archive-size"><?= h(bytes_h((int)($entry['size'] ?? 0))); ?></span>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+            <?php if (!empty($preview['more'])): ?>
+              <div class="attachment-preview-message">…… 等 <?= (int)$preview['more']; ?> 项</div>
+            <?php endif; ?>
+          <?php else: ?>
+            <div class="attachment-preview-message">未找到可预览的文件。</div>
+          <?php endif; ?>
+        <?php else: ?>
+          <div class="attachment-preview-message">暂无法生成预览</div>
+        <?php endif; ?>
+      <?php else: ?>
+        <div class="attachment-preview-message">暂不支持在线预览，请下载查看。</div>
+      <?php endif; ?>
+    </div>
+    <div class="attachment-preview-footer">
+      <div class="attachment-meta">
+        <div class="attachment-name" title="<?= h($name); ?>"><?= h($name); ?></div>
+        <div class="attachment-extra"><?= attachment_type_label($type); ?> · <?= h($size); ?></div>
+      </div>
+      <div class="attachment-actions">
+        <a class="btn btn-outline btn-small" href="<?= h($url); ?>" target="_blank" rel="noopener">下载</a>
+        <?php if ($withDelete): ?>
+          <form method="post" class="attachment-delete-form">
+            <input type="hidden" name="action" value="delete_attachment">
+            <input type="hidden" name="id" value="<?= $id; ?>">
+            <button class="btn btn-danger btn-small" type="submit">删除</button>
+          </form>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+  <?php
+  return trim((string)ob_get_clean());
+}
 function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
 
 if(!function_exists('array_is_list')){
@@ -611,11 +784,13 @@ function json_cats(): void {
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
   $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$att['mime']; $isImage=in_array($mime,['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true);
+  $mime=$att['mime'] ?: 'application/octet-stream';
   $filename=$att['orig_name'];
-  header('Content-Length: '.$att['size']); header('X-Content-Type-Options: nosniff');
-  if($isImage){ header('Content-Type: '.$mime); header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
-  else { header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
+  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
+  header('Content-Length: '.$att['size']);
+  header('X-Content-Type-Options: nosniff');
+  header('Content-Type: '.$mime);
+  header('Content-Disposition: '.($inline?'inline':'attachment').'; filename="'.rawurlencode($filename).'"');
   readfile($path); exit;
 }
 
@@ -1043,15 +1218,31 @@ if (is_post()) {
         $f=$_FILES['file']; if($f['size']>MAX_UPLOAD_BYTES) throw new RuntimeException('文件过大，最大 15MB');
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
         $ext = ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
-        if(!$ext) throw new RuntimeException('仅允许图片、PDF、ZIP、文本或视频文件');
+        if(!$ext) throw new RuntimeException('仅允许图片、PDF、ZIP、RAR、文本或视频文件');
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $orig=$f['name']; $itemIdForTouch=null;
         if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
         else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
         if(is_ajax()){
-          $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$mime,'markdown'=>$md,'size'=>$f['size']]); exit;
+          $attId=(int)db()->lastInsertId();
+          $url='?download='.$attId;
+          $isImg=str_starts_with($mime,'image/');
+          $md=$isImg ? '!['.preg_replace('/\.(zip|rar|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
+          $record=get_attachment($attId);
+          $previewHtml=$record ? render_attachment_preview($record, true) : '';
+          header('Content-Type: application/json');
+          echo json_encode([
+            'ok'=>1,
+            'id'=>$attId,
+            'url'=>$url,
+            'mime'=>$mime,
+            'markdown'=>$md,
+            'name'=>$orig,
+            'size'=>$f['size'],
+            'preview'=>$previewHtml,
+          ]);
+          exit;
         }
         break;
       }
@@ -1063,7 +1254,7 @@ if (is_post()) {
         if($nodeUid==='') throw new RuntimeException('节点信息缺失');
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
         $ext = ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
-        if(!$ext) throw new RuntimeException('仅允许图片、PDF、ZIP、文本或视频文件');
+        if(!$ext) throw new RuntimeException('仅允许图片、PDF、ZIP、RAR、文本或视频文件');
         if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
@@ -1234,10 +1425,25 @@ if ($view === 'new') {
       .preview::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
-      .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
-      .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .attachment-previews{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:16px}
+      .attachment-card{position:relative;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));box-shadow:var(--shadow-1)}
+      .attachment-card::before{content:"";position:absolute;inset:8px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.22);opacity:.6;pointer-events:none}
+      .attachment-preview-body{position:relative;border-radius:12px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.24);display:flex;align-items:center;justify-content:center;min-height:160px}
+      .attachment-card[data-type="image"] .attachment-preview-body{padding:0}
+      .attachment-preview-body img{display:block;width:100%;height:100%;object-fit:cover}
+      .attachment-preview-body video,.attachment-preview-body iframe{width:100%;border:0;border-radius:inherit;background:#000}
+      .attachment-preview-body video{max-height:240px}
+      .attachment-preview-body iframe{height:230px;background:#111}
+      .attachment-archive-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;width:100%;max-height:180px;overflow:auto;font:12px/1.5 'Inter','Noto Sans SC',sans-serif}
+      .attachment-archive-list .archive-name{display:block;color:var(--text-strong);word-break:break-word}
+      .attachment-archive-list .archive-size{color:var(--text-muted);font-size:11px}
+      .attachment-preview-message{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;text-align:center;padding:12px;word-break:break-word}
+      .attachment-preview-footer{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+      .attachment-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+      .attachment-name{font-weight:600;color:var(--text-strong);word-break:break-word}
+      .attachment-extra{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}
+      .attachment-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+      .attachment-delete-form{margin:0}
       .att-meta{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
       .timeline{position:relative;margin-top:20px;margin-left:16px;padding-left:32px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.6),rgba(201,168,106,.1));box-shadow:0 0 18px rgba(227,198,139,.28)}
@@ -1281,16 +1487,16 @@ if ($view === 'new') {
               <textarea id="md-editor" name="description" placeholder="描述 · 支持 Markdown"></textarea>
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
                 <div>
-                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
                   <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
-                  <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
+                  <span class="att-meta">图片、PDF、ZIP/RAR、文本或视频 ≤ 15MB</span>
                 </div>
                 <button class="btn btn-ghost" type="button" id="btn-preview-toggle">预览置顶/置底</button>
               </div>
             </div>
             <div class="preview">
               <div class="md-body" id="md-view"><span style="color:var(--text-dim)">预览区域</span></div>
-              <div class="thumbs" id="thumbs"></div>
+            <div class="attachment-previews" id="thumbs"></div>
             </div>
           </div>
         </form>
@@ -1416,7 +1622,75 @@ if ($view === 'new') {
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
         insertTextAtCursor(editorEl, j.markdown+"\n"); renderMD();
-        if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
+        if(j.preview){
+          const wrap=document.createElement('div');
+          wrap.innerHTML=j.preview;
+          const node=wrap.firstElementChild;
+          if(node){ const list=$('#thumbs'); if(list){ list.prepend(node); } }
+        } else if(j.mime && j.mime.startsWith('image/')){
+          const list=$('#thumbs');
+          if(list){
+            const card=document.createElement('div');
+            card.className='attachment-card';
+            card.dataset.type='image';
+            const body=document.createElement('div');
+            body.className='attachment-preview-body';
+            const link=document.createElement('a');
+            link.href=j.url;
+            link.target='_blank';
+            link.rel='noopener';
+            const img=document.createElement('img');
+            img.src=j.url;
+            img.alt=j.name || '';
+            link.appendChild(img);
+            body.appendChild(link);
+            card.appendChild(body);
+            const footer=document.createElement('div');
+            footer.className='attachment-preview-footer';
+            const meta=document.createElement('div');
+            meta.className='attachment-meta';
+            const nameEl=document.createElement('div');
+            nameEl.className='attachment-name';
+            nameEl.textContent=j.name || '图片附件';
+            const extra=document.createElement('div');
+            extra.className='attachment-extra';
+            extra.textContent='图片';
+            meta.appendChild(nameEl);
+            meta.appendChild(extra);
+            footer.appendChild(meta);
+            const actions=document.createElement('div');
+            actions.className='attachment-actions';
+            const download=document.createElement('a');
+            download.className='btn btn-outline btn-small';
+            download.href=j.url;
+            download.target='_blank';
+            download.rel='noopener';
+            download.textContent='下载';
+            actions.appendChild(download);
+            if(j.id){
+              const form=document.createElement('form');
+              form.method='post';
+              form.className='attachment-delete-form';
+              const actionInput=document.createElement('input');
+              actionInput.type='hidden';
+              actionInput.name='action';
+              actionInput.value='delete_attachment';
+              const idInput=document.createElement('input');
+              idInput.type='hidden';
+              idInput.name='id';
+              idInput.value=String(j.id);
+              const btn=document.createElement('button');
+              btn.className='btn btn-danger btn-small';
+              btn.type='submit';
+              btn.textContent='删除';
+              form.append(actionInput,idInput,btn);
+              actions.appendChild(form);
+            }
+            footer.appendChild(actions);
+            card.appendChild(footer);
+            list.prepend(card);
+          }
+        }
         e.target.value='';
       });
       $('#btn-preview-toggle').onclick=()=>{ const split=$('#split'); split.insertBefore(split.lastElementChild,split.firstElementChild); };
@@ -1453,9 +1727,9 @@ if ($view === 'new') {
                     <textarea id="md-step-${s.id}" name="notes" style="min-height:120px">${escapeHTML(s.notes||'')}</textarea>\
                     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">\
                       <div>\
-                        <input id="att-file-step-${s.id}" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">\
+                        <input id="att-file-step-${s.id}" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">\
                         <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
-                        <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>\
+                        <span class="att-meta">图片、PDF、ZIP/RAR、文本或视频 ≤ 15MB</span>\
                       </div>\
                       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">\
                         <button class="btn btn-primary" type="submit" data-step-button="notes-${s.id}">保存备注</button>\
@@ -1726,10 +2000,25 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .section label{display:block;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase}
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
-      .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
-      .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .attachment-previews{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:16px}
+      .attachment-card{position:relative;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:var(--r-sm);border:1px solid rgba(201,168,106,.34);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.92));box-shadow:var(--shadow-1)}
+      .attachment-card::before{content:"";position:absolute;inset:8px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.24);opacity:.7;pointer-events:none}
+      .attachment-preview-body{position:relative;border-radius:12px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.24);display:flex;align-items:center;justify-content:center;min-height:160px}
+      .attachment-card[data-type="image"] .attachment-preview-body{padding:0}
+      .attachment-preview-body img{display:block;width:100%;height:100%;object-fit:cover}
+      .attachment-preview-body video,.attachment-preview-body iframe{width:100%;border:0;border-radius:inherit;background:#000}
+      .attachment-preview-body video{max-height:240px}
+      .attachment-preview-body iframe{height:230px;background:#111}
+      .attachment-archive-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;width:100%;max-height:180px;overflow:auto;font:12px/1.5 'Inter','Noto Sans SC',sans-serif}
+      .attachment-archive-list .archive-name{display:block;color:var(--text-strong);word-break:break-word}
+      .attachment-archive-list .archive-size{color:var(--text-muted);font-size:11px}
+      .attachment-preview-message{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;text-align:center;padding:12px;word-break:break-word}
+      .attachment-preview-footer{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+      .attachment-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+      .attachment-name{font-weight:600;color:var(--text-strong);word-break:break-word}
+      .attachment-extra{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}
+      .attachment-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+      .attachment-delete-form{margin:0}
       .timeline{position:relative;margin-top:22px;margin-left:18px;padding-left:34px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.58),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.24)}
       .tl-item{position:relative;margin:14px 0;padding:16px 20px 20px 26px;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-md);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));box-shadow:var(--shadow-1)}
@@ -1792,32 +2081,18 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
                 <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
                 <div>
-                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
                   <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
-                  <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
+                  <span class="att-meta">图片、PDF、ZIP/RAR、文本或视频 ≤ 15MB</span>
                 </div>
               </div>
             </form>
           </div>
           <div class="preview">
             <div class="md-body" id="md-view"></div>
-            <div class="thumbs" id="thumbs">
-              <?php if ($itemAtts): foreach ($itemAtts as $a): $isImg=in_array($a['mime'],['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true); ?>
-                <div class="thumb">
-                  <?php if ($isImg): ?>
-                    <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
-                  <?php else: ?>
-                    <div style="display:flex;gap:8px;align-items:center;padding:8px">
-                      <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
-                      <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
-                    </div>
-                  <?php endif; ?>
-                  <form method="post" style="padding:6px;text-align:right">
-                    <input type="hidden" name="action" value="delete_attachment">
-                    <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
-                    <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
-                  </form>
-                </div>
+            <div class="attachment-previews" id="thumbs">
+              <?php if ($itemAtts): foreach ($itemAtts as $a): ?>
+                <?= render_attachment_preview($a, true); ?>
               <?php endforeach; endif; ?>
             </div>
           </div>
@@ -1859,9 +2134,9 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                       <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
                       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
                         <div>
-                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
                           <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
-                          <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
+                          <span class="att-meta">图片、PDF、ZIP/RAR、文本或视频 ≤ 15MB</span>
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
                           <button class="btn btn-primary" type="submit" data-step-button="notes-<?php echo $s['id']; ?>">保存备注</button>
@@ -1999,7 +2274,75 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           insertTextAtCursor(editorEl, j.markdown+"\n");
           renderEditorPreview();
           markItemDirty();
-          if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
+          if(j.preview){
+            const wrap=document.createElement('div');
+            wrap.innerHTML=j.preview;
+            const node=wrap.firstElementChild;
+            if(node){ const list=document.getElementById('thumbs'); if(list){ list.prepend(node); } }
+          } else if(j.mime && j.mime.startsWith('image/')){
+            const list=document.getElementById('thumbs');
+            if(list){
+              const card=document.createElement('div');
+              card.className='attachment-card';
+              card.dataset.type='image';
+              const body=document.createElement('div');
+              body.className='attachment-preview-body';
+              const link=document.createElement('a');
+              link.href=j.url;
+              link.target='_blank';
+              link.rel='noopener';
+              const img=document.createElement('img');
+              img.src=j.url;
+              img.alt=j.name || '';
+              link.appendChild(img);
+              body.appendChild(link);
+              card.appendChild(body);
+              const footer=document.createElement('div');
+              footer.className='attachment-preview-footer';
+              const meta=document.createElement('div');
+              meta.className='attachment-meta';
+              const nameEl=document.createElement('div');
+              nameEl.className='attachment-name';
+              nameEl.textContent=j.name || '图片附件';
+              const extra=document.createElement('div');
+              extra.className='attachment-extra';
+              extra.textContent='图片';
+              meta.appendChild(nameEl);
+              meta.appendChild(extra);
+              footer.appendChild(meta);
+              const actions=document.createElement('div');
+              actions.className='attachment-actions';
+              const download=document.createElement('a');
+              download.className='btn btn-outline btn-small';
+              download.href=j.url;
+              download.target='_blank';
+              download.rel='noopener';
+              download.textContent='下载';
+              actions.appendChild(download);
+              if(j.id){
+                const form=document.createElement('form');
+                form.method='post';
+                form.className='attachment-delete-form';
+                const actionInput=document.createElement('input');
+                actionInput.type='hidden';
+                actionInput.name='action';
+                actionInput.value='delete_attachment';
+                const idInput=document.createElement('input');
+                idInput.type='hidden';
+                idInput.name='id';
+                idInput.value=String(j.id);
+                const btn=document.createElement('button');
+                btn.className='btn btn-danger btn-small';
+                btn.type='submit';
+                btn.textContent='删除';
+                form.append(actionInput,idInput,btn);
+                actions.appendChild(form);
+              }
+              footer.appendChild(actions);
+              card.appendChild(footer);
+              list.prepend(card);
+            }
+          }
           e.target.value='';
         });
       }
@@ -2478,7 +2821,7 @@ if ($view === 'map_edit') {
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
       </div>
       <input id="import-input" type="file" accept="application/json" hidden>
-      <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" hidden>
+      <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,text/plain,text/markdown,text/csv,application/json,video/*" hidden>
       <?php if ($mind['id']): ?>
         <form id="delete-map-form" method="post" hidden>
           <input type="hidden" name="action" value="delete_mindmap">
@@ -4848,11 +5191,11 @@ if ($view === 'map_edit') {
         if(type.startsWith('image/')) return true;
         if(type.startsWith('video/')) return true;
         if(type.startsWith('text/')) return true;
-        if(type==='application/pdf' || type==='application/zip' || type==='application/x-zip-compressed' || type==='application/json') return true;
+        if(type==='application/pdf' || type==='application/zip' || type==='application/x-zip-compressed' || type==='application/x-rar-compressed' || type==='application/vnd.rar' || type==='application/json') return true;
         const ext=fileExtension(file.name);
         if(!ext) return false;
         if(imageExts.includes(ext) || textExts.includes(ext) || videoExts.includes(ext)) return true;
-        return ext==='.pdf' || ext==='.zip';
+        return ext==='.pdf' || ext==='.zip' || ext==='.rar';
       }
       function sanitizeAttachmentFiles(files){
         const limit=Math.min(files.length,5);
@@ -4864,7 +5207,7 @@ if ($view === 'map_edit') {
             continue;
           }
           if(!isAllowedAttachment(file)){
-            alert(file.name+' 类型不支持，仅可上传图片、PDF、ZIP、文本或视频文件。');
+            alert(file.name+' 类型不支持，仅可上传图片、PDF、ZIP/RAR、文本或视频文件。');
             continue;
           }
           accepted.push(file);
@@ -5794,7 +6137,7 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .mindmap-card:hover{transform:translateY(-4px);border-color:rgba(201,168,106,.45);box-shadow:0 24px 60px rgba(0,0,0,.6)}
   .mindmap-card h3{margin:0;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.1em;text-transform:uppercase;overflow-wrap:anywhere;hyphens:auto}
   .mindmap-card-meta{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-  .mindmap-card pre{margin:0;background:rgba(15,19,22,.85);border:1px solid rgba(201,168,106,.24);padding:12px;border-radius:14px;max-height:150px;overflow:auto;font:12px/1.6 'JetBrains Mono','Fira Code',monospace;color:var(--text-strong);box-shadow:inset 0 0 18px rgba(0,0,0,.45)}
+  .mindmap-card pre{margin:0;background:rgba(15,19,22,.85);border:1px solid rgba(201,168,106,.24);padding:12px;border-radius:14px;max-height:150px;overflow:auto;font:12px/1.6 'JetBrains Mono','Fira Code',monospace;color:var(--text-strong);box-shadow:inset 0 0 18px rgba(0,0,0,.45);white-space:pre-wrap;word-break:break-word}
   .mindmap-card-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto}
   .mindmap-empty{padding:40px;border:1px dashed rgba(201,168,106,.32);border-radius:20px;text-align:center;color:var(--text-muted);background:rgba(15,19,22,.82)}
   .mindmap-empty strong{display:block;margin-bottom:8px;color:var(--gold-400);font-size:16px;letter-spacing:.12em;text-transform:uppercase}
