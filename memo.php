@@ -46,6 +46,7 @@ const DEFAULT_MINDMAP = [
     'version' => '0.3'
   ],
   'format' => 'node_tree',
+  'relations' => [],
   'data' => [
     'id' => 'root',
     'topic' => '未命名导图',
@@ -564,7 +565,50 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
     }
   };
   $sanitize($payload['data'],0);
-} 
+
+  $nodeIds=[];
+  $collect=function($node) use (&$collect,&$nodeIds){
+    if(!is_array($node)) return;
+    if(!empty($node['id']) && is_string($node['id'])){
+      $nodeIds[$node['id']]=true;
+    }
+    if(isset($node['children']) && is_array($node['children'])){
+      foreach($node['children'] as $child){
+        $collect($child);
+      }
+    }
+  };
+  $collect($payload['data']);
+
+  $normalizedRelations=[];
+  $usedRelationIds=[];
+  $sourceRelations=is_array($payload['relations'] ?? null) ? $payload['relations'] : [];
+  foreach($sourceRelations as $relation){
+    if(!is_array($relation)) continue;
+    $from=isset($relation['from']) && is_string($relation['from']) ? trim($relation['from']) : '';
+    $to=isset($relation['to']) && is_string($relation['to']) ? trim($relation['to']) : '';
+    if($from==='' || $to==='' || $from===$to) continue;
+    if(!isset($nodeIds[$from]) || !isset($nodeIds[$to])) continue;
+    $relId=isset($relation['id']) && is_string($relation['id']) && $relation['id']!=='' ? $relation['id'] : null;
+    if($relId===null){
+      $relId='rel-'.bin2hex(random_bytes(5));
+    }
+    if(isset($usedRelationIds[$relId])){
+      $relId.='-'.bin2hex(random_bytes(2));
+    }
+    $usedRelationIds[$relId]=true;
+    $entry=['id'=>$relId,'from'=>$from,'to'=>$to];
+    if(isset($relation['label']) && is_string($relation['label'])){
+      $label=trim($relation['label']);
+      if($label!==''){ $entry['label']=$label; }
+    }
+    if(isset($relation['bidirectional']) && boolish($relation['bidirectional'])){
+      $entry['bidirectional']=true;
+    }
+    $normalizedRelations[]=$entry;
+  }
+  $payload['relations']=$normalizedRelations;
+}
 
 function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key): void {
   $pdo=db();
@@ -3751,6 +3795,13 @@ if ($view === 'map_edit') {
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
+      .mind-relations .relation-group{pointer-events:none}
+      .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+      .mind-relations .relation-shadow{stroke:rgba(75,195,209,.28);stroke-width:2.4;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-core{stroke:rgba(75,195,209,.85);stroke-width:1.7;stroke-dasharray:8 10;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-highlight{stroke:rgba(255,255,255,.4);stroke-width:0.9;opacity:.6}
+      .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.18)}
@@ -3765,6 +3816,8 @@ if ($view === 'map_edit') {
       .jsmind-node.isroot::after{opacity:.42;transform:scale(.95);box-shadow:0 0 36px rgba(227,198,139,.28)}
       .jsmind-node.selected{border-color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.32),0 0 40px rgba(227,198,139,.26);transform:translateY(-2px)}
       .jsmind-node.selected::after{opacity:.6;transform:scale(.98);box-shadow:0 0 40px rgba(75,195,209,.3)}
+      .jsmind-node.relation-source{border-color:rgba(75,195,209,.7);box-shadow:0 0 0 2px rgba(75,195,209,.35),0 0 36px rgba(75,195,209,.28)}
+      .jsmind-node.relation-target{border-style:dashed;border-color:rgba(75,195,209,.6)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
       .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
@@ -3795,6 +3848,10 @@ if ($view === 'map_edit') {
       @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:10px 14px;border-radius:24px;gap:10px}.dock-btn{width:78px;height:56px}.dock-btn .label{font-size:11px}}
       @media (max-width:600px){.dock-btn{width:72px;height:54px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
+      .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
+      .mind-shell[data-relation-mode="pending"] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
+      @keyframes relationPulse{0%{opacity:.35}50%{opacity:.8}100%{opacity:.35}}
       .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);transition:transform .24s ease,opacity .24s ease}
       .node-popover[hidden]{display:none!important}
       .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px;touch-action:pan-y}
@@ -3826,6 +3883,12 @@ if ($view === 'map_edit') {
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
       .node-popover .popover-actions button:hover{border-color:rgba(227,198,139,.6)}
       .node-popover.disabled{pointer-events:none;opacity:.6}
+      .relation-list{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 0}
+      .relation-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(75,195,209,.45);background:rgba(75,195,209,.16);color:var(--text-strong);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+      .relation-pill button{border:0;background:transparent;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px;line-height:1;padding:0 2px}
+      .relation-pill button:hover{color:#fff}
+      .relation-hint{margin:6px 0 0;font:500 11px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
+      #node-relations-field.empty .relation-list{display:none}
       .node-context-menu{position:fixed;z-index:150;min-width:180px;padding:12px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 22px 48px rgba(0,0,0,.6);display:grid;gap:8px}
       .node-context-menu[hidden]{display:none!important}
       .node-context-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
@@ -3863,6 +3926,9 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+          <path d="M0 0 L12 6 L0 12 Z" fill="rgba(75,195,209,.9)" />
+        </marker>
       </defs>
     </svg>
     <div class="mind-shell" data-fisheye="on">
@@ -3924,6 +3990,10 @@ if ($view === 'map_edit') {
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
+          <button class="dock-btn" data-action="relation" title="关联节点" aria-label="关联节点">
+            <span class="icon">🪢</span>
+            <span class="label">关联</span>
+          </button>
           <button class="dock-btn" data-action="link" title="新增链接" aria-label="新增链接">
             <span class="icon">🔗</span>
             <span class="label">链接</span>
@@ -3934,6 +4004,7 @@ if ($view === 'map_edit') {
           </button>
         </nav>
       </div>
+      <div class="mind-relation-toast" id="mind-relation-toast" role="status" aria-live="polite"></div>
     </div>
     <div class="mind-import-backdrop" id="mind-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="mind-import-title">
       <div class="mind-import-panel">
@@ -3969,20 +4040,25 @@ if ($view === 'map_edit') {
 标签：#重要 #任务"></textarea>
         </div>
         <div class="field fold-field" id="node-fold-field" hidden>
-          <div class="fold-row">
-            <label for="node-fold-toggle">折叠子节点</label>
-            <label class="toggle-switch">
-              <input type="checkbox" id="node-fold-toggle">
-              <span class="track"><span class="thumb"></span></span>
-              <span class="toggle-text" id="node-fold-toggle-text">展开中</span>
-            </label>
-          </div>
-          <p class="fold-hint" id="node-fold-hint"></p>
+        <div class="fold-row">
+          <label for="node-fold-toggle">折叠子节点</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="node-fold-toggle">
+            <span class="track"><span class="thumb"></span></span>
+            <span class="toggle-text" id="node-fold-toggle-text">展开中</span>
+          </label>
         </div>
-        <div class="popover-actions">
-          <button type="button" data-pop-close>取消</button>
-          <button type="button" class="accent" data-pop-save>完成</button>
-        </div>
+        <p class="fold-hint" id="node-fold-hint"></p>
+      </div>
+      <div class="field" id="node-relations-field">
+        <label>关联节点</label>
+        <div class="relation-list" id="node-relations-list"></div>
+        <p class="relation-hint">使用底部“关联”按钮在节点之间建立跨层级连线。</p>
+      </div>
+      <div class="popover-actions">
+        <button type="button" data-pop-close>取消</button>
+        <button type="button" class="accent" data-pop-save>完成</button>
+      </div>
       </form>
     </div>
     <div class="node-context-menu" id="node-context-menu" hidden>
@@ -4644,6 +4720,9 @@ if ($view === 'map_edit') {
           this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.linkLayer.classList.add('mind-links');
           this.viewport.appendChild(this.linkLayer);
+          this.relationLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.relationLayer.classList.add('mind-relations');
+          this.viewport.appendChild(this.relationLayer);
           this.guideLayer=document.createElement('div');
           this.guideLayer.className='mind-guides';
           this.guideLayer.style.position='absolute';
@@ -4670,7 +4749,9 @@ if ($view === 'map_edit') {
           this.dragState=null;
           this.activePointers=new Map();
           this.pinchState=null;
+          this.relations=[];
           this.linkRegistry=new Map();
+          this.relationRegistry=new Map();
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
@@ -4810,6 +4891,28 @@ if ($view === 'map_edit') {
           this.nodes.clear();
           this.root=null;
           this.selectedId=null;
+          if(this.relationRegistry){ this.relationRegistry.clear(); }
+          const relationsSource=Array.isArray(this.mind && this.mind.relations ? this.mind.relations : null) ? this.mind.relations : [];
+          this.relations=[];
+          const relationIds=new Set();
+          relationsSource.forEach(rel=>{
+            if(!rel || typeof rel!=='object') return;
+            const from=typeof rel.from==='string'?rel.from.trim():'';
+            const to=typeof rel.to==='string'?rel.to.trim():'';
+            if(!from || !to || from===to) return;
+            let id=typeof rel.id==='string' && rel.id.trim()!=='' ? rel.id.trim() : null;
+            if(!id){
+              do { id='rel-'+Math.random().toString(36).slice(2,10); } while(relationIds.has(id));
+            }
+            if(relationIds.has(id)){
+              do { id='rel-'+Math.random().toString(36).slice(2,10); } while(relationIds.has(id));
+            }
+            relationIds.add(id);
+            const entry={id,from,to};
+            if(typeof rel.label==='string' && rel.label.trim()!==''){ entry.label=rel.label.trim(); }
+            if(rel.bidirectional){ entry.bidirectional=true; }
+            this.relations.push(entry);
+          });
           const data=this.mind && this.mind.data ? this.mind.data : null;
           if(!data) return;
           const build=(item,parent)=>{
@@ -4844,6 +4947,24 @@ if ($view === 'map_edit') {
             return node;
           };
           build(data,null);
+          if(this.relations.length){
+            const filtered=[];
+            const seenIds=new Set();
+            for(const relation of this.relations){
+              if(!relation) continue;
+              if(!this.nodes.has(relation.from) || !this.nodes.has(relation.to) || relation.from===relation.to) continue;
+              if(seenIds.has(relation.id)){
+                let newId;
+                do { newId='rel-'+Math.random().toString(36).slice(2,10); } while(seenIds.has(newId));
+                relation.id=newId;
+              }
+              seenIds.add(relation.id);
+              filtered.push(relation);
+            }
+            this.relations.length=0;
+            this.relations.push(...filtered);
+          }
+          this.mind.relations=this.relations;
           this.hasCentered=false;
           this.computeLayout();
           this.render();
@@ -4913,10 +5034,15 @@ if ($view === 'map_edit') {
             parent.model.children=parent.model.children.filter(child=>child.id!==id);
           }
           const stack=[node];
+          const removedIds=new Set();
           while(stack.length){
             const cur=stack.pop();
+            removedIds.add(cur.id);
             this.nodes.delete(cur.id);
             if(cur.children && cur.children.length){ stack.push(...cur.children); }
+          }
+          if(removedIds.size){
+            this.pruneRelations(rel=>removedIds.has(rel.from) || removedIds.has(rel.to),{silent:true});
           }
           this.computeLayout();
           this.render();
@@ -5305,6 +5431,13 @@ if ($view === 'map_edit') {
           this.linkLayer.setAttribute('height',`${this.bounds.height}`);
           this.linkLayer.style.width=`${this.bounds.width}px`;
           this.linkLayer.style.height=`${this.bounds.height}px`;
+          if(this.relationLayer){
+            this.relationLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
+            this.relationLayer.setAttribute('width',`${this.bounds.width}`);
+            this.relationLayer.setAttribute('height',`${this.bounds.height}`);
+            this.relationLayer.style.width=`${this.bounds.width}px`;
+            this.relationLayer.style.height=`${this.bounds.height}px`;
+          }
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
@@ -5454,8 +5587,10 @@ if ($view === 'map_edit') {
         render(){
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          if(this.relationLayer){ while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); } }
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
+          if(this.relationRegistry){ this.relationRegistry.clear(); }
           if(!this.root) return;
           const walk=(node)=>{
             node.el=this.buildNodeElement(node,{forMeasure:false});
@@ -5498,7 +5633,41 @@ if ($view === 'map_edit') {
             }
           };
           walk(this.root);
+          this.renderRelations();
           this.applyTransform(true);
+        }
+        renderRelations(){
+          if(!this.relationLayer) return;
+          while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); }
+          if(this.relationRegistry){ this.relationRegistry.clear(); }
+          if(!Array.isArray(this.relations) || !this.relations.length) return;
+          for(const relation of this.relations){
+            if(!relation) continue;
+            const fromNode=this.nodes.get(relation.from);
+            const toNode=this.nodes.get(relation.to);
+            if(!fromNode || !toNode || fromNode===toNode) continue;
+            const group=document.createElementNS('http://www.w3.org/2000/svg','g');
+            group.classList.add('relation-group');
+            group.dataset.id=relation.id;
+            group.dataset.from=relation.from;
+            group.dataset.to=relation.to;
+            const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
+            shadow.classList.add('relation-shadow');
+            const core=document.createElementNS('http://www.w3.org/2000/svg','path');
+            core.classList.add('relation-core');
+            core.dataset.bidirectional=relation.bidirectional?'true':'false';
+            core.setAttribute('marker-end','url(#mindRelationArrow)');
+            if(relation.bidirectional){ core.setAttribute('marker-start','url(#mindRelationArrow)'); }
+            else{ core.removeAttribute('marker-start'); }
+            const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
+            highlight.classList.add('relation-highlight');
+            group.appendChild(shadow);
+            group.appendChild(core);
+            group.appendChild(highlight);
+            this.relationLayer.appendChild(group);
+            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            this.updateRelationPath(relation);
+          }
         }
         updateNodePosition(node){
           if(!node || !node.el) return;
@@ -5547,6 +5716,129 @@ if ($view === 'map_edit') {
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
         }
+        updateRelationPath(relation){
+          if(!relation) return;
+          const entry=this.relationRegistry ? this.relationRegistry.get(relation.id) : null;
+          if(!entry) return;
+          const fromNode=this.nodes.get(relation.from);
+          const toNode=this.nodes.get(relation.to);
+          if(!fromNode || !toNode) return;
+          if(!fromNode.anchors) this.updateAnchors(fromNode);
+          if(!toNode.anchors) this.updateAnchors(toNode);
+          const start=fromNode.anchors ? fromNode.anchors.center : null;
+          const end=toNode.anchors ? toNode.anchors.center : null;
+          if(!start || !end) return;
+          const dx=end.x-start.x;
+          const dy=end.y-start.y;
+          const distance=Math.hypot(dx,dy) || 1;
+          const normalX=distance?-dy/distance:0;
+          const normalY=distance?dx/distance:0;
+          const offset=Math.min(140, Math.max(30, distance*0.2));
+          const ctrl1x=start.x + dx*0.25 + normalX*offset;
+          const ctrl1y=start.y + dy*0.25 + normalY*offset;
+          const ctrl2x=start.x + dx*0.75 - normalX*offset;
+          const ctrl2y=start.y + dy*0.75 - normalY*offset;
+          const pathData=`M${start.x} ${start.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${end.x} ${end.y}`;
+          entry.shadow.setAttribute('d', pathData);
+          entry.core.setAttribute('d', pathData);
+          entry.highlight.setAttribute('d', pathData);
+          entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
+          if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
+          else{ entry.core.removeAttribute('marker-start'); }
+          entry.relation=relation;
+        }
+        updateRelationsForNode(node){
+          if(!node || !this.relationRegistry || !this.relationRegistry.size) return;
+          for(const entry of this.relationRegistry.values()){
+            if(!entry || !entry.relation) continue;
+            if(entry.relation.from===node.id || entry.relation.to===node.id){
+              this.updateRelationPath(entry.relation);
+            }
+          }
+        }
+        ensureRelationArray(){
+          if(!Array.isArray(this.relations)){ this.relations=[]; }
+          if(this.mind){ this.mind.relations=this.relations; }
+          return this.relations;
+        }
+        generateRelationId(){
+          const relations=this.ensureRelationArray();
+          let id;
+          do { id='rel-'+Math.random().toString(36).slice(2,10); }
+          while((this.relationRegistry && this.relationRegistry.has(id)) || relations.some(rel=>rel && rel.id===id));
+          return id;
+        }
+        add_relation(fromId,toId,options){
+          if(!fromId || !toId || fromId===toId) return null;
+          const source=this.get_node(fromId);
+          const target=this.get_node(toId);
+          if(!source || !target) return null;
+          const relations=this.ensureRelationArray();
+          const bidirectional=options && options.bidirectional===true;
+          const conflict=relations.some(rel=>rel && rel.from===fromId && rel.to===toId && (!!rel.bidirectional)===bidirectional);
+          if(conflict) return null;
+          const relation={
+            id:this.generateRelationId(),
+            from:fromId,
+            to:toId
+          };
+          if(options && options.label && typeof options.label==='string' && options.label.trim()!==''){
+            relation.label=options.label.trim();
+          }
+          if(bidirectional){ relation.bidirectional=true; }
+          relations.push(relation);
+          this.mind.relations=relations;
+          this.renderRelations();
+          this.emit(SimpleMind.event_type.update);
+          return relation;
+        }
+        remove_relation(id){
+          if(!id) return false;
+          const relations=this.ensureRelationArray();
+          const idx=relations.findIndex(rel=>rel && rel.id===id);
+          if(idx===-1) return false;
+          const [removed]=relations.splice(idx,1);
+          if(this.relationRegistry && this.relationRegistry.has(id)){
+            const entry=this.relationRegistry.get(id);
+            if(entry && entry.group && entry.group.parentNode){ entry.group.parentNode.removeChild(entry.group); }
+            this.relationRegistry.delete(id);
+          }
+          this.mind.relations=relations;
+          if(removed){ this.renderRelations(); this.emit(SimpleMind.event_type.update); }
+          return true;
+        }
+        pruneRelations(predicate, options={}){
+          if(typeof predicate!=='function') return false;
+          const relations=this.ensureRelationArray();
+          let changed=false;
+          for(let i=relations.length-1;i>=0;i--){
+            const rel=relations[i];
+            if(!rel) continue;
+            if(predicate(rel)){
+              relations.splice(i,1);
+              changed=true;
+              if(this.relationRegistry){
+                const entry=this.relationRegistry.get(rel.id);
+                if(entry && entry.group && entry.group.parentNode){ entry.group.parentNode.removeChild(entry.group); }
+                this.relationRegistry.delete(rel.id);
+              }
+            }
+          }
+          if(changed){
+            this.mind.relations=relations;
+            if(!options || options.silent!==true){
+              this.renderRelations();
+              this.emit(SimpleMind.event_type.update);
+            }
+          }
+          return changed;
+        }
+        get_relations(nodeId){
+          const relations=this.ensureRelationArray();
+          const clone=input=>JSON.parse(JSON.stringify(input));
+          if(!nodeId) return clone(relations);
+          return clone(relations.filter(rel=>rel && (rel.from===nodeId || rel.to===nodeId)));
+        }
         handleNodeResize(entries){
           if(!entries || !entries.length) return;
           const impacted=new Set();
@@ -5569,6 +5861,10 @@ if ($view === 'map_edit') {
             this.updateLinkPath(node);
             if(node.children && node.children.length){
               node.children.forEach(child=>this.updateLinkPath(child));
+            }
+            this.updateRelationsForNode(node);
+            if(node.children && node.children.length){
+              node.children.forEach(child=>this.updateRelationsForNode(child));
             }
           });
         }
@@ -6118,6 +6414,8 @@ if ($view === 'map_edit') {
       const nodeFoldToggle=document.getElementById('node-fold-toggle');
       const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
       const nodeFoldHint=document.getElementById('node-fold-hint');
+      const relationField=document.getElementById('node-relations-field');
+      const relationList=document.getElementById('node-relations-list');
       const mindShell=document.querySelector('.mind-shell');
       const mindInfoBar=document.getElementById('mind-info-bar');
       const mindInfoHandle=document.getElementById('mind-info-handle');
@@ -6136,6 +6434,7 @@ if ($view === 'map_edit') {
       const importModalName=importModal ? importModal.querySelector('[data-import-name]') : null;
       const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
+      const relationToast=document.getElementById('mind-relation-toast');
       let pendingImportPayload=null;
       let pendingImportFileName='';
       const foldAllMenuItem=null;
@@ -6224,6 +6523,8 @@ if ($view === 'map_edit') {
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
+      let relationMode=null;
+      let relationToastTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
       let contextMenuState=null;
@@ -6275,6 +6576,78 @@ if ($view === 'map_edit') {
             setSaveButtonState(null,false,null);
           }
         },1500);
+      }
+      function clearRelationHighlights(){
+        document.querySelectorAll('.jsmind-node.relation-source,.jsmind-node.relation-target').forEach(el=>{
+          el.classList.remove('relation-source','relation-target');
+        });
+      }
+      function showRelationToast(message, sticky=false){
+        if(!relationToast) return;
+        relationToast.textContent=message || '';
+        relationToast.dataset.visible='true';
+        if(relationToastTimer){ clearTimeout(relationToastTimer); relationToastTimer=null; }
+        if(!sticky){
+          relationToastTimer=window.setTimeout(()=>{ relationToast.dataset.visible='false'; relationToastTimer=null; },2600);
+        }
+      }
+      function hideRelationToast(){
+        if(relationToast){ relationToast.dataset.visible='false'; }
+        if(relationToastTimer){ clearTimeout(relationToastTimer); relationToastTimer=null; }
+      }
+      function startRelationMode(){
+        const node=ensureNode();
+        if(!node){ alert('请先选择一个节点'); return false; }
+        commitInlineEditing();
+        relationMode={from:node.id};
+        hideHandle();
+        clearRelationHighlights();
+        const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+        if(el){ el.classList.add('relation-source'); }
+        if(mindShell){ mindShell.dataset.relationMode='pending'; }
+        showRelationToast('点击另一个节点以建立关联，或按 Esc 取消', true);
+        return true;
+      }
+      function cancelRelationMode(notify=false){
+        if(!relationMode) return;
+        relationMode=null;
+        if(mindShell){ mindShell.removeAttribute('data-relation-mode'); }
+        clearRelationHighlights();
+        if(notify){ showRelationToast('已取消关联'); }
+        else{ hideRelationToast(); }
+        scheduleHandleRefresh();
+      }
+      function updateRelationHover(nodeId){
+        if(!relationMode) return;
+        const targetId=(nodeId && nodeId!==relationMode.from)?nodeId:null;
+        document.querySelectorAll('.jsmind-node.relation-target').forEach(el=>el.classList.remove('relation-target'));
+        if(targetId){
+          const el=document.querySelector(`.jsmind-node[nodeid="${targetId}"]`);
+          if(el){ el.classList.add('relation-target'); }
+        }
+      }
+      function completeRelationMode(targetNode){
+        if(!relationMode || !targetNode) return;
+        const sourceId=relationMode.from;
+        if(targetNode.id===sourceId){ showRelationToast('请选择不同的节点'); return; }
+        const options=relationMode.options || {};
+        const existing=typeof jm.get_relations==='function' ? jm.get_relations(sourceId) : [];
+        const duplicate=existing.some(rel=>rel && ((rel.from===sourceId && rel.to===targetNode.id) || (rel.bidirectional && rel.from===targetNode.id && rel.to===sourceId)));
+        cancelRelationMode(false);
+        if(duplicate){ showRelationToast('已存在关联'); return; }
+        if(typeof jm.add_relation==='function'){
+          const relation=jm.add_relation(sourceId, targetNode.id, options);
+          if(relation){
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+            showRelationToast('关联已创建');
+          }
+        }
+      }
+      function toggleRelationMode(){
+        if(relationMode){ cancelRelationMode(false); }
+        else{ startRelationMode(); }
       }
       function toggleSettings(forceShow){
         if(!settingsLayer) return;
@@ -6498,6 +6871,21 @@ if ($view === 'map_edit') {
           if(e.target.closest('[data-pop-save]')){ e.preventDefault(); commitInlineEditing(); closeInspectorPopover(); }
         });
       }
+      if(relationList){
+        relationList.addEventListener('click',e=>{
+          const btn=e.target.closest('button[data-rel-id]');
+          if(!btn) return;
+          const relId=btn.dataset.relId;
+          if(!relId) return;
+          if(!confirm('确定移除该关联吗？')) return;
+          if(typeof jm.remove_relation==='function' && jm.remove_relation(relId)){
+            markDirty();
+            scheduleHandleRefresh();
+            refreshInspector(jm.get_selected_node());
+            showRelationToast('关联已移除');
+          }
+        });
+      }
       const startSheetDrag=(e)=>{
         if(!nodePopover || nodePopover.dataset.mode!=='sheet') return;
         if(e.pointerType==='mouse' && e.button!==0) return;
@@ -6543,6 +6931,7 @@ if ($view === 'map_edit') {
       });
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){
+          if(relationMode){ cancelRelationMode(true); return; }
           if(popoverOpen){ closeInspectorPopover(); }
           if(isContextMenuOpen()){ closeNodeContextMenu(); }
         }
@@ -6594,12 +6983,18 @@ if ($view === 'map_edit') {
           };
         });
         jmContainer.addEventListener('pointermove',e=>{
+          if(relationMode){
+            const nodeEl=e.target.closest('.jsmind-node');
+            const nodeId=nodeEl ? nodeEl.getAttribute('nodeid') : null;
+            updateRelationHover(nodeId);
+          }
           if(!longPressState || e.pointerId!==longPressState.pointerId) return;
           if(longPressState.triggered) return;
           const dx=Math.abs(e.clientX-longPressState.startX);
           const dy=Math.abs(e.clientY-longPressState.startY);
           if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){ cancelLongPressState(); }
         });
+        jmContainer.addEventListener('pointerleave',()=>{ if(relationMode){ updateRelationHover(null); } });
         const finishLongPress=(e)=>{
           if(!longPressState || e.pointerId!==longPressState.pointerId) return;
           const triggered=!!longPressState.triggered;
@@ -6608,6 +7003,15 @@ if ($view === 'map_edit') {
         };
         jmContainer.addEventListener('pointerup',finishLongPress);
         jmContainer.addEventListener('pointercancel',finishLongPress);
+        jmContainer.addEventListener('click',e=>{
+          if(!relationMode) return;
+          const nodeEl=e.target.closest('.jsmind-node');
+          if(!nodeEl) return;
+          const nodeId=nodeEl.getAttribute('nodeid');
+          if(!nodeId) return;
+          const node=jm.get_node(nodeId);
+          if(node){ completeRelationMode(node); }
+        });
         jmContainer.addEventListener('contextmenu',e=>{
           const nodeEl=e.target.closest('.jsmind-node');
           if(!nodeEl) return;
@@ -6619,6 +7023,8 @@ if ($view === 'map_edit') {
       }
       function refreshInspector(node){
         inspectorSyncing=true;
+        if(relationList){ relationList.innerHTML=''; }
+        if(relationField){ relationField.classList.add('empty'); }
         if(!node){
           setInspectorEnabled(false);
           if(nodeTopicInput) nodeTopicInput.value='';
@@ -6635,6 +7041,32 @@ if ($view === 'map_edit') {
         if(nodeNoteInput) nodeNoteInput.value=data.note || '';
         updateFoldToggleUI(node);
         updateFoldAllLabel();
+        if(relationList){
+          const relations=typeof jm.get_relations==='function' ? jm.get_relations(node.id) : [];
+          if(relations.length){
+            if(relationField){ relationField.classList.remove('empty'); }
+            relations.forEach(rel=>{
+              if(!rel) return;
+              const partnerId=rel.from===node.id ? rel.to : rel.from;
+              const partner=jm.get_node(partnerId);
+              const name=(partner && partner.topic) ? partner.topic : partnerId;
+              const direction=rel.bidirectional ? '↔' : (rel.from===node.id ? '↦' : '↤');
+              const pill=document.createElement('span');
+              pill.className='relation-pill';
+              const labelSpan=document.createElement('span');
+              labelSpan.textContent=`${direction} ${name}`;
+              if(rel.label){ labelSpan.title=rel.label; }
+              pill.appendChild(labelSpan);
+              const remove=document.createElement('button');
+              remove.type='button';
+              remove.dataset.relId=rel.id;
+              remove.setAttribute('aria-label',`移除与 ${name} 的关联`);
+              remove.textContent='×';
+              pill.appendChild(remove);
+              relationList.appendChild(pill);
+            });
+          }
+        }
         inspectorSyncing=false;
         if(popoverOpen){ positionInspectorPopover(node); }
       }
@@ -6977,11 +7409,13 @@ if ($view === 'map_edit') {
       const handleMindAction=(action)=>{
         if(!action) return;
         closeMapIoMenu();
+        if(action!=='relation' && relationMode){ cancelRelationMode(false); }
         switch(action){
           case 'save': saveMindmap(); break;
           case 'sibling': addSiblingNode(); break;
           case 'child': addChildNode(); break;
           case 'attach': openAttachmentDialog(); break;
+          case 'relation': toggleRelationMode(); break;
           case 'link': openLinkPrompt(); break;
           case 'delete': deleteSelectedNode(); break;
           case 'import': triggerImport(); break;
