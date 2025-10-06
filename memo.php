@@ -96,6 +96,7 @@ const DEFAULT_MINDMAP = [
       ],
     ],
   ],
+  'connections' => [],
 ];
 
 function default_mindmap_payload(): string {
@@ -479,12 +480,14 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
   $asset_refs=[];
   if(!isset($payload['data']) || !is_array($payload['data'])) return;
   $payload['format']='node_tree';
-  $sanitize=function (&$node, int $depth = 0) use (&$sanitize,&$asset_refs,$map_id,$session_key){
+  $nodeIds=[];
+  $sanitize=function (&$node, int $depth = 0) use (&$sanitize,&$asset_refs,$map_id,$session_key,&$nodeIds){
     if(!is_array($node)) return;
     $node['direction']=$depth===0?'center':'right';
     if(empty($node['id']) || !is_string($node['id'])){
       $node['id']='node-'.bin2hex(random_bytes(4));
     }
+    $nodeIds[$node['id']]=true;
     if(isset($node['data']) && is_array($node['data'])){
       $processAttachment=function($raw) use (&$asset_refs,$map_id,$session_key,$node){
         if(!is_array($raw)) return null;
@@ -564,7 +567,29 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
     }
   };
   $sanitize($payload['data'],0);
-} 
+  if(isset($payload['connections']) && is_array($payload['connections'])){
+    $normalized=[];
+    $seen=[];
+    foreach($payload['connections'] as $conn){
+      if(!is_array($conn)) continue;
+      $from=isset($conn['from']) && is_string($conn['from']) ? trim($conn['from']) : '';
+      $to=isset($conn['to']) && is_string($conn['to']) ? trim($conn['to']) : '';
+      if($from==='' || $to==='' || $from===$to) continue;
+      if(!isset($nodeIds[$from]) || !isset($nodeIds[$to])) continue;
+      $id=isset($conn['id']) && is_string($conn['id']) && trim($conn['id'])!=='' ? trim($conn['id']) : 'link-'.bin2hex(random_bytes(4));
+      $label=isset($conn['label']) && is_string($conn['label']) ? trim($conn['label']) : '';
+      $key=$from<$to ? ($from.'|'.$to) : ($to.'|'.$from);
+      if(isset($seen[$key])) continue;
+      $seen[$key]=$id;
+      $entry=['id'=>$id,'from'=>$from,'to'=>$to];
+      if($label!==''){ $entry['label']=$label; }
+      $normalized[]=$entry;
+    }
+    $payload['connections']=$normalized;
+  } else {
+    $payload['connections']=[];
+  }
+}
 
 function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key): void {
   $pdo=db();
@@ -3744,10 +3769,14 @@ if ($view === 'map_edit') {
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
-      .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
-      .mind-links{pointer-events:none;overflow:visible}
+      .mind-viewport,.mind-links,.mind-free-links{position:absolute;top:0;left:0;transform-origin:0 0}
+      .mind-links,.mind-free-links{pointer-events:none;overflow:visible}
       .mind-links .trace-group{pointer-events:none}
       .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
+      .mind-free-links .free-link{fill:none;stroke-linecap:round;stroke-linejoin:round}
+      .mind-free-links .free-link.shadow{stroke:rgba(22,24,28,.6);stroke-width:3.2;filter:url(#mindSoftGlow);opacity:.6}
+      .mind-free-links .free-link.core{stroke:rgba(108,168,255,.85);stroke-width:2.4;stroke-dasharray:14 10;filter:url(#mindSoftGlow)}
+      .mind-free-links .free-link.highlight{stroke:rgba(212,234,255,.45);stroke-width:1.2;stroke-dasharray:18 14}
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
@@ -3811,6 +3840,14 @@ if ($view === 'map_edit') {
       .node-popover input,.node-popover select,.node-popover textarea{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em;transition:border-color var(--transition),box-shadow var(--transition)}
       .node-popover input:focus,.node-popover select:focus,.node-popover textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 2px rgba(227,198,139,.18)}
       .node-popover textarea{min-height:120px;resize:vertical}
+      .node-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+      .node-link-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.65);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .node-link-chip .chip-link{background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-decoration:none}
+      .node-link-chip .chip-link:hover,.node-link-chip .chip-link:focus{text-decoration:underline;outline:none}
+      .node-link-chip .chip-remove{background:none;border:none;color:rgba(255,255,255,.7);width:20px;height:20px;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+      .node-link-chip .chip-remove:hover,.node-link-chip .chip-remove:focus{background:rgba(255,255,255,.18);color:#fff;outline:none}
+      .node-link-empty{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:rgba(21,26,30,.65);border:1px dashed rgba(201,168,106,.28);color:var(--text-muted);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .field-hint{margin:8px 0 0;font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
       .node-popover .fold-field{padding-top:6px}
       .node-popover .fold-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
       .toggle-switch{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--text-muted)}
@@ -3967,6 +4004,11 @@ if ($view === 'map_edit') {
 优先级：高
 负责人：张三
 标签：#重要 #任务"></textarea>
+        </div>
+        <div class="field" id="node-links-field" hidden>
+          <label>关联节点</label>
+          <div class="node-links" id="node-links-list" data-links-list></div>
+          <p class="field-hint">拖动节点右侧的 + 手柄即可在两个节点之间建立跨层级关联。</p>
         </div>
         <div class="field fold-field" id="node-fold-field" hidden>
           <div class="fold-row">
@@ -4584,6 +4626,31 @@ if ($view === 'map_edit') {
         }
         return d;
       }
+      function buildFreeLinkCurve(start,end){
+        if(!start || !end) return '';
+        const dx=end.x-start.x;
+        const dy=end.y-start.y;
+        const distance=Math.hypot(dx,dy);
+        if(!Number.isFinite(distance) || distance<=0.01){
+          return `M${start.x} ${start.y} L${end.x} ${end.y}`;
+        }
+        const normX=dx/distance;
+        const normY=dy/distance;
+        const orientation=dx>=0?1:-1;
+        const perpX=-normY*orientation;
+        const perpY=normX*orientation;
+        const base=Math.max(60, Math.min(220, distance*0.3));
+        const sweep=Math.max(40, Math.min(200, distance*0.35));
+        const control1={
+          x:start.x + normX*base + perpX*sweep,
+          y:start.y + normY*base + perpY*sweep,
+        };
+        const control2={
+          x:end.x - normX*base + perpX*sweep,
+          y:end.y - normY*base + perpY*sweep,
+        };
+        return `M${start.x} ${start.y} C${control1.x} ${control1.y} ${control2.x} ${control2.y} ${end.x} ${end.y}`;
+      }
       function normalizeNodeData(value){
         if(!value || typeof value!=='object' || Array.isArray(value)) return {};
         const data=value;
@@ -4644,6 +4711,9 @@ if ($view === 'map_edit') {
           this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.linkLayer.classList.add('mind-links');
           this.viewport.appendChild(this.linkLayer);
+          this.connectionLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.connectionLayer.classList.add('mind-free-links');
+          this.viewport.appendChild(this.connectionLayer);
           this.guideLayer=document.createElement('div');
           this.guideLayer.className='mind-guides';
           this.guideLayer.style.position='absolute';
@@ -4671,6 +4741,11 @@ if ($view === 'map_edit') {
           this.activePointers=new Map();
           this.pinchState=null;
           this.linkRegistry=new Map();
+          this.connectionRegistry=new Map();
+          this.connections=[];
+          this.connectionLookup=new Map();
+          this.connectionIndex=new Map();
+          this.connectionById=new Map();
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
@@ -4844,6 +4919,19 @@ if ($view === 'map_edit') {
             return node;
           };
           build(data,null);
+          const rawConnections=Array.isArray(this.mind.connections)?this.mind.connections:[];
+          this.connections=[];
+          const seenKeys=new Set();
+          rawConnections.forEach(conn=>{
+            const normalized=this.normalizeConnection(conn);
+            if(!normalized) return;
+            const key=this.connectionKey(normalized.from, normalized.to);
+            if(seenKeys.has(key)) return;
+            seenKeys.add(key);
+            this.connections.push(normalized);
+          });
+          this.rebuildConnectionLookup();
+          this.syncMindConnections();
           this.hasCentered=false;
           this.computeLayout();
           this.render();
@@ -4912,11 +5000,25 @@ if ($view === 'map_edit') {
           if(parent.model && parent.model.children){
             parent.model.children=parent.model.children.filter(child=>child.id!==id);
           }
+          const removedIds=[];
           const stack=[node];
           while(stack.length){
             const cur=stack.pop();
+            removedIds.push(cur.id);
             this.nodes.delete(cur.id);
             if(cur.children && cur.children.length){ stack.push(...cur.children); }
+          }
+          if(removedIds.length && this.connections && this.connections.length){
+            const removedSet=new Set(removedIds);
+            const before=this.connections.length;
+            this.connections=this.connections.filter(conn=>{
+              if(!conn) return false;
+              return !(removedSet.has(conn.from) || removedSet.has(conn.to));
+            });
+            if(this.connections.length!==before){
+              this.rebuildConnectionLookup();
+              this.syncMindConnections();
+            }
           }
           this.computeLayout();
           this.render();
@@ -5305,6 +5407,13 @@ if ($view === 'map_edit') {
           this.linkLayer.setAttribute('height',`${this.bounds.height}`);
           this.linkLayer.style.width=`${this.bounds.width}px`;
           this.linkLayer.style.height=`${this.bounds.height}px`;
+          if(this.connectionLayer){
+            this.connectionLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
+            this.connectionLayer.setAttribute('width',`${this.bounds.width}`);
+            this.connectionLayer.setAttribute('height',`${this.bounds.height}`);
+            this.connectionLayer.style.width=`${this.bounds.width}px`;
+            this.connectionLayer.style.height=`${this.bounds.height}px`;
+          }
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
@@ -5456,6 +5565,7 @@ if ($view === 'map_edit') {
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
           this.linkRegistry.clear();
+          this.connectionRegistry.clear();
           if(!this.root) return;
           const walk=(node)=>{
             node.el=this.buildNodeElement(node,{forMeasure:false});
@@ -5498,6 +5608,7 @@ if ($view === 'map_edit') {
             }
           };
           walk(this.root);
+          this.renderConnections();
           this.applyTransform(true);
         }
         updateNodePosition(node){
@@ -5506,6 +5617,7 @@ if ($view === 'map_edit') {
           const height=node.height || node.el.offsetHeight || 0;
           node.el.style.left=`${node.absX - width/2}px`;
           node.el.style.top=`${node.absY - height/2}px`;
+          this.updateConnectionsFor(node);
         }
         updateAnchors(node){
           if(!node) return;
@@ -5518,6 +5630,7 @@ if ($view === 'map_edit') {
             top:{x:node.absX,y:node.absY - height/2},
             bottom:{x:node.absX,y:node.absY + height/2},
           };
+          this.updateConnectionsFor(node);
         }
         updateLinkPath(node){
           if(!node || !node.parent || !node.linkPath) return;
@@ -5547,6 +5660,151 @@ if ($view === 'map_edit') {
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
         }
+        renderConnections(){
+          if(!this.connectionLayer) return;
+          while(this.connectionLayer.firstChild){ this.connectionLayer.removeChild(this.connectionLayer.firstChild); }
+          this.connectionRegistry.clear();
+          if(!this.connections || !this.connections.length) return;
+          for(const conn of this.connections){
+            if(!conn) continue;
+            const fromNode=this.nodes.get(conn.from);
+            const toNode=this.nodes.get(conn.to);
+            if(!fromNode || !toNode) continue;
+            if(!fromNode.anchors) this.updateAnchors(fromNode);
+            if(!toNode.anchors) this.updateAnchors(toNode);
+            const group=document.createElementNS('http://www.w3.org/2000/svg','g');
+            group.classList.add('free-link-group');
+            group.dataset.connectionId=conn.id;
+            group.dataset.from=conn.from;
+            group.dataset.to=conn.to;
+            const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
+            shadow.classList.add('free-link','shadow');
+            const core=document.createElementNS('http://www.w3.org/2000/svg','path');
+            core.classList.add('free-link','core');
+            const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
+            highlight.classList.add('free-link','highlight');
+            group.appendChild(shadow);
+            group.appendChild(core);
+            group.appendChild(highlight);
+            const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+            const fromLabel=fromNode.topic || fromNode.id;
+            const toLabel=toNode.topic || toNode.id;
+            const tooltip=(conn.label && conn.label.trim()) ? conn.label.trim() : `${fromLabel} ↔ ${toLabel}`;
+            title.textContent=tooltip;
+            group.appendChild(title);
+            this.connectionLayer.appendChild(group);
+            this.connectionRegistry.set(conn.id,{group,shadow,core,highlight,title});
+            this.updateConnectionPath(conn);
+          }
+        }
+        updateConnectionPath(connection){
+          if(!connection || !this.connectionRegistry || !this.connectionRegistry.size) return;
+          const entry=this.connectionRegistry.get(connection.id);
+          if(!entry) return;
+          const fromNode=this.nodes.get(connection.from);
+          const toNode=this.nodes.get(connection.to);
+          if(!fromNode || !toNode) return;
+          if(!fromNode.anchors) this.updateAnchors(fromNode);
+          if(!toNode.anchors) this.updateAnchors(toNode);
+          const start=fromNode.anchors && fromNode.anchors.center ? fromNode.anchors.center : null;
+          const end=toNode.anchors && toNode.anchors.center ? toNode.anchors.center : null;
+          if(!start || !end) return;
+          let pathData=buildFreeLinkCurve(start,end);
+          if(!pathData){ pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`; }
+          if(entry.shadow){ entry.shadow.setAttribute('d', pathData); }
+          if(entry.core){ entry.core.setAttribute('d', pathData); }
+          if(entry.highlight){ entry.highlight.setAttribute('d', pathData); }
+        }
+        updateConnectionsFor(node){
+          if(!node || !this.connectionLookup || !this.connectionLookup.size) return;
+          const ids=this.connectionLookup.get(node.id);
+          if(!ids || !ids.length) return;
+          ids.forEach(id=>{
+            const conn=this.connectionById.get(id);
+            if(conn){ this.updateConnectionPath(conn); }
+          });
+        }
+        connectionKey(a,b){
+          if(!a || !b) return '';
+          return [a,b].sort().join('|');
+        }
+        normalizeConnection(raw){
+          if(!raw || typeof raw!=='object') return null;
+          const from=typeof raw.from==='string'?raw.from.trim():'';
+          const to=typeof raw.to==='string'?raw.to.trim():'';
+          if(!from || !to || from===to) return null;
+          if(!this.nodes.has(from) || !this.nodes.has(to)) return null;
+          let id=typeof raw.id==='string'?raw.id.trim():'';
+          if(!id){ id='link-'+Math.random().toString(36).slice(2,10); }
+          const normalized={id,from,to};
+          if(typeof raw.label==='string' && raw.label.trim()){ normalized.label=raw.label.trim(); }
+          return normalized;
+        }
+        rebuildConnectionLookup(){
+          this.connectionLookup=new Map();
+          this.connectionById=new Map();
+          this.connectionIndex=new Map();
+          if(!this.connections || !this.connections.length) return;
+          for(const conn of this.connections){
+            if(!conn) continue;
+            this.connectionById.set(conn.id, conn);
+            const key=this.connectionKey(conn.from, conn.to);
+            if(key){ this.connectionIndex.set(key, conn.id); }
+            if(!this.connectionLookup.has(conn.from)) this.connectionLookup.set(conn.from, []);
+            if(!this.connectionLookup.has(conn.to)) this.connectionLookup.set(conn.to, []);
+            this.connectionLookup.get(conn.from).push(conn.id);
+            this.connectionLookup.get(conn.to).push(conn.id);
+          }
+        }
+        syncMindConnections(){
+          if(!this.mind) return;
+          this.mind.connections=(this.connections||[]).map(conn=>{
+            if(!conn) return null;
+            const entry={id:conn.id,from:conn.from,to:conn.to};
+            if(conn.label){ entry.label=conn.label; }
+            return entry;
+          }).filter(Boolean);
+        }
+        add_connection(fromId,toId,options){
+          const normalized=this.normalizeConnection({from:fromId,to:toId,label:options && options.label});
+          if(!normalized) return null;
+          const key=this.connectionKey(normalized.from, normalized.to);
+          if(key && this.connectionIndex.has(key)) return null;
+          this.connections.push(normalized);
+          this.rebuildConnectionLookup();
+          this.syncMindConnections();
+          this.renderConnections();
+          this.updateConnectionsFor(this.get_node(normalized.from));
+          this.updateConnectionsFor(this.get_node(normalized.to));
+          this.emit(SimpleMind.event_type.update);
+          return Object.assign({}, normalized);
+        }
+        remove_connection(connectionId){
+          if(!connectionId) return false;
+          const index=this.connections.findIndex(conn=>conn && conn.id===connectionId);
+          if(index===-1) return false;
+          const [removed]=this.connections.splice(index,1);
+          this.rebuildConnectionLookup();
+          this.syncMindConnections();
+          this.renderConnections();
+          if(removed){
+            const fromNode=this.get_node(removed.from);
+            const toNode=this.get_node(removed.to);
+            if(fromNode) this.updateConnectionsFor(fromNode);
+            if(toNode) this.updateConnectionsFor(toNode);
+          }
+          this.emit(SimpleMind.event_type.update);
+          return true;
+        }
+        get_connections_for(nodeId){
+          if(!nodeId || !this.connectionLookup || !this.connectionLookup.size) return [];
+          const ids=this.connectionLookup.get(nodeId);
+          if(!ids || !ids.length) return [];
+          return ids.map(id=>{
+            const conn=this.connectionById.get(id);
+            return conn ? Object.assign({}, conn) : null;
+          }).filter(Boolean);
+        }
         handleNodeResize(entries){
           if(!entries || !entries.length) return;
           const impacted=new Set();
@@ -5568,8 +5826,12 @@ if ($view === 'map_edit') {
           impacted.forEach(node=>{
             this.updateLinkPath(node);
             if(node.children && node.children.length){
-              node.children.forEach(child=>this.updateLinkPath(child));
+              node.children.forEach(child=>{
+                this.updateLinkPath(child);
+                this.updateConnectionsFor(child);
+              });
             }
+            this.updateConnectionsFor(node);
           });
         }
         applyTransform(initial){
@@ -6075,12 +6337,20 @@ if ($view === 'map_edit') {
           const targetId=targetEl.getAttribute('nodeid');
           const targetNode=targetId ? jm.get_node(targetId) : null;
           if(targetNode && targetNode.id!==source.id){
-            executeCreateNodeCommand({
-              parentId:source.id,
-              topic:'🔗 '+targetNode.topic,
-              data:{link:targetNode.id},
-              meta:{relation:true,source:'handle'}
-            });
+            if(typeof jm.add_connection==='function'){
+              const created=jm.add_connection(source.id, targetNode.id, {});
+              if(created){
+                commandLog.push({type:'createConnection', id:created.id, from:created.from, to:created.to, timestamp:Date.now(), meta:{source:'handle'}});
+                window.__mindmapCommands=commandLog;
+                jm.select_node(source.id);
+                markDirty();
+                scheduleHandleRefresh();
+                refreshInspector(jm.get_node(source.id));
+                return;
+              }
+              alert('这两个节点已经存在关联。');
+              return;
+            }
             return;
           }
         }
@@ -6114,6 +6384,8 @@ if ($view === 'map_edit') {
       const inspector=document.getElementById('node-inspector');
       const nodeTopicInput=document.getElementById('node-topic-input');
       const nodeNoteInput=document.getElementById('node-note');
+      const nodeLinksField=document.getElementById('node-links-field');
+      const nodeLinksList=nodeLinksField ? nodeLinksField.querySelector('[data-links-list]') : null;
       const nodeFoldField=document.getElementById('node-fold-field');
       const nodeFoldToggle=document.getElementById('node-fold-toggle');
       const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
@@ -6315,6 +6587,61 @@ if ($view === 'map_edit') {
             ? `共有 ${count} 个直接子节点`
             : `已折叠 ${count} 个直接子节点`;
         }
+      }
+      function updateLinksField(node){
+        if(!nodeLinksField || !nodeLinksList){
+          return;
+        }
+        nodeLinksList.innerHTML='';
+        if(!node || typeof jm.get_connections_for!=='function'){
+          nodeLinksField.hidden=true;
+          return;
+        }
+        const connections=jm.get_connections_for(node.id)||[];
+        nodeLinksField.hidden=false;
+        if(!connections.length){
+          const empty=document.createElement('span');
+          empty.className='node-link-empty';
+          empty.textContent='暂无关联';
+          nodeLinksList.appendChild(empty);
+          return;
+        }
+        connections.forEach(conn=>{
+          if(!conn) return;
+          const otherId=conn.from===node.id ? conn.to : conn.from;
+          const otherNode=otherId ? jm.get_node(otherId) : null;
+          const chip=document.createElement('span');
+          chip.className='node-link-chip';
+          const btn=document.createElement('button');
+          btn.type='button';
+          btn.className='chip-link';
+          btn.textContent=otherNode ? (otherNode.topic || otherNode.id || otherId) : (otherId || '未知节点');
+          btn.addEventListener('click',()=>{
+            if(otherNode){
+              jm.select_node(otherNode.id);
+              scheduleHandleRefresh();
+              if(typeof jm.center_node==='function'){ jm.center_node(otherNode); }
+            }
+          });
+          chip.appendChild(btn);
+          const remove=document.createElement('button');
+          remove.type='button';
+          remove.className='chip-remove';
+          remove.setAttribute('aria-label','移除关联');
+          remove.textContent='×';
+          remove.addEventListener('click',()=>{
+            if(!confirm('确定要移除这条关联吗？')) return;
+            if(typeof jm.remove_connection==='function' && jm.remove_connection(conn.id)){
+              commandLog.push({type:'removeConnection', id:conn.id, from:conn.from, to:conn.to, timestamp:Date.now(), meta:{source:'inspector'}});
+              window.__mindmapCommands=commandLog;
+              markDirty();
+              scheduleHandleRefresh();
+              refreshInspector(jm.get_node(node.id));
+            }
+          });
+          chip.appendChild(remove);
+          nodeLinksList.appendChild(chip);
+        });
       }
       function hasCollapsedNodes(){
         if(typeof jm?.has_collapsed_nodes==='function'){
@@ -6623,6 +6950,7 @@ if ($view === 'map_edit') {
           setInspectorEnabled(false);
           if(nodeTopicInput) nodeTopicInput.value='';
           if(nodeNoteInput) nodeNoteInput.value='';
+          updateLinksField(null);
           updateFoldToggleUI(null);
           updateFoldAllLabel();
           inspectorSyncing=false;
@@ -6633,6 +6961,7 @@ if ($view === 'map_edit') {
         if(nodeTopicInput) nodeTopicInput.value=node.topic || '';
         const data=normalizeNodeData(deepClone(node.data||{}));
         if(nodeNoteInput) nodeNoteInput.value=data.note || '';
+        updateLinksField(node);
         updateFoldToggleUI(node);
         updateFoldAllLabel();
         inspectorSyncing=false;
