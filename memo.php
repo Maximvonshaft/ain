@@ -342,6 +342,73 @@ function attachments_for_item(int $item_id): array {
   $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
 }
 
+function normalize_disposition(string $mime, ?string $requested, bool $preferInline=false): string {
+  $requested=$requested!==null?strtolower(trim($requested)) : null;
+  if($requested==='inline' || $requested==='attachment'){
+    return $requested;
+  }
+  if($preferInline){
+    if(str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || str_starts_with($mime,'audio/') || $mime==='application/pdf'){
+      return 'inline';
+    }
+  }
+  return str_starts_with($mime,'image/') ? 'inline' : 'attachment';
+}
+
+function stream_file_response(string $path, string $mime, string $filename, string $disposition, ?int $declaredSize=null): void {
+  if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
+  $size=$declaredSize!==null && $declaredSize>0 ? $declaredSize : (int)filesize($path);
+  $method=$_SERVER['REQUEST_METHOD'] ?? 'GET';
+  $rangeHeader=$_SERVER['HTTP_RANGE'] ?? '';
+  $start=0; $end=$size>0?$size-1:0; $isRange=false;
+  if($rangeHeader && preg_match('/bytes=(\d*)-(\d*)/',$rangeHeader,$m)){
+    $rangeStart=$m[1]!==''?(int)$m[1]:null;
+    $rangeEnd=$m[2]!==''?(int)$m[2]:null;
+    if($rangeStart!==null || $rangeEnd!==null){
+      $isRange=true;
+      if($rangeStart===null){
+        $suffixLength=$rangeEnd!==null?min($rangeEnd,$size):0;
+        if($suffixLength<=0){ $suffixLength=$size; }
+        $rangeStart=max(0,$size-$suffixLength);
+        $rangeEnd=$size>0?$size-1:0;
+      }
+      elseif($rangeEnd===null || $rangeEnd>=$size){ $rangeEnd=$size-1; }
+      if($rangeStart>$rangeEnd){ $rangeStart=0; }
+      $start=max(0,$rangeStart);
+      $end=max($start, $rangeEnd);
+    }
+  }
+  header('Content-Type: '.$mime);
+  header('Content-Disposition: '.$disposition.'; filename="'.rawurlencode($filename).'"');
+  header('Accept-Ranges: bytes');
+  header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: private, max-age=0, must-revalidate');
+  if($isRange){
+    $length=$end-$start+1;
+    http_response_code(206);
+    header('Content-Length: '.$length);
+    header('Content-Range: bytes '.$start.'-'.$end.'/'.$size);
+  } else {
+    header('Content-Length: '.$size);
+  }
+  if($method==='HEAD'){ exit; }
+  $chunk=8192;
+  $fh=fopen($path,'rb');
+  if($fh===false){ http_response_code(500); echo 'Failed to open file'; exit; }
+  if($start>0){ fseek($fh,$start); }
+  $bytesToOutput=$isRange?($end-$start+1):$size;
+  while($bytesToOutput>0 && !feof($fh)){
+    $read=fread($fh, min($chunk,$bytesToOutput));
+    if($read===false) break;
+    echo $read;
+    flush();
+    $bytesToOutput-=strlen($read);
+    if(connection_aborted()){ break; }
+  }
+  fclose($fh);
+  exit;
+}
+
 function get_mindmap_asset(int $id): ?array {
   $pdo=db();
   $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE id=? LIMIT 1');
@@ -610,25 +677,20 @@ function json_cats(): void {
 // —— 下载附件 ——
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
-  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$att['mime']; $isImage=in_array($mime,['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true);
-  $filename=$att['orig_name'];
-  header('Content-Length: '.$att['size']); header('X-Content-Type-Options: nosniff');
-  if($isImage){ header('Content-Type: '.$mime); header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
-  else { header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
-  readfile($path); exit;
+  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name'];
+  $mime=is_string($att['mime']) && $att['mime']!=='' ? $att['mime'] : 'application/octet-stream';
+  $filename=$att['orig_name']!==''?$att['orig_name']:('attachment-'.$att['id']);
+  $disposition=normalize_disposition($mime, $_GET['disposition'] ?? null);
+  stream_file_response($path,$mime,$filename,$disposition,(int)($att['size'] ?? null));
 }
 
 if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])) {
   $asset=get_mindmap_asset((int)$_GET['mindmap_asset']); if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
-  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$asset['mime'];
-  $filename=$asset['orig_name'];
-  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
-  header('Content-Length: '.$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
-  if($inline){ header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
-  else { header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
-  readfile($path); exit;
+  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name'];
+  $mime=is_string($asset['mime']) && $asset['mime']!=='' ? $asset['mime'] : 'application/octet-stream';
+  $filename=$asset['orig_name']!==''?$asset['orig_name']:('asset-'.$asset['id']);
+  $disposition=normalize_disposition($mime, $_GET['disposition'] ?? null, true);
+  stream_file_response($path,$mime,$filename,$disposition,(int)($asset['size'] ?? null));
 }
 
 // —— 导出数据（JSON/CSV） ——
@@ -1235,9 +1297,16 @@ if ($view === 'new') {
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
+      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1);display:flex;flex-direction:column;width:240px;max-width:100%}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .thumb-media{position:relative;display:flex;align-items:center;justify-content:center;min-height:140px;padding:12px;background:rgba(9,16,20,.72)}
+      .thumb-media img{display:block;max-width:100%;max-height:170px;width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 0 12px rgba(0,0,0,.4)}
+      .thumb-info{padding:10px 14px 0;display:flex;flex-direction:column;gap:4px}
+      .thumb-info .att-name{font-weight:700;font-size:14px;color:var(--text)}
+      .thumb-info .att-meta{color:var(--text-muted);font-size:12px;letter-spacing:.06em}
+      .thumb-controls{display:flex;gap:10px;align-items:center;padding:12px 14px 14px}
+      .thumb-controls .btn{flex:1 1 auto;justify-content:center}
+      .thumb-file-icon{font-size:42px;line-height:1;color:rgba(201,168,106,.88);text-shadow:0 0 18px rgba(201,168,106,.45)}
       .att-meta{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
       .timeline{position:relative;margin-top:20px;margin-left:16px;padding-left:32px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.6),rgba(201,168,106,.1));box-shadow:0 0 18px rgba(227,198,139,.28)}
@@ -1255,6 +1324,70 @@ if ($view === 'new') {
       .save-tip.dirty{color:var(--accent-crimson)}
       .save-tip.show{display:inline-block}
       .placeholder-muted{color:var(--text-muted)}
+      .attachment-preview-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:40px 32px;background:rgba(6,10,15,.86);backdrop-filter:blur(6px);z-index:9999}
+      .attachment-preview-backdrop.show{display:flex}
+      .attachment-preview-panel{width:min(960px,90vw);height:min(85vh,820px);background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(12,16,18,.96));border:1px solid rgba(201,168,106,.42);border-radius:22px;box-shadow:0 32px 72px rgba(0,0,0,.6),0 0 42px rgba(201,168,106,.18);display:flex;flex-direction:column;position:relative;overflow:hidden}
+      .attachment-preview-header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 26px;border-bottom:1px solid rgba(201,168,106,.18);gap:18px}
+      .attachment-preview-title{font-size:18px;font-weight:700;color:var(--text);word-break:break-all}
+      .attachment-preview-meta{font-size:12px;color:var(--text-muted);margin-top:6px;letter-spacing:.08em;text-transform:uppercase}
+      .attachment-preview-actions{display:flex;gap:10px;align-items:center;flex-shrink:0}
+      .attachment-preview-body{flex:1;position:relative;padding:18px 26px;display:flex}
+      .attachment-preview-content{flex:1;border-radius:16px;background:rgba(9,14,18,.78);overflow:auto;padding:0;position:relative;box-shadow:inset 0 0 0 1px rgba(201,168,106,.08)}
+      .attachment-preview-content img,
+      .attachment-preview-content video,
+      .attachment-preview-content iframe{width:100%;height:100%;object-fit:contain;border:none;border-radius:16px;background:#050607}
+      .attachment-preview-content audio{width:100%;margin:18px 0}
+      .attachment-preview-loading,
+      .attachment-preview-error,
+      .attachment-preview-unsupported{position:absolute;inset:18px 26px;display:flex;align-items:center;justify-content:center;background:rgba(6,10,15,.82);border-radius:16px;backdrop-filter:blur(4px);color:var(--text);font:500 15px/1.6 'Inter','Noto Sans SC',sans-serif;opacity:0;pointer-events:none;transition:opacity .2s ease}
+      .attachment-preview-loading.show,
+      .attachment-preview-error.show,
+      .attachment-preview-unsupported.show{opacity:1;pointer-events:auto}
+      .attachment-preview-spinner{width:48px;height:48px;border-radius:50%;border:3px solid rgba(201,168,106,.28);border-top-color:rgba(201,168,106,.92);animation:preview-spin 1s linear infinite}
+      @keyframes preview-spin{to{transform:rotate(360deg)}}
+      .attachment-preview-footer{display:flex;justify-content:space-between;align-items:center;padding:16px 26px;border-top:1px solid rgba(201,168,106,.18);gap:18px}
+      .attachment-preview-nav{display:flex;gap:12px}
+      .attachment-preview-counter{font-size:13px;color:var(--text-muted);letter-spacing:.18em;text-transform:uppercase}
+      .attachment-preview-body pre{white-space:pre-wrap;word-break:break-word;font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;font-size:13px;line-height:1.6;color:var(--text);padding:24px;background:transparent;margin:0}
+      .attachment-preview-body code{font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;font-size:13px}
+      .attachment-preview-table{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
+      .attachment-preview-table th,.attachment-preview-table td{padding:8px 10px;border:1px solid rgba(201,168,106,.18);background:rgba(15,20,24,.88)}
+      .attachment-preview-table thead th{position:sticky;top:0;z-index:1;background:rgba(18,24,30,.94)}
+      .attachment-preview-empty{color:var(--text-muted);font-size:14px}
+      .attachment-preview-backdrop .btn{min-width:0}
+      body.preview-open{overflow:hidden}
+      .attachment-preview-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:40px 32px;background:rgba(6,10,15,.86);backdrop-filter:blur(6px);z-index:9999}
+      .attachment-preview-backdrop.show{display:flex}
+      .attachment-preview-panel{width:min(960px,90vw);height:min(85vh,820px);background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(12,16,18,.96));border:1px solid rgba(201,168,106,.42);border-radius:22px;box-shadow:0 32px 72px rgba(0,0,0,.6),0 0 42px rgba(201,168,106,.18);display:flex;flex-direction:column;position:relative;overflow:hidden}
+      .attachment-preview-header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 26px;border-bottom:1px solid rgba(201,168,106,.18);gap:18px}
+      .attachment-preview-title{font-size:18px;font-weight:700;color:var(--text);word-break:break-all}
+      .attachment-preview-meta{font-size:12px;color:var(--text-muted);margin-top:6px;letter-spacing:.08em;text-transform:uppercase}
+      .attachment-preview-actions{display:flex;gap:10px;align-items:center;flex-shrink:0}
+      .attachment-preview-body{flex:1;position:relative;padding:18px 26px;display:flex}
+      .attachment-preview-content{flex:1;border-radius:16px;background:rgba(9,14,18,.78);overflow:auto;padding:0;position:relative;box-shadow:inset 0 0 0 1px rgba(201,168,106,.08)}
+      .attachment-preview-content img,
+      .attachment-preview-content video,
+      .attachment-preview-content iframe{width:100%;height:100%;object-fit:contain;border:none;border-radius:16px;background:#050607}
+      .attachment-preview-content audio{width:100%;margin:18px 0}
+      .attachment-preview-loading,
+      .attachment-preview-error,
+      .attachment-preview-unsupported{position:absolute;inset:18px 26px;display:flex;align-items:center;justify-content:center;background:rgba(6,10,15,.82);border-radius:16px;backdrop-filter:blur(4px);color:var(--text);font:500 15px/1.6 'Inter','Noto Sans SC',sans-serif;opacity:0;pointer-events:none;transition:opacity .2s ease}
+      .attachment-preview-loading.show,
+      .attachment-preview-error.show,
+      .attachment-preview-unsupported.show{opacity:1;pointer-events:auto}
+      .attachment-preview-spinner{width:48px;height:48px;border-radius:50%;border:3px solid rgba(201,168,106,.28);border-top-color:rgba(201,168,106,.92);animation:preview-spin 1s linear infinite}
+      @keyframes preview-spin{to{transform:rotate(360deg)}}
+      .attachment-preview-footer{display:flex;justify-content:space-between;align-items:center;padding:16px 26px;border-top:1px solid rgba(201,168,106,.18);gap:18px}
+      .attachment-preview-nav{display:flex;gap:12px}
+      .attachment-preview-counter{font-size:13px;color:var(--text-muted);letter-spacing:.18em;text-transform:uppercase}
+      .attachment-preview-body pre{white-space:pre-wrap;word-break:break-word;font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;font-size:13px;line-height:1.6;color:var(--text);padding:24px;background:transparent;margin:0}
+      .attachment-preview-body code{font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;font-size:13px}
+      .attachment-preview-table{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
+      .attachment-preview-table th,.attachment-preview-table td{padding:8px 10px;border:1px solid rgba(201,168,106,.18);background:rgba(15,20,24,.88)}
+      .attachment-preview-table thead th{position:sticky;top:0;z-index:1;background:rgba(18,24,30,.94)}
+      .attachment-preview-empty{color:var(--text-muted);font-size:14px}
+      .attachment-preview-backdrop .btn{min-width:0}
+      body.preview-open{overflow:hidden}
     </style>
   </head>
   <body data-density="comfortable">
@@ -1314,6 +1447,72 @@ if ($view === 'new') {
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      function ensureAttachmentPreview(){
+        if(typeof window==='undefined') return null;
+        if(window.attachmentPreview){ return window.attachmentPreview; }
+        if(typeof createAttachmentPreviewer!=='function') return null;
+        if(!window.__attachmentPreviewRegistry){ window.__attachmentPreviewRegistry=new Set(); }
+        const registry=window.__attachmentPreviewRegistry;
+        if(!window.__attachmentPreviewUnloadBound){
+          window.addEventListener('beforeunload',()=>{
+            if(!window.__attachmentPreviewRegistry) return;
+            window.__attachmentPreviewRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
+            window.__attachmentPreviewRegistry.clear();
+          });
+          window.__attachmentPreviewUnloadBound=true;
+        }
+        const register=url=>{ if(typeof url==='string'){ registry.add(url); } };
+        const release=url=>{
+          if(typeof url!=='string') return;
+          if(registry.has(url)){
+            try{ URL.revokeObjectURL(url); }
+            catch(_){ }
+            registry.delete(url);
+          }
+        };
+        window.attachmentPreview=createAttachmentPreviewer({registerBlobUrl:register, releaseBlobUrl:release});
+        return window.attachmentPreview;
+      }
+      function initAttachmentPreviewContainers(){
+        const previewInstance=ensureAttachmentPreview();
+        if(!previewInstance) return;
+        document.querySelectorAll('.thumbs[data-attachment-items]').forEach(container=>{
+          if(container.dataset.previewBound==='1') return;
+          const raw=container.getAttribute('data-attachment-items');
+          if(!raw) return;
+          let parsed;
+          try{ parsed=JSON.parse(raw); }
+          catch(_){ parsed=[]; }
+          if(!Array.isArray(parsed) || !parsed.length) return;
+          const normalized=parsed.map(item=>({
+            id:item && item.id!==undefined ? item.id : null,
+            name:item && item.name ? String(item.name) : '附件',
+            mime:item && item.mime ? String(item.mime) : 'application/octet-stream',
+            size:item && typeof item.size==='number' ? item.size : Number(item && item.size) || 0,
+            previewUrl:item && typeof item.previewUrl==='string' ? item.previewUrl : null,
+            downloadUrl:item && typeof item.downloadUrl==='string' ? item.downloadUrl : null,
+          }));
+          if(!normalized.length) return;
+          const openAt=index=>{
+            const safeIndex=Number.isFinite(index)?Math.max(0, Math.min(index, normalized.length-1)):0;
+            previewInstance.open(normalized,safeIndex);
+          };
+          const bindTrigger=element=>{
+            if(!element) return;
+            element.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              const attr=element.dataset.previewIndex || element.closest('[data-preview-index]')?.dataset.previewIndex;
+              const idx=parseInt(attr ?? '0',10);
+              openAt(Number.isNaN(idx)?0:idx);
+            });
+          };
+          container.querySelectorAll('.js-attachment-preview').forEach(bindTrigger);
+          container.querySelectorAll('.thumb-preview-link').forEach(bindTrigger);
+          container.dataset.previewBound='1';
+        });
+      }
+      initAttachmentPreviewContainers();
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
@@ -1727,9 +1926,16 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(12,16,18,.82);padding:4px 14px;color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.2em}
       .status-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 8px rgba(227,198,139,.4)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
+      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1);display:flex;flex-direction:column;width:240px;max-width:100%}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .thumb-media{position:relative;display:flex;align-items:center;justify-content:center;min-height:140px;padding:12px;background:rgba(9,16,20,.72)}
+      .thumb-media img{display:block;max-width:100%;max-height:170px;width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 0 12px rgba(0,0,0,.4)}
+      .thumb-info{padding:10px 14px 0;display:flex;flex-direction:column;gap:4px}
+      .thumb-info .att-name{font-weight:700;font-size:14px;color:var(--text)}
+      .thumb-info .att-meta{color:var(--text-muted);font-size:12px;letter-spacing:.06em}
+      .thumb-controls{display:flex;gap:10px;align-items:center;padding:12px 14px 14px}
+      .thumb-controls .btn{flex:1 1 auto;justify-content:center}
+      .thumb-file-icon{font-size:42px;line-height:1;color:rgba(201,168,106,.88);text-shadow:0 0 18px rgba(201,168,106,.45)}
       .timeline{position:relative;margin-top:22px;margin-left:18px;padding-left:34px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.58),rgba(201,168,106,.12));box-shadow:0 0 18px rgba(227,198,139,.24)}
       .tl-item{position:relative;margin:14px 0;padding:16px 20px 20px 26px;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-md);background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));box-shadow:var(--shadow-1)}
@@ -1801,17 +2007,39 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           </div>
           <div class="preview">
             <div class="md-body" id="md-view"></div>
-            <div class="thumbs" id="thumbs">
-              <?php if ($itemAtts): foreach ($itemAtts as $a): $isImg=in_array($a['mime'],['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true); ?>
-                <div class="thumb">
-                  <?php if ($isImg): ?>
-                    <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
-                  <?php else: ?>
-                    <div style="display:flex;gap:8px;align-items:center;padding:8px">
-                      <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
-                      <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
-                    </div>
-                  <?php endif; ?>
+            <?php
+              $attachmentPreviewItems=[];
+              foreach($itemAtts as $payloadAtt){
+                $attachmentPreviewItems[]=[
+                  'id'=>(int)$payloadAtt['id'],
+                  'name'=>$payloadAtt['orig_name'],
+                  'mime'=>$payloadAtt['mime'],
+                  'size'=>(int)$payloadAtt['size'],
+                  'previewUrl'=>'?download='.$payloadAtt['id'].'&disposition=inline',
+                  'downloadUrl'=>'?download='.$payloadAtt['id'],
+                ];
+              }
+            ?>
+            <div class="thumbs" id="thumbs" data-attachment-items="<?php echo h(json_encode($attachmentPreviewItems, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP)); ?>">
+              <?php if ($itemAtts): foreach ($itemAtts as $idx => $a): $isImg=str_starts_with((string)$a['mime'],'image/'); ?>
+                <div class="thumb" data-preview-index="<?php echo $idx; ?>">
+                  <div class="thumb-media">
+                    <?php if ($isImg): ?>
+                      <a class="thumb-preview-link" data-preview-index="<?php echo $idx; ?>" href="?download=<?php echo $a['id']; ?>&disposition=inline" title="<?php echo h($a['orig_name']); ?>">
+                        <img src="?download=<?php echo $a['id']; ?>&disposition=inline" alt="<?php echo h($a['orig_name']); ?>">
+                      </a>
+                    <?php else: ?>
+                      <div class="thumb-file-icon" aria-hidden="true">📄</div>
+                    <?php endif; ?>
+                  </div>
+                  <div class="thumb-info">
+                    <div class="att-name"><?php echo h($a['orig_name']); ?></div>
+                    <div class="att-meta"><?php echo bytes_h((int)$a['size']); ?> · <?php echo h($a['mime']); ?></div>
+                  </div>
+                  <div class="thumb-controls">
+                    <button class="btn btn-ghost btn-small js-attachment-preview" type="button" data-preview-index="<?php echo $idx; ?>">预览</button>
+                    <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载</a>
+                  </div>
                   <form method="post" style="padding:6px;text-align:right">
                     <input type="hidden" name="action" value="delete_attachment">
                     <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
@@ -3473,7 +3701,7 @@ if ($view === 'map_edit') {
           }
           const badges=[];
           if(attachments.length){
-            attachments.forEach(att=>{
+            attachments.forEach((att,attIndex)=>{
               const badge=document.createElement('button');
               badge.type='button';
               badge.className='node-badge attachment';
@@ -3483,7 +3711,7 @@ if ($view === 'map_edit') {
               if(forMeasure){
                 badge.disabled=true;
               }else{
-                badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(att); });
+                badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(att, attachments, attIndex); });
               }
               badges.push(badge);
             });
@@ -3810,6 +4038,17 @@ if ($view === 'map_edit') {
         mode:'full',
       });
       const blobUrlRegistry=new Set();
+      const registerBlobUrl=(url)=>{ if(typeof url==='string'){ blobUrlRegistry.add(url); } };
+      const releaseBlobUrl=(url)=>{
+        if(typeof url!=='string') return;
+        if(blobUrlRegistry.has(url)){
+          try{ URL.revokeObjectURL(url); }
+          catch(_){ }
+          blobUrlRegistry.delete(url);
+        }
+      };
+      const attachmentPreview=createAttachmentPreviewer({registerBlobUrl, releaseBlobUrl});
+      if(typeof window!=='undefined'){ window.attachmentPreview=attachmentPreview; }
       const externalScriptCache=new Map();
       function loadExternalScript(src, resolver){
         if(typeof resolver==='function'){
@@ -3887,27 +4126,478 @@ if ($view === 'map_edit') {
         for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); }
         return new Blob([bytes],{type:mime});
       }
-      function openMindmapAttachment(descriptor){
-        if(!descriptor) return;
-        if(descriptor.assetId && descriptor.url){
-          const win=window.open(descriptor.url,'_blank','noopener');
-          if(!win){ window.location.href=descriptor.url; }
-          return;
+      function createAttachmentPreviewer({registerBlobUrl,releaseBlobUrl}={}){
+        const overlay=document.createElement('div');
+        overlay.className='attachment-preview-backdrop';
+        overlay.setAttribute('aria-hidden','true');
+        overlay.setAttribute('role','dialog');
+        overlay.setAttribute('aria-modal','true');
+        overlay.innerHTML=`<div class="attachment-preview-panel" role="document" tabindex="-1">
+          <div class="attachment-preview-header">
+            <div class="attachment-preview-heading">
+              <div class="attachment-preview-title"></div>
+              <div class="attachment-preview-meta"></div>
+            </div>
+            <div class="attachment-preview-actions">
+              <a class="btn btn-outline btn-small attachment-preview-download" href="#" target="_blank" rel="noopener">下载</a>
+              <button type="button" class="btn btn-ghost btn-small attachment-preview-close">关闭</button>
+            </div>
+          </div>
+          <div class="attachment-preview-body">
+            <div class="attachment-preview-content" tabindex="0"></div>
+            <div class="attachment-preview-loading" aria-hidden="true"><div class="attachment-preview-spinner"></div></div>
+            <div class="attachment-preview-error" role="alert"></div>
+            <div class="attachment-preview-unsupported" role="status"></div>
+          </div>
+          <div class="attachment-preview-footer">
+            <div class="attachment-preview-nav">
+              <button type="button" class="btn btn-ghost btn-small attachment-preview-prev">← 上一份</button>
+              <button type="button" class="btn btn-ghost btn-small attachment-preview-next">下一份 →</button>
+            </div>
+            <div class="attachment-preview-counter"></div>
+          </div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const panel=overlay.querySelector('.attachment-preview-panel');
+        const titleEl=overlay.querySelector('.attachment-preview-title');
+        const metaEl=overlay.querySelector('.attachment-preview-meta');
+        const contentEl=overlay.querySelector('.attachment-preview-content');
+        const loadingEl=overlay.querySelector('.attachment-preview-loading');
+        const errorEl=overlay.querySelector('.attachment-preview-error');
+        const unsupportedEl=overlay.querySelector('.attachment-preview-unsupported');
+        const downloadLink=overlay.querySelector('.attachment-preview-download');
+        const closeBtn=overlay.querySelector('.attachment-preview-close');
+        const prevBtn=overlay.querySelector('.attachment-preview-prev');
+        const nextBtn=overlay.querySelector('.attachment-preview-next');
+        const counterEl=overlay.querySelector('.attachment-preview-counter');
+        panel.setAttribute('tabindex','-1');
+        let items=[];
+        let currentIndex=-1;
+        let token=0;
+        let isOpen=false;
+        function formatBytes(bytes){
+          if(!(typeof bytes==='number') || !isFinite(bytes) || bytes<0) return '大小未知';
+          if(bytes===0) return '0 B';
+          const units=['B','KB','MB','GB','TB'];
+          let value=bytes;
+          let unitIndex=0;
+          while(value>=1024 && unitIndex<units.length-1){ value/=1024; unitIndex++; }
+          return `${value>=100 || unitIndex===0?value.toFixed(0):value.toFixed(1)} ${units[unitIndex]}`;
         }
+        function detectType(mime,name){
+          const lower=(mime||'').toLowerCase();
+          const ext=(name||'').toLowerCase().split('.').pop();
+          if(lower.startsWith('image/')) return 'image';
+          if(lower.startsWith('video/')) return 'video';
+          if(lower.startsWith('audio/')) return 'audio';
+          if(lower==='application/pdf' || ext==='pdf') return 'pdf';
+          if(lower==='text/markdown' || lower==='text/x-markdown' || ext==='md' || ext==='markdown') return 'markdown';
+          if(lower.startsWith('text/')) return 'text';
+          if(lower==='application/json' || ext==='json') return 'json';
+          if(lower==='text/csv' || lower==='application/csv' || ext==='csv') return 'csv';
+          if(lower.includes('sheet') || ext==='xls' || ext==='xlsx') return 'excel';
+          if(lower.includes('word') || ext==='doc' || ext==='docx') return 'doc';
+          if(lower.includes('zip') || lower.includes('rar') || ext==='zip' || ext==='rar') return 'archive';
+          return 'binary';
+        }
+        function typeLabel(type){
+          switch(type){
+            case 'image': return '图片';
+            case 'video': return '视频';
+            case 'audio': return '音频';
+            case 'pdf': return 'PDF 文档';
+            case 'markdown': return 'Markdown';
+            case 'text': return '文本';
+            case 'json': return 'JSON';
+            case 'csv': return 'CSV';
+            default: return '文件';
+          }
+        }
+        function cleanupItems(){
+          if(!items.length) return;
+          items.forEach(item=>{
+            if(item && typeof item.cleanup==='function'){
+              try{ item.cleanup(); }
+              catch(_){ }
+              item.cleanup=null;
+            }
+          });
+          items=[];
+        }
+        function normalizeItem(raw){
+          if(!raw) return null;
+          const norm={
+            id:raw.id ?? null,
+            name:(raw.name || raw.filename || '附件').toString(),
+            mime:(raw.mime || '').toString(),
+            size:typeof raw.size==='number' && isFinite(raw.size)?raw.size:0,
+            previewUrl:typeof raw.previewUrl==='string'?raw.previewUrl:null,
+            downloadUrl:typeof raw.downloadUrl==='string'?raw.downloadUrl:null,
+            cleanup:null,
+            objectUrl:typeof raw.objectUrl==='string'?raw.objectUrl:null,
+            blob:raw.blob instanceof Blob ? raw.blob : null,
+            type:null,
+          };
+          if(norm.blob){
+            const url=URL.createObjectURL(norm.blob);
+            if(typeof registerBlobUrl==='function') registerBlobUrl(url);
+            norm.objectUrl=url;
+            norm.mime=norm.mime || norm.blob.type || 'application/octet-stream';
+            norm.size=norm.size || norm.blob.size;
+            norm.cleanup=()=>{
+              if(typeof releaseBlobUrl==='function') releaseBlobUrl(url);
+              else{ try{ URL.revokeObjectURL(url); }catch(_){ } }
+            };
+          }
+          if(!norm.downloadUrl){
+            if(norm.previewUrl) norm.downloadUrl=norm.previewUrl;
+            else if(norm.objectUrl) norm.downloadUrl=norm.objectUrl;
+          }
+          norm.type=detectType(norm.mime, norm.name);
+          return norm;
+        }
+        function setLoading(state){
+          if(state) loadingEl.classList.add('show');
+          else loadingEl.classList.remove('show');
+        }
+        function resetOverlays(){
+          loadingEl.classList.remove('show');
+          errorEl.classList.remove('show');
+          unsupportedEl.classList.remove('show');
+          errorEl.textContent='';
+          unsupportedEl.textContent='';
+        }
+        function showError(message){
+          errorEl.textContent=message || '加载失败，请重试';
+          errorEl.classList.add('show');
+        }
+        function showUnsupported(message){
+          unsupportedEl.textContent=message || '无法预览此文件类型，请下载查看。';
+          unsupportedEl.classList.add('show');
+        }
+        function updateNav(){
+          if(!items.length){ prevBtn.disabled=true; nextBtn.disabled=true; counterEl.textContent=''; return; }
+          prevBtn.disabled=currentIndex<=0;
+          nextBtn.disabled=currentIndex>=items.length-1;
+          counterEl.textContent=`${currentIndex+1}/${items.length}`;
+        }
+        function buildMeta(item){
+          const parts=[typeLabel(item.type)];
+          parts.push(item.mime && item.mime!=='undefined'?item.mime:'未知类型');
+          parts.push(formatBytes(item.size));
+          return parts.join(' · ');
+        }
+        function parseCSV(text){
+          const rows=[];
+          let current='';
+          let row=[];
+          let inQuotes=false;
+          for(let i=0;i<text.length;i++){
+            const char=text[i];
+            if(inQuotes){
+              if(char==='"'){
+                if(text[i+1]==='"'){ current+='"'; i++; }
+                else{ inQuotes=false; }
+              }else{ current+=char; }
+            }else{
+              if(char==='"'){ inQuotes=true; }
+              else if(char===','){
+                row.push(current); current='';
+              }else if(char==='\n'){
+                row.push(current); rows.push(row); row=[]; current='';
+              }else if(char==='\r'){ continue; }
+              else{ current+=char; }
+            }
+          }
+          row.push(current);
+          rows.push(row);
+          return rows;
+        }
+        async function renderText(item,myToken,mode){
+          const url=item.previewUrl || item.objectUrl || item.downloadUrl;
+          if(!url){ setLoading(false); showUnsupported(); return; }
+          try{
+            const res=await fetch(url,{headers:{'X-Requested-With':'fetch'}});
+            if(myToken!==token) return;
+            if(!res.ok) throw new Error('加载失败');
+            const text=await res.text();
+            if(myToken!==token) return;
+            setLoading(false);
+            if(mode==='markdown' && window.marked && typeof window.marked.parse==='function' && window.DOMPurify && typeof window.DOMPurify.sanitize==='function'){
+              const html=window.DOMPurify.sanitize(window.marked.parse(text));
+              const wrapper=document.createElement('div');
+              wrapper.className='attachment-preview-markdown';
+              wrapper.innerHTML=html;
+              contentEl.appendChild(wrapper);
+              return;
+            }
+            if(mode==='json'){
+              let formatted=text;
+              try{ const parsed=JSON.parse(text); formatted=JSON.stringify(parsed,null,2); }
+              catch(_){ }
+              const pre=document.createElement('pre');
+              pre.textContent=formatted;
+              contentEl.appendChild(pre);
+              return;
+            }
+            if(mode==='csv'){
+              const rows=parseCSV(text);
+              if(!rows.length){
+                const empty=document.createElement('div');
+                empty.className='attachment-preview-empty';
+                empty.textContent='CSV 文件为空';
+                contentEl.appendChild(empty);
+                return;
+              }
+              const table=document.createElement('table');
+              table.className='attachment-preview-table';
+              const [header,...rest]=rows;
+              if(header && header.length){
+                const thead=document.createElement('thead');
+                const tr=document.createElement('tr');
+                header.forEach(cell=>{ const th=document.createElement('th'); th.textContent=cell; tr.appendChild(th); });
+                thead.appendChild(tr);
+                table.appendChild(thead);
+                const tbody=document.createElement('tbody');
+                rest.forEach(row=>{
+                  if(!row.length) return;
+                  const rowEl=document.createElement('tr');
+                  row.forEach(cell=>{ const td=document.createElement('td'); td.textContent=cell; rowEl.appendChild(td); });
+                  tbody.appendChild(rowEl);
+                });
+                table.appendChild(tbody);
+              }else{
+                const tbody=document.createElement('tbody');
+                rows.forEach(row=>{
+                  const rowEl=document.createElement('tr');
+                  row.forEach(cell=>{ const td=document.createElement('td'); td.textContent=cell; rowEl.appendChild(td); });
+                  tbody.appendChild(rowEl);
+                });
+                table.appendChild(tbody);
+              }
+              contentEl.appendChild(table);
+              return;
+            }
+            const pre=document.createElement('pre');
+            pre.textContent=text;
+            contentEl.appendChild(pre);
+          }catch(err){
+            if(myToken!==token) return;
+            setLoading(false);
+            showError(err && err.message ? err.message : '加载失败，请重试');
+          }
+        }
+        function renderCurrent(){
+          if(!items.length){ return; }
+          const item=items[currentIndex];
+          titleEl.textContent=item.name || '附件';
+          metaEl.textContent=buildMeta(item);
+          downloadLink.style.display=item.downloadUrl?'inline-flex':'none';
+          if(item.downloadUrl){ downloadLink.href=item.downloadUrl; downloadLink.setAttribute('download', item.name || 'attachment'); }
+          else{ downloadLink.removeAttribute('href'); downloadLink.removeAttribute('download'); }
+          contentEl.innerHTML='';
+          resetOverlays();
+          const MAX_PREVIEW_SIZE=100*1024*1024;
+          if(item.size && item.size>MAX_PREVIEW_SIZE){
+            showUnsupported('文件超过可在线预览大小（>100MB），请下载查看。');
+            return;
+          }
+          const currentToken=++token;
+          setLoading(true);
+          const source=item.objectUrl || item.previewUrl || item.downloadUrl;
+          const handleError=(message)=>{ if(currentToken!==token) return; setLoading(false); showError(message); };
+          switch(item.type){
+            case 'image': {
+              if(!source){ setLoading(false); showUnsupported(); return; }
+              const img=new Image();
+              img.decoding='async';
+              img.onload=()=>{ if(currentToken!==token) return; setLoading(false); contentEl.appendChild(img); };
+              img.onerror=()=>handleError('图片加载失败');
+              img.src=source;
+              img.alt=item.name || '';
+              break;
+            }
+            case 'video': {
+              if(!source){ setLoading(false); showUnsupported(); return; }
+              const video=document.createElement('video');
+              video.controls=true;
+              video.controlsList='nodownload';
+              video.preload='metadata';
+              video.onloadeddata=()=>{ if(currentToken!==token) return; setLoading(false); };
+              video.onerror=()=>handleError('视频加载失败');
+              video.src=source;
+              contentEl.appendChild(video);
+              break;
+            }
+            case 'audio': {
+              if(!source){ setLoading(false); showUnsupported(); return; }
+              const audio=document.createElement('audio');
+              audio.controls=true;
+              audio.preload='metadata';
+              audio.onloadeddata=()=>{ if(currentToken!==token) return; setLoading(false); };
+              audio.onerror=()=>handleError('音频加载失败');
+              audio.src=source;
+              contentEl.appendChild(audio);
+              break;
+            }
+            case 'pdf': {
+              if(!source){ setLoading(false); showUnsupported(); return; }
+              const frame=document.createElement('iframe');
+              frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation');
+              frame.onload=()=>{ if(currentToken!==token) return; setLoading(false); };
+              frame.onerror=()=>handleError('PDF 加载失败');
+              frame.src=source;
+              contentEl.appendChild(frame);
+              break;
+            }
+            case 'markdown':
+            case 'text':
+            case 'json':
+            case 'csv': {
+              renderText(item,currentToken,item.type);
+              break;
+            }
+            default:
+              setLoading(false);
+              showUnsupported();
+              break;
+          }
+        }
+        function onKeydown(e){
+          if(!isOpen) return;
+          if(e.key==='Escape'){ e.preventDefault(); close(); }
+          else if(e.key==='ArrowRight'){ e.preventDefault(); go(1); }
+          else if(e.key==='ArrowLeft'){ e.preventDefault(); go(-1); }
+        }
+        function go(delta){
+          if(!items.length) return;
+          const nextIndex=currentIndex+delta;
+          if(nextIndex<0 || nextIndex>=items.length) return;
+          currentIndex=nextIndex;
+          updateNav();
+          renderCurrent();
+        }
+        function open(rawItems,startIndex=0){
+          const list=Array.isArray(rawItems)?rawItems:[rawItems];
+          const normalized=list.map(normalizeItem).filter(Boolean);
+          if(!normalized.length) return false;
+          cleanupItems();
+          items=normalized;
+          currentIndex=Math.max(0, Math.min(startIndex, items.length-1));
+          isOpen=true;
+          overlay.classList.add('show');
+          overlay.setAttribute('aria-hidden','false');
+          document.body.classList.add('preview-open');
+          resetOverlays();
+          updateNav();
+          renderCurrent();
+          document.addEventListener('keydown', onKeydown, true);
+          try{ panel.focus({preventScroll:true}); }
+          catch(_){ panel.focus(); }
+          return true;
+        }
+        function close(){
+          if(!isOpen) return;
+          isOpen=false;
+          overlay.classList.remove('show');
+          overlay.setAttribute('aria-hidden','true');
+          document.body.classList.remove('preview-open');
+          document.removeEventListener('keydown', onKeydown, true);
+          resetOverlays();
+          contentEl.innerHTML='';
+          cleanupItems();
+          currentIndex=-1;
+        }
+        overlay.addEventListener('click',e=>{ if(e.target===overlay) close(); });
+        closeBtn.addEventListener('click',()=>close());
+        prevBtn.addEventListener('click',()=>go(-1));
+        nextBtn.addEventListener('click',()=>go(1));
+        downloadLink.addEventListener('click',e=>{ if(!downloadLink.href) e.preventDefault(); });
+        return { open, close, isOpen:()=>isOpen };
+      }
+      if(typeof window!=='undefined' && !window.createAttachmentPreviewer){ window.createAttachmentPreviewer=createAttachmentPreviewer; }
+      function appendDispositionParameter(url,value){
+        if(!url) return url;
+        try{
+          const parsed=new URL(url, location.href);
+          parsed.searchParams.set('disposition', value);
+          const originalIsAbsolute=/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith('//');
+          if(originalIsAbsolute){ return parsed.toString(); }
+          return parsed.pathname+parsed.search+parsed.hash;
+        }catch(_){
+          const hashIndex=url.indexOf('#');
+          const hash=hashIndex>=0?url.slice(hashIndex):'';
+          const base=hashIndex>=0?url.slice(0,hashIndex):url;
+          const qIndex=base.indexOf('?');
+          const path=qIndex>=0?base.slice(0,qIndex):base;
+          const query=qIndex>=0?base.slice(qIndex+1):'';
+          const params=query?query.split('&').filter(Boolean).filter(entry=>!entry.startsWith('disposition=')):[];
+          params.push('disposition='+encodeURIComponent(value));
+          return path+(params.length?'?'+params.join('&'):'')+hash;
+        }
+      }
+      function normalizeMindmapAttachment(att){
+        if(!att) return null;
+        if(att.content && typeof att.content==='string' && att.content.startsWith('data:')){
+          const blob=dataUrlToBlob(att.content);
+          if(!blob) return null;
+          return {
+            id:att.assetId || att.id || null,
+            name:att.name || att.filename || '附件',
+            mime:att.mime || blob.type || 'application/octet-stream',
+            size:blob.size,
+            blob,
+            downloadUrl:att.url ? appendDispositionParameter(att.url,'attachment') : null,
+          };
+        }
+        const url=typeof att.url==='string'?att.url:'';
+        const previewUrl=url?appendDispositionParameter(url,'inline'):null;
+        const downloadUrl=url?appendDispositionParameter(url,'attachment'):null;
+        return {
+          id:att.assetId || att.id || null,
+          name:att.name || att.filename || '附件',
+          mime:att.mime || 'application/octet-stream',
+          size:typeof att.size==='number'?att.size:0,
+          previewUrl,
+          downloadUrl:downloadUrl || previewUrl || url || null,
+        };
+      }
+      function openMindmapAttachment(descriptor, collection, startIndex){
+        if(descriptor && attachmentPreview){
+          const bundle=Array.isArray(collection) && collection.length ? collection : [descriptor];
+          const normalized=[];
+          let fallbackIndex=0;
+          bundle.forEach((item, idx)=>{
+            const normalizedItem=normalizeMindmapAttachment(item);
+            if(normalizedItem){
+              if(item===descriptor){ fallbackIndex=normalized.length; }
+              normalized.push(normalizedItem);
+            }
+          });
+          if(!normalized.length){
+            const single=normalizeMindmapAttachment(descriptor);
+            if(single){ normalized.push(single); fallbackIndex=0; }
+          }
+          if(normalized.length){
+            const indexToOpen=typeof startIndex==='number' && isFinite(startIndex)?Math.max(0, Math.min(startIndex, normalized.length-1)):fallbackIndex;
+            if(attachmentPreview.open(normalized,indexToOpen)){
+              return;
+            }
+          }
+        }
+        if(!descriptor) return;
         if(descriptor.content){
           const blob=dataUrlToBlob(descriptor.content);
           if(!blob){ alert('附件不可用'); return; }
           const url=URL.createObjectURL(blob);
-          blobUrlRegistry.add(url);
+          registerBlobUrl(url);
           const a=document.createElement('a');
           a.href=url;
           a.download=descriptor.name || 'attachment';
           document.body.appendChild(a);
           a.click();
           a.remove();
-          setTimeout(()=>{
-            if(blobUrlRegistry.has(url)){ URL.revokeObjectURL(url); blobUrlRegistry.delete(url); }
-          },1500);
+          setTimeout(()=>releaseBlobUrl(url),1500);
           return;
         }
         if(descriptor.url){
