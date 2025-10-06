@@ -3795,6 +3795,15 @@ if ($view === 'map_edit') {
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-inserts{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+      .mind-insert-btn{position:absolute;padding:0;width:32px;height:32px;border-radius:50%;border:1px solid rgba(227,198,139,.55);background:rgba(201,168,106,.2);color:var(--gold-400);font:600 18px/1 'Cinzel','Noto Serif SC',serif;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;box-shadow:0 0 24px rgba(227,198,139,.26);transition:transform var(--transition),box-shadow var(--transition),background var(--transition)}
+      .mind-insert-btn:hover{background:rgba(201,168,106,.28);box-shadow:0 0 32px rgba(227,198,139,.35)}
+      .mind-insert-btn:focus-visible{outline:3px solid rgba(227,198,139,.45);outline-offset:2px}
+      #drag-overlay{position:absolute;inset:0;pointer-events:none;overflow:visible}
+      #drag-overlay .ghost-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:0;filter:url(#mindSoftGlow);stroke-linecap:round;stroke-linejoin:round}
+      #drag-overlay .ghost-core{stroke:url(#mindGoldTrace);stroke-width:1.6;opacity:0;filter:url(#mindSoftGlow);stroke-linecap:round;stroke-linejoin:round}
+      #drag-overlay .ghost-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.9;opacity:0;stroke-linecap:round;stroke-linejoin:round}
+      #drag-overlay .ghost-ring{fill:rgba(15,19,22,.68);stroke:rgba(227,198,139,.78);stroke-width:1.6;opacity:0;filter:url(#mindSoftGlow)}
       .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
       .mind-relations .relation-group{pointer-events:none}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -3895,6 +3904,18 @@ if ($view === 'map_edit') {
       .node-context-menu button:hover{border-color:rgba(201,168,106,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
       .node-context-menu[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding:16px 16px 28px;gap:12px}
       .node-context-menu[data-mode="sheet"] button{width:100%}
+      .mind-insert-menu{position:fixed;z-index:170;display:none;min-width:240px;padding:16px;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 52px rgba(0,0,0,.62);backdrop-filter:blur(10px)}
+      .mind-insert-menu[data-open="true"]{display:block}
+      .mind-insert-menu form{display:grid;gap:14px}
+      .mind-insert-menu .insert-menu-hint{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase}
+      .mind-insert-menu .insert-menu-hint strong{color:var(--gold-400);font-weight:600}
+      .mind-insert-menu label{display:grid;gap:6px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
+      .mind-insert-menu input[type="text"]{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.78);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .mind-insert-menu input[type="text"]:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 2px rgba(227,198,139,.2)}
+      .mind-insert-menu .insert-menu-actions{display:flex;justify-content:flex-end;gap:10px}
+      .mind-insert-menu button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .mind-insert-menu button:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16)}
+      .mind-insert-menu button.accent{background:linear-gradient(135deg,rgba(201,168,106,.26),rgba(170,140,84,.32));color:#120c05}
       .mind-settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:130;background:rgba(5,6,8,.6);backdrop-filter:blur(8px)}
       .mind-settings[aria-hidden="false"]{display:flex}
       .mind-settings .settings-panel{background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 32px 60px rgba(0,0,0,.65);padding:20px 22px;display:grid;gap:16px;min-width:280px;max-width:360px}
@@ -4737,6 +4758,9 @@ if ($view === 'map_edit') {
           this.nodeLayer=document.createElement('div');
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
+          this.insertLayer=document.createElement('div');
+          this.insertLayer.className='mind-inserts';
+          this.viewport.appendChild(this.insertLayer);
           this.container.appendChild(this.viewport);
           this.sizeCache=new Map();
           this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
@@ -5024,6 +5048,67 @@ if ($view === 'map_edit') {
           this.select_node(newId);
           this.emit(SimpleMind.event_type.update);
           return node;
+        }
+        insert_node_between(parentNode,childNode,options){
+          const parent=typeof parentNode==='string'?this.get_node(parentNode):parentNode;
+          const child=typeof childNode==='string'?this.get_node(childNode):childNode;
+          if(!parent || !child || child.parent!==parent) return null;
+          if(parent.isroot && child.isroot) return null;
+          const parentChildren=this.ensureModelChildren(parent);
+          const childModelIndex=parentChildren.findIndex(entry=>entry && entry.id===child.id);
+          const childIndex=parent.children.indexOf(child);
+          if(childModelIndex===-1 || childIndex===-1) return null;
+          const newId=options && typeof options.id==='string' && options.id ? options.id : 'node-'+Math.random().toString(36).slice(2,10);
+          const topicRaw=options && typeof options.topic==='string' ? options.topic.trim() : '';
+          const topic=topicRaw!=='' ? topicRaw : '新节点';
+          const baseData=options && options.data && typeof options.data==='object' ? JSON.parse(JSON.stringify(options.data)) : {};
+          const normalized=normalizeNodeData(baseData);
+          const [childModel]=parentChildren.splice(childModelIndex,1);
+          if(!childModel) return null;
+          child.model=childModel;
+          const newModel={
+            id:newId,
+            topic,
+            data:normalized,
+            children:[childModel],
+            direction:childModel && childModel.direction ? childModel.direction : (child.direction || 'right'),
+            expanded:true,
+          };
+          if(options && options.style && typeof options.style==='object'){
+            newModel.style=JSON.parse(JSON.stringify(options.style));
+          }
+          if(options && options.meta && typeof options.meta==='object'){
+            newModel.meta=JSON.parse(JSON.stringify(options.meta));
+          }
+          parentChildren.splice(childModelIndex,0,newModel);
+          const newNode={
+            id:newId,
+            topic,
+            data:newModel.data,
+            parent:parent,
+            children:[child],
+            direction:newModel.direction || 'right',
+            expanded:true,
+            isroot:false,
+            style:newModel.style || null,
+            meta:newModel.meta || null,
+            model:newModel,
+            depth:(parent.depth||0)+1,
+          };
+          parent.children.splice(childIndex,1,newNode);
+          child.parent=newNode;
+          const syncDepth=(node, depth)=>{
+            if(!node) return;
+            node.depth=depth;
+            if(node.children && node.children.length){ node.children.forEach(n=>syncDepth(n, depth+1)); }
+          };
+          syncDepth(newNode,newNode.depth);
+          this.nodes.set(newId,newNode);
+          this.computeLayout();
+          this.render();
+          this.select_node(newId);
+          this.emit(SimpleMind.event_type.update);
+          return newNode;
         }
         remove_node(id){
           const node=this.nodes.get(id);
@@ -5585,6 +5670,7 @@ if ($view === 'map_edit') {
           return el;
         }
         render(){
+          if(this.insertLayer){ this.insertLayer.innerHTML=''; }
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
           if(this.relationLayer){ while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); } }
@@ -5620,12 +5706,39 @@ if ($view === 'map_edit') {
               group.dataset.from=node.parent.id;
               group.dataset.to=node.id;
               this.linkLayer.appendChild(group);
+              let insertBtn=null;
+              if(this.insertLayer){
+                insertBtn=document.createElement('button');
+                insertBtn.type='button';
+                insertBtn.className='mind-insert-btn';
+                insertBtn.textContent='+';
+                insertBtn.setAttribute('aria-label',`在 ${node.parent.topic||'父节点'} 与 ${node.topic||'子节点'} 之间插入节点`);
+                insertBtn.dataset.parentId=node.parent.id;
+                insertBtn.dataset.childId=node.id;
+                insertBtn.addEventListener('click',evt=>{
+                  evt.preventDefault();
+                  evt.stopPropagation();
+                  const detail={
+                    parentId:node.parent.id,
+                    childId:node.id,
+                    parentTopic:node.parent.topic||'',
+                    childTopic:node.topic||'',
+                    button:insertBtn,
+                  };
+                  const customEvent=new CustomEvent('mind:insert-request',{detail,bubbles:true});
+                  this.container.dispatchEvent(customEvent);
+                });
+                this.insertLayer.appendChild(insertBtn);
+              }
               node.linkGroup=group;
               node.linkShadow=shadow;
               node.linkPath=core;
               node.linkHighlight=highlight;
-              this.linkRegistry.set(node.id,{group,shadow,core,highlight});
+              node.linkInsertBtn=insertBtn;
+              this.linkRegistry.set(node.id,{group,shadow,core,highlight,button:insertBtn});
               this.updateLinkPath(node);
+            }else{
+              node.linkInsertBtn=null;
             }
             if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
             if(node.expanded){
@@ -5688,6 +5801,44 @@ if ($view === 'map_edit') {
             bottom:{x:node.absX,y:node.absY + height/2},
           };
         }
+        applyInsertButtonScale(button){
+          if(!button) return;
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const inverse=scale>0?(1/scale):1;
+          button.style.transform=`translate(-50%, -50%) scale(${inverse})`;
+        }
+        positionInsertButton(node){
+          if(!node || !node.linkInsertBtn || !node.linkPath) return;
+          const button=node.linkInsertBtn;
+          try{
+            const total=node.linkPath.getTotalLength();
+            if(!isFinite(total) || total<=0){
+              button.style.display='none';
+              return;
+            }
+            const midpoint=node.linkPath.getPointAtLength(total/2);
+            if(!midpoint || !isFinite(midpoint.x) || !isFinite(midpoint.y)){
+              button.style.display='none';
+              return;
+            }
+            button.style.display='';
+            button.style.left=`${midpoint.x}px`;
+            button.style.top=`${midpoint.y}px`;
+            this.applyInsertButtonScale(button);
+          }catch(err){
+            button.style.display='none';
+          }
+        }
+        updateInsertButtonScale(){
+          if(!this.insertLayer) return;
+          const buttons=this.insertLayer.querySelectorAll('.mind-insert-btn');
+          if(!buttons || !buttons.length) return;
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const inverse=scale>0?(1/scale):1;
+          Array.from(buttons).forEach(btn=>{
+            btn.style.transform=`translate(-50%, -50%) scale(${inverse})`;
+          });
+        }
         updateLinkPath(node){
           if(!node || !node.parent || !node.linkPath) return;
           if(!node.anchors) this.updateAnchors(node);
@@ -5715,6 +5866,7 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          if(node.linkInsertBtn){ this.positionInsertButton(node); }
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -5730,15 +5882,58 @@ if ($view === 'map_edit') {
           if(!start || !end) return;
           const dx=end.x-start.x;
           const dy=end.y-start.y;
-          const distance=Math.hypot(dx,dy) || 1;
-          const normalX=distance?-dy/distance:0;
-          const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=start.x + dx*0.25 + normalX*offset;
-          const ctrl1y=start.y + dy*0.25 + normalY*offset;
-          const ctrl2x=start.x + dx*0.75 - normalX*offset;
-          const ctrl2y=start.y + dy*0.75 - normalY*offset;
-          const pathData=`M${start.x} ${start.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${end.x} ${end.y}`;
+          const distance=Math.hypot(dx,dy) || 0;
+          const computeEdgeOffset=(node,ux,uy,margin)=>{
+            if(!node) return margin;
+            const width=node.width || (node.el?node.el.offsetWidth:0) || 0;
+            const height=node.height || (node.el?node.el.offsetHeight:0) || 0;
+            if(width<=0 && height<=0) return margin;
+            const halfW=Math.max(1,width/2);
+            const halfH=Math.max(1,height/2);
+            let limit=Number.POSITIVE_INFINITY;
+            if(Math.abs(ux)>0.0001){ limit=Math.min(limit, halfW/Math.abs(ux)); }
+            if(Math.abs(uy)>0.0001){ limit=Math.min(limit, halfH/Math.abs(uy)); }
+            if(!isFinite(limit)){ limit=0; }
+            return limit + margin;
+          };
+          let adjustedStart={...start};
+          let adjustedEnd={...end};
+          if(distance>0.01){
+            const ux=dx/distance;
+            const uy=dy/distance;
+            let sourceOffset=computeEdgeOffset(fromNode,ux,uy,6);
+            let targetOffset=computeEdgeOffset(toNode,ux,uy,14);
+            const maxTotal=Math.max(0, distance-12);
+            const combined=sourceOffset+targetOffset;
+            if(combined>maxTotal && combined>0){
+              const scale=maxTotal/combined;
+              sourceOffset*=scale;
+              targetOffset*=scale;
+            }
+            if(sourceOffset>0){
+              adjustedStart={
+                x:start.x + ux*sourceOffset,
+                y:start.y + uy*sourceOffset,
+              };
+            }
+            if(targetOffset>0){
+              adjustedEnd={
+                x:end.x - ux*targetOffset,
+                y:end.y - uy*targetOffset,
+              };
+            }
+          }
+          const finalDx=adjustedEnd.x-adjustedStart.x;
+          const finalDy=adjustedEnd.y-adjustedStart.y;
+          const finalDistance=Math.hypot(finalDx,finalDy) || 1;
+          const normalX=finalDistance?-finalDy/finalDistance:0;
+          const normalY=finalDistance?finalDx/finalDistance:0;
+          const offset=Math.min(140, Math.max(30, finalDistance*0.2));
+          const ctrl1x=adjustedStart.x + finalDx*0.25 + normalX*offset;
+          const ctrl1y=adjustedStart.y + finalDy*0.25 + normalY*offset;
+          const ctrl2x=adjustedStart.x + finalDx*0.75 - normalX*offset;
+          const ctrl2y=adjustedStart.y + finalDy*0.75 - normalY*offset;
+          const pathData=`M${adjustedStart.x} ${adjustedStart.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${adjustedEnd.x} ${adjustedEnd.y}`;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
@@ -5873,6 +6068,7 @@ if ($view === 'map_edit') {
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
           this.viewport.style.transform=transform;
+          this.updateInsertButtonScale();
         }
         zoom(step){
           const prev=this.scale;
@@ -6010,11 +6206,24 @@ if ($view === 'map_edit') {
     overlay.setAttribute('width','100%');
     overlay.setAttribute('height','100%');
     overlay.setAttribute('viewBox','0 0 100 100');
-    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ghostLine.setAttribute('opacity','0');
+    const ghostGroup=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const ghostShadow=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostShadow.classList.add('ghost-shadow');
+    ghostShadow.setAttribute('opacity','0');
+    const ghostCore=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostCore.classList.add('ghost-core');
+    ghostCore.setAttribute('stroke','url(#mindGoldTrace)');
+    ghostCore.setAttribute('opacity','0');
+    const ghostHighlight=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostHighlight.classList.add('ghost-highlight');
+    ghostHighlight.setAttribute('opacity','0');
+    ghostGroup.appendChild(ghostShadow);
+    ghostGroup.appendChild(ghostCore);
+    ghostGroup.appendChild(ghostHighlight);
     const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ghostRing.classList.add('ghost-ring');
     ghostRing.setAttribute('opacity','0');
-    overlay.appendChild(ghostLine);
+    overlay.appendChild(ghostGroup);
     overlay.appendChild(ghostRing);
     const jm=new jsMind({
       container:'jsmind-container',
@@ -6286,6 +6495,7 @@ if ($view === 'map_edit') {
         handleSource=null;
         hideGhost();
         pointerDragState=null;
+        closeInsertMenu();
       }
       function updateHandlePosition(){
         const node=jm.get_selected_node();
@@ -6327,20 +6537,58 @@ if ($view === 'map_edit') {
         const rect=el.getBoundingClientRect();
         return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
       }
+      function nodeEdgePointSvg(nodeId, originPoint, margin=14){
+        if(!nodeId || !originPoint) return null;
+        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+        if(!el) return null;
+        const rect=el.getBoundingClientRect();
+        const centerSvg=svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
+        const dx=originPoint.x - centerSvg.x;
+        const dy=originPoint.y - centerSvg.y;
+        const distance=Math.hypot(dx,dy);
+        if(distance<0.01){ return {x:centerSvg.x,y:centerSvg.y}; }
+        const ux=dx/distance;
+        const uy=dy/distance;
+        const halfW=rect.width/2;
+        const halfH=rect.height/2;
+        let limit=Number.POSITIVE_INFINITY;
+        if(Math.abs(ux)>0.0001){ limit=Math.min(limit, halfW/Math.abs(ux)); }
+        if(Math.abs(uy)>0.0001){ limit=Math.min(limit, halfH/Math.abs(uy)); }
+        if(!isFinite(limit)){ limit=0; }
+        let offset=limit + margin;
+        const maxOffset=Math.max(limit, distance-4);
+        if(offset>maxOffset){ offset=maxOffset; }
+        return {
+          x:centerSvg.x + ux*offset,
+          y:centerSvg.y + uy*offset,
+        };
+      }
       function showGhost(start,end){
         if(!start || !end){ hideGhost(); return; }
-        ghostLine.setAttribute('x1', start.x);
-        ghostLine.setAttribute('y1', start.y);
-        ghostLine.setAttribute('x2', end.x);
-        ghostLine.setAttribute('y2', end.y);
-        ghostLine.setAttribute('opacity','1');
+        ghostShadow.setAttribute('x1', start.x);
+        ghostShadow.setAttribute('y1', start.y);
+        ghostShadow.setAttribute('x2', end.x);
+        ghostShadow.setAttribute('y2', end.y);
+        ghostShadow.setAttribute('opacity','1');
+        ghostCore.setAttribute('x1', start.x);
+        ghostCore.setAttribute('y1', start.y);
+        ghostCore.setAttribute('x2', end.x);
+        ghostCore.setAttribute('y2', end.y);
+        ghostCore.setAttribute('opacity','1');
+        ghostHighlight.setAttribute('x1', start.x);
+        ghostHighlight.setAttribute('y1', start.y);
+        ghostHighlight.setAttribute('x2', end.x);
+        ghostHighlight.setAttribute('y2', end.y);
+        ghostHighlight.setAttribute('opacity','1');
         ghostRing.setAttribute('cx', end.x);
         ghostRing.setAttribute('cy', end.y);
         ghostRing.setAttribute('r', 16);
         ghostRing.setAttribute('opacity','1');
       }
       function hideGhost(){
-        ghostLine.setAttribute('opacity','0');
+        ghostShadow.setAttribute('opacity','0');
+        ghostCore.setAttribute('opacity','0');
+        ghostHighlight.setAttribute('opacity','0');
         ghostRing.setAttribute('opacity','0');
       }
       dragHandle.addEventListener('pointerdown',e=>{
@@ -6391,8 +6639,12 @@ if ($view === 'map_edit') {
           const targetEl=hovered.closest('.jsmind-node');
           if(targetEl){
             const targetId=targetEl.getAttribute('nodeid');
-            const center=nodeCenterSvg(targetId);
-            if(center) ringPoint=center;
+            const edge=nodeEdgePointSvg(targetId, pointerDragState.origin);
+            if(edge){ ringPoint=edge; }
+            else{
+              const center=nodeCenterSvg(targetId);
+              if(center) ringPoint=center;
+            }
           }
         }
         pointerDragState.lastPoint=ringPoint;
@@ -6403,6 +6655,99 @@ if ($view === 'map_edit') {
       window.addEventListener('resize',scheduleHandleRefresh);
       document.addEventListener('scroll',scheduleHandleRefresh, true);
       scheduleHandleRefresh();
+      const insertMenu=document.createElement('div');
+      insertMenu.id='mind-insert-menu';
+      insertMenu.className='mind-insert-menu';
+      insertMenu.setAttribute('aria-hidden','true');
+      insertMenu.setAttribute('hidden','hidden');
+      insertMenu.style.transform='translate(-50%, -110%)';
+      insertMenu.innerHTML=`<form data-insert-form>
+        <div class="insert-menu-hint" data-insert-hint></div>
+        <label>
+          <span>节点标题</span>
+          <input type="text" name="topic" placeholder="新节点" autocomplete="off">
+        </label>
+        <div class="insert-menu-actions">
+          <button type="submit" class="accent">插入节点</button>
+          <button type="button" data-action="cancel">取消</button>
+        </div>
+      </form>`;
+      document.body.appendChild(insertMenu);
+      const insertMenuForm=insertMenu.querySelector('[data-insert-form]');
+      const insertMenuInput=insertMenu.querySelector('input[name="topic"]');
+      const insertMenuHint=insertMenu.querySelector('[data-insert-hint]');
+      const insertMenuCancel=insertMenu.querySelector('button[data-action="cancel"]');
+      let insertMenuState=null;
+      const insertMenuEntities={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'};
+      insertMenuEntities['\'']='&#39;';
+      const escapeInsertMenuHtml=(text)=>String(text||'').replace(/[&<>"']/g,match=>insertMenuEntities[match]||match);
+      function isInsertMenuOpen(){ return !!insertMenuState; }
+      function closeInsertMenu(){
+        if(insertMenuState){ insertMenuState=null; }
+        insertMenu.dataset.open='false';
+        insertMenu.setAttribute('aria-hidden','true');
+        insertMenu.setAttribute('hidden','hidden');
+      }
+      function updateInsertMenuPosition(){
+        if(!insertMenuState || !insertMenuState.button || !insertMenuState.button.isConnected){
+          closeInsertMenu();
+          return;
+        }
+        const rect=insertMenuState.button.getBoundingClientRect();
+        insertMenu.style.left=`${rect.left + rect.width/2}px`;
+        insertMenu.style.top=`${rect.top}px`;
+      }
+      function openInsertMenu(detail){
+        if(!detail) return;
+        closeInsertMenu();
+        insertMenuState={
+          parentId:detail.parentId,
+          childId:detail.childId,
+          parentTopic:detail.parentTopic||'',
+          childTopic:detail.childTopic||'',
+          button:detail.button||null,
+        };
+        if(insertMenuHint){
+          insertMenuHint.innerHTML=`插入 <strong>${escapeInsertMenuHtml(insertMenuState.parentTopic||'父节点')}</strong> → <strong>${escapeInsertMenuHtml(insertMenuState.childTopic||'子节点')}</strong> 之间的节点`;
+        }
+        if(insertMenuInput){ insertMenuInput.value=''; }
+        insertMenu.dataset.open='true';
+        insertMenu.removeAttribute('hidden');
+        insertMenu.setAttribute('aria-hidden','false');
+        updateInsertMenuPosition();
+        requestAnimationFrame(()=>{
+          if(insertMenuInput){
+            try{ insertMenuInput.focus({preventScroll:true}); }
+            catch(_){ insertMenuInput.focus(); }
+          }
+        });
+      }
+      if(insertMenuForm){
+        insertMenuForm.addEventListener('submit',e=>{
+          e.preventDefault();
+          if(!insertMenuState) return;
+          const topic=(insertMenuInput ? insertMenuInput.value.trim() : '') || '新节点';
+          insertNodeBetween(insertMenuState.parentId, insertMenuState.childId, { topic, meta:{source:'insert-between'} });
+          closeInsertMenu();
+        });
+      }
+      if(insertMenuCancel){
+        insertMenuCancel.addEventListener('click',e=>{ e.preventDefault(); closeInsertMenu(); });
+      }
+      document.addEventListener('pointerdown',e=>{
+        if(!isInsertMenuOpen()) return;
+        if(insertMenu.contains(e.target)) return;
+        if(insertMenuState && insertMenuState.button && insertMenuState.button.contains(e.target)) return;
+        closeInsertMenu();
+      }, true);
+      window.addEventListener('resize',()=>{ if(isInsertMenuOpen()) updateInsertMenuPosition(); });
+      document.addEventListener('scroll',()=>{ if(isInsertMenuOpen()) updateInsertMenuPosition(); }, true);
+      if(jmContainer){
+        jmContainer.addEventListener('mind:insert-request',evt=>{
+          if(!evt || !evt.detail) return;
+          openInsertMenu(evt.detail);
+        });
+      }
       const titleInput=document.getElementById('map-title');
       const saveState=document.getElementById('save-state');
       const importInput=document.getElementById('import-input');
@@ -7141,14 +7486,42 @@ if ($view === 'map_edit') {
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(newNode.id));
         if(typeof requestAnimationFrame==='function'){
-          requestAnimationFrame(()=>{
-            const target=jm.get_node(newNode.id);
-            if(target && typeof jm.center_node==='function'){
-              const centered=jm.center_node(target);
-              if(centered){ scheduleHandleRefresh(); }
-            }
-          });
+        requestAnimationFrame(()=>{
+          const target=jm.get_node(newNode.id);
+          if(target && typeof jm.center_node==='function'){
+            const centered=jm.center_node(target);
+            if(centered){ scheduleHandleRefresh(); }
+          }
+        });
         }
+        return newNode;
+      }
+      function insertNodeBetween(parentId, childId, options){
+        commitInlineEditing();
+        if(!parentId || !childId) return null;
+        const payload=options && typeof options==='object' ? JSON.parse(JSON.stringify(options)) : {};
+        if(!payload.topic || typeof payload.topic!=='string'){ payload.topic='新节点'; }
+        const meta=payload.meta && typeof payload.meta==='object' ? payload.meta : {};
+        if(!meta.source){ meta.source='insert-between'; }
+        payload.meta=meta;
+        const newNode=jm.insert_node_between(parentId, childId, payload);
+        if(!newNode) return null;
+        const command={
+          type:'insertBetween',
+          id:newNode.id,
+          parentId,
+          childId,
+          topic:newNode.topic,
+          data:payload.data ? deepClone(payload.data) : null,
+          style:payload.style ? deepClone(payload.style) : null,
+          meta:deepClone(payload.meta),
+          timestamp:Date.now(),
+        };
+        commandLog.push(command);
+        window.__mindmapCommands=commandLog;
+        markDirty();
+        scheduleHandleRefresh();
+        refreshInspector(jm.get_node(newNode.id));
         return newNode;
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
@@ -7615,6 +7988,9 @@ if ($view === 'map_edit') {
         jm.add_event_listener(type=>{
           if(isContextMenuOpen() && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
             closeNodeContextMenu();
+          }
+          if(isInsertMenuOpen() && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
+            closeInsertMenu();
           }
           if(type===jsMind.event_type.select){
             const selected=jm.get_selected_node();
