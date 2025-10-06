@@ -3798,10 +3798,15 @@ if ($view === 'map_edit') {
       .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
       .mind-relations .relation-group{pointer-events:none}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-      .mind-relations .relation-shadow{stroke:rgba(75,195,209,.28);stroke-width:2.4;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-core{stroke:rgba(75,195,209,.85);stroke-width:1.7;stroke-dasharray:8 10;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-highlight{stroke:rgba(255,255,255,.4);stroke-width:0.9;opacity:.6}
+      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.7;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;opacity:.85}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
+      .mind-insert-handles{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:25}
+      .mind-insert-handle{position:absolute;width:32px;height:32px;border-radius:50%;border:1px solid rgba(201,168,106,.58);background:rgba(201,168,106,.18);color:var(--gold-400);display:grid;place-items:center;font:600 18px/1 'Inter','Noto Sans SC',sans-serif;box-shadow:0 0 18px rgba(227,198,139,.28);cursor:pointer;pointer-events:auto;transition:transform var(--transition),box-shadow var(--transition),background-color var(--transition);backdrop-filter:blur(6px);--insert-transform:translate(-50%,-50%);transform:var(--insert-transform)}
+      .mind-insert-handle:hover{background:rgba(201,168,106,.28);box-shadow:0 0 24px rgba(227,198,139,.42)}
+      .mind-insert-handle:active{transform:var(--insert-transform) scale(.95)}
+      .mind-insert-handle:focus-visible{outline:3px solid rgba(201,168,106,.45);outline-offset:2px}
       .mind-nodes{position:absolute;top:0;left:0}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.18)}
@@ -3926,8 +3931,8 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
-          <path d="M0 0 L12 6 L0 12 Z" fill="rgba(75,195,209,.9)" />
+        <marker id="mindRelationArrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth">
+          <path d="M12 7 L0 14 L0 0 Z" fill="#C9A86A" />
         </marker>
       </defs>
     </svg>
@@ -4723,6 +4728,9 @@ if ($view === 'map_edit') {
           this.relationLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.relationLayer.classList.add('mind-relations');
           this.viewport.appendChild(this.relationLayer);
+          this.insertLayer=document.createElement('div');
+          this.insertLayer.className='mind-insert-handles';
+          this.viewport.appendChild(this.insertLayer);
           this.guideLayer=document.createElement('div');
           this.guideLayer.className='mind-guides';
           this.guideLayer.style.position='absolute';
@@ -5438,6 +5446,10 @@ if ($view === 'map_edit') {
             this.relationLayer.style.width=`${this.bounds.width}px`;
             this.relationLayer.style.height=`${this.bounds.height}px`;
           }
+          if(this.insertLayer){
+            this.insertLayer.style.width=`${this.bounds.width}px`;
+            this.insertLayer.style.height=`${this.bounds.height}px`;
+          }
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
@@ -5586,6 +5598,8 @@ if ($view === 'map_edit') {
         }
         render(){
           this.nodeLayer.innerHTML='';
+          if(this.insertLayer){ this.insertLayer.innerHTML=''; }
+          for(const node of this.nodes.values()){ if(node){ node.insertHandle=null; node.linkRoute=null; } }
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
           if(this.relationLayer){ while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); } }
           if(this.resizeObserver){ this.resizeObserver.disconnect(); }
@@ -5708,6 +5722,7 @@ if ($view === 'map_edit') {
           }
           const start={x:baseStart.x,y:baseStart.y+portYOffset};
           const route=buildTraceRoute(start,end,isLeft?-1:1);
+          node.linkRoute=route;
           let pathData=buildChamferedPath(route, TRACE_CHAMFER);
           if(!pathData){
             pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`;
@@ -5715,6 +5730,111 @@ if ($view === 'map_edit') {
           node.linkPath.setAttribute('d', pathData);
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          this.updateInsertHandle(node, route);
+        }
+        computeRouteMidpoint(points){
+          if(!Array.isArray(points) || points.length<2) return null;
+          let total=0;
+          const segments=[];
+          for(let i=1;i<points.length;i++){
+            const a=points[i-1];
+            const b=points[i];
+            if(!a || !b) continue;
+            const length=Math.hypot(b.x-a.x, b.y-a.y);
+            if(!(length>0)) continue;
+            total+=length;
+            segments.push({a,b,length});
+          }
+          if(!segments.length){
+            const midIndex=Math.floor(points.length/2);
+            return points[midIndex]||points[points.length-1];
+          }
+          const half=total/2;
+          let acc=0;
+          for(const seg of segments){
+            if(acc + seg.length >= half){
+              const ratio=seg.length>0?(half-acc)/seg.length:0;
+              return {
+                x:seg.a.x + (seg.b.x-seg.a.x)*ratio,
+                y:seg.a.y + (seg.b.y-seg.a.y)*ratio
+              };
+            }
+            acc+=seg.length;
+          }
+          const last=segments[segments.length-1];
+          return last ? last.b : points[points.length-1];
+        }
+        ensureInsertHandle(node){
+          if(!this.insertLayer || !node || !node.parent) return null;
+          if(node.insertHandle && node.insertHandle.parentElement!==this.insertLayer){
+            node.insertHandle.remove();
+            node.insertHandle=null;
+          }
+          if(!node.insertHandle){
+            const btn=document.createElement('button');
+            btn.type='button';
+            btn.className='mind-insert-handle';
+            btn.setAttribute('aria-label','在此插入节点');
+            btn.title='在此插入节点';
+            btn.textContent='+';
+            btn.tabIndex=0;
+            btn.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              if(typeof this.options.onInsertBetween==='function'){
+                try{ this.options.onInsertBetween(node.parent, node); }
+                catch(err){ console.error(err); }
+              }
+            });
+            this.insertLayer.appendChild(btn);
+            node.insertHandle=btn;
+          }
+          node.insertHandle.dataset.childId=node.id;
+          node.insertHandle.dataset.parentId=node.parent.id;
+          return node.insertHandle;
+        }
+        updateInsertHandle(node, route){
+          if(!this.insertLayer || !node || !node.parent){ return; }
+          if(!Array.isArray(route) || route.length<2){
+            if(node.insertHandle){ node.insertHandle.style.display='none'; }
+            return;
+          }
+          const handle=this.ensureInsertHandle(node);
+          if(!handle){ return; }
+          const mid=this.computeRouteMidpoint(route);
+          if(!mid || !Number.isFinite(mid.x) || !Number.isFinite(mid.y)){
+            handle.style.display='none';
+            return;
+          }
+          handle.style.display='grid';
+          handle.style.setProperty('--insert-transform', `translate(${mid.x}px, ${mid.y}px) translate(-50%, -50%)`);
+        }
+        computeRelationEndpoint(node, targetNode, extra=0){
+          if(!node) return null;
+          if(!node.anchors) this.updateAnchors(node);
+          if(targetNode && !targetNode.anchors) this.updateAnchors(targetNode);
+          const anchors=node.anchors || {};
+          const center=anchors.center || null;
+          const targetCenter=targetNode && targetNode.anchors ? targetNode.anchors.center : null;
+          if(!center){ return null; }
+          if(!targetCenter){ return center; }
+          let dx=targetCenter.x - center.x;
+          let dy=targetCenter.y - center.y;
+          if(Math.abs(dx)<0.0001 && Math.abs(dy)<0.0001){ dx=1; dy=0; }
+          const distance=Math.hypot(dx,dy) || 1;
+          const ux=dx/distance;
+          const uy=dy/distance;
+          const halfWidth=Math.max(1, (anchors.right?.x ?? center.x) - center.x);
+          const halfHeight=Math.max(1, (anchors.bottom?.y ?? center.y) - center.y);
+          let edgeDist=Math.min(
+            Math.abs(ux)>1e-6 ? halfWidth/Math.abs(ux) : Infinity,
+            Math.abs(uy)>1e-6 ? halfHeight/Math.abs(uy) : Infinity
+          );
+          if(!isFinite(edgeDist)) edgeDist=Math.max(halfWidth, halfHeight);
+          const maxDist=Math.max(0, distance - 6);
+          const desired=edgeDist + (extra||0);
+          const finalDist=Math.max(edgeDist*0.6, Math.min(desired, maxDist));
+          return { x:center.x + ux*finalDist, y:center.y + uy*finalDist };
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -5725,19 +5845,19 @@ if ($view === 'map_edit') {
           if(!fromNode || !toNode) return;
           if(!fromNode.anchors) this.updateAnchors(fromNode);
           if(!toNode.anchors) this.updateAnchors(toNode);
-          const start=fromNode.anchors ? fromNode.anchors.center : null;
-          const end=toNode.anchors ? toNode.anchors.center : null;
+          const start=this.computeRelationEndpoint(fromNode,toNode,12) || (fromNode.anchors ? fromNode.anchors.center : null);
+          const end=this.computeRelationEndpoint(toNode,fromNode,16) || (toNode.anchors ? toNode.anchors.center : null);
           if(!start || !end) return;
           const dx=end.x-start.x;
           const dy=end.y-start.y;
           const distance=Math.hypot(dx,dy) || 1;
           const normalX=distance?-dy/distance:0;
           const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=start.x + dx*0.25 + normalX*offset;
-          const ctrl1y=start.y + dy*0.25 + normalY*offset;
-          const ctrl2x=start.x + dx*0.75 - normalX*offset;
-          const ctrl2y=start.y + dy*0.75 - normalY*offset;
+          const offset=Math.min(160, Math.max(40, distance*0.28));
+          const ctrl1x=start.x + dx*0.35 + normalX*offset;
+          const ctrl1y=start.y + dy*0.35 + normalY*offset;
+          const ctrl2x=start.x + dx*0.65 - normalX*offset;
+          const ctrl2y=start.y + dy*0.65 - normalY*offset;
           const pathData=`M${start.x} ${start.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${end.x} ${end.y}`;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
@@ -6023,6 +6143,7 @@ if ($view === 'map_edit') {
         support_html:true,
         mode:'full',
       });
+      jm.options.onInsertBetween=insertNodeBetween;
       const blobUrlRegistry=new Set();
       const externalScriptCache=new Map();
       function loadExternalScript(src, resolver){
@@ -7150,6 +7271,72 @@ if ($view === 'map_edit') {
           });
         }
         return newNode;
+      }
+      function insertNodeBetween(parentNode, childNode){
+        const parentId=parentNode && parentNode.id ? parentNode.id : null;
+        const childId=childNode && childNode.id ? childNode.id : null;
+        if(!parentId || !childId) return;
+        const parent=jm.get_node(parentId);
+        const child=jm.get_node(childId);
+        if(!parent || !child || !child.parent || child.parent.id!==parent.id) return;
+        commitInlineEditing();
+        const siblings=parent.children ? parent.children.slice() : [];
+        const childIndex=siblings.indexOf(child);
+        if(childIndex===-1) return;
+        const created=executeCreateNodeCommand({
+          parentId:parent.id,
+          topic:'新节点',
+          meta:{source:'insert-between', target:child.id}
+        });
+        if(!created) return;
+        const freshParent=jm.get_node(parent.id) || parent;
+        const freshChild=jm.get_node(child.id) || child;
+        const freshNew=jm.get_node(created.id) || created;
+        const freshSiblings=freshParent.children || [];
+        const newIndex=freshSiblings.indexOf(freshNew);
+        if(newIndex!==-1){ freshSiblings.splice(newIndex,1); }
+        const currentChildIndex=freshSiblings.indexOf(freshChild);
+        const insertIndex=currentChildIndex!==-1 ? currentChildIndex : Math.max(0, childIndex);
+        if(currentChildIndex!==-1){ freshSiblings.splice(currentChildIndex,1); }
+        freshSiblings.splice(insertIndex,0,freshNew);
+        freshNew.parent=freshParent;
+        freshNew.children=freshNew.children || [];
+        freshNew.children.length=0;
+        freshNew.children.push(freshChild);
+        freshChild.parent=freshNew;
+        if(freshNew.model){ freshNew.model.children=freshNew.model.children||[]; freshNew.model.children.length=0; }
+        const parentModelChildren=freshParent.model && Array.isArray(freshParent.model.children) ? freshParent.model.children : null;
+        let childModelEntry=null;
+        if(parentModelChildren){
+          const childModelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===freshChild.id);
+          if(childModelIndex!==-1){ childModelEntry=parentModelChildren.splice(childModelIndex,1)[0]; }
+          const newModelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===freshNew.id);
+          let newModelEntry=null;
+          if(newModelIndex!==-1){ newModelEntry=parentModelChildren.splice(newModelIndex,1)[0]; }
+          else if(freshNew.model){ newModelEntry=freshNew.model; }
+          parentModelChildren.splice(insertIndex,0,newModelEntry);
+          if(newModelEntry){
+            if(!Array.isArray(newModelEntry.children)){ newModelEntry.children=[]; }
+            newModelEntry.children.length=0;
+            if(childModelEntry){ newModelEntry.children.push(childModelEntry); }
+            else if(freshChild.model){ newModelEntry.children.push(freshChild.model); }
+            if(newModelEntry!==freshNew.model){ freshNew.model=newModelEntry; }
+          }
+        }else if(freshNew.model){
+          freshNew.model.children=[freshChild.model].filter(Boolean);
+        }
+        freshNew.expanded=true;
+        if(freshNew.model){ freshNew.model.expanded=true; }
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(freshNew.id);
+        markDirty();
+        scheduleHandleRefresh();
+        refreshInspector(jm.get_node(freshNew.id));
+        requestAnimationFrame(()=>{
+          const node=jm.get_node(freshNew.id);
+          if(node){ startInlineEditing(node); }
+        });
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
       function isProbablyUrl(text){
