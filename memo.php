@@ -32,7 +32,105 @@ const ALLOWED_UPLOAD_MIME_MAP = [
   'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip',
   'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','text/csv'=>'csv','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
   'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg',
+  'audio/mpeg'=>'mp3','audio/mp3'=>'mp3','audio/mp4'=>'m4a','audio/x-m4a'=>'m4a','audio/m4a'=>'m4a','audio/webm'=>'webm','audio/ogg'=>'ogg','audio/x-ogg'=>'ogg','audio/wav'=>'wav','audio/x-wav'=>'wav','audio/flac'=>'flac','audio/x-flac'=>'flac','audio/aac'=>'aac',
 ];
+
+function guess_preview_mime_from_extension(?string $filename): ?string {
+  if ($filename === null || $filename === '') {
+    return null;
+  }
+  $ext = strtolower((string)pathinfo($filename, PATHINFO_EXTENSION));
+  if ($ext === '') {
+    return null;
+  }
+  return match ($ext) {
+    'png' => 'image/png',
+    'jpg', 'jpeg' => 'image/jpeg',
+    'webp' => 'image/webp',
+    'gif' => 'image/gif',
+    'svg' => 'image/svg+xml',
+    'avif' => 'image/avif',
+    'bmp' => 'image/bmp',
+    'ico', 'cur' => 'image/x-icon',
+    'mp4' => 'video/mp4',
+    'mov' => 'video/quicktime',
+    'mkv' => 'video/x-matroska',
+    'webm' => 'video/webm',
+    'avi' => 'video/x-msvideo',
+    'mpeg', 'mpg' => 'video/mpeg',
+    'mp3' => 'audio/mpeg',
+    'm4a' => 'audio/mp4',
+    'aac' => 'audio/aac',
+    'ogg', 'oga' => 'audio/ogg',
+    'wav' => 'audio/wav',
+    'flac' => 'audio/flac',
+    'pdf' => 'application/pdf',
+    'json' => 'application/json',
+    'csv' => 'text/csv',
+    'tsv' => 'text/tab-separated-values',
+    'md', 'markdown' => 'text/markdown',
+    'txt' => 'text/plain',
+    'yaml', 'yml' => 'text/yaml',
+    'log' => 'text/x-log',
+    default => null,
+  };
+}
+
+function normalize_preview_mime(string $mime, ?string $filename = null): string {
+  $normalized = strtolower(trim($mime));
+  if ($normalized !== '' && str_contains($normalized, ';')) {
+    $normalized = trim(strtok($normalized, ';'));
+  }
+  if ($normalized !== '' && $normalized !== 'application/octet-stream') {
+    return $normalized;
+  }
+  $guessed = guess_preview_mime_from_extension($filename);
+  if ($guessed !== null) {
+    return $guessed;
+  }
+  return $normalized;
+}
+
+function is_previewable_mime(string $mime, ?string $filename = null): bool {
+  $normalized = normalize_preview_mime($mime, $filename);
+  if ($normalized === '') {
+    return false;
+  }
+  if (str_starts_with($normalized, 'image/') || str_starts_with($normalized, 'video/') || str_starts_with($normalized, 'audio/')) {
+    return true;
+  }
+  return in_array($normalized, [
+    'application/pdf',
+    'application/json',
+    'text/json',
+    'text/plain',
+    'text/markdown',
+    'text/x-markdown',
+    'text/csv',
+    'text/tab-separated-values',
+    'text/yaml',
+    'application/yaml',
+    'text/x-yaml',
+    'text/x-log',
+  ], true) || (str_starts_with($normalized, 'text/') && $normalized !== 'text/html');
+}
+
+function preview_content_type(string $mime, ?string $filename = null): ?string {
+  $normalized = normalize_preview_mime($mime, $filename);
+  if ($normalized === '') {
+    return null;
+  }
+  if (str_starts_with($normalized, 'image/') || str_starts_with($normalized, 'video/') || str_starts_with($normalized, 'audio/')) {
+    return $normalized;
+  }
+  return match ($normalized) {
+    'application/pdf' => 'application/pdf',
+    'application/json', 'text/json' => 'application/json; charset=utf-8',
+    'text/csv', 'text/tab-separated-values' => $normalized . '; charset=utf-8',
+    'text/markdown', 'text/x-markdown', 'text/plain', 'text/yaml', 'application/yaml', 'text/x-yaml', 'text/x-log' => 'text/plain; charset=utf-8',
+    default => str_starts_with($normalized, 'text/') && $normalized !== 'text/html' ? 'text/plain; charset=utf-8' : null,
+  };
+}
 date_default_timezone_set('Asia/Shanghai');
 
 // —— 思维导图默认内容 ——
@@ -494,17 +592,19 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
             'assetId'=>$asset_id,
             'name'=>$asset['orig_name'],
             'size'=>(int)$asset['size'],
-            'mime'=>$asset['mime'],
+            'mime'=>normalize_preview_mime((string)$asset['mime'], $asset['orig_name']),
             'url'=>'?mindmap_asset='.$asset_id,
           ];
         }
         $asset_id=(int)($raw['assetId'] ?? ($raw['id'] ?? 0));
         if($asset_id<=0) return null;
+        $name=$raw['name'] ?? ($node['topic'] ?? '附件');
+        $rawMime=$raw['mime'] ?? ($raw['type'] ?? 'application/octet-stream');
         $normalized=[
           'assetId'=>$asset_id,
-          'name'=>$raw['name'] ?? ($node['topic'] ?? '附件'),
+          'name'=>$name,
           'size'=>(int)($raw['size'] ?? 0),
-          'mime'=>$raw['mime'] ?? ($raw['type'] ?? 'application/octet-stream'),
+          'mime'=>normalize_preview_mime((string)$rawMime, $name),
           'url'=>$raw['url'] ?? ('?mindmap_asset='.$asset_id),
         ];
         $asset_refs[$asset_id]=$node['id'];
@@ -611,23 +711,41 @@ function json_cats(): void {
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
   $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$att['mime']; $isImage=in_array($mime,['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true);
-  $filename=$att['orig_name'];
+  $mime=(string)($att['mime'] ?? '');
+  $filename=$att['orig_name'] ?? '';
+  $detectedMime=normalize_preview_mime($mime, $filename);
+  $previewMode=isset($_GET['preview']) && is_previewable_mime($mime, $filename);
+  $contentType=$previewMode ? (preview_content_type($mime, $filename) ?? ($detectedMime ?: $mime)) : null;
+  $inlineMime=$detectedMime ?: ($mime !== '' ? strtolower(trim($mime)) : '');
   header('Content-Length: '.$att['size']); header('X-Content-Type-Options: nosniff');
-  if($isImage){ header('Content-Type: '.$mime); header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
+  if($previewMode && $contentType){
+    header('Content-Type: '.$contentType);
+    header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"');
+  }
+  elseif($inlineMime !== '' && (str_starts_with($inlineMime,'image/') || str_starts_with($inlineMime,'video/') || $inlineMime==='application/pdf')){
+    header('Content-Type: '.$inlineMime);
+    header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"');
+  }
   else { header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
+  if(($_SERVER['REQUEST_METHOD'] ?? 'GET')==='HEAD'){ exit; }
   readfile($path); exit;
 }
 
 if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])) {
   $asset=get_mindmap_asset((int)$_GET['mindmap_asset']); if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
   $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$asset['mime'];
-  $filename=$asset['orig_name'];
-  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || $mime==='application/pdf';
-  header('Content-Length: '.$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
+  $mime=(string)($asset['mime'] ?? '');
+  $filename=$asset['orig_name'] ?? '';
+  $detectedMime=normalize_preview_mime($mime, $filename);
+  $previewMode=isset($_GET['preview']) && is_previewable_mime($mime, $filename);
+  $contentType=$previewMode ? (preview_content_type($mime, $filename) ?? ($detectedMime ?: $mime)) : ($detectedMime ?: $mime);
+  $inline=$previewMode || ($detectedMime !== '' && (str_starts_with($detectedMime,'image/') || str_starts_with($detectedMime,'video/') || $detectedMime==='application/pdf'));
+  header('Content-Length: '.$asset['size']);
+  header('Content-Type: '.($contentType ?: 'application/octet-stream'));
+  header('X-Content-Type-Options: nosniff');
   if($inline){ header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
   else { header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
+  if(($_SERVER['REQUEST_METHOD'] ?? 'GET')==='HEAD'){ exit; }
   readfile($path); exit;
 }
 
@@ -1051,7 +1169,8 @@ if (is_post()) {
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
         if(is_ajax()){
           $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$mime,'markdown'=>$md,'size'=>$f['size']]); exit;
+          $normalizedMime=normalize_preview_mime($mime, $orig);
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$attId,'url'=>$url,'mime'=>$normalizedMime ?: $mime,'markdown'=>$md,'size'=>$f['size'],'name'=>$orig]); exit;
         }
         break;
       }
@@ -1068,7 +1187,8 @@ if (is_post()) {
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
         if(is_ajax()){
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id']]); exit;
+          $normalizedMime=normalize_preview_mime((string)$asset['mime'], $asset['orig_name']);
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$normalizedMime ?: $asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id']]); exit;
         }
         break;
       }
@@ -1235,9 +1355,20 @@ if ($view === 'new') {
       .md-body{color:var(--text-dim);font:400 15px/1.75 'Noto Sans SC','Inter',sans-serif}
       .md-body img{max-width:100%;height:auto;border:1px solid rgba(201,168,106,.32);border-radius:var(--r-sm);box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 24px rgba(227,198,139,.12)}
       .thumbs{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
-      .thumb{position:relative;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
+      .thumb{position:relative;display:flex;flex-direction:column;border:1px solid rgba(201,168,106,.34);border-radius:var(--r-sm);overflow:hidden;background:rgba(10,14,16,.82);box-shadow:var(--shadow-1)}
       .thumb::after{content:"";position:absolute;inset:6px;border-radius:calc(var(--r-sm) - 4px);border:1px dashed rgba(201,168,106,.26);pointer-events:none}
-      .thumb img{display:block;max-width:220px;max-height:150px}
+      .thumb img{display:block;width:100%;height:auto;max-height:260px;object-fit:contain;background:rgba(12,16,18,.88)}
+      .thumb-trigger{background:none;border:none;padding:0;margin:0;cursor:pointer;width:100%;flex-shrink:0}
+      .thumb-trigger:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:4px}
+      .thumb-generic{display:flex;gap:12px;align-items:center;padding:22px 18px;justify-content:flex-start}
+      .thumb-icon{font-size:28px;filter:drop-shadow(0 4px 12px rgba(227,198,139,.24))}
+      .thumb-info{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+      .thumb-name{color:var(--text-strong);font:600 14px/1.35 'Inter','Noto Sans SC',sans-serif;letter-spacing:.04em}
+      .thumb-meta{color:var(--text-muted);font:12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .thumb-footer{margin-top:auto;padding:12px 14px 14px;background:rgba(6,10,12,.78);display:flex;flex-direction:column;gap:10px}
+      .thumb-meta-line{color:var(--text-dim);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;word-break:break-all}
+      .thumb-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+      .thumb-actions form{display:inline-flex;align-items:center}
       .att-meta{color:var(--text-muted);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
       .timeline{position:relative;margin-top:20px;margin-left:16px;padding-left:32px;color:var(--text-muted)}
       .timeline::before{content:"";position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,rgba(201,168,106,.6),rgba(201,168,106,.1));box-shadow:0 0 18px rgba(227,198,139,.28)}
@@ -1255,6 +1386,33 @@ if ($view === 'new') {
       .save-tip.dirty{color:var(--accent-crimson)}
       .save-tip.show{display:inline-block}
       .placeholder-muted{color:var(--text-muted)}
+      .attachment-preview{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,12,15,.82);backdrop-filter:blur(10px);z-index:2000;opacity:0;pointer-events:none;transition:opacity .24s ease}
+      .attachment-preview[data-open="true"]{opacity:1;pointer-events:auto}
+      .attachment-preview-dialog{position:relative;width:min(960px,90vw);height:min(86vh,90vh);display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(18,21,24,.96),rgba(9,12,14,.94));border:1px solid rgba(201,168,106,.38);border-radius:16px;box-shadow:0 28px 64px rgba(0,0,0,.55);overflow:hidden}
+      .attachment-preview-header{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px 12px;gap:16px;border-bottom:1px solid rgba(201,168,106,.22)}
+      .attachment-preview-title{color:var(--gold-400);font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;text-transform:uppercase}
+      .attachment-preview-meta{color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
+      .attachment-preview-actions{display:flex;gap:10px;flex-wrap:wrap}
+      .attachment-preview-body{position:relative;flex:1;min-height:0;padding:18px 22px 22px;display:flex;flex-direction:column;background:radial-gradient(circle at 50% 0%,rgba(201,168,106,.08),transparent 65%)}
+      .attachment-preview-content{flex:1;overflow:auto;border:1px dashed rgba(201,168,106,.2);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:center;background:rgba(12,16,18,.72)}
+      .attachment-preview-content>*{max-width:100%;max-height:100%;width:100%}
+      .attachment-preview-content img{border-radius:12px;box-shadow:0 14px 48px rgba(0,0,0,.55)}
+      .attachment-preview-content video,.attachment-preview-content audio{max-width:100%;outline:none;border-radius:12px;background:rgba(0,0,0,.36)}
+      .attachment-preview-content iframe{width:100%;height:100%;border:none;border-radius:12px;background:#fff}
+      .attachment-preview-code{width:100%;max-height:100%;overflow:auto;background:rgba(9,13,16,.92);color:#d6d6d6;font:500 13px/1.6 'JetBrains Mono','Fira Code','Consolas',monospace;border-radius:12px;padding:16px;white-space:pre-wrap;word-break:break-word;box-shadow:inset 0 0 0 1px rgba(201,168,106,.18)}
+      .attachment-preview-loading{color:var(--gold-400);font:500 14px/1.5 'Inter','Noto Sans SC',sans-serif;text-align:center;padding:18px 0}
+      .attachment-preview-message{font:500 14px/1.6 'Inter','Noto Sans SC',sans-serif;text-align:center;padding:18px;margin-bottom:12px;border-radius:12px;background:rgba(201,168,106,.14);color:var(--text-strong)}
+      .attachment-preview-message[data-state="error"]{background:rgba(209,75,75,.16);color:var(--accent-crimson)}
+      .attachment-preview-message[data-state="info"]{background:rgba(75,195,209,.14);color:#9fe8f1}
+      .attachment-preview-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(9,12,14,.72);border:1px solid rgba(201,168,106,.32);color:var(--gold-400);width:40px;height:40px;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:20px;cursor:pointer;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+      .attachment-preview-nav:hover{background:rgba(201,168,106,.22)}
+      .attachment-preview[data-open="true"] .attachment-preview-nav{display:flex}
+      .attachment-preview-nav.prev{left:18px}
+      .attachment-preview-nav.next{right:18px}
+      body.attachment-preview-open{overflow:hidden}
+      .attachment-preview-table{width:100%;border-collapse:collapse;background:rgba(12,16,18,.92);border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(201,168,106,.18)}
+      .attachment-preview-table th,.attachment-preview-table td{border:1px solid rgba(201,168,106,.24);padding:10px 12px;text-align:left;color:var(--text-strong);font:500 13px/1.4 'Inter','Noto Sans SC',sans-serif}
+      .attachment-preview-table th{background:rgba(201,168,106,.18);text-transform:uppercase;letter-spacing:.12em}
     </style>
   </head>
   <body data-density="comfortable">
@@ -1281,7 +1439,7 @@ if ($view === 'new') {
               <textarea id="md-editor" name="description" placeholder="描述 · 支持 Markdown"></textarea>
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
                 <div>
-                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*,audio/*" style="display:none">
                   <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
                   <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                 </div>
@@ -1313,6 +1471,7 @@ if ($view === 'new') {
       const saveFeedback = createSaveFeedbackController(saveTip, saveButtonEl);
       const $ = s=>document.querySelector(s);
       const $$ = s=>Array.from(document.querySelectorAll(s));
+      const memoAttachmentManager = initMemoAttachmentManager();
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
@@ -1416,7 +1575,7 @@ if ($view === 'new') {
         const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
         insertTextAtCursor(editorEl, j.markdown+"\n"); renderMD();
-        if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; $('#thumbs').prepend(div); }
+        if(memoAttachmentManager){ memoAttachmentManager.addAttachment({ id:j.id, url:j.url, mime:j.mime, size:j.size, name:j.name || f.name }); }
         e.target.value='';
       });
       $('#btn-preview-toggle').onclick=()=>{ const split=$('#split'); split.insertBefore(split.lastElementChild,split.firstElementChild); };
@@ -1453,7 +1612,7 @@ if ($view === 'new') {
                     <textarea id="md-step-${s.id}" name="notes" style="min-height:120px">${escapeHTML(s.notes||'')}</textarea>\
                     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">\
                       <div>\
-                        <input id="att-file-step-${s.id}" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">\
+                        <input id="att-file-step-${s.id}" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*,audio/*" style="display:none">\
                         <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
                         <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>\
                       </div>\
@@ -1792,7 +1951,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
                 <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
                 <div>
-                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+                  <input id="att-file-item" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*,audio/*" style="display:none">
                   <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
                   <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                 </div>
@@ -1801,25 +1960,53 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           </div>
           <div class="preview">
             <div class="md-body" id="md-view"></div>
-            <div class="thumbs" id="thumbs">
-              <?php if ($itemAtts): foreach ($itemAtts as $a): $isImg=in_array($a['mime'],['image/png','image/jpeg','image/webp','image/gif','image/svg+xml'],true); ?>
-                <div class="thumb">
-                  <?php if ($isImg): ?>
-                    <a href="?download=<?php echo $a['id']; ?>" target="_blank" title="<?php echo h($a['orig_name']); ?>"><img src="?download=<?php echo $a['id']; ?>" alt=""></a>
-                  <?php else: ?>
-                    <div style="display:flex;gap:8px;align-items:center;padding:8px">
-                      <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载 ZIP</a>
-                      <div class="att-meta"><?php echo h($a['orig_name']); ?> · <?php echo bytes_h((int)$a['size']); ?></div>
+            <?php
+              $itemAttachmentDescriptors = array_map(
+                fn($att) => [
+                  'id'=>(int)$att['id'],
+                  'name'=>$att['orig_name'],
+                  'mime'=>normalize_preview_mime((string)$att['mime'], $att['orig_name']),
+                  'size'=>(int)$att['size'],
+                  'url'=>'?download='.$att['id'],
+                ],
+                $itemAtts
+              );
+            ?>
+            <div class="thumbs" id="thumbs" data-attachment-context="item">
+              <?php foreach ($itemAtts as $index => $a):
+                $isImg = str_starts_with((string)$a['mime'], 'image/');
+                $sizeLabel = bytes_h((int)$a['size']);
+                $previewSrc = '?download='.$a['id'].'&preview=1';
+              ?>
+                <div class="thumb" data-attachment-index="<?php echo $index; ?>">
+                  <button class="thumb-trigger" type="button" title="预览附件：<?php echo h($a['orig_name']); ?>">
+                    <?php if ($isImg): ?>
+                      <img src="<?php echo $previewSrc; ?>" alt="<?php echo h($a['orig_name']); ?>">
+                    <?php else: ?>
+                      <div class="thumb-generic">
+                        <div class="thumb-icon" aria-hidden="true">📎</div>
+                        <div class="thumb-info">
+                          <div class="thumb-name"><?php echo h($a['orig_name']); ?></div>
+                          <div class="thumb-meta"><?php echo h($a['mime']); ?> · <?php echo $sizeLabel; ?></div>
+                        </div>
+                      </div>
+                    <?php endif; ?>
+                  </button>
+                  <div class="thumb-footer">
+                    <div class="thumb-meta-line"><?php echo h($a['orig_name']); ?> · <?php echo $sizeLabel; ?></div>
+                    <div class="thumb-actions">
+                      <a class="btn btn-outline btn-small" href="?download=<?php echo $a['id']; ?>">下载</a>
+                      <form method="post" style="margin:0">
+                        <input type="hidden" name="action" value="delete_attachment">
+                        <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
+                        <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
+                      </form>
                     </div>
-                  <?php endif; ?>
-                  <form method="post" style="padding:6px;text-align:right">
-                    <input type="hidden" name="action" value="delete_attachment">
-                    <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
-                    <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
-                  </form>
+                  </div>
                 </div>
-              <?php endforeach; endif; ?>
+              <?php endforeach; ?>
             </div>
+            <script type="application/json" id="item-attachment-data"><?php echo json_encode($itemAttachmentDescriptors, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px">
@@ -1859,7 +2046,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
                       <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
                       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
                         <div>
-                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" style="display:none">
+                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*,audio/*" style="display:none">
                           <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
                           <span class="att-meta">图片、PDF、ZIP、文本或视频 ≤ 15MB</span>
                         </div>
@@ -1885,6 +2072,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
     <script>
       const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
       const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+      const memoAttachmentManager = initMemoAttachmentManager();
       function createSaveFeedbackController(tipEl, buttonEl){
         const defaultLabel = buttonEl ? (buttonEl.dataset.defaultLabel || buttonEl.textContent || '保存') : '保存';
         if(buttonEl){ buttonEl.dataset.defaultLabel = defaultLabel; }
@@ -1999,7 +2187,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           insertTextAtCursor(editorEl, j.markdown+"\n");
           renderEditorPreview();
           markItemDirty();
-          if(j.mime.startsWith('image/')){ const div=document.createElement('div'); div.className='thumb'; div.innerHTML=`<a href="${j.url}" target="_blank"><img src="${j.url}" alt=""></a>`; document.getElementById('thumbs').prepend(div); }
+          if(memoAttachmentManager){ memoAttachmentManager.addAttachment({ id:j.id, url:j.url, mime:j.mime, size:j.size, name:j.name || f.name }); }
           e.target.value='';
         });
       }
@@ -2478,7 +2666,7 @@ if ($view === 'map_edit') {
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
       </div>
       <input id="import-input" type="file" accept="application/json" hidden>
-      <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*" hidden>
+      <input id="attach-file-input" type="file" accept="image/*,application/pdf,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,application/json,video/*,audio/*" hidden>
       <?php if ($mind['id']): ?>
         <form id="delete-map-form" method="post" hidden>
           <input type="hidden" name="action" value="delete_mindmap">
@@ -3473,7 +3661,7 @@ if ($view === 'map_edit') {
           }
           const badges=[];
           if(attachments.length){
-            attachments.forEach(att=>{
+            attachments.forEach((att,attIndex)=>{
               const badge=document.createElement('button');
               badge.type='button';
               badge.className='node-badge attachment';
@@ -3483,7 +3671,11 @@ if ($view === 'map_edit') {
               if(forMeasure){
                 badge.disabled=true;
               }else{
-                badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(att); });
+                badge.addEventListener('click',evt=>{
+                  evt.preventDefault();
+                  evt.stopPropagation();
+                  openMindmapAttachment(attachments, attIndex, node.topic || '');
+                });
               }
               badges.push(badge);
             });
@@ -3809,7 +4001,6 @@ if ($view === 'map_edit') {
         support_html:true,
         mode:'full',
       });
-      const blobUrlRegistry=new Set();
       const externalScriptCache=new Map();
       function loadExternalScript(src, resolver){
         if(typeof resolver==='function'){
@@ -3876,44 +4067,63 @@ if ($view === 'map_edit') {
         const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
         return `${safeTitle}-${timestamp}.${extension}`;
       }
-      function dataUrlToBlob(dataUrl){
+      function parseMindmapDataUrl(dataUrl){
         if(typeof dataUrl!=='string') return null;
         const match=dataUrl.match(/^data:(.*?);base64,(.*)$/);
         if(!match) return null;
         const mime=match[1]||'application/octet-stream';
-        const binary=atob(match[2].replace(/\s+/g,''));
-        const len=binary.length;
-        const bytes=new Uint8Array(len);
-        for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); }
-        return new Blob([bytes],{type:mime});
+        try{
+          const binary=atob(match[2].replace(/\s+/g,''));
+          const len=binary.length;
+          const bytes=new Uint8Array(len);
+          for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); }
+          const blob=new Blob([bytes],{type:mime});
+          return { blob, mime };
+        }catch(_){
+          return null;
+        }
       }
-      function openMindmapAttachment(descriptor){
-        if(!descriptor) return;
-        if(descriptor.assetId && descriptor.url){
-          const win=window.open(descriptor.url,'_blank','noopener');
-          if(!win){ window.location.href=descriptor.url; }
-          return;
-        }
-        if(descriptor.content){
-          const blob=dataUrlToBlob(descriptor.content);
-          if(!blob){ alert('附件不可用'); return; }
-          const url=URL.createObjectURL(blob);
-          blobUrlRegistry.add(url);
-          const a=document.createElement('a');
-          a.href=url;
-          a.download=descriptor.name || 'attachment';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(()=>{
-            if(blobUrlRegistry.has(url)){ URL.revokeObjectURL(url); blobUrlRegistry.delete(url); }
-          },1500);
-          return;
-        }
-        if(descriptor.url){
-          const win=window.open(descriptor.url,'_blank','noopener');
-          if(!win){ window.location.href=descriptor.url; }
-        }
+      function buildMindmapPreviewItems(rawList){
+        const items=[];
+        (rawList||[]).forEach(entry=>{
+          if(!entry) return;
+          if(typeof entry.content==='string' && entry.content.startsWith('data:')){
+            const parsed=parseMindmapDataUrl(entry.content);
+            if(!parsed) return;
+            const url=URL.createObjectURL(parsed.blob);
+            const name=entry.name || entry.filename || '附件';
+            items.push({
+              name,
+              mime:normalizePreviewMime(parsed.mime || '', name),
+              size:parsed.blob.size,
+              previewUrl:url,
+              downloadUrl:url,
+              blob:parsed.blob,
+              cleanup:()=>{ try{ URL.revokeObjectURL(url); }catch(_){ } },
+            });
+            return;
+          }
+          const baseUrl=entry.url || '';
+          const previewUrl=baseUrl ? appendQueryParam(baseUrl,'preview','1') : baseUrl;
+          const sizeValue=entry.size!==undefined ? Number(entry.size) : null;
+          const name=entry.name || entry.filename || '附件';
+          const mime=normalizePreviewMime(entry.mime || '', name);
+          items.push({
+            name,
+            mime,
+            size:Number.isFinite(sizeValue)?sizeValue:null,
+            previewUrl:previewUrl || baseUrl,
+            downloadUrl:baseUrl || previewUrl || '',
+          });
+        });
+        return items;
+      }
+      function openMindmapAttachment(list, index=0, nodeTopic=''){
+        const array=Array.isArray(list) ? list : (list ? [list] : []);
+        const normalized=buildMindmapPreviewItems(array);
+        if(!normalized.length) return;
+        const position=Math.min(Math.max(Number(index) || 0,0), normalized.length-1);
+        AttachmentPreview.open(normalized, position, { context: nodeTopic || '' });
       }
       function openMindmapLink(raw){
         if(!raw) return;
@@ -5551,10 +5761,6 @@ if ($view === 'map_edit') {
       }
       window.addEventListener('beforeunload',e=>{
         commitInlineEditing();
-        if(blobUrlRegistry.size){
-          blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
-          blobUrlRegistry.clear();
-        }
         if(dirty){ e.preventDefault(); e.returnValue=''; }
       });
       })();
@@ -6094,6 +6300,27 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
     </form>
   </div>
 </div>
+<div id="attachment-preview" class="attachment-preview" data-open="false" aria-hidden="true">
+  <div class="attachment-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="attachment-preview-title">
+    <header class="attachment-preview-header">
+      <div>
+        <div class="attachment-preview-title" id="attachment-preview-title">附件预览</div>
+        <div class="attachment-preview-meta" data-role="meta"></div>
+      </div>
+      <div class="attachment-preview-actions">
+        <a class="btn btn-outline btn-small" data-role="download" href="#" download>下载原文件</a>
+        <button type="button" class="btn btn-ghost btn-small" data-role="close">关闭</button>
+      </div>
+    </header>
+    <div class="attachment-preview-body">
+      <div class="attachment-preview-message" hidden data-state="info"></div>
+      <div class="attachment-preview-loading" hidden>加载中…</div>
+      <div class="attachment-preview-content"></div>
+    </div>
+    <button type="button" class="attachment-preview-nav prev" data-role="prev" aria-label="上一附件">‹</button>
+    <button type="button" class="attachment-preview-nav next" data-role="next" aria-label="下一附件">›</button>
+  </div>
+</div>
 <script>
 const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
 const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
@@ -6112,6 +6339,559 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); const q=document.querySelector('input[name="q"]'); if(q){ q.focus(); q.select(); }
   }
 });
+
+function formatFileSize(bytes){
+  const value=Number(bytes);
+  if(!Number.isFinite(value) || value<0){ return ''; }
+  const units=['B','KB','MB','GB','TB'];
+  let size=value;
+  let unitIndex=0;
+  while(size>=1024 && unitIndex<units.length-1){ size/=1024; unitIndex++; }
+  const formatted = unitIndex===0 ? Math.round(size).toString() : (size>=10 ? size.toFixed(0) : size.toFixed(1));
+  return `${formatted} ${units[unitIndex]}`;
+}
+
+function appendQueryParam(url, key, value){
+  if(!url){ return url; }
+  const separator=url.includes('?')?'&':'?';
+  return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
+const PREVIEW_EXTENSION_MIME_MAP={
+  png:'image/png',
+  jpg:'image/jpeg',
+  jpeg:'image/jpeg',
+  webp:'image/webp',
+  gif:'image/gif',
+  svg:'image/svg+xml',
+  avif:'image/avif',
+  bmp:'image/bmp',
+  ico:'image/x-icon',
+  cur:'image/x-icon',
+  mp4:'video/mp4',
+  mov:'video/quicktime',
+  mkv:'video/x-matroska',
+  webm:'video/webm',
+  avi:'video/x-msvideo',
+  mpeg:'video/mpeg',
+  mpg:'video/mpeg',
+  mp3:'audio/mpeg',
+  m4a:'audio/mp4',
+  aac:'audio/aac',
+  ogg:'audio/ogg',
+  oga:'audio/ogg',
+  wav:'audio/wav',
+  flac:'audio/flac',
+  pdf:'application/pdf',
+  json:'application/json',
+  csv:'text/csv',
+  tsv:'text/tab-separated-values',
+  md:'text/markdown',
+  markdown:'text/markdown',
+  txt:'text/plain',
+  yaml:'text/yaml',
+  yml:'text/yaml',
+  log:'text/x-log',
+};
+
+function guessPreviewMime(name){
+  if(typeof name!=='string'){ return ''; }
+  const match=name.toLowerCase().match(/\.([a-z0-9]+)(?:$|\?)/);
+  if(!match){ return ''; }
+  return PREVIEW_EXTENSION_MIME_MAP[match[1]] || '';
+}
+
+function normalizePreviewMime(mime,name){
+  let cleaned='';
+  if(typeof mime==='string' && mime.trim()){
+    cleaned=mime.toLowerCase().split(';',1)[0].trim();
+  }
+  if(cleaned && cleaned!=='application/octet-stream'){ return cleaned; }
+  const guessed=guessPreviewMime(name);
+  if(guessed){ return guessed; }
+  return cleaned;
+}
+
+const AttachmentPreview = (()=>{
+  const overlay=document.getElementById('attachment-preview');
+  if(!overlay){ return { open(){}, close(){}, formatSize:formatFileSize }; }
+  const titleEl=overlay.querySelector('#attachment-preview-title');
+  const metaEl=overlay.querySelector('[data-role="meta"]');
+  const downloadEl=overlay.querySelector('[data-role="download"]');
+  const closeEl=overlay.querySelector('[data-role="close"]');
+  const contentEl=overlay.querySelector('.attachment-preview-content');
+  const loadingEl=overlay.querySelector('.attachment-preview-loading');
+  const messageEl=overlay.querySelector('.attachment-preview-message');
+  const prevEl=overlay.querySelector('[data-role="prev"]');
+  const nextEl=overlay.querySelector('[data-role="next"]');
+  const state={ list:[], index:0, meta:{} };
+  let cleanupFns=[];
+  const MAX_PREVIEW_BYTES=100*1024*1024;
+
+  function detectType(item){
+    const mime=normalizePreviewMime(item?.mime || '', item?.name || '');
+    if(mime && item && item.mime!==mime){ item.mime=mime; }
+    if(!mime) return 'unknown';
+    if(mime.startsWith('image/')) return 'image';
+    if(mime.startsWith('video/')) return 'video';
+    if(mime.startsWith('audio/')) return 'audio';
+    if(mime==='application/pdf') return 'pdf';
+    if(mime==='application/json' || mime==='text/json') return 'json';
+    if(mime==='text/csv' || mime==='text/tab-separated-values') return 'csv';
+    if(mime==='text/markdown' || mime==='text/x-markdown') return 'text';
+    if(mime==='application/yaml' || mime==='text/yaml' || mime==='text/x-yaml' || mime==='text/x-log') return 'text';
+    if(mime.startsWith('text/')) return 'text';
+    return 'unknown';
+  }
+
+  function clearContent(){ if(contentEl){ contentEl.innerHTML=''; } }
+  function showLoading(text){ if(loadingEl){ loadingEl.textContent=text || '加载中…'; loadingEl.hidden=false; } }
+  function hideLoading(){ if(loadingEl){ loadingEl.hidden=true; } }
+  function showMessage(text,stateType='info'){
+    if(!messageEl) return;
+    messageEl.textContent=text;
+    messageEl.dataset.state=stateType;
+    messageEl.hidden=false;
+  }
+  function hideMessage(){ if(messageEl){ messageEl.hidden=true; } }
+  function cleanup(){ cleanupFns.forEach(fn=>{ try{ fn(); }catch(_){ } }); cleanupFns=[]; }
+  function updateNav(){
+    const hasMultiple=state.list.length>1;
+    if(prevEl){ prevEl.style.display=hasMultiple?'flex':'none'; }
+    if(nextEl){ nextEl.style.display=hasMultiple?'flex':'none'; }
+  }
+
+  async function ensurePreviewAllowed(item){
+    if(!item){
+      const err=new Error('无法预览此文件，请下载后查看。');
+      err.code='unavailable';
+      throw err;
+    }
+    const sizeLimit=MAX_PREVIEW_BYTES;
+    const knownSize=typeof item.size==='number' ? item.size : null;
+    if(knownSize!==null && knownSize>sizeLimit){
+      const err=new Error('文件超过可在线预览大小（100MB），请下载查看。');
+      err.code='too_large';
+      throw err;
+    }
+    const sourceUrl=item.previewUrl || item.downloadUrl || '';
+    if(!sourceUrl && !(item.blob instanceof Blob)){
+      const err=new Error('无法预览此文件，请下载后查看。');
+      err.code='unavailable';
+      throw err;
+    }
+    if(!sourceUrl || sourceUrl.startsWith('data:') || sourceUrl.startsWith('blob:')){
+      return;
+    }
+    if(!item._headPromise){
+      item._headPromise=(async()=>{
+        try{
+          const res=await fetch(sourceUrl,{method:'HEAD',headers:{'X-Requested-With':'fetch'},credentials:'same-origin'});
+          if(!res.ok){ return; }
+          const len=res.headers.get('Content-Length');
+          if(len){
+            const bytes=Number(len);
+            if(Number.isFinite(bytes)){
+              if(item.size==null){ item.size=bytes; }
+            }
+          }
+          const type=res.headers.get('Content-Type');
+          if(type && (!item.mime || item.mime==='application/octet-stream')){
+            const normalized=normalizePreviewMime(type,item.name||'');
+            if(normalized){ item.mime=normalized; }
+          }
+        }catch(err){
+          console.warn('HEAD 请求失败', err);
+        }
+      })();
+    }
+    try{
+      await item._headPromise;
+    }finally{
+      item._headPromise=null;
+    }
+    const refreshedSize=typeof item.size==='number' ? item.size : null;
+    if(refreshedSize!==null && refreshedSize>sizeLimit){
+      const err=new Error('文件超过可在线预览大小（100MB），请下载查看。');
+      err.code='too_large';
+      throw err;
+    }
+  }
+
+  async function readAsText(item){
+    if(item && item.blob && typeof item.blob.text==='function'){ return item.blob.text(); }
+    const url=item && (item.previewUrl || item.downloadUrl);
+    if(url){
+      const res=await fetch(url,{headers:{'X-Requested-With':'fetch'},credentials:'same-origin'});
+      if(!res.ok) throw new Error('文件加载失败');
+      const len=res.headers.get('Content-Length');
+      if(len){
+        const bytes=Number(len);
+        if(Number.isFinite(bytes)){
+          if(item && item.size==null){ item.size=bytes; }
+          if(bytes>MAX_PREVIEW_BYTES){
+            const err=new Error('文件超过可在线预览大小（100MB），请下载查看。');
+            err.code='too_large';
+            throw err;
+          }
+        }
+      }
+      return res.text();
+    }
+    throw new Error('无法加载该文件');
+  }
+
+  function parseCsvLine(line){
+    const cells=[];
+    let current='';
+    let inQuotes=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(inQuotes){
+        if(ch==='"'){
+          if(line[i+1]==='"'){ current+='"'; i++; }
+          else { inQuotes=false; }
+        }else{
+          current+=ch;
+        }
+      }else{
+        if(ch==='"'){
+          inQuotes=true;
+        }else if(ch===','){
+          cells.push(current);
+          current='';
+        }else{
+          current+=ch;
+        }
+      }
+    }
+    cells.push(current);
+    return cells;
+  }
+
+  function buildCsvTable(text){
+    const table=document.createElement('table');
+    table.className='attachment-preview-table';
+    const rows=text.replace(/\r\n?/g,'\n').split('\n');
+    let hasData=false;
+    rows.forEach((rowText,rowIndex)=>{
+      if(!rowText.length) return;
+      const cells=parseCsvLine(rowText);
+      const row=document.createElement('tr');
+      cells.forEach(cellText=>{
+        const cell=document.createElement(rowIndex===0?'th':'td');
+        cell.textContent=cellText.trim();
+        row.appendChild(cell);
+      });
+      table.appendChild(row);
+      hasData=true;
+    });
+    if(!hasData){
+      throw new Error('empty');
+    }
+    return table;
+  }
+
+  async function loadItem(item){
+    const kind=detectType(item);
+    switch(kind){
+      case 'image':{
+        const img=new Image();
+        img.alt=item?.name || '';
+        img.src=item?.previewUrl || item?.downloadUrl || '';
+        await new Promise((resolve,reject)=>{
+          img.onload=()=>resolve();
+          img.onerror=()=>reject(new Error('图片加载失败'));
+        });
+        contentEl.appendChild(img);
+        break;
+      }
+      case 'video':{
+        const video=document.createElement('video');
+        video.controls=true;
+        video.src=item?.previewUrl || item?.downloadUrl || '';
+        video.preload='metadata';
+        contentEl.appendChild(video);
+        break;
+      }
+      case 'audio':{
+        const audio=document.createElement('audio');
+        audio.controls=true;
+        audio.src=item?.previewUrl || item?.downloadUrl || '';
+        audio.preload='metadata';
+        contentEl.appendChild(audio);
+        break;
+      }
+      case 'pdf':{
+        const frame=document.createElement('iframe');
+        frame.src=item?.previewUrl || item?.downloadUrl || '';
+        frame.title=item?.name || 'PDF 预览';
+        frame.loading='lazy';
+        contentEl.appendChild(frame);
+        break;
+      }
+      case 'json':{
+        const text=await readAsText(item);
+        let formatted=text;
+        try{ formatted=JSON.stringify(JSON.parse(text), null, 2); }
+        catch(_){ }
+        const pre=document.createElement('pre');
+        pre.className='attachment-preview-code';
+        pre.textContent=formatted;
+        contentEl.appendChild(pre);
+        break;
+      }
+      case 'csv':{
+        const csvText=await readAsText(item);
+        try{
+          const table=buildCsvTable(csvText);
+          contentEl.appendChild(table);
+        }catch(_){
+          const pre=document.createElement('pre');
+          pre.className='attachment-preview-code';
+          pre.textContent=csvText;
+          contentEl.appendChild(pre);
+        }
+        break;
+      }
+      case 'text':{
+        const text=await readAsText(item);
+        const pre=document.createElement('pre');
+        pre.className='attachment-preview-code';
+        pre.textContent=text;
+        contentEl.appendChild(pre);
+        break;
+      }
+      default:
+        showMessage('无法预览此文件，请下载后查看。','info');
+        break;
+    }
+  }
+
+  async function renderCurrent(){
+    const item=state.list[state.index];
+    if(!item) return;
+    const title=item.name || '附件';
+    if(titleEl){ titleEl.textContent=title; }
+    if(metaEl){
+      const metaParts=[];
+      if(item.mime){ metaParts.push(item.mime); }
+      if(typeof item.size==='number' && item.size>=0){
+        const sizeLabel=formatFileSize(item.size);
+        if(sizeLabel){ metaParts.push(sizeLabel); }
+      }
+      metaEl.textContent=metaParts.join(' · ');
+    }
+    if(downloadEl){
+      if(item.downloadUrl){
+        downloadEl.href=item.downloadUrl;
+        if(item.name){ downloadEl.download=item.name; }
+        downloadEl.style.display='';
+      }else{
+        downloadEl.style.display='none';
+      }
+    }
+    updateNav();
+    clearContent();
+    hideMessage();
+    showLoading('加载中…');
+    try{
+      await ensurePreviewAllowed(item);
+      await loadItem(item);
+    }catch(err){
+      console.error(err);
+      if(err && err.code==='too_large'){
+        showMessage('文件超过可在线预览大小（100MB），请下载查看。','info');
+      }else if(err && err.code==='unavailable'){
+        showMessage(err.message || '无法预览此文件，请下载后查看。','info');
+      }else{
+        showMessage(err?.message || '加载失败，请稍后重试','error');
+      }
+    }finally{
+      hideLoading();
+    }
+  }
+
+  function step(delta){
+    if(state.list.length<=1) return;
+    state.index=(state.index+delta+state.list.length)%state.list.length;
+    renderCurrent();
+  }
+
+  function open(list,index=0,meta={}){
+    const normalized=Array.isArray(list)?list.filter(Boolean).map(entry=>{
+      const clone={...entry};
+      clone.mime=normalizePreviewMime(clone.mime || '', clone.name || '');
+      return clone;
+    }):[];
+    if(!normalized.length) return;
+    cleanup();
+    cleanupFns=normalized.map(entry=>typeof entry.cleanup==='function'?entry.cleanup:null).filter(Boolean);
+    state.list=normalized;
+    state.index=Math.min(Math.max(index,0), normalized.length-1);
+    state.meta=meta || {};
+    overlay.dataset.open='true';
+    overlay.setAttribute('aria-hidden','false');
+    document.body.classList.add('attachment-preview-open');
+    renderCurrent();
+  }
+
+  function close(){
+    overlay.dataset.open='false';
+    overlay.setAttribute('aria-hidden','true');
+    document.body.classList.remove('attachment-preview-open');
+    cleanup();
+    clearContent();
+    hideMessage();
+    hideLoading();
+  }
+
+  if(closeEl){ closeEl.addEventListener('click',e=>{ e.preventDefault(); close(); }); }
+  if(prevEl){ prevEl.addEventListener('click',e=>{ e.preventDefault(); step(-1); }); }
+  if(nextEl){ nextEl.addEventListener('click',e=>{ e.preventDefault(); step(1); }); }
+  overlay.addEventListener('click',e=>{ if(e.target===overlay){ close(); } });
+  document.addEventListener('keydown',e=>{
+    if(overlay.dataset.open==='true'){
+      if(e.key==='Escape'){ e.preventDefault(); close(); }
+      else if(e.key==='ArrowLeft'){ e.preventDefault(); step(-1); }
+      else if(e.key==='ArrowRight'){ e.preventDefault(); step(1); }
+    }
+  });
+
+  return { open, close, formatSize:formatFileSize };
+})();
+if(typeof window!=='undefined'){ window.AttachmentPreview=AttachmentPreview; }
+
+function initMemoAttachmentManager({ containerId='thumbs', dataScriptId='item-attachment-data' }={}){
+  const container=document.getElementById(containerId);
+  if(!container){ return null; }
+  const script=dataScriptId ? document.getElementById(dataScriptId) : null;
+  const normalize=(raw)=>{
+    if(!raw) return null;
+    const id=raw.id!==undefined ? Number(raw.id) : null;
+    const name=typeof raw.name==='string' && raw.name.trim() ? raw.name.trim() : (typeof raw.orig_name==='string' && raw.orig_name.trim() ? raw.orig_name.trim() : '附件');
+    let mime=typeof raw.mime==='string' ? raw.mime : '';
+    mime=normalizePreviewMime(mime, name);
+    const sizeValue=raw.size!==undefined ? Number(raw.size) : null;
+    const baseUrl=typeof raw.url==='string' && raw.url ? raw.url : (id ? `?download=${id}` : null);
+    const previewUrl=baseUrl ? appendQueryParam(baseUrl, 'preview', '1') : null;
+    return {
+      id,
+      name,
+      mime,
+      size:Number.isFinite(sizeValue)?sizeValue:null,
+      downloadUrl:baseUrl,
+      previewUrl:previewUrl || baseUrl,
+    };
+  };
+  let attachments=[];
+  if(script){
+    try{
+      const parsed=JSON.parse(script.textContent||'[]');
+      attachments=Array.isArray(parsed)?parsed.map(normalize).filter(Boolean):[];
+    }catch(err){
+      console.warn('Failed to parse attachment dataset', err);
+      attachments=[];
+    }
+  }
+  function rebuild(){
+    Array.from(container.querySelectorAll('.thumb')).forEach((el,idx)=>{
+      el.dataset.attachmentIndex=String(idx);
+    });
+  }
+  rebuild();
+  container.addEventListener('click',event=>{
+    const trigger=event.target.closest('.thumb-trigger');
+    if(!trigger || !container.contains(trigger)) return;
+    const thumb=trigger.closest('.thumb');
+    if(!thumb) return;
+    const idx=Number(thumb.dataset.attachmentIndex);
+    if(Number.isNaN(idx)) return;
+    event.preventDefault();
+    AttachmentPreview.open(attachments, idx, { context:'memo-item' });
+  });
+  function createThumb(item){
+    const element=document.createElement('div');
+    element.className='thumb';
+    element.dataset.attachmentIndex='0';
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='thumb-trigger';
+    button.title=`预览附件：${item.name || '附件'}`;
+    const previewSrc=item.previewUrl || item.downloadUrl || '';
+    if((item.mime||'').startsWith('image/')){
+      const img=document.createElement('img');
+      img.src=previewSrc;
+      img.alt=item.name || '';
+      button.appendChild(img);
+    }else{
+      const generic=document.createElement('div');
+      generic.className='thumb-generic';
+      const icon=document.createElement('div');
+      icon.className='thumb-icon';
+      icon.textContent='📎';
+      const info=document.createElement('div');
+      info.className='thumb-info';
+      const nameEl=document.createElement('div');
+      nameEl.className='thumb-name';
+      nameEl.textContent=item.name || '附件';
+      const metaEl=document.createElement('div');
+      metaEl.className='thumb-meta';
+      const metaParts=[];
+      if(item.mime){ metaParts.push(item.mime); }
+      if(typeof item.size==='number' && item.size>=0){
+        const sizeLabel=formatFileSize(item.size);
+        if(sizeLabel){ metaParts.push(sizeLabel); }
+      }
+      metaEl.textContent=metaParts.join(' · ');
+      info.appendChild(nameEl);
+      info.appendChild(metaEl);
+      generic.appendChild(icon);
+      generic.appendChild(info);
+      button.appendChild(generic);
+    }
+    element.appendChild(button);
+    const footer=document.createElement('div');
+    footer.className='thumb-footer';
+    const metaLine=document.createElement('div');
+    metaLine.className='thumb-meta-line';
+    const summaryParts=[item.name || '附件'];
+    if(typeof item.size==='number' && item.size>=0){
+      const sizeLabel=formatFileSize(item.size);
+      if(sizeLabel){ summaryParts.push(sizeLabel); }
+    }
+    metaLine.textContent=summaryParts.join(' · ');
+    footer.appendChild(metaLine);
+    const actions=document.createElement('div');
+    actions.className='thumb-actions';
+    const download=document.createElement('a');
+    download.className='btn btn-outline btn-small';
+    download.href=item.downloadUrl || item.previewUrl || '#';
+    download.textContent='下载';
+    actions.appendChild(download);
+    if(item.id){
+      const form=document.createElement('form');
+      form.method='post';
+      form.style.margin='0';
+      form.innerHTML=`<input type="hidden" name="action" value="delete_attachment"><input type="hidden" name="id" value="${item.id}"><button class="btn btn-danger btn-small" style="font-size:12px">删除</button>`;
+      actions.appendChild(form);
+    }
+    footer.appendChild(actions);
+    element.appendChild(footer);
+    return element;
+  }
+  function addAttachment(raw,{prepend=true}={}){
+    const normalized=normalize(raw);
+    if(!normalized) return;
+    if(prepend){ attachments.unshift(normalized); }
+    else { attachments.push(normalized); }
+    const node=createThumb(normalized);
+    if(prepend && container.firstChild){ container.insertBefore(node, container.firstChild); }
+    else { container.appendChild(node); }
+    rebuild();
+  }
+  return { addAttachment, list:()=>attachments.slice() };
+}
 <?php if ($isMindmapCategory): ?>
 (function(){
   const mapsDataElement=document.getElementById('mind-maps-data');
