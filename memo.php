@@ -2,8 +2,8 @@
 // 单文件备忘录应用（修订版）
 // 说明：此文件是原始单文件备忘录的完整替换版本。
 // 修订内容：
-//   1. 引入思维导图库与编辑器，可通过 ?view=maps / ?view=map_edit 访问。
-//   2. 在侧边栏添加“思维导图”按钮，方便访问导图模块。
+//   1. 引入思维导图库与编辑器，可通过“思维导图”分类或 ?view=map_edit 访问。
+//   2. 在侧边栏整合“思维导图”分类，提供统一入口。
 //   3. CSP 增加 'unsafe-inline'，修复无法执行内联脚本的问题。
 //   4. 修复搜索框颜色变量 bug（color:var(--text)）。
 
@@ -594,8 +594,16 @@ function json_cats(): void {
   $pdo=db();
   $total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
   $uncat = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE category_id IS NULL AND done = 0')->fetchColumn();
+  $mindmapCount = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
   header('Content-Type: application/json; charset=utf-8');
-  echo json_encode(['ok'=>1,'cats'=>$cats,'counts'=>$counts,'total'=>$total,'uncat'=>$uncat], JSON_UNESCAPED_UNICODE);
+  echo json_encode([
+    'ok'=>1,
+    'cats'=>$cats,
+    'counts'=>$counts,
+    'total'=>$total,
+    'uncat'=>$uncat,
+    'mindmap_count'=>$mindmapCount,
+  ], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -1106,7 +1114,7 @@ if (is_post()) {
         $id=(int)($_POST['id'] ?? 0);
         if($id>0) delete_mindmap($id);
         if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1]); exit; }
-        redirect('?view=maps');
+        redirect('?cat=mindmap');
         break;
       }
     }
@@ -2144,7 +2152,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
 
 // —— 思维导图视图 ——
 if ($view === 'map') {
-  redirect('?view=maps');
+  redirect('?cat=mindmap');
 }
 
 if ($view === 'map_edit') {
@@ -2444,7 +2452,7 @@ if ($view === 'map_edit') {
           </button>
           <div class="mind-info-content" aria-hidden="false">
             <div class="mind-info-row">
-              <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=maps') ?>" aria-label="返回导图库">← 导图库</a>
+              <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?cat=mindmap') ?>" aria-label="返回导图库">← 导图库</a>
               <label class="sr-only" for="map-title">导图标题</label>
               <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
               <div class="map-io" id="map-io" aria-expanded="false">
@@ -5558,449 +5566,72 @@ if ($view === 'map_edit') {
 }
 
 if ($view === 'maps') {
-  $maps = get_mindmaps();
-  ?>
-  <!doctype html>
-  <html lang="zh-Hans">
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>思维导图库</title>
-    <meta name="color-scheme" content="dark"/>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
-    <style>
-      :root{
-        --bg-void:#0A0C0E;
-        --bg-elev-1:#0F1316;
-        --bg-elev-2:#151A1E;
-        --gold-700:#AA8C54;
-        --gold-600:#C9A86A;
-        --gold-500:#D1B274;
-        --gold-400:#E3C68B;
-        --accent-emerald:#24C2A0;
-        --accent-crimson:#D14B4B;
-        --accent-cyan:#4BC3D1;
-        --text-strong:#E8E5DF;
-        --text-muted:#A7A39A;
-        --text-dim:#7A766E;
-        --divider:rgba(201,168,106,.2);
-        --bg:var(--bg-void);
-        --panel:rgba(21,26,30,.9);
-        --panel-strong:rgba(15,19,22,.94);
-        --glow:var(--gold-500);
-        --glow-soft:rgba(227,198,139,.24);
-        --border:rgba(201,168,106,.34);
-        --grid-size:72px;
-        --transition:300ms cubic-bezier(.22,.61,.36,1);
-      }
-      *,*::before,*::after{box-sizing:border-box}
-      html,body{margin:0;min-height:100vh;background:var(--bg-void);color:var(--text-strong);font:16px/1.65 'Source Han Sans','Noto Sans SC','Inter','Microsoft YaHei',sans-serif;letter-spacing:.01em;position:relative;overflow-x:hidden}
-  body{--item-padding:18px 16px;--item-gap:12px;--item-radius:18px;--item-line:36px;--item-desc-lines:3;--item-grid-gap:20px;}
-  body[data-density='compact']{--item-padding:14px 14px;--item-gap:8px;--item-radius:16px;--item-line:28px;--item-desc-lines:2;--item-grid-gap:16px;}
-
-      body{background:
-        radial-gradient(1200px 700px at 70% -10%,rgba(227,198,139,.06),transparent 60%),
-        linear-gradient(120deg,rgba(201,168,106,.08),transparent 30%,rgba(201,168,106,.06) 70%,transparent 90%),
-        #0A0C0E;
-      }
-      body::before{content:"";position:fixed;inset:0;background:
-        linear-gradient(180deg,rgba(10,12,14,.45),rgba(10,12,14,.82)),
-        url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"%3E%3Cpath fill="rgba(201,168,106,0.05)" d="M0 79h160v2H0zm79-79h2v160h-2z"/%3E%3C/svg%3E');
-        background-size:cover,160px 160px;opacity:.6;pointer-events:none;z-index:-3;
-      }
-      body::after{content:"";position:fixed;inset:0;background:
-        repeating-linear-gradient(0deg,rgba(75,195,209,.08) 0,rgba(75,195,209,.08) 1px,transparent 1px,transparent var(--grid-size)),
-        repeating-linear-gradient(90deg,rgba(201,168,106,.12) 0,rgba(201,168,106,.12) 1px,transparent 1px,transparent var(--grid-size));
-        mix-blend-mode:screen;opacity:.3;pointer-events:none;z-index:-4;background-attachment:fixed;
-      }
-      .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.12) 0,transparent 4px);background-size:100% 6px;opacity:.18}
-      a{color:inherit;text-decoration:none}
-      .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px;position:relative;z-index:0}
-      .wrap::before{content:"";position:absolute;inset:20px;border-radius:28px;border:1px dashed rgba(201,168,106,.24);pointer-events:none}
-      .header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:24px}
-      .header h1{margin:0;font:600 28px/1.2 'Cinzel','Noto Serif SC',serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400);text-shadow:0 0 26px rgba(227,198,139,.28)}
-      .header .meta{color:var(--text-muted);font:14px/1.7 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em}
-      .btn{position:relative;padding:12px 18px;border-radius:16px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.62));color:#1b1306;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);box-shadow:0 16px 36px rgba(227,198,139,.26),0 0 26px rgba(227,198,139,.2);overflow:hidden}
-      .btn::after{content:none}
-      .btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(227,198,139,.3),0 0 32px rgba(227,198,139,.26)}
-      .btn.acc{background:linear-gradient(135deg,rgba(227,198,139,.92),rgba(201,168,106,.72));color:#120d05}
-      .btn.danger{border-color:rgba(255,156,156,.8);background:linear-gradient(135deg,rgba(255,156,156,.85),rgba(209,75,75,.72));color:#2b0909;box-shadow:0 16px 34px rgba(209,75,75,.24)}
-      .btn:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:3px;box-shadow:0 0 0 2px rgba(227,198,139,.25)}
-      .search{margin-top:20px;display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:linear-gradient(135deg,rgba(21,26,30,.82),rgba(15,19,22,.92));box-shadow:inset 0 0 22px rgba(0,0,0,.5);max-width:480px}
-      .search input{all:unset;flex:1;color:var(--text-strong);font-size:15px;letter-spacing:.06em}
-      .search input::placeholder{color:var(--text-dim)}
-      .search span{font-size:20px;font-weight:600;color:var(--gold-400);text-shadow:0 0 16px rgba(227,198,139,.3)}
-      .grid{margin-top:28px;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-      .card{position:relative;display:flex;flex-direction:column;gap:14px;min-height:260px;padding:22px;border-radius:24px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(15,19,22,.94));border:1px solid rgba(201,168,106,.32);box-shadow:0 24px 60px rgba(0,0,0,.58);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
-      .card::before{content:"";position:absolute;inset:12px;border-radius:20px;box-shadow:inset 0 0 0 1px rgba(227,198,139,.18),inset 0 0 34px rgba(227,198,139,.08);pointer-events:none;opacity:.9}
-      .card:hover{transform:translateY(-6px);border-color:rgba(201,168,106,.45);box-shadow:0 0 24px rgba(201,168,106,.32),0 32px 68px rgba(0,0,0,.6)}
-      .card h2{margin:0;font:600 18px/1.4 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.08em;text-shadow:0 0 18px rgba(227,198,139,.22)}
-  .meta{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
-  .meta-inline{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;color:var(--text-muted)}
-      pre{background:rgba(15,19,22,.85);border:1px solid rgba(201,168,106,.28);padding:14px;border-radius:18px;max-height:160px;overflow:auto;font:12px/1.6 'JetBrains Mono','Fira Code',monospace;color:var(--text-strong);box-shadow:inset 0 0 18px rgba(0,0,0,.45)}
-      .card-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto}
-      .card-actions .btn{flex:1 0 auto;text-align:center}
-      .empty{margin-top:48px;padding:48px;border:1px dashed rgba(201,168,106,.34);border-radius:24px;text-align:center;color:var(--text-muted);background:rgba(15,19,22,.85);box-shadow:0 24px 48px rgba(0,0,0,.55)}
-      .empty strong{color:var(--gold-400);font-size:18px;letter-spacing:.12em;text-transform:uppercase}
-      .tag{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--text-muted);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
-      .import-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.78);backdrop-filter:blur(16px);z-index:160}
-      .import-backdrop[data-open="true"]{display:flex}
-      .import-panel{background:linear-gradient(160deg,rgba(21,26,30,.92),rgba(12,16,18,.94));border:1px solid rgba(201,168,106,.34);border-radius:24px;box-shadow:0 32px 64px rgba(0,0,0,.68),0 0 30px rgba(227,198,139,.18);padding:24px;max-width:420px;width:100%;display:grid;gap:16px;position:relative}
-      .import-panel::before{content:"";position:absolute;inset:12px;border-radius:18px;border:1px dashed rgba(201,168,106,.24);opacity:.7;pointer-events:none}
-      .import-panel h2{margin:0;font:600 20px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.16em;text-transform:uppercase;text-align:center}
-      .import-panel p{margin:0;color:var(--text-dim);font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-align:center}
-      .import-panel .mode-buttons{display:grid;gap:10px}
-      .import-panel .mode-buttons button{padding:12px 16px;border-radius:16px;border:1px solid rgba(227,198,139,.6);background:linear-gradient(135deg,rgba(227,198,139,.82),rgba(170,140,84,.58));color:#1b1306;font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition)}
-      .import-panel .mode-buttons button:hover{transform:translateY(-2px);box-shadow:0 18px 36px rgba(227,198,139,.3),0 0 28px rgba(227,198,139,.24)}
-      .import-panel .mode-buttons button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
-      .import-panel label{display:flex;flex-direction:column;gap:6px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
-      .import-panel select{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.86);color:var(--text-strong);font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif}
-      .import-panel .import-tip{color:var(--text-dim);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;text-align:left}
-      .import-panel .actions{display:flex;justify-content:flex-end;gap:10px}
-      .import-panel .actions button{padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition)}
-      .import-panel .actions button:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(227,198,139,.22)}
-      @media (max-width:720px){
-        .grid{grid-template-columns:minmax(0,1fr)}
-        .header{align-items:flex-start}
-        .import-panel{padding:18px}
-      }
-    </style>
-
-  </head>
-<body>
-  <div class="scanlines" aria-hidden="true"></div>
-  <div class="wrap">
-      <div class="header">
-        <div>
-          <h1>思维导图库</h1>
-          <div class="meta">集中管理所有导图，支持多版本协作、导入导出与快速检索。</div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回备忘录</a>
-          <button class="btn btn-outline" type="button" id="btn-import-map">导入导图</button>
-          <button class="btn btn-outline" type="button" id="btn-export-maps">导出全部</button>
-          <a class="btn btn-primary" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit') ?>">＋ 新建导图</a>
-        </div>
-      </div>
-      <div class="search">
-        <span>🔍</span>
-        <input id="mind-search" placeholder="搜索标题或大纲关键字">
-      </div>
-      <?php if (!$maps): ?>
-        <div class="empty">
-          <strong>暂时还没有导图。</strong><br>点击右上角「新建导图」开始构建第一个思维导图。
-        </div>
-      <?php else: ?>
-        <div class="grid" id="mind-grid">
-          <?php foreach ($maps as $m): $outline = mindmap_outline_preview($m['content']); ?>
-            <article class="card" data-title="<?php echo h($m['title']); ?>" data-outline="<?php echo h(str_replace("\n",' ',$outline)); ?>">
-              <div>
-                <h2><?php echo h($m['title']); ?></h2>
-                <div class="meta">更新：<?php echo dt((int)$m['updated_at']); ?> · 创建：<?php echo dt((int)$m['created_at']); ?></div>
-              </div>
-              <?php if ($outline !== ''): ?>
-                <pre><?php echo h($outline); ?></pre>
-              <?php else: ?>
-                <pre>（暂无内容）</pre>
-              <?php endif; ?>
-              <div class="card-actions">
-                <a class="btn btn-primary" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?view=map_edit&id='.$m['id']) ?>">编辑</a>
-                <form method="post" onsubmit="return confirm('确认删除该导图？');">
-                  <input type="hidden" name="action" value="delete_mindmap">
-                  <input type="hidden" name="id" value="<?php echo $m['id']; ?>">
-                  <button class="btn btn-danger" type="submit">删除</button>
-                </form>
-              </div>
-            </article>
-          <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
-    </div>
-    <input id="mind-import-file" type="file" accept="application/json" hidden>
-    <div class="import-backdrop" id="map-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
-      <div class="import-panel">
-        <h2 id="import-modal-title">导入导图</h2>
-        <p>选择导入方式以处理文件：<strong id="import-file-name">未选择文件</strong></p>
-        <div class="mode-buttons">
-          <button type="button" data-mode="replace" data-requires-target="true">覆盖现有导图</button>
-          <button type="button" data-mode="append" data-requires-target="true">导入为根节点</button>
-          <button type="button" data-mode="new">导入为新导图</button>
-        </div>
-        <label for="import-target-select">目标导图（覆盖/追加时选择）
-          <select id="import-target-select">
-            <option value="">请选择</option>
-            <?php foreach ($maps as $m): ?>
-              <option value="<?= $m['id']; ?>"><?= h($m['title']); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <p class="import-tip">导入文件将自动调整为向右展开结构。如需插入到特定节点，可在编辑界面使用导入功能。</p>
-        <div class="actions">
-          <button type="button" data-action="cancel">取消</button>
-        </div>
-      </div>
-    </div>
-    <script type="application/json" id="mind-maps-data"><?= json_encode(array_map(fn($m)=>[
-      'id'=>$m['id'],
-      'title'=>$m['title'],
-      'content'=>$m['content'],
-      'created_at'=>$m['created_at'],
-      'updated_at'=>$m['updated_at'],
-    ], $maps), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
-    <script>
-      const mapsDataElement=document.getElementById('mind-maps-data');
-      let mapsData=[];
-      try{
-        mapsData=mapsDataElement ? JSON.parse(mapsDataElement.textContent||'[]') : [];
-      }catch(_){ mapsData=[]; }
-      const mapsById=new Map((mapsData||[]).map(item=>[String(item.id), item]));
-      const importInput=document.getElementById('mind-import-file');
-      const importButton=document.getElementById('btn-import-map');
-      const exportButton=document.getElementById('btn-export-maps');
-      const importModal=document.getElementById('map-import-modal');
-      const importFileNameEl=document.getElementById('import-file-name');
-      const importTargetSelect=document.getElementById('import-target-select');
-      let pendingImport=null;
-      let pendingImportName='';
-      if(importTargetSelect){
-        if(mapsData.length){
-          importTargetSelect.disabled=false;
-          importTargetSelect.value=importTargetSelect.value || String(mapsData[0].id);
-        }else{
-          importTargetSelect.disabled=true;
-        }
-      }
-      if(importModal){
-        const targetButtons=Array.from(importModal.querySelectorAll('[data-requires-target="true"]'));
-        if(!mapsData.length){ targetButtons.forEach(btn=>btn.disabled=true); }
-      }
-      function openImportModal(){
-        if(!importModal) return;
-        importModal.dataset.open='true';
-        if(importFileNameEl){ importFileNameEl.textContent=pendingImportName || '未选择文件'; }
-      }
-      function closeImportModal(){
-        if(importModal){ importModal.dataset.open='false'; }
-        pendingImport=null;
-        pendingImportName='';
-        if(importInput){ importInput.value=''; }
-      }
-      function resolveImportTitle(data,fallback){
-        const metaName=data?.meta && typeof data.meta.name==='string' ? data.meta.name.trim() : '';
-        const topicName=data?.data && typeof data.data.topic==='string' ? data.data.topic.trim() : '';
-        if(metaName) return metaName;
-        if(topicName) return topicName;
-        if(typeof fallback==='string' && fallback.trim()) return fallback.trim();
-        return '未命名导图';
-      }
-      function enforceRightOrientationFromRoot(node, depth=0){
-        if(!node || typeof node!=='object') return;
-        node.direction=depth===0?'center':'right';
-        if(Array.isArray(node.children)){
-          node.children=node.children.map(child=>{
-            if(child && typeof child==='object'){ enforceRightOrientationFromRoot(child, depth+1); return child; }
-            return null;
-          }).filter(Boolean);
-        }else{
-          node.children=[];
-        }
-      }
-      function cloneImportSubtree(source){
-        if(!source || typeof source!=='object') return null;
-        const cloned={
-          id:'node-'+Math.random().toString(36).slice(2,10),
-          topic:typeof source.topic==='string' && source.topic.trim()?source.topic.trim():'导入节点',
-          data:source.data?JSON.parse(JSON.stringify(source.data)):{},
-          expanded:source.expanded!==false,
-          direction:'right',
-          children:[],
-        };
-        if(source.meta){ cloned.meta=JSON.parse(JSON.stringify(source.meta)); }
-        if(source.style){ cloned.style=JSON.parse(JSON.stringify(source.style)); }
-        if(Array.isArray(source.children)){
-          cloned.children=source.children.map(child=>cloneImportSubtree(child)).filter(Boolean);
-        }
-        return cloned;
-      }
-      async function saveMindmapRequest(id,title,data){
-        const fd=new FormData();
-        fd.append('action','save_mindmap');
-        fd.append('id', String(id||0));
-        fd.append('title', title || '未命名导图');
-        fd.append('content', JSON.stringify(data));
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        if(!res.ok) throw new Error('网络异常');
-        const json=await res.json();
-        if(!json.ok) throw new Error(json.error||'保存失败');
-        return json;
-      }
-      async function handleImportMode(mode){
-        if(!pendingImport){
-          alert('请先选择导入文件');
-          return;
-        }
-        const requiresTarget=mode==='replace' || mode==='append';
-        const targetId=importTargetSelect ? importTargetSelect.value : '';
-        if(requiresTarget){
-          if(!targetId){ alert('请选择目标导图'); return; }
-          if(!mapsById.has(String(targetId))){ alert('目标导图不存在'); return; }
-        }
-        try{
-          if(mode==='new'){
-            const payload=JSON.parse(JSON.stringify(pendingImport));
-            if(payload && payload.data) enforceRightOrientationFromRoot(payload.data);
-            const title=resolveImportTitle(payload,'');
-            await saveMindmapRequest(0,title,payload);
-          }else if(mode==='replace'){
-            const target=mapsById.get(String(targetId));
-            if(!target) throw new Error('目标导图不存在');
-            const payload=JSON.parse(JSON.stringify(pendingImport));
-            if(payload && payload.data) enforceRightOrientationFromRoot(payload.data);
-            const title=resolveImportTitle(payload,target.title||'');
-            await saveMindmapRequest(target.id,title,payload);
-          }else if(mode==='append'){
-            const target=mapsById.get(String(targetId));
-            if(!target) throw new Error('目标导图不存在');
-            let base;
-            try{ base=JSON.parse(target.content); }catch(_){ throw new Error('目标导图内容无法解析'); }
-            if(!base || typeof base!=='object' || !base.data){ throw new Error('目标导图缺少数据'); }
-            const subtree=cloneImportSubtree(pendingImport.data || pendingImport);
-            if(!subtree){ throw new Error('导入文件中缺少节点数据'); }
-            if(!Array.isArray(base.data.children)){ base.data.children=[]; }
-            base.data.children.push(subtree);
-            enforceRightOrientationFromRoot(base.data);
-            const title=target.title || resolveImportTitle(pendingImport,'');
-            await saveMindmapRequest(target.id,title,base);
-          }else{
-            return;
-          }
-          alert('导入成功');
-          closeImportModal();
-          location.reload();
-        }catch(err){
-          alert(err.message || '导入失败');
-        }
-      }
-      function handleImportFile(event){
-        const file=event.target.files && event.target.files[0];
-        if(!file) return;
-        const reader=new FileReader();
-        reader.onload=evt=>{
-          try{
-            const json=JSON.parse(evt.target.result);
-            if(!json || typeof json!=='object' || !json.data){ throw new Error('文件格式不兼容'); }
-            pendingImport=json;
-            pendingImportName=file.name;
-            if(importTargetSelect && mapsData.length){
-              importTargetSelect.disabled=false;
-              if(!importTargetSelect.value){ importTargetSelect.value=String(mapsData[0].id); }
-            }
-            openImportModal();
-          }catch(err){
-            pendingImport=null;
-            pendingImportName='';
-            alert(err.message || '无法解析导图文件');
-          }finally{
-            if(importInput){ importInput.value=''; }
-          }
-        };
-        reader.onerror=()=>{
-          pendingImport=null;
-          pendingImportName='';
-          alert('读取文件失败');
-          if(importInput){ importInput.value=''; }
-        };
-        reader.readAsText(file,'utf-8');
-      }
-      function buildTimestamp(){
-        const now=new Date();
-        const pad=n=>String(n).padStart(2,'0');
-        return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      }
-      function exportAllMaps(){
-        if(!mapsData.length){
-          alert('暂无导图可导出');
-          return;
-        }
-        const payload=mapsData.map(map=>{
-          let content;
-          try{ content=JSON.parse(map.content); }
-          catch(_){ content=map.content; }
-          return {
-            id: map.id,
-            title: map.title,
-            created_at: map.created_at,
-            updated_at: map.updated_at,
-            content,
-          };
-        });
-        const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;
-        a.download=`mindmaps-${buildTimestamp()}.json`;
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
-      }
-      if(importButton && importInput){
-        importButton.addEventListener('click',()=>{
-          pendingImport=null;
-          pendingImportName='';
-          importInput.click();
-        });
-      }
-      if(importInput){
-        importInput.addEventListener('change',handleImportFile);
-      }
-      if(exportButton){
-        exportButton.addEventListener('click',exportAllMaps);
-      }
-      if(importModal){
-        importModal.addEventListener('click',e=>{
-          if(e.target===importModal){ closeImportModal(); }
-        });
-        importModal.querySelectorAll('[data-mode]').forEach(btn=>{
-          btn.addEventListener('click',e=>{
-            e.preventDefault();
-            handleImportMode(btn.dataset.mode);
-          });
-        });
-        const cancelBtn=importModal.querySelector('[data-action="cancel"]');
-        if(cancelBtn){ cancelBtn.addEventListener('click',e=>{ e.preventDefault(); closeImportModal(); }); }
-      }
-      const searchInput=document.getElementById('mind-search');
-      const cards=document.querySelectorAll('#mind-grid .card');
-      if(searchInput){
-        searchInput.addEventListener('input',()=>{
-          const q=searchInput.value.trim().toLowerCase();
-          cards.forEach(card=>{
-            const text=(card.dataset.title+' '+card.dataset.outline).toLowerCase();
-            card.style.display = q==='' || text.includes(q) ? '' : 'none';
-          });
-        });
-      }
-    </script>
-  </body>
-  </html>
-  <?php
-  exit;
+  $qRedirect = trim((string)($_GET['q'] ?? ''));
+  $target = '?cat=mindmap';
+  if ($qRedirect !== '') {
+    $target .= '&q=' . urlencode($qRedirect);
+  }
+  redirect($target);
 }
 
 // —— 首页 ——
 $pdo=db(); [$cats,$counts]=get_categories();
-$cat=$_GET['cat'] ?? 'all'; $q=trim((string)($_GET['q'] ?? '')); $params=[]; $where=[];
-if($cat==='all'){
-  $where[]='done = 0';
+$cat=$_GET['cat'] ?? 'all';
+$q=trim((string)($_GET['q'] ?? ''));
+$isMindmapCategory = ($cat === 'mindmap');
+$items=[];
+$params=[];
+$where=[];
+if(!$isMindmapCategory){
+  if($cat==='all'){
+    $where[]='done = 0';
+  }
+  if($cat!=='all' && ctype_digit((string)$cat)){
+    $where[]='category_id = :cat';
+    $params[':cat']=(int)$cat;
+  }
+  if($q!==''){
+    $where[]='(title LIKE :q OR description LIKE :q)';
+    $params[':q']='%'.$q.'%';
+  }
+  $sql='SELECT * FROM items';
+  if($where){ $sql.=' WHERE '.implode(' AND ',$where); }
+  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
+  $st=$pdo->prepare($sql);
+  $st->execute($params);
+  $items=$st->fetchAll();
 }
-if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
-if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
-$sql='SELECT * FROM items'; if($where) $sql.=' WHERE '.implode(' AND ',$where); $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
-$st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
 $all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
 $categoryNames=[];
 foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
+$mindmapItems=[];
+$mindmapCount=0;
+if($isMindmapCategory){
+  $maps=get_mindmaps();
+  $mindmapCount=count($maps);
+  $needle=$q!=='' ? $q : '';
+  foreach($maps as $m){
+    $title=(string)$m['title'];
+    $outline=mindmap_outline_preview($m['content']);
+    if($needle!==''){
+      $haystack=$title.' '.$outline;
+      if(mb_stripos($haystack, $needle)===false){
+        continue;
+      }
+    }
+    $mindmapItems[]=[
+      'id'=>(int)$m['id'],
+      'title'=>$title,
+      'title_html'=>$q!=='' ? highlight_text($title, $q) : h($title),
+      'outline'=>$outline,
+      'outline_html'=>$outline!=='' ? ($q!=='' ? highlight_text($outline, $q) : h($outline)) : '',
+      'updated_at'=>(int)$m['updated_at'],
+      'created_at'=>(int)$m['created_at'],
+    ];
+  }
+} else {
+  $mindmapCount = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
+}
 ?>
 <!doctype html>
 <html lang="zh-Hans">
@@ -6077,6 +5708,13 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:10px;border:1px solid rgba(201,168,106,.38);box-shadow:0 0 16px rgba(227,198,139,.3);opacity:.85}
   .brand h1{font:600 16px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.25)}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
+  .btn-group{position:relative;display:inline-flex;align-items:stretch}
+  .btn-dropdown{padding-right:34px}
+  .btn-dropdown .caret{margin-left:8px;font-size:12px;letter-spacing:0}
+  .dropdown-menu{position:absolute;top:calc(100% + 6px);left:0;display:grid;gap:6px;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.94);box-shadow:0 18px 40px rgba(0,0,0,.45),0 0 24px rgba(227,198,139,.12);min-width:180px;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity var(--transition),transform var(--transition);z-index:40}
+  .btn-group[data-open="true"] .dropdown-menu{opacity:1;pointer-events:auto;transform:translateY(0)}
+  .dropdown-item{display:block;padding:8px 12px;border-radius:10px;color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:background var(--transition),color var(--transition)}
+  .dropdown-item:hover{background:rgba(230,192,137,.12);color:var(--gold-400)}
   .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:14px;border:1px solid transparent;background:transparent;color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;box-shadow:none;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background var(--transition),color var(--transition);cursor:pointer}
   .btn::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(227,198,139,.08);opacity:0;transition:opacity var(--transition)}
   .btn:hover::before{opacity:1}
@@ -6127,6 +5765,19 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .item.done{background:linear-gradient(155deg,rgba(26,24,18,.9),rgba(18,16,12,.94));border-color:rgba(227,198,139,.55);box-shadow:0 0 28px rgba(201,168,106,.38),0 24px 58px rgba(0,0,0,.7)}
   .item-empty{grid-column:1/-1;text-align:center;padding:40px 24px;background:linear-gradient(150deg,rgba(15,19,22,.88),rgba(10,12,14,.9));border:1px dashed rgba(201,168,106,.28);box-shadow:none;color:var(--text-muted);letter-spacing:.12em}
   .item-empty::after,.item-empty::before{display:none}
+  .mindmap-card{position:relative;display:grid;gap:var(--item-gap);padding:var(--item-padding);border-radius:var(--item-radius);background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);min-height:220px}
+  .mindmap-card::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.24);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.16)}
+  .mindmap-card:hover{transform:translateY(-4px);box-shadow:0 0 28px rgba(201,168,106,.26),0 26px 50px rgba(0,0,0,.58);border-color:rgba(201,168,106,.48)}
+  .mindmap-card-header{display:flex;flex-direction:column;gap:6px;position:relative;z-index:1}
+  .mindmap-title{margin:0;font:600 17px/1.5 'Cinzel','Noto Serif SC',serif;letter-spacing:.1em;color:var(--gold-400);text-shadow:0 0 18px rgba(227,198,139,.2)}
+  .mindmap-meta{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.12em;text-transform:uppercase}
+  .mindmap-outline{position:relative;z-index:1;background:rgba(15,19,22,.82);border:1px solid rgba(201,168,106,.26);border-radius:16px;padding:14px;max-height:180px;overflow:auto;font:12px/1.6 'JetBrains Mono','Fira Code',monospace;color:var(--text-strong);box-shadow:inset 0 0 18px rgba(0,0,0,.4);white-space:pre-wrap}
+  .mindmap-outline-empty{display:flex;align-items:center;justify-content:center;border:1px dashed rgba(201,168,106,.32);background:rgba(15,19,22,.78);border-radius:16px;padding:24px;font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase}
+  .mindmap-actions{position:relative;z-index:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:auto}
+  .mindmap-actions form{margin:0}
+  .mindmap-empty{grid-column:1/-1;text-align:center;padding:40px 24px;border:1px dashed rgba(201,168,106,.3);border-radius:var(--item-radius);background:rgba(15,19,22,.85);color:var(--text-muted);letter-spacing:.12em}
+  .mindmap-toolbar{justify-content:flex-end;color:var(--text-dim);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase}
+  .mindmap-toolbar .mindmap-hint{max-width:520px}
   .item.done::after{background:transparent;box-shadow:none;border:1px solid rgba(230,192,137,.3)}
   .item.done::before{opacity:1;border-style:double;border-color:rgba(201,168,106,.45);box-shadow:0 0 32px rgba(227,198,139,.3)}
   .item-title{font-weight:600;font-size:16px;line-height:var(--item-line);letter-spacing:.2px;color:var(--text-strong);text-shadow:0 0 14px rgba(227,198,139,.16);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
@@ -6180,6 +5831,8 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .modal-count{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
   body[data-density='compact'] .item-title{font-size:15px}
   body[data-density='compact'] .item-desc{font-size:12px;opacity:.78}
+  body[data-density='compact'] .mindmap-title{font-size:16px}
+  body[data-density='compact'] .mindmap-outline{max-height:160px}
   body[data-density='compact'] .item-meta{margin-top:4px}
   body[data-density='compact'] .btn-detail .btn-label{display:none}
   body[data-density='compact'] .item-actions{gap:6px}
@@ -6213,14 +5866,25 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
       <h1>自适应备忘录 · Memo</h1>
     </div>
     <div class="controls">
-      <a class="btn btn-primary" href="?view=new">＋ 新建备忘录</a>
+      <div class="btn-group" id="new-menu-group" data-open="false">
+        <button class="btn btn-primary btn-dropdown" type="button" id="btn-new-menu" aria-haspopup="true" aria-expanded="false">
+          ＋ 新建<span class="caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="dropdown-menu" role="menu" aria-label="选择新建类型">
+          <a class="dropdown-item" href="?view=map_edit" role="menuitem">思维导图</a>
+          <a class="dropdown-item" href="?view=new" role="menuitem">备忘录</a>
+        </div>
+      </div>
       <button class="btn btn-outline" id="btn-cat-mgr">分类管理</button>
-      <a class="btn btn-outline" href="?view=maps">思维导图</a>
     </div>
     <div class="section-title">分类 · Categories</div>
-    <div class="cat-list" id="cat-list">
+    <div class="cat-list" id="cat-list" data-mindmap-count="<?php echo $mindmapCount; ?>">
       <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
         <span class="name">全部 · All</span><span class="count"><?php echo $all_total; ?></span>
+      </a>
+      <a class="cat <?php echo ($cat==='mindmap'?'active':''); ?>" href="?cat=mindmap&q=<?php echo urlencode($q); ?>">
+        <span class="name">思维导图</span>
+        <span class="count"><?php echo $mindmapCount; ?></span>
       </a>
       <?php foreach ($cats as $c): ?>
       <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>">
@@ -6243,98 +5907,132 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
     <div class="toolbar">
       <form class="search" method="get" style="flex:1">
         <input type="hidden" name="cat" value="<?php echo h((string)$cat); ?>">
-        <input name="q" value="<?php echo h($q); ?>" placeholder="搜索标题/内容 · Search"/>
+        <input name="q" value="<?php echo h($q); ?>" placeholder="<?php echo $isMindmapCategory ? '搜索导图标题/大纲' : '搜索标题/内容 · Search'; ?>"/>
         <button>搜索</button>
       </form>
-      <div class="actions-row">
-        <div class="density-toggle" role="group" aria-label="显示密度">
-          <button class="btn btn-ghost btn-small density-option" type="button" data-density="comfortable">舒适</button>
-          <button class="btn btn-ghost btn-small density-option" type="button" data-density="compact">紧凑</button>
+      <?php if ($isMindmapCategory): ?>
+        <div class="actions-row mindmap-toolbar" role="note">
+          <span class="mindmap-hint">提示：搜索可匹配导图标题或大纲，使用卡片上的操作按钮管理导图。</span>
         </div>
-        <button class="btn btn-outline btn-small" type="button" id="btn-import-items">导入 JSON</button>
-        <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
-        <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
-      </div>
+      <?php else: ?>
+        <div class="actions-row">
+          <div class="density-toggle" role="group" aria-label="显示密度">
+            <button class="btn btn-ghost btn-small density-option" type="button" data-density="comfortable">舒适</button>
+            <button class="btn btn-ghost btn-small density-option" type="button" data-density="compact">紧凑</button>
+          </div>
+          <button class="btn btn-outline btn-small" type="button" id="btn-import-items">导入 JSON</button>
+          <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
+          <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
+        </div>
+      <?php endif; ?>
     </div>
     <input id="memo-import-input" type="file" accept="application/json" hidden>
-    <div class="items" id="items">
-      <?php if (!$items): ?>
-        <div class="item item-empty">没有条目 · No items</div>
-      <?php endif; ?>
-      <?php foreach ($items as $it): ?>
-        <?php
-          $steps_time=get_steps_by_time((int)$it['id']);
-          $attachments=attachments_for_item((int)$it['id']);
-          $titlePlain=(string)$it['title'];
-          $titleHtml = $q!=='' ? highlight_text($titlePlain, $q) : h($titlePlain);
-          $descRaw = (string)$it['description'];
-          $descHtml = $descRaw!=='' ? nl2br($q!=='' ? highlight_text($descRaw, $q) : h($descRaw)) : '';
-          $catLabel = $it['category_id'] ? ($categoryNames[(int)$it['category_id']] ?? '未分类') : '未分类';
-        ?>
-        <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>" data-title="<?php echo h($titlePlain); ?>" data-updated="<?php echo dt((int)$it['updated_at']); ?>">
-          <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
-            <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
-              <input type="hidden" name="action" value="toggle_done">
-              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
-              <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
-            </form>
-            <div style="flex:1">
-              <div class="item-title"><?php echo $titleHtml; ?></div>
-              <?php if ($descHtml!==''): ?>
-                <div class="item-desc"><?php echo $descHtml; ?></div>
+    <div class="items" id="items" data-mode="<?php echo $isMindmapCategory ? 'mindmap' : 'memo'; ?>">
+      <?php if ($isMindmapCategory): ?>
+        <?php if (!$mindmapItems): ?>
+          <div class="mindmap-empty">暂时还没有思维导图。</div>
+        <?php else: ?>
+          <?php foreach ($mindmapItems as $map): ?>
+            <article class="mindmap-card" data-id="<?php echo $map['id']; ?>" data-title="<?php echo h($map['title']); ?>">
+              <div class="mindmap-card-header">
+                <h2 class="mindmap-title"><?php echo $map['title_html']; ?></h2>
+                <div class="mindmap-meta">更新：<?php echo dt((int)$map['updated_at']); ?> · 创建：<?php echo dt((int)$map['created_at']); ?></div>
+              </div>
+              <?php if ($map['outline'] !== ''): ?>
+                <pre class="mindmap-outline"><?php echo $map['outline_html']; ?></pre>
+              <?php else: ?>
+                <div class="mindmap-outline mindmap-outline-empty">（暂无大纲预览）</div>
               <?php endif; ?>
-              <?php if ($steps_time): ?>
-              <div class="tinyline" aria-label="时间轴">
-                <?php foreach($steps_time as $s): ?>
-                  <div class="tlrow <?php echo $s['done']?'done':''; ?>">
-                    <span class="dot"></span>
-                    <form method="post" class="form-toggle-step" onsubmit="return false" style="margin:0;display:inline-block">
-                      <input type="hidden" name="action" value="toggle_step">
-                      <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
-                      <input type="checkbox" class="step-toggle" <?php echo $s['done']?'checked':''; ?> title="完成">
-                    </form>
-                    <span class="step-title"><?php echo h($s['title']); ?></span>
-                    <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
+              <div class="mindmap-actions">
+                <a class="btn btn-primary btn-small" href="?view=map_edit&id=<?php echo $map['id']; ?>">编辑</a>
+                <form method="post" onsubmit="return confirm('确认删除该导图？');">
+                  <input type="hidden" name="action" value="delete_mindmap">
+                  <input type="hidden" name="id" value="<?php echo $map['id']; ?>">
+                  <button class="btn btn-danger btn-small" type="submit">删除</button>
+                </form>
+              </div>
+            </article>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      <?php else: ?>
+        <?php if (!$items): ?>
+          <div class="item item-empty">没有条目 · No items</div>
+        <?php endif; ?>
+        <?php foreach ($items as $it): ?>
+          <?php
+            $steps_time=get_steps_by_time((int)$it['id']);
+            $attachments=attachments_for_item((int)$it['id']);
+            $titlePlain=(string)$it['title'];
+            $titleHtml = $q!=='' ? highlight_text($titlePlain, $q) : h($titlePlain);
+            $descRaw = (string)$it['description'];
+            $descHtml = $descRaw!=='' ? nl2br($q!=='' ? highlight_text($descRaw, $q) : h($descRaw)) : '';
+            $catLabel = $it['category_id'] ? ($categoryNames[(int)$it['category_id']] ?? '未分类') : '未分类';
+          ?>
+          <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>" data-title="<?php echo h($titlePlain); ?>" data-updated="<?php echo dt((int)$it['updated_at']); ?>">
+            <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
+              <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
+                <input type="hidden" name="action" value="toggle_done">
+                <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+                <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
+              </form>
+              <div style="flex:1">
+                <div class="item-title"><?php echo $titleHtml; ?></div>
+                <?php if ($descHtml!==''): ?>
+                  <div class="item-desc"><?php echo $descHtml; ?></div>
+                <?php endif; ?>
+                <?php if ($steps_time): ?>
+                <div class="tinyline" aria-label="时间轴">
+                  <?php foreach($steps_time as $s): ?>
+                    <div class="tlrow <?php echo $s['done']?'done':''; ?>">
+                      <span class="dot"></span>
+                      <form method="post" class="form-toggle-step" onsubmit="return false" style="margin:0;display:inline-block">
+                        <input type="hidden" name="action" value="toggle_step">
+                        <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                        <input type="checkbox" class="step-toggle" <?php echo $s['done']?'checked':''; ?> title="完成">
+                      </form>
+                      <span class="step-title"><?php echo h($s['title']); ?></span>
+                      <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <div class="meta meta-inline item-meta" aria-label="分类与更新时间">
+                  <div class="meta-left">
+                    <span class="badge"><?php echo h($catLabel); ?></span>
+                    <?php if(!empty($attachments)): ?>
+                      <span class="badge attachment-badge">📎 <?php echo count($attachments); ?></span>
+                    <?php endif; ?>
                   </div>
-                <?php endforeach; ?>
-              </div>
-              <?php endif; ?>
-              <div class="meta meta-inline item-meta" aria-label="分类与更新时间">
-                <div class="meta-left">
-                  <span class="badge"><?php echo h($catLabel); ?></span>
-                  <?php if(!empty($attachments)): ?>
-                    <span class="badge attachment-badge">📎 <?php echo count($attachments); ?></span>
-                  <?php endif; ?>
-                </div>
-                <div class="meta-right">
-                  <span class="item-time js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+                  <div class="meta-right">
+                    <span class="item-time js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div class="item-actions">
-            <span class="tip status-tip"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></span>
-            <span class="tip note-tip">↔ 按钮调整排序</span>
-            <div class="move-controls desktop">
-              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
-              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
+            <div class="item-actions">
+              <span class="tip status-tip"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></span>
+              <span class="tip note-tip">↔ 按钮调整排序</span>
+              <div class="move-controls desktop">
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
+              </div>
+              <div class="move-controls mobile">
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
+              </div>
+              <a class="btn btn-ghost btn-small btn-detail" href="?view=item&id=<?php echo $it['id']; ?>">
+                <span class="btn-icon" aria-hidden="true">✦</span>
+                <span class="btn-label">详情</span>
+              </a>
+              <form method="post" class="form-delete-item" style="margin:0">
+                <input type="hidden" name="action" value="delete_item">
+                <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+                <button class="btn btn-danger btn-small" type="submit">删除</button>
+              </form>
             </div>
-            <div class="move-controls mobile">
-              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
-              <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
-            </div>
-            <a class="btn btn-ghost btn-small btn-detail" href="?view=item&id=<?php echo $it['id']; ?>">
-              <span class="btn-icon" aria-hidden="true">✦</span>
-              <span class="btn-label">详情</span>
-            </a>
-            <form method="post" class="form-delete-item" style="margin:0">
-              <input type="hidden" name="action" value="delete_item">
-              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
-              <button class="btn btn-danger btn-small" type="submit">删除</button>
-            </form>
-          </div>
-        </article>
-      <?php endforeach; ?>
+          </article>
+        <?php endforeach; ?>
+      <?php endif; ?>
     </div>
     <div class="shortcuts">
       快捷键：<span class="kbd">/</span> 聚焦搜索。
@@ -6370,7 +6068,26 @@ const memoImportInput=document.getElementById('memo-import-input');
 const toastContainer=document.getElementById('toast-container');
 const densityButtons=$$('.density-option');
 const deleteForms=$$('.form-delete-item');
+const newMenuGroup=document.getElementById('new-menu-group');
+const newMenuButton=document.getElementById('btn-new-menu');
 const DENSITY_KEY='memo-density';
+if(newMenuGroup && newMenuButton){
+  const closeNewMenu=()=>{
+    newMenuGroup.dataset.open='false';
+    newMenuButton.setAttribute('aria-expanded','false');
+  };
+  newMenuButton.addEventListener('click',()=>{
+    const open=newMenuGroup.dataset.open==='true';
+    newMenuGroup.dataset.open=open?'false':'true';
+    newMenuButton.setAttribute('aria-expanded', open?'false':'true');
+  });
+  document.addEventListener('click',e=>{
+    if(!newMenuGroup.contains(e.target)){ closeNewMenu(); }
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){ closeNewMenu(); newMenuButton.focus(); }
+  });
+}
 function safeStorageGet(key){ try{ return window.localStorage.getItem(key); }catch(_){ return null; }}
 function safeStorageSet(key,value){ try{ window.localStorage.setItem(key,value); }catch(_){ }}
 function applyDensity(mode,{persist=true}={}){
@@ -6438,8 +6155,8 @@ async function handleDeleteForm(form){
     }
     showToast(`已删除 · ${title}`, data.undo_token ? [{label:'撤销', onClick:()=>undoDelete(data.undo_token)}] : []);
     try{
-      const {cats,counts,total}=await fetchCats();
-      refreshSidebarCats(cats,counts,total);
+      const {cats,counts,total,mindmap_count}=await fetchCats();
+      refreshSidebarCats(cats,counts,total,mindmap_count);
     }catch(_){ }
   }catch(err){
     alert(err instanceof Error ? err.message : '删除失败');
@@ -6573,7 +6290,7 @@ function renderCatRows(cats, counts){
     box.appendChild(row);
   });
 }
-function renderCatRowsFromDOM(){ fetchCats().then(({cats,counts,total})=>{renderCatRows(cats,counts); refreshSidebarCats(cats,counts,total);}); }
+function renderCatRowsFromDOM(){ fetchCats().then(({cats,counts,total,mindmap_count})=>{renderCatRows(cats,counts); refreshSidebarCats(cats,counts,total,mindmap_count);}); }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
 async function fetchCats(){
   const fd=new FormData(); fd.append('action','ping_cats');
@@ -6585,7 +6302,7 @@ async function addCat(ev){
   const name=document.getElementById('new-cat-name').value.trim(); if(!name) return false;
   const fd=new FormData(); fd.append('action','add_category'); fd.append('name', name);
   const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(j.ok){ document.getElementById('new-cat-name').value=''; renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total); }
+  if(j.ok){ document.getElementById('new-cat-name').value=''; renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_count); }
   return false;
 }
 async function saveCat(ev, id){
@@ -6593,25 +6310,33 @@ async function saveCat(ev, id){
   const name=new FormData(ev.target).get('name');
   const fd=new FormData(); fd.append('action','edit_category'); fd.append('id', id); fd.append('name', name);
   const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total); }
+  if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_count); }
   return false;
 }
 async function delCat(id, name){
   if(!confirm(`确认删除分类【${name}】？该分类下条目将移入“其他”。`)) return false;
   const fd=new FormData(); fd.append('action','delete_category'); fd.append('id', id);
   const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total); }
+  if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_count); }
   return false;
 }
-function refreshSidebarCats(cats, counts, total){
+function refreshSidebarCats(cats, counts, total, mindmapCount){
   const qParam=new URL(location.href).searchParams.get('q')||'';
   const urlCat=(new URL(location.href)).searchParams.get('cat')||'all';
-  const list=document.getElementById('cat-list'); list.innerHTML='';
+  const list=document.getElementById('cat-list');
+  if(!list) return;
+  const mmCount = typeof mindmapCount==='number' ? mindmapCount : Number(list.dataset.mindmapCount||0);
+  list.innerHTML='';
   const all=document.createElement('a');
   all.className='cat'+(urlCat==='all'?' active':'');
   all.href='?cat=all&q='+encodeURIComponent(qParam);
   all.innerHTML='<span class="name">全部 · All</span><span class="count">'+(total??0)+'</span>';
   list.appendChild(all);
+  const mindLink=document.createElement('a');
+  mindLink.className='cat'+(urlCat==='mindmap'?' active':'');
+  mindLink.href='?cat=mindmap&q='+encodeURIComponent(qParam);
+  mindLink.innerHTML='<span class="name">思维导图</span><span class="count">'+mmCount+'</span>';
+  list.appendChild(mindLink);
   cats.forEach(c=>{
     const link=document.createElement('a');
     link.className='cat'+(String(urlCat)===String(c.id)?' active':'');
@@ -6620,6 +6345,7 @@ function refreshSidebarCats(cats, counts, total){
     link.innerHTML=`<span class="name">${escapeHtml(c.name)}</span><span class="count">${counts[c.id]||0}</span>`;
     list.appendChild(link);
   });
+  list.dataset.mindmapCount=String(mmCount);
 }
 function fmt(ts){ const d=new Date(ts*1000); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 if(itemsContainer){
@@ -6648,8 +6374,8 @@ if(itemsContainer){
             ensureItemsEmptyState();
           }
           try{
-            const {cats,counts,total}=await fetchCats();
-            refreshSidebarCats(cats,counts,total);
+            const {cats,counts,total,mindmap_count}=await fetchCats();
+            refreshSidebarCats(cats,counts,total,mindmap_count);
           }catch(_){ }
         }
       }catch(_){ }
