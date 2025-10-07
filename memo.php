@@ -3961,15 +3961,17 @@ if ($view === 'map_edit') {
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-relations{position:absolute;top:0;left:0;overflow:visible}
-      .mind-relations .relation-group{pointer-events:auto}
+      .mind-relations .relation-group{pointer-events:auto;transition:filter var(--transition)}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition)}
+      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition)}
+      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-highlight{pointer-events:none}
-      .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2;stroke:url(#mindGoldTrace);filter:url(#mindSoftGlow)}
-      .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(255,242,218,.72);stroke-width:1.4}
+      .mind-relations .relation-group[data-selected="true"]{filter:drop-shadow(0 0 6px rgba(191,242,255,.45)) drop-shadow(0 0 18px rgba(191,242,255,.3))}
+      .mind-relations .relation-group[data-selected="true"] .relation-shadow{stroke:rgba(75,195,209,.85);opacity:.9}
+      .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2.6;stroke:rgba(191,242,255,.92);filter:url(#mindSoftGlow)}
+      .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(255,255,255,.88);stroke-width:2;opacity:1;animation:relationGlowPulse 1.2s ease-in-out infinite}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0;pointer-events:none}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto}
@@ -4103,8 +4105,14 @@ if ($view === 'map_edit') {
       .mind-attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.24);border-radius:999px}
       .mind-attachment-row{display:grid;grid-template-columns:auto 56px 1fr;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
       .mind-attachment-row[data-selected="true"]{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.12);box-shadow:0 0 0 1px rgba(75,195,209,.25)}
-      .mind-attachment-select{width:18px;height:18px;border-radius:6px;border:1px solid rgba(201,168,106,.32);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(227,198,139,.85);grid-row:1/span 3;align-self:flex-start}
-      .mind-attachment-row[data-selected="true"] .mind-attachment-select{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.22);color:#d9fbff}
+      .mind-attachment-select{position:relative;width:20px;height:20px;border-radius:8px;grid-row:1/span 3;align-self:flex-start;display:inline-flex}
+      .mind-attachment-checkbox{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+      .mind-attachment-checkbox-box{width:100%;height:100%;border-radius:8px;border:1px solid rgba(201,168,106,.32);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(227,198,139,.85);transition:border-color var(--transition),background var(--transition),color var(--transition),box-shadow var(--transition)}
+      .mind-attachment-checkbox-box::after{content:'✓';opacity:0;transform:scale(.8);transition:opacity var(--transition),transform var(--transition)}
+      .mind-attachment-checkbox:focus-visible + .mind-attachment-checkbox-box{box-shadow:0 0 0 2px rgba(227,198,139,.3)}
+      .mind-attachment-checkbox:checked + .mind-attachment-checkbox-box{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.18);color:#d9fbff}
+      .mind-attachment-checkbox:checked + .mind-attachment-checkbox-box::after{opacity:1;transform:scale(1)}
+      .mind-attachment-row[data-selected="true"] .mind-attachment-checkbox-box{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.22);color:#d9fbff}
       .mind-attachment-thumb{width:54px;height:54px;border-radius:16px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--gold-400);grid-row:1/span 3;align-self:flex-start}
       .mind-attachment-thumb img{width:100%;height:100%;object-fit:cover}
       .mind-attachment-content{display:grid;gap:12px;min-width:0}
@@ -4140,6 +4148,11 @@ if ($view === 'map_edit') {
         .mind-attachment-header{flex-direction:column;align-items:flex-start}
         .mind-attachment-actions{width:100%;justify-content:flex-start;margin-left:0}
         .mind-attachment-list{max-height:none}
+      }
+      @keyframes relationGlowPulse{
+        0%{opacity:.65}
+        50%{opacity:1}
+        100%{opacity:.65}
       }
       @keyframes mindNodeFlash{
         0%{box-shadow:0 0 0 0 rgba(75,195,209,.0)}
@@ -7413,7 +7426,7 @@ if ($view === 'map_edit') {
         if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
       }
       function afterMindStateChange(){
-        if(typeof cancelRelationMode==='function'){ cancelRelationMode(false); }
+        if(typeof cancelRelationMode==='function'){ cancelRelationMode(true); }
         scheduleHandleRefresh();
         requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
         updateFoldAllLabel();
@@ -7815,7 +7828,7 @@ if ($view === 'map_edit') {
         }
       }
       function toggleRelationMode(){
-        if(relationMode){ cancelRelationMode(false); }
+        if(relationMode){ cancelRelationMode(true); }
         else{ startRelationMode(); }
       }
       function handleRelationSelect(relation, evt){
@@ -8484,7 +8497,7 @@ if ($view === 'map_edit') {
             if(latest){
               refreshInspector(latest);
               updateHandlePosition();
-              centerOnNodeSmooth(latest);
+              centerOnNodeSmooth(latest,{animate:false});
             }
             updateFoldAllLabel();
             if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
@@ -8546,7 +8559,7 @@ if ($view === 'map_edit') {
             if(latest){
               refreshInspector(latest);
               updateHandlePosition();
-              centerOnNodeSmooth(latest);
+              centerOnNodeSmooth(latest,{animate:false});
             }
             updateFoldAllLabel();
             if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
@@ -8739,7 +8752,7 @@ if ($view === 'map_edit') {
               jm.select_node(latest.id);
               refreshInspector(latest);
               startInlineEditing(latest);
-              centerOnNodeSmooth(latest);
+              centerOnNodeSmooth(latest,{animate:false});
             }
           });
           return true;
@@ -8958,6 +8971,7 @@ if ($view === 'map_edit') {
             if(action==='download'){ triggerDirectDownload(item); return; }
             if(action==='delete'){ handleDelete([item.assetId]); return; }
           }
+          if(evt.target.closest('.mind-attachment-select')) return;
           if(!row) return;
           handleRowSelection(row, evt);
         }
@@ -9153,9 +9167,22 @@ if ($view === 'map_edit') {
           const selected=state.selection.has(item.assetId);
           if(selected) row.dataset.selected='true';
           row.setAttribute('aria-selected',selected?'true':'false');
-          const selectBox=document.createElement('div');
+          const selectBox=document.createElement('label');
           selectBox.className='mind-attachment-select';
-          selectBox.textContent='✓';
+          selectBox.setAttribute('aria-label',`选择附件：${item.name}`);
+          selectBox.addEventListener('click',evt=>evt.stopPropagation());
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';
+          checkbox.className='mind-attachment-checkbox';
+          checkbox.setAttribute('aria-label',`选择附件：${item.name}`);
+          checkbox.checked=selected;
+          checkbox.addEventListener('pointerdown',evt=>{ checkbox.dataset.shift=evt.shiftKey?'true':'false'; });
+          checkbox.addEventListener('change',evt=>handleCheckboxChange(row, checkbox, evt));
+          selectBox.addEventListener('pointerdown',evt=>{ checkbox.dataset.shift=evt.shiftKey?'true':'false'; });
+          const fauxBox=document.createElement('span');
+          fauxBox.className='mind-attachment-checkbox-box';
+          selectBox.appendChild(checkbox);
+          selectBox.appendChild(fauxBox);
           const thumb=document.createElement('div');
           thumb.className='mind-attachment-thumb';
           if(item.type==='image'){
@@ -9262,6 +9289,8 @@ if ($view === 'map_edit') {
             if(selected) row.dataset.selected='true';
             else row.removeAttribute('data-selected');
             row.setAttribute('aria-selected',selected?'true':'false');
+            const checkbox=row.querySelector('.mind-attachment-checkbox');
+            if(checkbox){ checkbox.checked=selected; }
           });
           updateSelectionInfo();
         }
@@ -9277,6 +9306,36 @@ if ($view === 'map_edit') {
           state.items.forEach(item=>{ if(state.selection.has(item.assetId)) total+=Number(item.size)||0; });
           const sizeText=total>0?formatBytesLocal(total):'';
           elements.selectionInfo.textContent=sizeText?`已选择 ${count} 个附件 · ${sizeText}`:`已选择 ${count} 个附件`;
+        }
+        function handleCheckboxChange(row, checkbox, evt){
+          if(!row || !checkbox) return;
+          if(evt){ evt.stopPropagation(); }
+          const index=Number(row.dataset.index);
+          const id=Number(row.dataset.assetId);
+          if(!Number.isFinite(index) || !Number.isFinite(id)) return;
+          const selection=new Set(state.selection);
+          const shiftKey=(evt && evt.shiftKey) || checkbox.dataset.shift==='true';
+          if(checkbox.checked){
+            if(shiftKey && state.lastIndex!==null){
+              const start=Math.min(state.lastIndex,index);
+              const end=Math.max(state.lastIndex,index);
+              for(let i=start;i<=end;i++){
+                const item=state.filtered[i];
+                if(!item) continue;
+                const asset=Number(item.assetId);
+                if(Number.isFinite(asset)){ selection.add(asset); }
+              }
+            }else{
+              selection.add(id);
+            }
+            state.lastIndex=index;
+          }else{
+            selection.delete(id);
+            if(state.lastIndex===index){ state.lastIndex=null; }
+          }
+          state.selection=selection;
+          checkbox.dataset.shift='';
+          syncSelectionState();
         }
         function handleRowSelection(row,evt){
           const index=Number(row.dataset.index);
@@ -9313,7 +9372,7 @@ if ($view === 'map_edit') {
           const node=jm.get_node(nodeId);
           if(!node) return;
           try{ jm.select_node(node.id); }catch(_){ }
-          centerOnNodeSmooth(node,{animate:true});
+          centerOnNodeSmooth(node,{animate:false});
           const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
           if(el){
             el.classList.add('mind-node-highlight');
@@ -9450,7 +9509,7 @@ if ($view === 'map_edit') {
       const handleMindAction=(action)=>{
         if(!action) return;
         closeMapIoMenu();
-        if(action!=='relation' && relationMode){ cancelRelationMode(false); }
+        if(action!=='relation' && relationMode){ cancelRelationMode(true); }
         switch(action){
           case 'save': saveMindmap(); break;
           case 'undo': undoMindChange(); break;
