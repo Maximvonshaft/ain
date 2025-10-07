@@ -3946,6 +3946,9 @@ if ($view === 'map_edit') {
       .mind-stage{position:relative;flex:1 1 auto;min-height:0;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
+      .mind-container{cursor:default}
+      .mind-container.mind-pan-key{cursor:grab}
+      .mind-container.mind-pan-dragging{cursor:grabbing}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:auto;overflow:visible}
@@ -4003,8 +4006,8 @@ if ($view === 'map_edit') {
       .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
@@ -4025,9 +4028,9 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -5084,11 +5087,71 @@ if ($view === 'map_edit') {
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
           this.edgeHoverState=null;
+          this.spacePanActive=false;
+          this.globalPanKeyHandlersAttached=false;
+          this.boundPanKeyDown=null;
+          this.boundPanKeyUp=null;
+          this.boundPanBlur=null;
+          this.isPointerPanning=false;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
         }
+        ensurePanKeyHandlers(){
+          if(this.globalPanKeyHandlersAttached) return;
+          this.boundPanKeyDown=evt=>this.handleGlobalKeyDown(evt);
+          this.boundPanKeyUp=evt=>this.handleGlobalKeyUp(evt);
+          this.boundPanBlur=()=>this.cancelSpacePan();
+          document.addEventListener('keydown',this.boundPanKeyDown,true);
+          document.addEventListener('keyup',this.boundPanKeyUp,true);
+          window.addEventListener('blur',this.boundPanBlur);
+          this.globalPanKeyHandlersAttached=true;
+        }
+        isEditableTarget(target){
+          if(!target) return false;
+          const ElementCtor=typeof Element!=='undefined'?Element:null;
+          const el=ElementCtor && target instanceof ElementCtor ? target : (target.parentElement || null);
+          if(!el) return false;
+          if(el.closest('input,textarea,select,[contenteditable="true"]')) return true;
+          if(typeof el.isContentEditable==='boolean' && el.isContentEditable) return true;
+          return false;
+        }
+        isSpaceKey(evt){
+          if(!evt) return false;
+          if(evt.code==='Space') return true;
+          const key=evt.key;
+          return key===' ' || key==='Spacebar';
+        }
+        handleGlobalKeyDown(evt){
+          if(!this.isSpaceKey(evt)) return;
+          if(evt.repeat) return;
+          if(this.isEditableTarget(evt.target)) return;
+          this.spacePanActive=true;
+          this.applySpacePanState();
+          evt.preventDefault();
+        }
+        handleGlobalKeyUp(evt){
+          if(!this.isSpaceKey(evt)) return;
+          this.cancelSpacePan();
+        }
+        cancelSpacePan(){
+          if(!this.spacePanActive) return;
+          this.spacePanActive=false;
+          this.applySpacePanState();
+        }
+        applySpacePanState(){
+          if(!this.container) return;
+          if(this.spacePanActive){ this.container.classList.add('mind-pan-key'); }
+          else{ this.container.classList.remove('mind-pan-key'); }
+        }
+        updatePointerPanState(active){
+          this.isPointerPanning=!!active;
+          if(!this.container) return;
+          if(this.isPointerPanning){ this.container.classList.add('mind-pan-dragging'); }
+          else{ this.container.classList.remove('mind-pan-dragging'); }
+        }
         setupPan(){
+          this.ensurePanKeyHandlers();
           const updatePinchBaseline=()=>{
             if(this.activePointers.size<2){ this.pinchState=null; return; }
             const pointers=Array.from(this.activePointers.values());
@@ -5108,35 +5171,42 @@ if ($view === 'map_edit') {
             };
           };
           const startPan=(evt)=>{
+            if(!evt) return;
             this.clearEdgeHover();
             const isTouch=evt.pointerType==='touch';
-            const onNode=!!evt.target.closest('.jsmind-node');
-            if(!isTouch){
-              if(evt.button!==0) return;
-              if(onNode) return;
+            const onNode=!!(evt.target && evt.target.closest && evt.target.closest('.jsmind-node'));
+            if(isTouch){
               this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
-              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
-              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
-              return;
-            }
-            this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
-            if(isTouch && (this.activePointers.size>=2 || !onNode)){
-              evt.preventDefault();
-            }
-            if(this.activePointers.size>=2){
-              for(const id of this.activePointers.keys()){
-                try{ this.container.setPointerCapture(id); }catch(_){ }
+              if(this.activePointers.size>=2){
+                evt.preventDefault();
+                this.dragState=null;
+                this.updatePointerPanState(false);
+                for(const id of this.activePointers.keys()){
+                  try{ this.container.setPointerCapture(id); }catch(_){ }
+                }
+                updatePinchBaseline();
+                return;
               }
-              this.dragState=null;
-              updatePinchBaseline();
-              return;
-            }
-            if(!onNode){
+              if(onNode && !this.spacePanActive){
+                this.dragState=null;
+                return;
+              }
               try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
               this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
-            }else{
-              this.dragState=null;
+              this.updatePointerPanState(true);
+              evt.preventDefault();
+              return;
             }
+            const button=typeof evt.button==='number'?evt.button:0;
+            const isPrimary=button===0;
+            const isMiddle=button===1;
+            if(!isPrimary && !isMiddle) return;
+            if(onNode && !(this.spacePanActive || isMiddle)) return;
+            this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+            try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+            this.updatePointerPanState(true);
+            evt.preventDefault();
           };
           const movePan=(evt)=>{
             if(!this.activePointers.has(evt.pointerId)) return;
@@ -5145,6 +5215,7 @@ if ($view === 'map_edit') {
               this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
               if(this.activePointers.size>=2){
                 evt.preventDefault();
+                this.updatePointerPanState(false);
                 if(!this.pinchState){ updatePinchBaseline(); }
                 const pinch=this.pinchState;
                 if(!pinch) return;
@@ -5156,10 +5227,12 @@ if ($view === 'map_edit') {
                 const centerX=((a.x+b.x)/2)-rect.left;
                 const centerY=((a.y+b.y)/2)-rect.top;
                 const nextScale=this.clampScale(pinch.baseScale * (distance / pinch.initialDistance), rect);
-                this.scale=nextScale;
-                this.offsetX=centerX - pinch.originX*this.scale;
-                this.offsetY=centerY - pinch.originY*this.scale;
-                this.applyTransform();
+                if(Math.abs(nextScale-this.scale)>0.0001){
+                  this.scale=nextScale;
+                  this.offsetX=centerX - pinch.originX*this.scale;
+                  this.offsetY=centerY - pinch.originY*this.scale;
+                  this.applyTransform();
+                }
                 return;
               }
               if(this.dragState && this.dragState.pointerId===evt.pointerId){
@@ -5179,6 +5252,7 @@ if ($view === 'map_edit') {
             }
             if(this.dragState && evt.pointerId===this.dragState.pointerId){
               this.dragState=null;
+              this.updatePointerPanState(false);
             }
             if(this.activePointers.size<2){
               this.pinchState=null;
@@ -5253,26 +5327,38 @@ if ($view === 'map_edit') {
         }
         handleWheel(evt){
           if(!evt) return;
-          if(evt.ctrlKey || evt.metaKey){
+          const rect=this.container.getBoundingClientRect();
+          if(!rect) return;
+          const trackpadThreshold=60;
+          const isTrackpadLike=evt.deltaMode===0 && Math.abs(evt.deltaY)<trackpadThreshold && Math.abs(evt.deltaX)<trackpadThreshold;
+          const wantsZoom=evt.ctrlKey || evt.metaKey || (!evt.shiftKey && !evt.altKey && !isTrackpadLike);
+          if(wantsZoom){
             evt.preventDefault();
-            const delta=Math.max(-1, Math.min(1, evt.deltaY));
-            const factor=delta<0?1.12:0.9;
-            const prevScale=this.scale;
-            const rect=this.container.getBoundingClientRect();
-            const nextScale=this.clampScale(prevScale*factor, rect);
-            if(Math.abs(nextScale-prevScale)<0.0001) return;
-            const originX=(evt.clientX-rect.left - this.offsetX)/this.scale;
-            const originY=(evt.clientY-rect.top - this.offsetY)/this.scale;
+            const baseScale=this.scale>0?this.scale:1;
+            const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
+            const delta=evt.deltaY||0;
+            const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
+            if(Math.abs(nextScale-baseScale)<0.0001) return;
+            const anchorX=evt.clientX-rect.left;
+            const anchorY=evt.clientY-rect.top;
+            const originX=(anchorX - this.offsetX)/baseScale;
+            const originY=(anchorY - this.offsetY)/baseScale;
             this.scale=nextScale;
-            this.offsetX=evt.clientX-rect.left - originX*this.scale;
-            this.offsetY=evt.clientY-rect.top - originY*this.scale;
+            this.offsetX=anchorX - originX*this.scale;
+            this.offsetY=anchorY - originY*this.scale;
             this.applyTransform();
             return;
           }
           evt.preventDefault();
-          const multiplier=evt.deltaMode===1?16:(evt.deltaMode===2?240:1);
-          this.offsetX-=evt.deltaX*multiplier;
-          this.offsetY-=evt.deltaY*multiplier;
+          let deltaX=evt.deltaX||0;
+          let deltaY=evt.deltaY||0;
+          if(evt.shiftKey && !evt.altKey){
+            deltaX+=deltaY;
+            deltaY=0;
+          }
+          const multiplier=evt.deltaMode===1?20:(evt.deltaMode===2?Math.max(rect.width,rect.height)*0.8:(isTrackpadLike?1:1.8));
+          this.offsetX-=deltaX*multiplier;
+          this.offsetY-=deltaY*multiplier;
           this.applyTransform();
         }
         add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
@@ -9054,6 +9140,30 @@ if ($view === 'map_edit') {
           if(mime.includes('zip') || mime.includes('rar') || archiveExts.includes(ext)) return 'archive';
           return 'other';
         }
+        function backupAndRemoveAssetMeta(ids){
+          const stash=new Map();
+          if(!Array.isArray(ids)) return stash;
+          ids.forEach(id=>{
+            const numeric=Number(id);
+            if(!Number.isFinite(numeric)) return;
+            if(assetMeta.has(numeric)){
+              const meta=assetMeta.get(numeric);
+              stash.set(numeric, meta && typeof meta==='object'?{...meta}:meta);
+              assetMeta.delete(numeric);
+            }
+          });
+          return stash;
+        }
+        function restoreAssetMeta(stash){
+          if(!(stash instanceof Map)) return;
+          stash.forEach((meta,id)=>{
+            if(meta && typeof meta==='object'){
+              assetMeta.set(id,{...meta});
+            }else if(meta!=null){
+              assetMeta.set(id,meta);
+            }
+          });
+        }
         function collectAttachments(){
           const items=[];
           if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return items;
@@ -9387,14 +9497,15 @@ if ($view === 'map_edit') {
           const sizeText=total>0?`（总计 ${formatBytesLocal(total)}）`:'';
           if(!confirm(`确定要删除 ${unique.length} 个附件${sizeText}吗？`)) return;
           const changed=removeAttachmentsFromMind(unique);
-          if(!changed) return;
+          const metaBackup=backupAndRemoveAssetMeta(unique);
+          refresh(true);
           requestDelete(unique).then(()=>{
-            unique.forEach(id=>assetMeta.delete(id));
             state.selection.clear();
             refresh(true);
           }).catch(err=>{
             alert(err && err.message ? err.message : '删除附件失败');
-            undoMindChange();
+            restoreAssetMeta(metaBackup);
+            if(changed){ undoMindChange(); }
             refresh(true);
           });
         }
