@@ -3762,15 +3762,6 @@ if ($view === 'map_edit') {
       .mind-info-row .map-title-input{flex:1;min-width:0}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
-      .map-shortcuts{margin-top:10px;padding-top:10px;border-top:1px solid rgba(201,168,106,.18);display:flex;flex-direction:column;gap:6px}
-      .map-shortcuts table{width:100%;border-collapse:collapse;font:500 11px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;color:var(--text-dim)}
-      .map-shortcuts thead th{text-align:left;font:600 10px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--text-strong);padding-bottom:4px}
-      .map-shortcuts td{padding:3px 6px 3px 0;vertical-align:top;white-space:normal}
-      .map-shortcuts td:first-child{color:var(--text-strong)}
-      .map-shortcuts .key-set{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-      .map-shortcuts .key-set span{font-weight:600;letter-spacing:.12em;color:var(--text-dim)}
-      .map-shortcuts kbd{display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;border-radius:6px;border:1px solid rgba(201,168,106,.26);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.12)}
-      .map-shortcuts .key-set .key-join{font-size:12px}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
@@ -3839,8 +3830,11 @@ if ($view === 'map_edit') {
       .jsmind-node.relation-target{border-style:dashed;border-color:rgba(75,195,209,.6)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
-      .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
-      .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.42)}
+      .node-collapse-marker{position:absolute;right:18px;bottom:16px;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);cursor:pointer;pointer-events:auto;transition:background var(--transition),border-color var(--transition),transform var(--transition)}
+      .node-collapse-marker:hover{transform:translateY(-1px);border-color:rgba(201,168,106,.48)}
+      .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .node-collapse-marker .icon{font-size:14px;line-height:1}
+      .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 26px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 40px - var(--safe-left) - var(--safe-right)),720px)}
       .mind-dock-wrap::before,.mind-dock-wrap::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:26px;height:70%;pointer-events:none;opacity:0;transition:opacity var(--t-fast) var(--ease);z-index:0}
       .mind-dock-wrap::before{left:8px;background:linear-gradient(90deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
@@ -3852,6 +3846,12 @@ if ($view === 'map_edit') {
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 auto;scroll-snap-align:center}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
+      @media (hover:hover) and (pointer:fine){
+        .dock-btn[data-tip]::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);padding:6px 10px;border-radius:12px;border:1px solid rgba(201,168,106,.38);background:rgba(12,16,18,.92);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);box-shadow:0 12px 28px rgba(0,0,0,.45)}
+        .dock-btn[data-tip]::before{content:"";position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);border-width:6px;border-style:solid;border-color:rgba(12,16,18,.92) transparent transparent transparent;opacity:0;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+        .dock-btn[data-tip]:hover::after,.dock-btn[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,-4px)}
+        .dock-btn[data-tip]:hover::before,.dock-btn[data-tip]:focus-visible::before{opacity:1;transform:translate(-50%,-4px)}
+      }
       .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
       .dock-btn:active{transform:translateY(-1px)}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
@@ -3979,62 +3979,6 @@ if ($view === 'map_edit') {
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
             </div>
-            <div class="map-shortcuts" aria-label="思维导图快捷键">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">操作</th>
-                    <th scope="col">Win</th>
-                    <th scope="col">Mac</th>
-                    <th scope="col">说明</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>新建同级节点</td>
-                    <td><div class="key-set"><kbd>Enter</kbd></div></td>
-                    <td><div class="key-set"><kbd>Return</kbd></div></td>
-                    <td>在当前节点下方创建同级节点</td>
-                  </tr>
-                  <tr>
-                    <td>新建子级节点</td>
-                    <td><div class="key-set"><kbd>Tab</kbd></div></td>
-                    <td><div class="key-set"><kbd>Tab</kbd></div></td>
-                    <td>在当前节点下创建子节点</td>
-                  </tr>
-                  <tr>
-                    <td>新建父级节点</td>
-                    <td><div class="key-set"><kbd>Shift</kbd><span class="key-join">+</span><kbd>Tab</kbd></div></td>
-                    <td><div class="key-set"><kbd>Shift</kbd><span class="key-join">+</span><kbd>Tab</kbd></div></td>
-                    <td>将当前节点提升为父层的兄弟节点</td>
-                  </tr>
-                  <tr>
-                    <td>删除节点</td>
-                    <td><div class="key-set"><kbd>Del</kbd><span>/</span><kbd>Backspace</kbd></div></td>
-                    <td><div class="key-set"><kbd>⌫</kbd></div></td>
-                    <td>删除当前选中节点</td>
-                  </tr>
-                  <tr>
-                    <td>折叠 / 展开</td>
-                    <td><div class="key-set"><kbd>Space</kbd><span>/</span><kbd>→</kbd><span>/</span><kbd>←</kbd></div></td>
-                    <td><div class="key-set"><kbd>Space</kbd><span>/</span><kbd>→</kbd><span>/</span><kbd>←</kbd></div></td>
-                    <td>展开或折叠当前节点分支</td>
-                  </tr>
-                  <tr>
-                    <td>复制节点</td>
-                    <td><div class="key-set"><kbd>Ctrl</kbd><span class="key-join">+</span><kbd>C</kbd></div></td>
-                    <td><div class="key-set"><kbd>⌘</kbd><span class="key-join">+</span><kbd>C</kbd></div></td>
-                    <td>复制节点及其子节点</td>
-                  </tr>
-                  <tr>
-                    <td>粘贴节点</td>
-                    <td><div class="key-set"><kbd>Ctrl</kbd><span class="key-join">+</span><kbd>V</kbd></div></td>
-                    <td><div class="key-set"><kbd>⌘</kbd><span class="key-join">+</span><kbd>V</kbd></div></td>
-                    <td>粘贴为同级节点</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </header>
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
@@ -4049,31 +3993,43 @@ if ($view === 'map_edit') {
       <?php endif; ?>
       <div class="mind-dock-wrap">
         <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
-          <button class="dock-btn" data-action="save" data-default-label="保存" title="保存 (Ctrl+S)" aria-label="保存">
+          <button class="dock-btn" data-action="save" data-default-label="保存" data-tip="保存（Ctrl+S）" aria-label="保存">
             <span class="icon">💾</span>
             <span class="label">保存</span>
           </button>
-          <button class="dock-btn" data-action="sibling" title="新增同级 (Enter)" aria-label="新增同级节点">
+          <button class="dock-btn" data-action="undo" data-tip="撤销（Ctrl/⌘+Z）" aria-label="撤销操作">
+            <span class="icon">↺</span>
+            <span class="label">撤销</span>
+          </button>
+          <button class="dock-btn" data-action="redo" data-tip="重做（Ctrl+Shift+Z）" aria-label="重做操作">
+            <span class="icon">↻</span>
+            <span class="label">重做</span>
+          </button>
+          <button class="dock-btn" data-action="sibling" data-tip="同级节点（Enter）" aria-label="新增同级节点">
             <span class="icon">⧉</span>
             <span class="label">同级</span>
           </button>
-          <button class="dock-btn" data-action="child" title="新增子级 (Tab)" aria-label="新增子级节点">
+          <button class="dock-btn" data-action="child" data-tip="子级节点（Tab）" aria-label="新增子级节点">
             <span class="icon">↳</span>
             <span class="label">子级</span>
           </button>
-          <button class="dock-btn" data-action="attach" title="上传附件" aria-label="上传附件">
+          <button class="dock-btn" data-action="fold" data-tip="折叠/展开（Space 或 ←/→）" aria-label="折叠或展开节点">
+            <span class="icon" data-fold-icon>⇅</span>
+            <span class="label" data-fold-label>折叠</span>
+          </button>
+          <button class="dock-btn" data-action="attach" data-tip="上传附件" aria-label="上传附件">
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
-          <button class="dock-btn" data-action="relation" title="关联节点" aria-label="关联节点">
+          <button class="dock-btn" data-action="relation" data-tip="建立关联" aria-label="关联节点">
             <span class="icon">🪢</span>
             <span class="label">关联</span>
           </button>
-          <button class="dock-btn" data-action="link" title="新增链接" aria-label="新增链接">
+          <button class="dock-btn" data-action="link" data-tip="新增链接" aria-label="新增链接">
             <span class="icon">🔗</span>
             <span class="label">链接</span>
           </button>
-          <button class="dock-btn danger" data-action="delete" title="删除节点 (Del)" aria-label="删除节点">
+          <button class="dock-btn danger" data-action="delete" data-tip="删除（Backspace/Del）" aria-label="删除节点">
             <span class="icon">🗑</span>
             <span class="label">删除</span>
           </button>
@@ -4114,17 +4070,6 @@ if ($view === 'map_edit') {
 负责人：张三
 标签：#重要 #任务"></textarea>
         </div>
-        <div class="field fold-field" id="node-fold-field" hidden>
-        <div class="fold-row">
-          <label for="node-fold-toggle">折叠子节点</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="node-fold-toggle">
-            <span class="track"><span class="thumb"></span></span>
-            <span class="toggle-text" id="node-fold-toggle-text">展开中</span>
-          </label>
-        </div>
-        <p class="fold-hint" id="node-fold-hint"></p>
-      </div>
       <div class="field" id="node-relations-field">
         <label>关联节点</label>
         <div class="relation-list" id="node-relations-list"></div>
@@ -5785,12 +5730,18 @@ if ($view === 'map_edit') {
             badges.forEach(btn=>wrap.appendChild(btn));
             el.appendChild(wrap);
           }
-          if(node.children && node.children.length && node.expanded===false){
-            const marker=document.createElement('span');
+          if(!forMeasure && node.children && node.children.length && node.expanded===false){
+            const marker=document.createElement('button');
+            marker.type='button';
             marker.className='node-collapse-marker';
-            marker.textContent='⤴ 已折叠';
-            marker.title='该节点包含折叠的子节点';
-            marker.setAttribute('aria-hidden','true');
+            marker.innerHTML='<span class="icon">⤴</span><span class="text">展开</span>';
+            marker.setAttribute('aria-label','展开节点');
+            marker.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              const latest=jm.get_node(node.id);
+              if(latest){ setNodeExpandedState(latest,true); }
+            });
             el.appendChild(marker);
           }
           if(!forMeasure){
@@ -6048,6 +5999,14 @@ if ($view === 'map_edit') {
           if(!node || !node.parent || !Array.isArray(points) || points.length<2) return;
           const btn=this.ensureEdgeInsertButton(node);
           if(!btn) return;
+          if(node.parent && node.parent.expanded===false){
+            btn.hidden=true;
+            this.clearEdgeHover(node.parent.id, node.id);
+            btn._logicalPosition=null;
+            delete btn.dataset.logicalX;
+            delete btn.dataset.logicalY;
+            return;
+          }
           const mid=this.computeRouteMidpoint(points);
           if(!mid){
             btn.hidden=true;
@@ -6648,8 +6607,18 @@ if ($view === 'map_edit') {
           return;
         }
         if(value!==initialText){
-          if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
-          markDirty();
+          const target=jm.get_node(nodeId);
+          if(target){
+            performUndoable('rename-node',()=>{
+              if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
+              markDirty();
+              requestAnimationFrame(()=>refreshInspector(jm.get_node(nodeId)));
+              return true;
+            },{mergeKey:`rename:${nodeId}`});
+          }else if(typeof jm.update_node==='function'){
+            jm.update_node(nodeId, value);
+            markDirty();
+          }
         }
         scheduleHandleRefresh();
       }
@@ -6897,6 +6866,11 @@ if ($view === 'map_edit') {
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
+      const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
+      const dockRedoButton=dock ? dock.querySelector('.dock-btn[data-action="redo"]') : null;
+      const dockFoldButton=dock ? dock.querySelector('.dock-btn[data-action="fold"]') : null;
+      const dockFoldLabel=dockFoldButton ? dockFoldButton.querySelector('[data-fold-label]') : null;
+      const dockFoldIcon=dockFoldButton ? dockFoldButton.querySelector('[data-fold-icon]') : null;
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
@@ -6990,14 +6964,244 @@ if ($view === 'map_edit') {
         if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
         else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
+      const UNDO_MAX_DEPTH=100;
+      const UNDO_MERGE_WINDOW=200;
+      class MindUndoManager{
+        constructor(options={}){
+          this.maxDepth=typeof options.maxDepth==='number' && options.maxDepth>0 ? options.maxDepth : UNDO_MAX_DEPTH;
+          this.stack=[];
+          this.redoStack=[];
+          this.isRestoring=false;
+        }
+        clear(){ this.stack.length=0; this.redoStack.length=0; }
+        canUndo(){ return this.stack.length>0; }
+        canRedo(){ return this.redoStack.length>0; }
+        push(entry){
+          if(!entry) return;
+          const now=entry.timestamp || Date.now();
+          const prev=this.stack[this.stack.length-1];
+          if(prev && entry.mergeKey && prev.mergeKey===entry.mergeKey && (now - prev.timestamp) <= UNDO_MERGE_WINDOW){
+            prev.after=entry.after;
+            prev.afterSerialized=entry.afterSerialized;
+            prev.timestamp=now;
+            return;
+          }
+          this.stack.push({
+            label:entry.label || '',
+            before:entry.before,
+            after:entry.after,
+            beforeSerialized:entry.beforeSerialized,
+            afterSerialized:entry.afterSerialized,
+            timestamp:now,
+            mergeKey:entry.mergeKey || null,
+          });
+          if(this.stack.length>this.maxDepth){ this.stack.shift(); }
+          this.redoStack.length=0;
+        }
+        pushExisting(entry){
+          if(!entry) return;
+          this.stack.push(entry);
+          if(this.stack.length>this.maxDepth){ this.stack.shift(); }
+        }
+        popUndoEntry(){ return this.stack.pop() || null; }
+        pushRedo(entry){ if(entry){ this.redoStack.push(entry); if(this.redoStack.length>this.maxDepth){ this.redoStack.shift(); } } }
+        popRedoEntry(){ return this.redoStack.pop() || null; }
+      }
+      const undoManager=new MindUndoManager({maxDepth:UNDO_MAX_DEPTH});
+      function snapshotSignature(snapshot){
+        if(!snapshot || !snapshot.tree) return '';
+        try{ return JSON.stringify(snapshot.tree); }
+        catch(_){ return ''; }
+      }
+      function captureMindSnapshot(){
+        if(!jm || typeof jm.get_data!=='function') return null;
+        let data=null;
+        try{ data=jm.get_data('node_tree'); }
+        catch(err){ console.warn(err); return null; }
+        if(!data) return null;
+        const selected=typeof jm.get_selected_node==='function' ? jm.get_selected_node() : null;
+        return {
+          tree:deepClone(data),
+          selectedId:selected && selected.id ? selected.id : null,
+          view:{
+            offsetX:Number.isFinite(jm.offsetX)?jm.offsetX:null,
+            offsetY:Number.isFinite(jm.offsetY)?jm.offsetY:null,
+            scale:Number.isFinite(jm.scale)?jm.scale:null,
+          }
+        };
+      }
+      function applyViewState(view){
+        if(!jm || !view) return;
+        if(typeof view.scale==='number' && isFinite(view.scale)){ jm.scale=view.scale; }
+        if(typeof view.offsetX==='number' && isFinite(view.offsetX)){ jm.offsetX=view.offsetX; }
+        if(typeof view.offsetY==='number' && isFinite(view.offsetY)){ jm.offsetY=view.offsetY; }
+        if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+      }
+      function afterMindStateChange(){
+        if(typeof cancelRelationMode==='function'){ cancelRelationMode(false); }
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+        updateFoldAllLabel();
+        updateFoldButtonState();
+        if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
+        if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+      }
+      function updateFoldButtonState(){
+        if(!dockFoldButton) return;
+        const node=jm && typeof jm.get_selected_node==='function' ? jm.get_selected_node() : null;
+        const hasChildren=!!(node && node.children && node.children.length);
+        let label='折叠';
+        let icon='⇅';
+        let tip='折叠/展开（Space 或 ←/→）';
+        if(hasChildren){
+          const collapsed=node.expanded===false;
+          label=collapsed?'展开':'折叠';
+          icon=collapsed?'⤴':'⤵';
+          tip=collapsed?'展开（Space 或 →）':'折叠（Space 或 ←）';
+        }
+        if(dockFoldLabel){ dockFoldLabel.textContent=label; }
+        if(dockFoldIcon){ dockFoldIcon.textContent=icon; }
+        dockFoldButton.dataset.tip=tip;
+        dockFoldButton.disabled=!hasChildren;
+        dockFoldButton.setAttribute('aria-label', hasChildren ? `${label}节点` : '折叠或展开节点');
+      }
+      function restoreMindSnapshot(snapshot){
+        if(!snapshot || !snapshot.tree) return false;
+        if(!jm || typeof jm.show!=='function') return false;
+        undoManager.isRestoring=true;
+        try{
+          jm.show(deepClone(snapshot.tree));
+          if(snapshot.view){ applyViewState(snapshot.view); }
+          if(snapshot.selectedId && typeof jm.select_node==='function'){
+            try{ jm.select_node(snapshot.selectedId); }
+            catch(_){ /* ignore */ }
+          }
+          afterMindStateChange();
+          markDirty();
+          return true;
+        }catch(err){
+          console.error(err);
+          return false;
+        }finally{
+          undoManager.isRestoring=false;
+        }
+      }
+      function updateUndoRedoButtons(){
+        if(dockUndoButton){ dockUndoButton.disabled=!undoManager.canUndo(); }
+        if(dockRedoButton){ dockRedoButton.disabled=!undoManager.canRedo(); }
+      }
+      function performUndoable(label, action, options={}){
+        if(typeof action!=='function') return;
+        if(undoManager.isRestoring) return action();
+        const before=captureMindSnapshot();
+        const result=action();
+        if(result instanceof Promise){
+          console.warn('performUndoable 不支持异步操作');
+          return result;
+        }
+        if(result===false && !options.force){ return result; }
+        const after=captureMindSnapshot();
+        if(!before || !after) return result;
+        const beforeSerialized=snapshotSignature(before);
+        const afterSerialized=snapshotSignature(after);
+        if(!beforeSerialized || beforeSerialized===afterSerialized) return result;
+        undoManager.push({
+          label:label||'',
+          before,
+          after,
+          beforeSerialized,
+          afterSerialized,
+          mergeKey:options.mergeKey||null,
+          timestamp:Date.now(),
+        });
+        updateUndoRedoButtons();
+        return result;
+      }
+      function undoMindChange(){
+        if(!undoManager.canUndo()) return false;
+        const entry=undoManager.popUndoEntry();
+        if(!entry) return false;
+        const success=restoreMindSnapshot(entry.before);
+        if(success){
+          undoManager.pushRedo(entry);
+        }else{
+          undoManager.pushExisting(entry);
+        }
+        updateUndoRedoButtons();
+        return success;
+      }
+      function redoMindChange(){
+        if(!undoManager.canRedo()) return false;
+        const entry=undoManager.popRedoEntry();
+        if(!entry) return false;
+        const success=restoreMindSnapshot(entry.after);
+        if(success){
+          entry.timestamp=Date.now();
+          undoManager.pushExisting(entry);
+        }else{
+          undoManager.pushRedo(entry);
+        }
+        updateUndoRedoButtons();
+        return success;
+      }
+      let panAnimation=null;
+      function stopPanAnimation(){
+        if(panAnimation && panAnimation.raf){ cancelAnimationFrame(panAnimation.raf); }
+        panAnimation=null;
+      }
+      function centerOnNodeSmooth(node){
+        if(!jm || !node || typeof jm.center_node!=='function') return false;
+        const startX=Number.isFinite(jm.offsetX)?jm.offsetX:0;
+        const startY=Number.isFinite(jm.offsetY)?jm.offsetY:0;
+        const startScale=jm.scale;
+        const prevHasCentered=jm.hasCentered;
+        const centered=jm.center_node(node);
+        if(!centered){ return false; }
+        const targetX=Number.isFinite(jm.offsetX)?jm.offsetX:startX;
+        const targetY=Number.isFinite(jm.offsetY)?jm.offsetY:startY;
+        jm.offsetX=startX;
+        jm.offsetY=startY;
+        jm.scale=startScale;
+        jm.hasCentered=prevHasCentered;
+        if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+        stopPanAnimation();
+        if(Math.abs(targetX-startX)<0.5 && Math.abs(targetY-startY)<0.5){
+          jm.offsetX=targetX;
+          jm.offsetY=targetY;
+          if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          return true;
+        }
+        const duration=260;
+        const startTime=performance.now();
+        const ease=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+        function step(now){
+          const elapsed=now-startTime;
+          const progress=Math.min(1, elapsed/duration);
+          const eased=ease(progress);
+          jm.offsetX=startX + (targetX-startX)*eased;
+          jm.offsetY=startY + (targetY-startY)*eased;
+          if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          if(progress<1){ panAnimation={raf:requestAnimationFrame(step)}; }
+          else{ panAnimation=null; }
+        }
+        panAnimation={raf:requestAnimationFrame(step)};
+        return true;
+      }
+      function centerOnNearestVisible(node){
+        if(!node) return false;
+        let current=node;
+        while(current){
+          if(centerOnNodeSmooth(current)) return true;
+          current=current.parent || null;
+        }
+        return false;
+      }
       const deleteMapForm=document.getElementById('delete-map-form');
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
       let relationMode=null;
       let relationToastTimer=null;
-      const commandLog=[];
-      window.__mindmapCommands=commandLog;
       let nodeClipboardTemplate=null;
       let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
@@ -7108,13 +7312,15 @@ if ($view === 'map_edit') {
         cancelRelationMode(false);
         if(duplicate){ showRelationToast('已存在关联'); return; }
         if(typeof jm.add_relation==='function'){
-          const relation=jm.add_relation(sourceId, targetNode.id, options);
-          if(relation){
+          performUndoable('add-relation',()=>{
+            const relation=jm.add_relation(sourceId, targetNode.id, options);
+            if(!relation) return false;
             markDirty();
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             showRelationToast('关联已创建');
-          }
+            return true;
+          },{mergeKey:`relation:add:${sourceId}`});
         }
       }
       function toggleRelationMode(){
@@ -7206,42 +7412,57 @@ if ($view === 'map_edit') {
       }
       function toggleFoldAll(){
         const target=hasCollapsedNodes() ? true : false;
-        const changed=setAllNodesExpanded(target);
-        if(changed){
-          markDirty();
-          scheduleHandleRefresh();
-          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
-        }
-        updateFoldAllLabel();
-      }
-      function setNodeExpandedState(node, expanded){
-        if(!node) return;
-        let changed=false;
-        if(typeof jm.set_node_expanded==='function'){
-          try{ changed=!!jm.set_node_expanded(node.id, expanded); }
-          catch(_){ changed=false; }
-        }
-        if(!changed && typeof jm.set_node_expanded!=='function'){
-          const desired=expanded!==false;
-          if(node.expanded!==desired){
-            node.expanded=desired;
-            if(node.model){ node.model.expanded=desired; }
-            jm.computeLayout();
-            jm.render();
-            if(typeof jm.emit==='function' && jsMind?.event_type?.refresh){
-              jm.emit(jsMind.event_type.refresh);
-            }
-            changed=true;
+        performUndoable('toggle-all',()=>{
+          const changed=setAllNodesExpanded(target);
+          if(changed){
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
           }
-        }
-        if(changed){
-          markDirty();
-          scheduleHandleRefresh();
-          requestAnimationFrame(()=>refreshInspector(jm.get_node(node.id)));
-        }else{
-          updateFoldToggleUI(jm.get_node(node.id));
-        }
-        updateFoldAllLabel();
+          updateFoldAllLabel();
+          updateFoldButtonState();
+          return changed;
+        },{mergeKey:'fold:all'});
+      }
+      function setNodeExpandedState(node, expanded, options={}){
+        if(!node) return;
+        const mergeKey=`fold:${node.id}`;
+        performUndoable('toggle-node',()=>{
+          let changed=false;
+          if(typeof jm.set_node_expanded==='function'){
+            try{ changed=!!jm.set_node_expanded(node.id, expanded); }
+            catch(_){ changed=false; }
+          }
+          if(!changed && typeof jm.set_node_expanded!=='function'){
+            const desired=expanded!==false;
+            if(node.expanded!==desired){
+              node.expanded=desired;
+              if(node.model){ node.model.expanded=desired; }
+              jm.computeLayout();
+              jm.render();
+              if(typeof jm.emit==='function' && jsMind?.event_type?.refresh){
+                jm.emit(jsMind.event_type.refresh);
+              }
+              changed=true;
+            }
+          }
+          if(changed){
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>{
+              const latest=jm.get_node(node.id);
+              if(latest){
+                refreshInspector(latest);
+                if(options.focus!==false){ centerOnNearestVisible(latest); }
+              }
+            });
+          }else{
+            updateFoldToggleUI(jm.get_node(node.id));
+          }
+          updateFoldAllLabel();
+          updateFoldButtonState();
+          return changed;
+        },{mergeKey});
       }
       let popoverOpen=false;
       let sheetDragState=null;
@@ -7350,11 +7571,15 @@ if ($view === 'map_edit') {
           const relId=btn.dataset.relId;
           if(!relId) return;
           if(!confirm('确定移除该关联吗？')) return;
-          if(typeof jm.remove_relation==='function' && jm.remove_relation(relId)){
-            markDirty();
-            scheduleHandleRefresh();
-            refreshInspector(jm.get_selected_node());
-            showRelationToast('关联已移除');
+          if(typeof jm.remove_relation==='function'){
+            performUndoable('remove-relation',()=>{
+              if(!jm.remove_relation(relId)) return false;
+              markDirty();
+              scheduleHandleRefresh();
+              refreshInspector(jm.get_selected_node());
+              showRelationToast('关联已移除');
+              return true;
+            },{mergeKey:`relation:remove:${relId}`});
           }
         });
       }
@@ -7544,23 +7769,31 @@ if ($view === 'map_edit') {
       }
       refreshInspector(jm.get_selected_node());
       if(jm.options){ jm.options.onNodeDetails=openInspectorPopover; }
+      updateFoldButtonState();
+      updateUndoRedoButtons();
       function applyInspectorChange(mutator){
         if(typeof mutator!=='function') return;
         const node=ensureNode();
         if(!node) return;
-        commitInlineEditing();
-        const data=ensureNodeDataObject(node);
-        mutator(data,node);
-        node.model.data=data;
-        node.data=data;
-        jm.computeLayout();
-        jm.render();
-        jm.select_node(node.id);
-        markDirty();
-        requestAnimationFrame(()=>{
-          updateHandlePosition();
-          refreshInspector(jm.get_node(node.id));
-        });
+        performUndoable('update-node-data',()=>{
+          commitInlineEditing();
+          const data=ensureNodeDataObject(node);
+          mutator(data,node);
+          node.model.data=data;
+          node.data=data;
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(node.id);
+          markDirty();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(node.id);
+            if(latest){
+              updateHandlePosition();
+              refreshInspector(latest);
+            }
+          });
+          return true;
+        },{mergeKey:`data:${node.id}`});
       }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
       function ensureNode(){
@@ -7580,48 +7813,33 @@ if ($view === 'map_edit') {
         return normalized;
       }
       function executeCreateNodeCommand(input){
-        commitInlineEditing();
-        if(!input || !input.parentId) return null;
-        const parent=jm.get_node(input.parentId);
-        if(!parent) return null;
-        const nodeId=input.id || randomId();
-        const payloadData=deepClone(input.data)||{};
-        const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
-        const style=deepClone(input.style);
-        if(style && (style.background || style.foreground)){
-          jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
-        }
-        if(input.position){
-          newNode.data = newNode.data || {};
-          newNode.data.position = {x:input.position.x, y:input.position.y};
-        }
-        const command={
-          type:'createNode',
-          id:newNode.id,
-          parentId:parent.id,
-          topic:input.topic || '新节点',
-          data:deepClone(input.data),
-          style:deepClone(input.style),
-          position:input.position ? {x:input.position.x, y:input.position.y} : null,
-          timestamp:Date.now(),
-          meta:deepClone(input.meta)
-        };
-        commandLog.push(command);
-        window.__mindmapCommands=commandLog;
-        jm.select_node(newNode.id);
-        markDirty();
-        scheduleHandleRefresh();
-        refreshInspector(jm.get_node(newNode.id));
-        if(typeof requestAnimationFrame==='function'){
+        const mergeKey=input && input.meta && input.meta.source ? `create:${input.meta.source}` : null;
+        return performUndoable('create-node',()=>{
+          commitInlineEditing();
+          if(!input || !input.parentId) return null;
+          const parent=jm.get_node(input.parentId);
+          if(!parent) return null;
+          const nodeId=input.id || randomId();
+          const payloadData=deepClone(input.data)||{};
+          const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
+          const style=deepClone(input.style);
+          if(style && (style.background || style.foreground)){
+            jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
+          }
+          if(input.position){
+            newNode.data = newNode.data || {};
+            newNode.data.position = {x:input.position.x, y:input.position.y};
+          }
+          jm.select_node(newNode.id);
+          markDirty();
+          scheduleHandleRefresh();
+          refreshInspector(jm.get_node(newNode.id));
           requestAnimationFrame(()=>{
             const target=jm.get_node(newNode.id);
-            if(target && typeof jm.center_node==='function'){
-              const centered=jm.center_node(target);
-              if(centered){ scheduleHandleRefresh(); }
-            }
+            if(target){ centerOnNodeSmooth(target); }
           });
-        }
-        return newNode;
+          return newNode;
+        },{mergeKey});
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
       function generateUniqueNodeId(){
@@ -7718,91 +7936,100 @@ if ($view === 'map_edit') {
           showRelationToast('根节点无法粘贴为同级');
           return null;
         }
-        commitInlineEditing();
-        const parent=target.parent;
-        const baseDirection=(target.direction==='left' || target.dir===-1)?'left':'right';
-        const template=prepareClipboardTemplate(nodeClipboardTemplate,{baseDirection});
-        if(!template) return null;
-        const parentChildren=parent.children || [];
-        const insertIndex=parentChildren.indexOf(target)+1;
-        const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
-          ? jm.ensureModelChildren(parent)
-          : (parent.model.children = parent.model.children || []);
-        const modelIndex=parentModelChildren.findIndex(child=>child && child.id===target.id)+1;
-        const created=buildNodeFromTemplate(template,parent,{insertIndex,modelIndex});
-        if(!created) return null;
-        jm.computeLayout();
-        jm.render();
-        jm.select_node(created.id);
-        if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
-        markDirty();
-        scheduleHandleRefresh();
-        requestAnimationFrame(()=>{
-          const latest=jm.get_node(created.id);
-          if(latest){
-            refreshInspector(latest);
-            updateHandlePosition();
-          }
-          updateFoldAllLabel();
-          if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
-        });
-        return created;
+        return performUndoable('paste-node',()=>{
+          commitInlineEditing();
+          const parent=target.parent;
+          const baseDirection=(target.direction==='left' || target.dir===-1)?'left':'right';
+          const template=prepareClipboardTemplate(nodeClipboardTemplate,{baseDirection});
+          if(!template) return null;
+          const parentChildren=parent.children || [];
+          const insertIndex=parentChildren.indexOf(target)+1;
+          const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+            ? jm.ensureModelChildren(parent)
+            : (parent.model.children = parent.model.children || []);
+          const modelIndex=parentModelChildren.findIndex(child=>child && child.id===target.id)+1;
+          const created=buildNodeFromTemplate(template,parent,{insertIndex,modelIndex});
+          if(!created) return null;
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(created.id);
+          if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(created.id);
+            if(latest){
+              refreshInspector(latest);
+              updateHandlePosition();
+              centerOnNodeSmooth(latest);
+            }
+            updateFoldAllLabel();
+            if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+          });
+          return created;
+        },{mergeKey:`paste:${target.parent.id}`});
       }
       function promoteNodeLevel(){
         const node=ensureNode();
         if(!node || !node.parent || node.parent.isroot) return false;
-        commitInlineEditing();
-        const parent=node.parent;
-        const grand=parent.parent;
-        if(!grand) return false;
-        const parentChildren=parent.children || (parent.children=[]);
-        const parentIndex=parentChildren.indexOf(node);
-        if(parentIndex!==-1){ parentChildren.splice(parentIndex,1); }
-        const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
-          ? jm.ensureModelChildren(parent)
-          : (parent.model.children = parent.model.children || []);
-        const modelIdx=parentModelChildren.findIndex(child=>child && child.id===node.id);
-        if(modelIdx!==-1){ parentModelChildren.splice(modelIdx,1); }
-        const direction=(parent.direction==='left' || parent.dir===-1)?'left':'right';
-        node.parent=grand;
-        node.direction=direction;
-        node.dir=direction==='left'?-1:1;
-        if(node.model){
-          node.model.direction=direction;
-          node.model.parentId=grand.id;
-        }
-        const grandChildren=grand.children || (grand.children=[]);
-        const grandModelChildren=(jm && typeof jm.ensureModelChildren==='function')
-          ? jm.ensureModelChildren(grand)
-          : (grand.model.children = grand.model.children || []);
-        const parentPosition=grandChildren.indexOf(parent);
-        const insertIndex=parentPosition===-1?grandChildren.length:parentPosition+1;
-        const parentModelPosition=grandModelChildren.findIndex(child=>child && child.id===parent.id);
-        const modelInsertIndex=parentModelPosition===-1?grandModelChildren.length:parentModelPosition+1;
-        grandChildren.splice(insertIndex,0,node);
-        grandModelChildren.splice(modelInsertIndex,0,node.model);
-        const updateDepth=(current, depth)=>{
-          if(!current) return;
-          current.depth=depth;
-          if(current.model){ current.model.depth=depth; }
-          if(current.children && current.children.length){
-            current.children.forEach(child=>updateDepth(child, depth+1));
+        return performUndoable('promote-node',()=>{
+          commitInlineEditing();
+          const parent=node.parent;
+          const grand=parent.parent;
+          if(!grand) return false;
+          const parentChildren=parent.children || (parent.children=[]);
+          const parentIndex=parentChildren.indexOf(node);
+          if(parentIndex!==-1){ parentChildren.splice(parentIndex,1); }
+          const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+            ? jm.ensureModelChildren(parent)
+            : (parent.model.children = parent.model.children || []);
+          const modelIdx=parentModelChildren.findIndex(child=>child && child.id===node.id);
+          if(modelIdx!==-1){ parentModelChildren.splice(modelIdx,1); }
+          const direction=(parent.direction==='left' || parent.dir===-1)?'left':'right';
+          node.parent=grand;
+          node.direction=direction;
+          node.dir=direction==='left'?-1:1;
+          if(node.model){
+            node.model.direction=direction;
+            node.model.parentId=grand.id;
           }
-        };
-        updateDepth(node,(grand.depth||0)+1);
-        jm.computeLayout();
-        jm.render();
-        jm.select_node(node.id);
-        if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
-        markDirty();
-        scheduleHandleRefresh();
-        requestAnimationFrame(()=>{
-          const latest=jm.get_node(node.id);
-          if(latest){ refreshInspector(latest); updateHandlePosition(); }
-          updateFoldAllLabel();
-          if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
-        });
-        return true;
+          const grandChildren=grand.children || (grand.children=[]);
+          const grandModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+            ? jm.ensureModelChildren(grand)
+            : (grand.model.children = grand.model.children || []);
+          const parentPosition=grandChildren.indexOf(parent);
+          const insertIndex=parentPosition===-1?grandChildren.length:parentPosition+1;
+          const parentModelPosition=grandModelChildren.findIndex(child=>child && child.id===parent.id);
+          const modelInsertIndex=parentModelPosition===-1?grandModelChildren.length:parentModelPosition+1;
+          grandChildren.splice(insertIndex,0,node);
+          grandModelChildren.splice(modelInsertIndex,0,node.model);
+          const updateDepth=(current, depth)=>{
+            if(!current) return;
+            current.depth=depth;
+            if(current.model){ current.model.depth=depth; }
+            if(current.children && current.children.length){
+              current.children.forEach(child=>updateDepth(child, depth+1));
+            }
+          };
+          updateDepth(node,(grand.depth||0)+1);
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(node.id);
+          if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(node.id);
+            if(latest){
+              refreshInspector(latest);
+              updateHandlePosition();
+              centerOnNodeSmooth(latest);
+            }
+            updateFoldAllLabel();
+            if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+          });
+          return true;
+        },{mergeKey:`promote:${node.id}`});
       }
       function toggleBranch(){
         const node=ensureNode();
@@ -7953,19 +8180,23 @@ if ($view === 'map_edit') {
       }
       function handleInsertBetweenNodes(parentNode, childNode){
         if(!parentNode || !childNode || typeof jm.insert_node_between!=='function') return;
-        commitInlineEditing();
-        const created=jm.insert_node_between(parentNode.id, childNode.id, {topic:'新节点'});
-        if(!created) return;
-        markDirty();
-        scheduleHandleRefresh();
-        requestAnimationFrame(()=>{
-          const latest=jm.get_node(created.id);
-          if(latest){
-            jm.select_node(latest.id);
-            refreshInspector(latest);
-            startInlineEditing(latest);
-          }
-        });
+        performUndoable('insert-between',()=>{
+          commitInlineEditing();
+          const created=jm.insert_node_between(parentNode.id, childNode.id, {topic:'新节点'});
+          if(!created) return false;
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(created.id);
+            if(latest){
+              jm.select_node(latest.id);
+              refreshInspector(latest);
+              startInlineEditing(latest);
+              centerOnNodeSmooth(latest);
+            }
+          });
+          return true;
+        },{mergeKey:`insert:${parentNode.id}`});
       }
       function addSiblingNode(){
         const node=ensureNode();
@@ -7982,10 +8213,14 @@ if ($view === 'map_edit') {
       }
       function deleteSelectedNode(){
         const node=ensureNode(); if(!node || node.isroot) return;
-        commitInlineEditing();
-        jm.remove_node(node.id); markDirty();
-        scheduleHandleRefresh();
-        requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+        performUndoable('delete-node',()=>{
+          commitInlineEditing();
+          jm.remove_node(node.id);
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          return true;
+        },{mergeKey:`delete:${node.parent ? node.parent.id : 'root'}`});
       }
       function renameSelectedNode(){
         const node=ensureNode();
@@ -8101,8 +8336,18 @@ if ($view === 'map_edit') {
         if(action!=='relation' && relationMode){ cancelRelationMode(false); }
         switch(action){
           case 'save': saveMindmap(); break;
+          case 'undo': undoMindChange(); break;
+          case 'redo': redoMindChange(); break;
           case 'sibling': addSiblingNode(); break;
           case 'child': addChildNode(); break;
+          case 'fold': {
+            const node=ensureNode();
+            if(node && node.children && node.children.length){
+              const next=node.expanded===false;
+              setNodeExpandedState(node, next);
+            }
+            break;
+          }
           case 'attach': openAttachmentDialog(); break;
           case 'relation': toggleRelationMode(); break;
           case 'link': openLinkPrompt(); break;
@@ -8243,6 +8488,16 @@ if ($view === 'map_edit') {
         if(currentEditingId()) return;
         const key=e.key || '';
         const lowerKey=key.toLowerCase();
+        if((e.ctrlKey || e.metaKey) && !e.shiftKey && lowerKey==='z'){
+          e.preventDefault();
+          undoMindChange();
+          return;
+        }
+        if((e.ctrlKey || e.metaKey) && ((e.shiftKey && lowerKey==='z') || (!e.metaKey && lowerKey==='y'))){
+          e.preventDefault();
+          redoMindChange();
+          return;
+        }
         if((e.ctrlKey || e.metaKey) && lowerKey==='c'){
           e.preventDefault();
           if(copySelectedNode()){ showRelationToast('节点已复制'); }
@@ -8350,8 +8605,10 @@ if ($view === 'map_edit') {
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             updateFoldAllLabel();
+            updateFoldButtonState();
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
+          updateUndoRedoButtons();
         });
       }
       function captureLayoutSnapshot(mind){
