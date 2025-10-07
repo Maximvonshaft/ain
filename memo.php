@@ -3725,6 +3725,9 @@ if ($view === 'map_edit') {
       .map-io[aria-expanded="true"] .map-io-menu{display:flex}
       .map-io-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition),color var(--transition);text-align:left}
       .map-io-menu button:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
+      .map-attachments-btn{padding:10px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.34);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+      .map-attachments-btn:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5);transform:translateY(-1px)}
+      .map-attachments-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .mind-export-overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;background:rgba(6,8,10,.82);backdrop-filter:blur(20px);z-index:400;opacity:0;visibility:hidden;pointer-events:none;transition:opacity var(--transition),visibility var(--transition)}
       .mind-export-overlay[data-active="true"]{opacity:1;visibility:visible;pointer-events:auto}
       .mind-export-overlay .export-spinner{width:74px;height:74px;border-radius:50%;border:3px solid rgba(201,168,106,.18);border-top-color:rgba(227,198,139,.78);animation:exportSpin 1s linear infinite}
@@ -3744,6 +3747,40 @@ if ($view === 'map_edit') {
       .mind-import-footer{display:flex;justify-content:flex-end}
       .mind-import-footer button{padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition)}
       .mind-import-footer button:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(227,198,139,.22)}
+      .mind-attachment-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.78);backdrop-filter:blur(18px);z-index:300}
+      .mind-attachment-backdrop[data-open="true"]{display:flex}
+      .mind-attachment-dialog{width:min(960px,calc(100vw - 36px));max-height:min(88vh,94svh);background:linear-gradient(170deg,rgba(21,26,30,.94),rgba(12,16,18,.9));border:1px solid rgba(201,168,106,.34);border-radius:24px;box-shadow:0 32px 64px rgba(0,0,0,.7),0 0 34px rgba(227,198,139,.2);padding:24px;display:flex;flex-direction:column;gap:18px;outline:none}
+      .mind-attachment-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+      .mind-attachment-header h3{margin:0;font:600 18px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.16em;text-transform:uppercase}
+      .mind-attachment-subtitle{margin-top:6px;color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-close{border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.8);color:var(--gold-400);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:border-color var(--transition),transform var(--transition)}
+      .mind-attachment-close:hover{border-color:rgba(227,198,139,.6);transform:translateY(-1px)}
+      .mind-attachment-close:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .mind-attachment-body{flex:1 1 auto;min-height:220px;padding:6px;border-radius:18px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.82);box-shadow:inset 0 0 22px rgba(0,0,0,.45);overflow:auto}
+      .mind-attachment-empty{padding:36px 24px;text-align:center;color:var(--text-muted);font:500 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+      .mind-attachment-item{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.86);box-shadow:0 18px 40px rgba(0,0,0,.45)}
+      .mind-attachment-item[data-selected="true"]{border-color:rgba(227,198,139,.55);background:rgba(201,168,106,.16)}
+      .mind-attachment-checkbox{display:flex;align-items:center;justify-content:center}
+      .mind-attachment-checkbox input{width:18px;height:18px}
+      .mind-attachment-info{display:grid;gap:6px;min-width:0}
+      .mind-attachment-name{font:600 14px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.04em;word-break:break-all}
+      .mind-attachment-meta{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+      .mind-attachment-action{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.34);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),background var(--transition)}
+      .mind-attachment-action:hover{transform:translateY(-1px);border-color:rgba(227,198,139,.5);background:rgba(201,168,106,.18)}
+      .mind-attachment-action:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .mind-attachment-action.locate{border-style:dashed}
+      .mind-attachment-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+      .mind-attachment-summary{color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+      .mind-attachment-buttons{display:flex;gap:10px;flex-wrap:wrap}
+      .mind-attachment-toggle,.mind-attachment-danger{padding:10px 16px;border-radius:12px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),background var(--transition)}
+      .mind-attachment-toggle{border:1px solid rgba(201,168,106,.34);background:rgba(201,168,106,.12);color:var(--gold-400)}
+      .mind-attachment-toggle:hover{transform:translateY(-1px);border-color:rgba(227,198,139,.5);background:rgba(201,168,106,.18)}
+      .mind-attachment-danger{border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6}
+      .mind-attachment-danger:hover{transform:translateY(-1px);border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
+      .mind-attachment-footer button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+      @media (max-width:720px){.mind-attachment-dialog{padding:20px;gap:16px}.mind-attachment-item{grid-template-columns:1fr;align-items:flex-start}.mind-attachment-checkbox{justify-content:flex-start}.mind-attachment-actions{justify-content:flex-start}.mind-attachment-footer{flex-direction:column;align-items:flex-start}.mind-attachment-summary{width:100%}}
       .attachment-preview-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(5,7,10,.78);backdrop-filter:blur(18px);z-index:280}
       .attachment-preview-backdrop[data-open="true"]{display:flex}
       .attachment-preview-panel{width:min(960px,calc(100vw - 32px));max-height:min(90vh,96svh);background:linear-gradient(165deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.34);border-radius:24px;box-shadow:0 32px 64px rgba(0,0,0,.72),0 0 34px rgba(227,198,139,.2);padding:20px;display:flex;flex-direction:column;gap:16px;position:relative}
@@ -3976,6 +4013,7 @@ if ($view === 'map_edit') {
                   <button type="button" data-action="export-jpg" role="menuitem">导出 JPG</button>
                 </div>
               </div>
+              <button type="button" class="map-attachments-btn" id="map-attachments-btn" aria-haspopup="dialog" aria-controls="mind-attachment-panel">附件管理</button>
               <div class="save-state" id="save-state">保存成功</div>
             </div>
             <div class="map-meta">
@@ -4060,6 +4098,28 @@ if ($view === 'map_edit') {
         <div class="mind-import-footer">
           <button type="button" data-import-cancel>取消</button>
         </div>
+      </div>
+    </div>
+    <div class="mind-attachment-backdrop" id="mind-attachment-panel" data-open="false" hidden>
+      <div class="mind-attachment-dialog" role="dialog" aria-modal="true" aria-labelledby="mind-attachment-title" tabindex="-1">
+        <header class="mind-attachment-header">
+          <div>
+            <h3 id="mind-attachment-title">附件管理</h3>
+            <div class="mind-attachment-subtitle" id="mind-attachment-subtitle">集中查看所有节点附件，支持快速预览与删除。</div>
+          </div>
+          <button type="button" class="mind-attachment-close" data-attachment-close aria-label="关闭附件管理">×</button>
+        </header>
+        <div class="mind-attachment-body">
+          <div class="mind-attachment-empty" id="mind-attachment-empty">当前导图暂无附件。</div>
+          <ul class="mind-attachment-list" id="mind-attachment-list" hidden></ul>
+        </div>
+        <footer class="mind-attachment-footer">
+          <div class="mind-attachment-summary" id="mind-attachment-summary">共 0 个附件</div>
+          <div class="mind-attachment-buttons">
+            <button type="button" class="mind-attachment-toggle" id="mind-attachment-select-all" disabled>全选</button>
+            <button type="button" class="mind-attachment-danger" id="mind-attachment-delete" disabled>删除所选</button>
+          </div>
+        </footer>
       </div>
     </div>
     <div class="node-popover" id="node-popover" hidden>
@@ -6941,6 +7001,15 @@ if ($view === 'map_edit') {
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
+      const attachmentManagerButton=document.getElementById('map-attachments-btn');
+      const attachmentPanel=document.getElementById('mind-attachment-panel');
+      const attachmentDialog=attachmentPanel ? attachmentPanel.querySelector('.mind-attachment-dialog') : null;
+      const attachmentList=attachmentPanel ? document.getElementById('mind-attachment-list') : null;
+      const attachmentEmpty=attachmentPanel ? document.getElementById('mind-attachment-empty') : null;
+      const attachmentSummary=attachmentPanel ? document.getElementById('mind-attachment-summary') : null;
+      const attachmentSelectAllButton=attachmentPanel ? document.getElementById('mind-attachment-select-all') : null;
+      const attachmentDeleteButton=attachmentPanel ? document.getElementById('mind-attachment-delete') : null;
+      const attachmentCloseButton=attachmentPanel ? attachmentPanel.querySelector('[data-attachment-close]') : null;
       const mapDeleteButton=document.getElementById('map-delete-btn');
       const importModal=document.getElementById('mind-import-modal');
       const importModalName=importModal ? importModal.querySelector('[data-import-name]') : null;
@@ -6961,6 +7030,218 @@ if ($view === 'map_edit') {
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
+      const attachmentManagerState={
+        entries:[],
+        selection:new Set(),
+        lastActive:null,
+      };
+      function isAttachmentManagerOpen(){
+        return !!(attachmentPanel && attachmentPanel.dataset.open==='true');
+      }
+      function attachmentSizeValue(att){
+        if(!att || typeof att!=='object') return null;
+        const candidates=[att.size, att.filesize, att.length];
+        for(const value of candidates){
+          if(typeof value==='number' && Number.isFinite(value) && value>0){ return value; }
+        }
+        return null;
+      }
+      function formatAttachmentSize(value){
+        if(!Number.isFinite(value) || value<=0) return '';
+        const units=['B','KB','MB','GB','TB'];
+        let idx=0; let num=value;
+        while(num>=1024 && idx<units.length-1){ num/=1024; idx++; }
+        const decimals=num>=100 || idx===0 ? 0 : 1;
+        return num.toFixed(decimals)+' '+units[idx];
+      }
+      function formatAttachmentTimestamp(value){
+        if(!Number.isFinite(value) || value<=0) return '';
+        const date=new Date(value);
+        if(Number.isNaN(date.getTime())) return '';
+        const pad=num=>String(num).padStart(2,'0');
+        return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+      function collectAttachmentEntries(){
+        const entries=[];
+        if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return entries;
+        jm.nodes.forEach(node=>{
+          if(!node) return;
+          const data=ensureNodeDataObject(node) || {};
+          const attachments=Array.isArray(data.attachments)?data.attachments:[];
+          attachments.forEach((att, idx)=>{
+            if(!att || typeof att!=='object') return;
+            const keyParts=[node.id || `node-${idx}`, att.assetId || att.id || att.url || att.name || `att-${idx}`, idx];
+            const key=keyParts.join('::');
+            entries.push({
+              key,
+              nodeId:node.id,
+              nodeTopic:node.topic || '',
+              attachment:att,
+              attachmentRef:att,
+              size:attachmentSizeValue(att),
+              uploadedAt:typeof att.uploadedAt==='number'?att.uploadedAt:null,
+              mime:typeof att.mime==='string'?att.mime:(typeof att.type==='string'?att.type:''),
+              assetId:att.assetId || att.id || null,
+            });
+          });
+        });
+        entries.sort((a,b)=>{
+          if(a.uploadedAt && b.uploadedAt && a.uploadedAt!==b.uploadedAt){ return b.uploadedAt - a.uploadedAt; }
+          if(a.uploadedAt && !b.uploadedAt) return -1;
+          if(!a.uploadedAt && b.uploadedAt) return 1;
+          const topicCompare=(a.nodeTopic || '').localeCompare(b.nodeTopic || '', 'zh-CN', {sensitivity:'base'});
+          if(topicCompare!==0) return topicCompare;
+          const labelA=(attachmentLabel(a.attachment)||'').toLowerCase();
+          const labelB=(attachmentLabel(b.attachment)||'').toLowerCase();
+          return labelA.localeCompare(labelB,'zh-CN');
+        });
+        return entries;
+      }
+      function updateAttachmentManagerSummary(){
+        if(attachmentSummary){
+          const total=attachmentManagerState.entries.length;
+          const totalSize=attachmentManagerState.entries.reduce((sum,entry)=>sum+(Number.isFinite(entry.size)?entry.size:0),0);
+          if(total===0){
+            attachmentSummary.textContent='暂无附件';
+          }else{
+            let text=`共 ${total} 个附件`;
+            if(totalSize>0){ text+=' · 总计 '+formatAttachmentSize(totalSize); }
+            attachmentSummary.textContent=text;
+          }
+        }
+        if(attachmentSelectAllButton){
+          const total=attachmentManagerState.entries.length;
+          const selected=attachmentManagerState.selection.size;
+          attachmentSelectAllButton.disabled=total===0;
+          attachmentSelectAllButton.textContent=total>0 && selected===total ? '取消全选' : '全选';
+        }
+        if(attachmentDeleteButton){
+          const selected=attachmentManagerState.selection.size;
+          attachmentDeleteButton.disabled=selected===0;
+          attachmentDeleteButton.textContent=selected>0?`删除所选（${selected}）`:'删除所选';
+        }
+      }
+      function renderAttachmentManagerList(){
+        if(!attachmentList || !attachmentEmpty) return;
+        attachmentList.innerHTML='';
+        const entries=attachmentManagerState.entries;
+        if(!entries.length){
+          attachmentEmpty.hidden=false;
+          attachmentList.hidden=true;
+        }else{
+          attachmentEmpty.hidden=true;
+          attachmentList.hidden=false;
+          entries.forEach(entry=>{
+            const li=document.createElement('li');
+            li.className='mind-attachment-item';
+            li.dataset.attachmentKey=entry.key;
+            if(attachmentManagerState.selection.has(entry.key)){ li.dataset.selected='true'; }
+            const checkboxWrap=document.createElement('label');
+            checkboxWrap.className='mind-attachment-checkbox';
+            const checkbox=document.createElement('input');
+            checkbox.type='checkbox';
+            checkbox.checked=attachmentManagerState.selection.has(entry.key);
+            checkbox.setAttribute('aria-label',`选择附件 ${attachmentLabel(entry.attachment)}`);
+            checkbox.addEventListener('change',()=>{
+              if(checkbox.checked){
+                attachmentManagerState.selection.add(entry.key);
+                li.dataset.selected='true';
+              }else{
+                attachmentManagerState.selection.delete(entry.key);
+                delete li.dataset.selected;
+              }
+              updateAttachmentManagerSummary();
+            });
+            checkboxWrap.appendChild(checkbox);
+            li.appendChild(checkboxWrap);
+            const info=document.createElement('div');
+            info.className='mind-attachment-info';
+            const nameEl=document.createElement('div');
+            nameEl.className='mind-attachment-name';
+            nameEl.textContent='📎 '+attachmentLabel(entry.attachment);
+            info.appendChild(nameEl);
+            const meta=document.createElement('div');
+            meta.className='mind-attachment-meta';
+            const parts=[`节点：${entry.nodeTopic || '未命名节点'}`];
+            if(entry.assetId){ parts.push(`ID：${entry.assetId}`); }
+            const sizeText=formatAttachmentSize(entry.size);
+            if(sizeText){ parts.push(sizeText); }
+            const timeText=formatAttachmentTimestamp(entry.uploadedAt);
+            if(timeText){ parts.push(timeText); }
+            meta.textContent=parts.join(' · ');
+            info.appendChild(meta);
+            li.appendChild(info);
+            const actions=document.createElement('div');
+            actions.className='mind-attachment-actions';
+            const previewBtn=document.createElement('button');
+            previewBtn.type='button';
+            previewBtn.className='mind-attachment-action';
+            previewBtn.textContent='预览';
+            previewBtn.addEventListener('click',evt=>{
+              evt.preventDefault();
+              openMindmapAttachment(entry.attachment);
+            });
+            actions.appendChild(previewBtn);
+            const locateBtn=document.createElement('button');
+            locateBtn.type='button';
+            locateBtn.className='mind-attachment-action locate';
+            locateBtn.textContent='定位节点';
+            locateBtn.addEventListener('click',evt=>{
+              evt.preventDefault();
+              const node=jm.get_node(entry.nodeId);
+              if(node){
+                jm.select_node(node.id);
+                refreshInspector(node);
+                centerOnNodeSmooth(node,{animate:true});
+                updateFoldButtonState();
+              }
+            });
+            actions.appendChild(locateBtn);
+            li.appendChild(actions);
+            attachmentList.appendChild(li);
+          });
+        }
+        updateAttachmentManagerSummary();
+      }
+      function rebuildAttachmentManager(){
+        if(!attachmentPanel) return;
+        const previousSelection=new Set(attachmentManagerState.selection);
+        const entries=collectAttachmentEntries();
+        attachmentManagerState.entries=entries;
+        attachmentManagerState.selection=new Set();
+        entries.forEach(entry=>{
+          if(previousSelection.has(entry.key)){ attachmentManagerState.selection.add(entry.key); }
+        });
+        renderAttachmentManagerList();
+      }
+      function openAttachmentManager(){
+        if(!attachmentPanel) return;
+        rebuildAttachmentManager();
+        attachmentManagerState.lastActive=document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        attachmentPanel.dataset.open='true';
+        attachmentPanel.removeAttribute('hidden');
+        if(attachmentManagerButton){ attachmentManagerButton.setAttribute('aria-expanded','true'); }
+        if(attachmentDialog){ attachmentDialog.focus(); }
+        document.addEventListener('keydown',handleAttachmentPanelKeydown,true);
+      }
+      function closeAttachmentManager(){
+        if(!attachmentPanel) return;
+        attachmentPanel.dataset.open='false';
+        attachmentPanel.setAttribute('hidden','');
+        if(attachmentManagerButton){ attachmentManagerButton.setAttribute('aria-expanded','false'); }
+        document.removeEventListener('keydown',handleAttachmentPanelKeydown,true);
+        const last=attachmentManagerState.lastActive;
+        attachmentManagerState.lastActive=null;
+        if(last && typeof last.focus==='function'){
+          try{ last.focus(); }catch(_){ }
+        }
+      }
+      function handleAttachmentPanelKeydown(evt){
+        if(evt.key==='Escape' && isAttachmentManagerOpen()){
+          evt.preventDefault();
+          closeAttachmentManager();
+        }
+      }
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
@@ -7003,6 +7284,81 @@ if ($view === 'map_edit') {
       }
       if(mindInfoBar){
         mindInfoBar.addEventListener('focusin',()=>{ expandInfoBar(); });
+      }
+      if(attachmentManagerButton){
+        attachmentManagerButton.addEventListener('click',e=>{
+          e.preventDefault();
+          if(isAttachmentManagerOpen()){ closeAttachmentManager(); }
+          else{ openAttachmentManager(); }
+        });
+        attachmentManagerButton.setAttribute('aria-expanded','false');
+      }
+      if(attachmentCloseButton){
+        attachmentCloseButton.addEventListener('click',e=>{
+          e.preventDefault();
+          closeAttachmentManager();
+        });
+      }
+      if(attachmentPanel){
+        attachmentPanel.addEventListener('click',evt=>{
+          if(evt.target===attachmentPanel){ closeAttachmentManager(); }
+        });
+      }
+      if(attachmentSelectAllButton){
+        attachmentSelectAllButton.addEventListener('click',()=>{
+          const entries=attachmentManagerState.entries;
+          if(!entries.length) return;
+          const selectAll=attachmentManagerState.selection.size!==entries.length;
+          attachmentManagerState.selection.clear();
+          if(selectAll){ entries.forEach(entry=>attachmentManagerState.selection.add(entry.key)); }
+          renderAttachmentManagerList();
+        });
+      }
+      if(attachmentDeleteButton){
+        attachmentDeleteButton.addEventListener('click',()=>{
+          const selectedKeys=[...attachmentManagerState.selection];
+          if(!selectedKeys.length) return;
+          if(!confirm(`确认删除选中的 ${selectedKeys.length} 个附件？`)) return;
+          const selectedSet=new Set(selectedKeys);
+          performUndoable('delete-attachments',()=>{
+            const targets=attachmentManagerState.entries.filter(entry=>selectedSet.has(entry.key));
+            if(!targets.length) return false;
+            const touched=new Set();
+            const selectedNode=jm.get_selected_node();
+            targets.forEach(entry=>{
+              const node=jm.get_node(entry.nodeId);
+              if(!node) return;
+              const data=ensureNodeDataObject(node);
+              const attachments=Array.isArray(data.attachments)?data.attachments:[];
+              const next=attachments.filter(att=>att!==entry.attachmentRef);
+              if(next.length===attachments.length) return;
+              if(next.length){
+                data.attachments=next;
+                data.attachment=next[0];
+              }else{
+                delete data.attachments;
+                delete data.attachment;
+              }
+              node.model.data=data;
+              node.data=data;
+              touched.add(node.id);
+            });
+            if(!touched.size) return false;
+            jm.computeLayout();
+            jm.render();
+            if(selectedNode){
+              try{ jm.select_node(selectedNode.id); }catch(_){ }
+            }
+            refreshInspector(jm.get_selected_node());
+            scheduleHandleRefresh();
+            updateFoldButtonState();
+            markDirty();
+            if(isAttachmentManagerOpen()){ requestAnimationFrame(()=>rebuildAttachmentManager()); }
+            return true;
+          },{mergeKey:'attachments:delete'});
+          attachmentManagerState.selection.clear();
+          rebuildAttachmentManager();
+        });
       }
       function showExportOverlay(){
         if(!exportOverlay) return;
@@ -7123,6 +7479,7 @@ if ($view === 'map_edit') {
         updateFoldButtonState();
         if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
         if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+        if(isAttachmentManagerOpen()){ rebuildAttachmentManager(); }
       }
       function updateFoldButtonState(){
         if(!dockFoldButton) return;
@@ -8368,6 +8725,7 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        if(isAttachmentManagerOpen()){ rebuildAttachmentManager(); }
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
