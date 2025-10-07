@@ -8054,6 +8054,100 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
+      function captureMindLayoutState(instance){
+        if(!instance) return null;
+        const captureElementState=(el,{attrs=[],withHtml=false}={})=>{
+          if(!el) return null;
+          const state={
+            style:el.style ? el.style.cssText : '',
+            hadStyle:el.hasAttribute ? el.hasAttribute('style') : false,
+          };
+          if(attrs && attrs.length){
+            state.attrs={};
+            attrs.forEach(name=>{
+              if(!state.attrs) state.attrs={};
+              state.attrs[name]=el.getAttribute ? el.getAttribute(name) : null;
+            });
+          }
+          if(withHtml){ state.innerHTML=el.innerHTML; }
+          return state;
+        };
+        const nodes=[];
+        if(instance.nodes && typeof instance.nodes.values==='function'){
+          for(const node of instance.nodes.values()){
+            if(!node) continue;
+            nodes.push({
+              id:node.id,
+              x:node.x,
+              y:node.y,
+              absX:node.absX,
+              absY:node.absY,
+              dir:node.dir,
+              direction:node.direction,
+              depth:node.depth,
+              layoutHeight:node._layoutHeight,
+              modelDirection:node.model && Object.prototype.hasOwnProperty.call(node.model,'direction')
+                ? node.model.direction
+                : undefined,
+            });
+          }
+        }
+        return {
+          bounds:instance.bounds ? {...instance.bounds} : null,
+          nodes,
+          viewport:captureElementState(instance.viewport),
+          nodeLayer:captureElementState(instance.nodeLayer),
+          linkLayer:captureElementState(instance.linkLayer,{attrs:['viewBox','width','height']}),
+          relationLayer:captureElementState(instance.relationLayer,{attrs:['viewBox','width','height']}),
+          guideLayer:captureElementState(instance.guideLayer,{withHtml:true}),
+          linkControlLayer:captureElementState(instance.linkControlLayer),
+        };
+      }
+      function restoreMindLayoutState(instance,snapshot){
+        if(!instance || !snapshot) return;
+        const restoreElementState=(el,state)=>{
+          if(!el || !state) return;
+          if(state.hadStyle){
+            if(el.style) el.style.cssText=state.style||'';
+            else el.setAttribute('style', state.style||'');
+          }else if(el.removeAttribute){
+            el.removeAttribute('style');
+          }
+          if(state.attrs){
+            Object.entries(state.attrs).forEach(([name,value])=>{
+              if(value==null){ el.removeAttribute && el.removeAttribute(name); }
+              else if(el.setAttribute){ el.setAttribute(name,value); }
+            });
+          }
+          if(Object.prototype.hasOwnProperty.call(state,'innerHTML') && el.innerHTML!==undefined){
+            el.innerHTML=state.innerHTML||'';
+          }
+        };
+        if(snapshot.bounds){ instance.bounds={...snapshot.bounds}; }
+        if(Array.isArray(snapshot.nodes) && instance.nodes && typeof instance.nodes.get==='function'){
+          snapshot.nodes.forEach(saved=>{
+            const node=instance.nodes.get(saved.id);
+            if(!node) return;
+            node.x=saved.x;
+            node.y=saved.y;
+            node.absX=saved.absX;
+            node.absY=saved.absY;
+            node.dir=saved.dir;
+            node.direction=saved.direction;
+            node.depth=saved.depth;
+            node._layoutHeight=saved.layoutHeight;
+            if(node.model && Object.prototype.hasOwnProperty.call(saved,'modelDirection')){
+              node.model.direction=saved.modelDirection;
+            }
+          });
+        }
+        restoreElementState(instance.viewport, snapshot.viewport);
+        restoreElementState(instance.nodeLayer, snapshot.nodeLayer);
+        restoreElementState(instance.linkLayer, snapshot.linkLayer);
+        restoreElementState(instance.relationLayer, snapshot.relationLayer);
+        restoreElementState(instance.guideLayer, snapshot.guideLayer);
+        restoreElementState(instance.linkControlLayer, snapshot.linkControlLayer);
+      }
       function exportMindmapAsJson(){
         if(!jm){
           alert('思维导图尚未加载');
@@ -8077,6 +8171,7 @@ if ($view === 'map_edit') {
         const titleValue=titleInput ? titleInput.value.trim() : '';
         const overlayDisplay=overlay ? overlay.style.display : null;
         let exportHost=null;
+        const layoutSnapshot=jm ? captureMindLayoutState(jm) : null;
         try{
           const htmlToImage=await ensureHtmlToImage();
           const computedStyle=getComputedStyle(document.body);
@@ -8181,6 +8276,7 @@ if ($view === 'map_edit') {
         }finally{
           if(exportHost && exportHost.parentElement){ exportHost.remove(); }
           if(overlay){ overlay.style.display=overlayDisplay || ''; }
+          if(layoutSnapshot){ restoreMindLayoutState(jm, layoutSnapshot); }
         }
       }
       function openImportModeDialog(fileName, data){
