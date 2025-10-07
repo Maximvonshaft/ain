@@ -3762,15 +3762,6 @@ if ($view === 'map_edit') {
       .mind-info-row .map-title-input{flex:1;min-width:0}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
-      .map-shortcuts{margin-top:10px;padding-top:10px;border-top:1px solid rgba(201,168,106,.18);display:flex;flex-direction:column;gap:6px}
-      .map-shortcuts table{width:100%;border-collapse:collapse;font:500 11px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;color:var(--text-dim)}
-      .map-shortcuts thead th{text-align:left;font:600 10px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--text-strong);padding-bottom:4px}
-      .map-shortcuts td{padding:3px 6px 3px 0;vertical-align:top;white-space:normal}
-      .map-shortcuts td:first-child{color:var(--text-strong)}
-      .map-shortcuts .key-set{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-      .map-shortcuts .key-set span{font-weight:600;letter-spacing:.12em;color:var(--text-dim)}
-      .map-shortcuts kbd{display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;border-radius:6px;border:1px solid rgba(201,168,106,.26);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.12)}
-      .map-shortcuts .key-set .key-join{font-size:12px}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
@@ -3839,7 +3830,8 @@ if ($view === 'map_edit') {
       .jsmind-node.relation-target{border-style:dashed;border-color:rgba(75,195,209,.6)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
-      .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);pointer-events:none}
+      .node-collapse-marker{position:absolute;right:18px;bottom:16px;padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.18);display:inline-flex;align-items:center;gap:6px;cursor:pointer;pointer-events:auto}
+      .node-collapse-marker .icon{font-size:12px}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.42)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 26px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 40px - var(--safe-left) - var(--safe-right)),720px)}
       .mind-dock-wrap::before,.mind-dock-wrap::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:26px;height:70%;pointer-events:none;opacity:0;transition:opacity var(--t-fast) var(--ease);z-index:0}
@@ -3867,6 +3859,8 @@ if ($view === 'map_edit') {
       @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:10px 14px;border-radius:24px;gap:10px}.dock-btn{width:78px;height:56px}.dock-btn .label{font-size:11px}}
       @media (max-width:600px){.dock-btn{width:72px;height:54px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      .mind-tooltip{position:fixed;transform:translate(-50%,-14px);background:rgba(15,19,22,.92);border:1px solid rgba(201,168,106,.4);border-radius:12px;padding:8px 12px;color:var(--gold-400);font:600 12px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;pointer-events:none;box-shadow:0 12px 24px rgba(0,0,0,.5);opacity:0;transition:opacity var(--t-fast) var(--ease);z-index:200}
+      .mind-tooltip[data-visible="true"]{opacity:1}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode="pending"] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -3887,16 +3881,6 @@ if ($view === 'map_edit') {
       .node-popover input,.node-popover select,.node-popover textarea{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.3);background:rgba(12,16,18,.7);color:var(--text-strong);font:500 14px/1.5 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em;transition:border-color var(--transition),box-shadow var(--transition)}
       .node-popover input:focus,.node-popover select:focus,.node-popover textarea:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 2px rgba(227,198,139,.18)}
       .node-popover textarea{min-height:120px;resize:vertical}
-      .node-popover .fold-field{padding-top:6px}
-      .node-popover .fold-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-      .toggle-switch{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--text-muted)}
-      .toggle-switch input{position:absolute;opacity:0;width:1px;height:1px;overflow:hidden}
-      .toggle-switch .track{position:relative;width:48px;height:24px;border-radius:999px;background:rgba(201,168,106,.14);border:1px solid rgba(201,168,106,.3);transition:background var(--transition),border-color var(--transition)}
-      .toggle-switch .thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 12px rgba(227,198,139,.45);transition:transform var(--transition)}
-      .toggle-switch input:checked + .track{background:rgba(36,194,160,.2);border-color:rgba(36,194,160,.4)}
-      .toggle-switch input:checked + .track .thumb{transform:translateX(24px)}
-      .toggle-switch .toggle-text{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
-      .fold-hint{margin:8px 0 0;font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
       .node-popover .popover-actions{display:flex;justify-content:flex-end;gap:10px}
       .node-popover .popover-actions button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition)}
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
@@ -3979,62 +3963,6 @@ if ($view === 'map_edit') {
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
             </div>
-            <div class="map-shortcuts" aria-label="思维导图快捷键">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">操作</th>
-                    <th scope="col">Win</th>
-                    <th scope="col">Mac</th>
-                    <th scope="col">说明</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>新建同级节点</td>
-                    <td><div class="key-set"><kbd>Enter</kbd></div></td>
-                    <td><div class="key-set"><kbd>Return</kbd></div></td>
-                    <td>在当前节点下方创建同级节点</td>
-                  </tr>
-                  <tr>
-                    <td>新建子级节点</td>
-                    <td><div class="key-set"><kbd>Tab</kbd></div></td>
-                    <td><div class="key-set"><kbd>Tab</kbd></div></td>
-                    <td>在当前节点下创建子节点</td>
-                  </tr>
-                  <tr>
-                    <td>新建父级节点</td>
-                    <td><div class="key-set"><kbd>Shift</kbd><span class="key-join">+</span><kbd>Tab</kbd></div></td>
-                    <td><div class="key-set"><kbd>Shift</kbd><span class="key-join">+</span><kbd>Tab</kbd></div></td>
-                    <td>将当前节点提升为父层的兄弟节点</td>
-                  </tr>
-                  <tr>
-                    <td>删除节点</td>
-                    <td><div class="key-set"><kbd>Del</kbd><span>/</span><kbd>Backspace</kbd></div></td>
-                    <td><div class="key-set"><kbd>⌫</kbd></div></td>
-                    <td>删除当前选中节点</td>
-                  </tr>
-                  <tr>
-                    <td>折叠 / 展开</td>
-                    <td><div class="key-set"><kbd>Space</kbd><span>/</span><kbd>→</kbd><span>/</span><kbd>←</kbd></div></td>
-                    <td><div class="key-set"><kbd>Space</kbd><span>/</span><kbd>→</kbd><span>/</span><kbd>←</kbd></div></td>
-                    <td>展开或折叠当前节点分支</td>
-                  </tr>
-                  <tr>
-                    <td>复制节点</td>
-                    <td><div class="key-set"><kbd>Ctrl</kbd><span class="key-join">+</span><kbd>C</kbd></div></td>
-                    <td><div class="key-set"><kbd>⌘</kbd><span class="key-join">+</span><kbd>C</kbd></div></td>
-                    <td>复制节点及其子节点</td>
-                  </tr>
-                  <tr>
-                    <td>粘贴节点</td>
-                    <td><div class="key-set"><kbd>Ctrl</kbd><span class="key-join">+</span><kbd>V</kbd></div></td>
-                    <td><div class="key-set"><kbd>⌘</kbd><span class="key-join">+</span><kbd>V</kbd></div></td>
-                    <td>粘贴为同级节点</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </header>
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
@@ -4049,31 +3977,35 @@ if ($view === 'map_edit') {
       <?php endif; ?>
       <div class="mind-dock-wrap">
         <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
-          <button class="dock-btn" data-action="save" data-default-label="保存" title="保存 (Ctrl+S)" aria-label="保存">
+          <button class="dock-btn" data-action="save" data-default-label="保存" data-tip="保存（Ctrl/⌘+S）" aria-label="保存">
             <span class="icon">💾</span>
             <span class="label">保存</span>
           </button>
-          <button class="dock-btn" data-action="sibling" title="新增同级 (Enter)" aria-label="新增同级节点">
+          <button class="dock-btn" data-action="sibling" data-tip="新增同级（Enter）" aria-label="新增同级节点">
             <span class="icon">⧉</span>
             <span class="label">同级</span>
           </button>
-          <button class="dock-btn" data-action="child" title="新增子级 (Tab)" aria-label="新增子级节点">
+          <button class="dock-btn" data-action="child" data-tip="新增子级（Tab）" aria-label="新增子级节点">
             <span class="icon">↳</span>
             <span class="label">子级</span>
           </button>
-          <button class="dock-btn" data-action="attach" title="上传附件" aria-label="上传附件">
+          <button class="dock-btn" data-action="fold-toggle" data-tip-collapsed="展开（Space 或 →）" data-tip-expanded="折叠（Space 或 ←）" aria-label="折叠或展开">
+            <span class="icon">⇅</span>
+            <span class="label">折叠</span>
+          </button>
+          <button class="dock-btn" data-action="attach" data-tip="上传附件" aria-label="上传附件">
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
-          <button class="dock-btn" data-action="relation" title="关联节点" aria-label="关联节点">
+          <button class="dock-btn" data-action="relation" data-tip="关联节点" aria-label="关联节点">
             <span class="icon">🪢</span>
             <span class="label">关联</span>
           </button>
-          <button class="dock-btn" data-action="link" title="新增链接" aria-label="新增链接">
+          <button class="dock-btn" data-action="link" data-tip="新增链接" aria-label="新增链接">
             <span class="icon">🔗</span>
             <span class="label">链接</span>
           </button>
-          <button class="dock-btn danger" data-action="delete" title="删除节点 (Del)" aria-label="删除节点">
+          <button class="dock-btn danger" data-action="delete" data-tip="删除（Backspace / Del）" aria-label="删除节点">
             <span class="icon">🗑</span>
             <span class="label">删除</span>
           </button>
@@ -4114,17 +4046,6 @@ if ($view === 'map_edit') {
 负责人：张三
 标签：#重要 #任务"></textarea>
         </div>
-        <div class="field fold-field" id="node-fold-field" hidden>
-        <div class="fold-row">
-          <label for="node-fold-toggle">折叠子节点</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="node-fold-toggle">
-            <span class="track"><span class="thumb"></span></span>
-            <span class="toggle-text" id="node-fold-toggle-text">展开中</span>
-          </label>
-        </div>
-        <p class="fold-hint" id="node-fold-hint"></p>
-      </div>
       <div class="field" id="node-relations-field">
         <label>关联节点</label>
         <div class="relation-list" id="node-relations-list"></div>
@@ -4783,6 +4704,7 @@ if ($view === 'map_edit') {
           this.scalePadding=200;
           this.offsetX=0;
           this.offsetY=0;
+          this._centerAnimationFrame=null;
           this.mind=null;
           this.nodes=new Map();
           this.root=null;
@@ -5786,11 +5708,12 @@ if ($view === 'map_edit') {
             el.appendChild(wrap);
           }
           if(node.children && node.children.length && node.expanded===false){
-            const marker=document.createElement('span');
+            const marker=document.createElement('button');
+            marker.type='button';
             marker.className='node-collapse-marker';
-            marker.textContent='⤴ 已折叠';
-            marker.title='该节点包含折叠的子节点';
-            marker.setAttribute('aria-hidden','true');
+            marker.dataset.node=node.id;
+            marker.innerHTML='<span class="icon">⤵</span><span class="text">展开</span>';
+            marker.setAttribute('aria-label','展开该节点的子节点');
             el.appendChild(marker);
           }
           if(!forMeasure){
@@ -6394,7 +6317,7 @@ if ($view === 'map_edit') {
           this.applyTransform();
           return true;
         }
-        center_node(target){
+        center_node(target, options={}){
           if(!target || !this.bounds) return false;
           const node=typeof target==='string'?this.get_node(target):target;
           if(!node) return false;
@@ -6416,9 +6339,45 @@ if ($view === 'map_edit') {
             };
           }
           if(!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return false;
-          this.offsetX=rect.width/2 - anchor.x*this.scale;
-          this.offsetY=rect.height/2 - anchor.y*this.scale;
-          this.applyTransform();
+          const targetOffsetX=rect.width/2 - anchor.x*this.scale;
+          const targetOffsetY=rect.height/2 - anchor.y*this.scale;
+          const animate=options && options.animate && typeof requestAnimationFrame==='function';
+          const duration=Math.max(0, typeof options.duration==='number'?options.duration:240);
+          if(this._centerAnimationFrame){ cancelAnimationFrame(this._centerAnimationFrame); this._centerAnimationFrame=null; }
+          if(animate && duration>0){
+            const startX=this.offsetX;
+            const startY=this.offsetY;
+            const deltaX=targetOffsetX-startX;
+            const deltaY=targetOffsetY-startY;
+            if(Math.abs(deltaX)<0.5 && Math.abs(deltaY)<0.5){
+              this.offsetX=targetOffsetX;
+              this.offsetY=targetOffsetY;
+              this.applyTransform();
+              return true;
+            }
+            const ease=t=>t<0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
+            const startTime=performance.now();
+            const step=(now)=>{
+              const progress=Math.min(1,(now-startTime)/duration);
+              const eased=ease(progress);
+              this.offsetX=startX + deltaX*eased;
+              this.offsetY=startY + deltaY*eased;
+              this.applyTransform();
+              if(progress<1){
+                this._centerAnimationFrame=requestAnimationFrame(step);
+              }else{
+                this._centerAnimationFrame=null;
+                this.offsetX=targetOffsetX;
+                this.offsetY=targetOffsetY;
+                this.applyTransform();
+              }
+            };
+            this._centerAnimationFrame=requestAnimationFrame(step);
+          }else{
+            this.offsetX=targetOffsetX;
+            this.offsetY=targetOffsetY;
+            this.applyTransform();
+          }
           return true;
         }
         showNodeDetails(node){
@@ -6650,6 +6609,7 @@ if ($view === 'map_edit') {
         if(value!==initialText){
           if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
           markDirty();
+          requestHistorySnapshot('重命名节点',{mergeKey:'rename',mergeWindow:200});
         }
         scheduleHandleRefresh();
       }
@@ -6730,6 +6690,7 @@ if ($view === 'map_edit') {
       if(!jm.get_selected_node() && initialData && initialData.data){
         jm.select_node(initialData.data.id);
       }
+      initializeHistory();
       function syncOverlaySize(){
         const rect=jmContainer.getBoundingClientRect();
         const width=Math.max(rect.width,1);
@@ -6897,6 +6858,8 @@ if ($view === 'map_edit') {
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
+      const dockFoldButton=dock ? dock.querySelector('.dock-btn[data-action="fold-toggle"]') : null;
+      const dockFoldLabel=dockFoldButton ? dockFoldButton.querySelector('.label') : null;
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
@@ -6918,6 +6881,37 @@ if ($view === 'map_edit') {
       const fisheyeToggle=document.getElementById('setting-fisheye');
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
+      const tooltipEl=document.createElement('div');
+      tooltipEl.className='mind-tooltip';
+      tooltipEl.setAttribute('role','tooltip');
+      document.body.appendChild(tooltipEl);
+      let tooltipTarget=null;
+      function getDockTooltipText(target){
+        if(!target) return '';
+        const state=target.dataset.foldState;
+        if(state==='collapsed'){ return target.dataset.tipCollapsed || target.dataset.tip || target.getAttribute('aria-label') || ''; }
+        if(state==='expanded'){ return target.dataset.tipExpanded || target.dataset.tip || target.getAttribute('aria-label') || ''; }
+        return target.dataset.tip || target.getAttribute('aria-label') || '';
+      }
+      function showDockTooltip(target){
+        if(!target || pointerIsCoarse) return;
+        const text=getDockTooltipText(target);
+        if(!text) return;
+        tooltipEl.textContent=text;
+        const rect=target.getBoundingClientRect();
+        tooltipEl.style.left=`${rect.left + rect.width/2}px`;
+        tooltipEl.style.top=`${rect.top}px`;
+        tooltipEl.dataset.visible='true';
+        tooltipTarget=target;
+      }
+      function hideDockTooltip(target){
+        if(target && tooltipTarget && target!==tooltipTarget) return;
+        tooltipTarget=null;
+        tooltipEl.dataset.visible='false';
+      }
+      function refreshDockTooltip(target){
+        if(tooltipTarget && (!target || tooltipTarget===target)){ showDockTooltip(tooltipTarget); }
+      }
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
@@ -6982,7 +6976,10 @@ if ($view === 'map_edit') {
       }
       function handlePointerPrecisionChange(event){
         pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
+        if(pointerIsCoarse){
+          hideDockTooltip();
+          if(fisheyeToggle){ fisheyeToggle.checked=false; }
+        }
         syncFisheyeState();
       }
       syncFisheyeState();
@@ -6998,6 +6995,121 @@ if ($view === 'map_edit') {
       let relationToastTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
+      const historyLimit=100;
+      const historyStack=[];
+      let historyInitialized=false;
+      let historyIndex=-1;
+      let historyCurrentState='';
+      let suppressHistory=false;
+      let canUndo=false;
+      let canRedo=false;
+      function serializeMindState(){
+        if(!jm || typeof jm.get_data!=='function') return '';
+        try{ return JSON.stringify(jm.get_data('node_tree')||{}); }
+        catch(_){ return ''; }
+      }
+      function currentSelectionId(){
+        if(!jm || typeof jm.get_selected_node!=='function') return null;
+        const selected=jm.get_selected_node();
+        return selected ? selected.id : null;
+      }
+      function updateUndoRedoState(){
+        canUndo=historyInitialized && historyIndex>0;
+        canRedo=historyInitialized && historyIndex>=0 && historyIndex<historyStack.length-1;
+      }
+      function initializeHistory(force=false){
+        if(!jm) return;
+        if(historyInitialized && !force) return;
+        const state=serializeMindState();
+        historyStack.length=0;
+        historyStack.push({before:state,after:state,description:'初始状态',timestamp:Date.now(),mergeKey:null,selection:currentSelectionId()});
+        historyIndex=historyStack.length-1;
+        historyCurrentState=state;
+        historyInitialized=true;
+        updateUndoRedoState();
+      }
+      function recordHistory(description, options={}){
+        if(!historyInitialized || suppressHistory) return;
+        const state=serializeMindState();
+        if(!state || state===historyCurrentState) return;
+        const now=Date.now();
+        const mergeKey=options.mergeKey || null;
+        const mergeWindow=typeof options.mergeWindow==='number' ? options.mergeWindow : 0;
+        if(mergeKey && historyIndex>=0 && historyIndex===historyStack.length-1){
+          const last=historyStack[historyIndex];
+          if(last && last.mergeKey===mergeKey && now - last.timestamp <= mergeWindow){
+            last.after=state;
+            last.timestamp=now;
+            last.selection=currentSelectionId();
+            historyCurrentState=state;
+            updateUndoRedoState();
+            return;
+          }
+        }
+        const before=historyIndex>=0 ? historyStack[historyIndex].after : historyCurrentState || state;
+        if(historyIndex < historyStack.length-1){
+          historyStack.splice(historyIndex+1);
+        }
+        historyStack.push({before:before||state, after:state, description:description||'变更', timestamp:now, mergeKey, selection:currentSelectionId()});
+        if(historyStack.length>historyLimit+1){
+          historyStack.splice(0, historyStack.length-(historyLimit+1));
+          historyIndex=historyStack.length-1;
+        }else{
+          historyIndex=historyStack.length-1;
+        }
+        historyCurrentState=state;
+        updateUndoRedoState();
+      }
+      function requestHistorySnapshot(description, options={}){
+        if(!historyInitialized || suppressHistory) return;
+        requestAnimationFrame(()=>recordHistory(description, options));
+      }
+      function applyMindState(state, selectionId){
+        if(!jm || !state) return false;
+        let parsed=null;
+        try{ parsed=JSON.parse(state); }
+        catch(_){ return false; }
+        suppressHistory=true;
+        try{
+          jm.show(parsed);
+          initialData=parsed;
+          const targetId=selectionId || (parsed && parsed.data ? parsed.data.id : null);
+          if(targetId){
+            try{ jm.select_node(targetId); }
+            catch(_){ }
+          }
+        }finally{
+          suppressHistory=false;
+        }
+        refreshInspector(jm.get_selected_node());
+        updateFoldAllLabel();
+        scheduleHandleRefresh();
+        updateFoldToggleUI(jm.get_selected_node());
+        markDirty();
+        return true;
+      }
+      function performUndo(){
+        if(!historyInitialized || historyIndex<=0) return false;
+        const targetIndex=historyIndex-1;
+        const entry=historyStack[targetIndex];
+        if(!entry) return false;
+        if(!applyMindState(entry.after, entry.selection)) return false;
+        historyIndex=targetIndex;
+        historyCurrentState=entry.after;
+        updateUndoRedoState();
+        return true;
+      }
+      function performRedo(){
+        if(!historyInitialized || historyIndex>=historyStack.length-1) return false;
+        const targetIndex=historyIndex+1;
+        const entry=historyStack[targetIndex];
+        if(!entry) return false;
+        if(!applyMindState(entry.after, entry.selection)) return false;
+        historyIndex=targetIndex;
+        historyCurrentState=entry.after;
+        updateUndoRedoState();
+        return true;
+      }
       let nodeClipboardTemplate=null;
       let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
@@ -7114,6 +7226,7 @@ if ($view === 'map_edit') {
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             showRelationToast('关联已创建');
+            requestHistorySnapshot('新增关联',{mergeKey:'relation',mergeWindow:200});
           }
         }
       }
@@ -7141,7 +7254,28 @@ if ($view === 'map_edit') {
         inspectorFields.forEach(el=>{ el.disabled=!enabled; });
         if(inspector){ inspector.classList.toggle('disabled', !enabled); }
       }
+      function updateFoldButtonState(node){
+        if(!dockFoldButton) return;
+        const hasChildren=!!(node && node.children && node.children.length);
+        if(!hasChildren){
+          if(dockFoldLabel) dockFoldLabel.textContent='折叠';
+          dockFoldButton.disabled=true;
+          dockFoldButton.dataset.foldState='disabled';
+          dockFoldButton.dataset.tip='无子节点可折叠';
+          hideDockTooltip(dockFoldButton);
+          return;
+        }
+        dockFoldButton.disabled=false;
+        const collapsed=node.expanded===false;
+        if(dockFoldLabel) dockFoldLabel.textContent=collapsed?'展开':'折叠';
+        dockFoldButton.dataset.foldState=collapsed?'collapsed':'expanded';
+        const expandedTip=dockFoldButton.dataset.tipExpanded || '折叠（Space 或 ←）';
+        const collapsedTip=dockFoldButton.dataset.tipCollapsed || '展开（Space 或 →）';
+        dockFoldButton.dataset.tip=collapsed ? collapsedTip : expandedTip;
+        refreshDockTooltip(dockFoldButton);
+      }
       function updateFoldToggleUI(node){
+        updateFoldButtonState(node);
         if(!nodeFoldField || !nodeFoldToggle || !nodeFoldToggleText) return;
         const hasChildren=!!(node && node.children && node.children.length);
         nodeFoldField.hidden=!hasChildren;
@@ -7177,6 +7311,16 @@ if ($view === 'map_edit') {
       function updateFoldAllLabel(){
         if(!foldAllMenuItem) return;
         foldAllMenuItem.textContent=hasCollapsedNodes() ? '展开全部' : '折叠全部';
+      }
+      function removeEdgeButtonsForDescendants(node){
+        if(!node || !node.children || !node.children.length) return;
+        node.children.forEach(child=>{
+          if(child && child.edgeButton){
+            if(child.edgeButton.parentElement){ child.edgeButton.parentElement.removeChild(child.edgeButton); }
+            child.edgeButton=null;
+          }
+          if(child && child.children && child.children.length){ removeEdgeButtonsForDescendants(child); }
+        });
       }
       function setAllNodesExpanded(expanded){
         if(!jm) return false;
@@ -7217,12 +7361,13 @@ if ($view === 'map_edit') {
       function setNodeExpandedState(node, expanded){
         if(!node) return;
         let changed=false;
+        const desired=expanded!==false;
+        if(!desired){ removeEdgeButtonsForDescendants(node); }
         if(typeof jm.set_node_expanded==='function'){
           try{ changed=!!jm.set_node_expanded(node.id, expanded); }
           catch(_){ changed=false; }
         }
         if(!changed && typeof jm.set_node_expanded!=='function'){
-          const desired=expanded!==false;
           if(node.expanded!==desired){
             node.expanded=desired;
             if(node.model){ node.model.expanded=desired; }
@@ -7235,9 +7380,24 @@ if ($view === 'map_edit') {
           }
         }
         if(changed){
+          updateFoldToggleUI(node);
           markDirty();
+          requestHistorySnapshot(desired?'展开节点':'折叠节点',{mergeKey:'fold',mergeWindow:200});
           scheduleHandleRefresh();
-          requestAnimationFrame(()=>refreshInspector(jm.get_node(node.id)));
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(node.id);
+            refreshInspector(latest);
+            if(latest && typeof jm.center_node==='function'){
+              const centered=jm.center_node(latest,{animate:true,duration:260});
+              if(!centered){
+                let ancestor=latest.parent;
+                while(ancestor){
+                  if(jm.center_node(ancestor,{animate:true,duration:260})) break;
+                  ancestor=ancestor.parent;
+                }
+              }
+            }
+          });
         }else{
           updateFoldToggleUI(jm.get_node(node.id));
         }
@@ -7355,6 +7515,7 @@ if ($view === 'map_edit') {
             scheduleHandleRefresh();
             refreshInspector(jm.get_selected_node());
             showRelationToast('关联已移除');
+            requestHistorySnapshot('移除关联',{mergeKey:'relation',mergeWindow:200});
           }
         });
       }
@@ -7432,6 +7593,21 @@ if ($view === 'map_edit') {
         longPressState=null;
       };
       if(jmContainer){
+        jmContainer.addEventListener('click',e=>{
+          const marker=e.target.closest('.node-collapse-marker');
+          if(marker){
+            e.preventDefault();
+            const targetId=marker.dataset.node;
+            if(targetId){
+              const targetNode=jm.get_node(targetId);
+              if(targetNode){
+                jm.select_node(targetNode.id);
+                setNodeExpandedState(targetNode,true);
+              }
+            }
+            return;
+          }
+        });
         jmContainer.addEventListener('pointerdown',e=>{
           const nodeEl=e.target.closest('.jsmind-node');
           if(!nodeEl){ cancelLongPressState(); return; }
@@ -7561,6 +7737,7 @@ if ($view === 'map_edit') {
           updateHandlePosition();
           refreshInspector(jm.get_node(node.id));
         });
+        requestHistorySnapshot('更新节点',{mergeKey:'inspector',mergeWindow:200});
       }
       function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
       function ensureNode(){
@@ -7612,6 +7789,7 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(newNode.id));
+        requestHistorySnapshot('新增节点',{mergeKey:'node-create',mergeWindow:200});
         if(typeof requestAnimationFrame==='function'){
           requestAnimationFrame(()=>{
             const target=jm.get_node(newNode.id);
@@ -7736,6 +7914,7 @@ if ($view === 'map_edit') {
         jm.select_node(created.id);
         if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
         markDirty();
+        requestHistorySnapshot('粘贴节点',{mergeKey:'node-create',mergeWindow:200});
         scheduleHandleRefresh();
         requestAnimationFrame(()=>{
           const latest=jm.get_node(created.id);
@@ -7795,6 +7974,7 @@ if ($view === 'map_edit') {
         jm.select_node(node.id);
         if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
         markDirty();
+        requestHistorySnapshot('调整层级',{mergeKey:'structure',mergeWindow:200});
         scheduleHandleRefresh();
         requestAnimationFrame(()=>{
           const latest=jm.get_node(node.id);
@@ -7924,6 +8104,7 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        requestHistorySnapshot('上传附件',{mergeKey:'attachment',mergeWindow:200});
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -7965,6 +8146,7 @@ if ($view === 'map_edit') {
             refreshInspector(latest);
             startInlineEditing(latest);
           }
+          requestHistorySnapshot('插入节点',{mergeKey:'node-create',mergeWindow:200});
         });
       }
       function addSiblingNode(){
@@ -7984,6 +8166,7 @@ if ($view === 'map_edit') {
         const node=ensureNode(); if(!node || node.isroot) return;
         commitInlineEditing();
         jm.remove_node(node.id); markDirty();
+        requestHistorySnapshot('删除节点',{mergeKey:'node-delete',mergeWindow:200});
         scheduleHandleRefresh();
         requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
       }
@@ -8026,6 +8209,7 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(node.id));
+        requestHistorySnapshot('更新链接',{mergeKey:'inspector',mergeWindow:200});
       }
       if(attachInput){
         attachInput.addEventListener('change',async e=>{
@@ -8052,6 +8236,7 @@ if ($view === 'map_edit') {
           if(value===node.topic) return;
           commitInlineEditing();
           if(typeof jm.update_node==='function'){ jm.update_node(node.id, value); }
+          requestHistorySnapshot('更新标题',{mergeKey:'rename',mergeWindow:200});
         };
         nodeTopicInput.addEventListener('change',commitTopic);
         nodeTopicInput.addEventListener('blur',commitTopic);
@@ -8103,6 +8288,7 @@ if ($view === 'map_edit') {
           case 'save': saveMindmap(); break;
           case 'sibling': addSiblingNode(); break;
           case 'child': addChildNode(); break;
+          case 'fold-toggle': toggleBranch(); break;
           case 'attach': openAttachmentDialog(); break;
           case 'relation': toggleRelationMode(); break;
           case 'link': openLinkPrompt(); break;
@@ -8215,8 +8401,18 @@ if ($view === 'map_edit') {
           });
         };
         if(dockButtons.length){
+          dockButtons.forEach(btn=>{
+            btn.addEventListener('pointerenter',event=>{
+              if(pointerIsCoarse) return;
+              if(event.pointerType && event.pointerType!=='mouse' && event.pointerType!=='pen') return;
+              showDockTooltip(btn);
+            });
+            btn.addEventListener('pointerleave',()=>hideDockTooltip(btn));
+            btn.addEventListener('focus',()=>{ if(pointerIsCoarse) return; showDockTooltip(btn); });
+            btn.addEventListener('blur',()=>hideDockTooltip(btn));
+          });
           dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
+          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); hideDockTooltip(); });
         }
         if(fisheyeToggle){
           fisheyeToggle.addEventListener('change',()=>{
@@ -8232,6 +8428,25 @@ if ($view === 'map_edit') {
         if(key==='s' && (e.ctrlKey || e.metaKey)){
           e.preventDefault();
           saveMindmap();
+        }
+      });
+      document.addEventListener('keydown',e=>{
+        const lowerKey=(e.key||'').toLowerCase();
+        const meta=e.metaKey || e.ctrlKey;
+        if(!meta && !(e.ctrlKey && lowerKey==='y')) return;
+        const active=document.activeElement;
+        if(active){
+          const tag=active.tagName || '';
+          if(active.isContentEditable || /input|textarea|select/i.test(tag)){ return; }
+        }
+        if(meta && !e.shiftKey && lowerKey==='z'){
+          e.preventDefault();
+          performUndo();
+          return;
+        }
+        if((meta && e.shiftKey && lowerKey==='z') || (e.ctrlKey && lowerKey==='y')){
+          e.preventDefault();
+          performRedo();
         }
       });
       document.addEventListener('keydown',e=>{
@@ -8690,6 +8905,14 @@ if ($view === 'map_edit') {
               initialData=JSON.parse(JSON.stringify(payload));
               if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
               markDirty();
+              requestAnimationFrame(()=>{
+                const latest=jm.get_selected_node();
+                refreshInspector(latest);
+                updateFoldAllLabel();
+                updateFoldToggleUI(latest);
+                scheduleHandleRefresh();
+                requestHistorySnapshot('导入导图',{mergeKey:'import',mergeWindow:200});
+              });
               break;
             case 'append-node':
               importJsonAsSubtree(payload);
@@ -8752,7 +8975,15 @@ if ($view === 'map_edit') {
         parentModel.expanded=true;
         enforceRightOrientation(current.data);
         jm.show(current);
-        requestAnimationFrame(()=>{ jm.select_node(newNode.id); scheduleHandleRefresh(); });
+        requestAnimationFrame(()=>{
+          jm.select_node(newNode.id);
+          scheduleHandleRefresh();
+          const latest=jm.get_node(newNode.id);
+          refreshInspector(latest);
+          updateFoldAllLabel();
+          updateFoldToggleUI(latest);
+          requestHistorySnapshot('导入节点',{mergeKey:'import',mergeWindow:200});
+        });
         markDirty();
       }
       function importJsonAsNewMap(json){
@@ -8775,7 +9006,14 @@ if ($view === 'map_edit') {
           if(nextTitle){ titleInput.value=nextTitle; }
         }
         markDirty();
-        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const latest=jm.get_selected_node();
+          refreshInspector(latest);
+          updateFoldAllLabel();
+          updateFoldToggleUI(latest);
+          scheduleHandleRefresh();
+          requestHistorySnapshot('导入导图',{mergeKey:'import',mergeWindow:200});
+        });
       }
       if(importInput){
         importInput.addEventListener('change', e=>{
