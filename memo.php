@@ -3808,12 +3808,16 @@ if ($view === 'map_edit') {
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
-      .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
-      .mind-relations .relation-group{pointer-events:none}
+      .mind-relations{position:absolute;top:0;left:0;overflow:visible}
+      .mind-relations .relation-group{pointer-events:auto}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
       .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
+      .mind-relations .relation-highlight{pointer-events:none}
+      .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2;stroke:url(#mindGoldTrace);filter:url(#mindSoftGlow)}
+      .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(255,242,218,.72);stroke-width:1.4}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0;pointer-events:none}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto}
@@ -3833,7 +3837,10 @@ if ($view === 'map_edit') {
       .jsmind-node.edge-glow::after{opacity:.6;transform:scale(.98);box-shadow:0 0 44px rgba(227,198,139,.28)}
       .jsmind-node.edge-glow.selected{border-color:var(--gold-400)}
       .jsmind-node.edge-glow.selected::after{box-shadow:0 0 44px rgba(75,195,209,.3),0 0 40px rgba(227,198,139,.26)}
+      .mind-shell[data-relation-mode] .mind-stage{cursor:crosshair}
+      .mind-shell[data-relation-mode] .jsmind-node{cursor:pointer}
       .jsmind-node.relation-source{border-color:rgba(75,195,209,.7);box-shadow:0 0 0 2px rgba(75,195,209,.35),0 0 36px rgba(75,195,209,.28)}
+      .mind-shell[data-relation-mode="awaiting-target"] .jsmind-node:not(.relation-source){opacity:.92}
       .jsmind-node.relation-target{border-style:dashed;border-color:rgba(75,195,209,.6)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
       .jsmind-node:not(.isroot) .node-topic::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--gold-400);box-shadow:0 0 6px rgba(227,198,139,.4);vertical-align:middle}
@@ -3844,7 +3851,7 @@ if ($view === 'map_edit') {
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);display:flex;justify-content:center}
       .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 92px;min-width:76px}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -3864,13 +3871,13 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:1 1 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:center}.dock-btn{height:58px;flex:1 1 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:center}.dock-btn{height:56px;flex:1 1 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
-      .mind-shell[data-relation-mode="pending"] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
+      .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
       @keyframes relationPulse{0%{opacity:.35}50%{opacity:.8}100%{opacity:.35}}
       .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);transition:transform .24s ease,opacity .24s ease}
       .node-popover[hidden]{display:none!important}
@@ -3903,18 +3910,16 @@ if ($view === 'map_edit') {
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
       .node-popover .popover-actions button:hover{border-color:rgba(227,198,139,.6)}
       .node-popover.disabled{pointer-events:none;opacity:.6}
-      .relation-list{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 0}
-      .relation-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(75,195,209,.45);background:rgba(75,195,209,.16);color:var(--text-strong);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase}
-      .relation-pill button{border:0;background:transparent;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px;line-height:1;padding:0 2px}
-      .relation-pill button:hover{color:#fff}
-      .relation-hint{margin:6px 0 0;font:500 11px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
-      #node-relations-field.empty .relation-list{display:none}
       .node-context-menu{position:fixed;z-index:150;min-width:180px;padding:12px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 22px 48px rgba(0,0,0,.6);display:grid;gap:8px}
       .node-context-menu[hidden]{display:none!important}
       .node-context-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
       .node-context-menu button:hover{border-color:rgba(201,168,106,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
       .node-context-menu[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding:16px 16px 28px;gap:12px}
       .node-context-menu[data-mode="sheet"] button{width:100%}
+      .relation-context-menu{position:fixed;z-index:160;min-width:160px;padding:10px;margin:0;border-radius:16px;border:1px solid rgba(75,195,209,.32);background:rgba(10,16,20,.94);box-shadow:0 18px 38px rgba(0,0,0,.55);display:grid;gap:8px}
+      .relation-context-menu[hidden]{display:none!important}
+      .relation-context-menu button{padding:8px 12px;border-radius:12px;border:1px solid rgba(75,195,209,.28);background:rgba(12,18,24,.88);color:rgba(191,242,255,.92);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
+      .relation-context-menu button:hover{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.16);color:#e9fcff}
       .mind-settings{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:130;background:rgba(5,6,8,.6);backdrop-filter:blur(8px)}
       .mind-settings[aria-hidden="false"]{display:flex}
       .mind-settings .settings-panel{background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.9));border:1px solid rgba(201,168,106,.32);border-radius:22px;box-shadow:0 32px 60px rgba(0,0,0,.65);padding:20px 22px;display:grid;gap:16px;min-width:280px;max-width:360px}
@@ -4076,11 +4081,6 @@ if ($view === 'map_edit') {
 负责人：张三
 标签：#重要 #任务"></textarea>
         </div>
-      <div class="field" id="node-relations-field">
-        <label>关联节点</label>
-        <div class="relation-list" id="node-relations-list"></div>
-        <p class="relation-hint">使用底部“关联”按钮在节点之间建立跨层级连线。</p>
-      </div>
       <div class="popover-actions">
         <button type="button" data-pop-close>取消</button>
         <button type="button" class="accent" data-pop-save>完成</button>
@@ -4089,6 +4089,9 @@ if ($view === 'map_edit') {
     </div>
     <div class="node-context-menu" id="node-context-menu" hidden>
       <button type="button" data-menu-action="edit">编辑属性</button>
+    </div>
+    <div class="relation-context-menu" id="relation-context-menu" hidden>
+      <button type="button" data-relation-menu-action="delete">删除连接</button>
     </div>
     <div class="mind-settings" id="mind-settings" aria-hidden="true">
       <div class="settings-panel">
@@ -4788,6 +4791,7 @@ if ($view === 'map_edit') {
           this.activePointers=new Map();
           this.pinchState=null;
           this.relations=[];
+          this.selectedRelationId=null;
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
           this.edgeHoverState=null;
@@ -5837,7 +5841,10 @@ if ($view === 'map_edit') {
           if(!this.relationLayer) return;
           while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); }
           if(this.relationRegistry){ this.relationRegistry.clear(); }
-          if(!Array.isArray(this.relations) || !this.relations.length) return;
+          if(!Array.isArray(this.relations) || !this.relations.length){
+            this.selectedRelationId=null;
+            return;
+          }
           for(const relation of this.relations){
             if(!relation) continue;
             const fromNode=this.nodes.get(relation.from);
@@ -5858,13 +5865,65 @@ if ($view === 'map_edit') {
             else{ core.removeAttribute('marker-start'); }
             const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
             highlight.classList.add('relation-highlight');
+            if(this.selectedRelationId && this.selectedRelationId===relation.id){
+              group.dataset.selected='true';
+            }
             group.appendChild(shadow);
             group.appendChild(core);
             group.appendChild(highlight);
             this.relationLayer.appendChild(group);
             this.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            const handleSelect=evt=>{
+              if(evt){ evt.stopPropagation(); }
+              const isMouse=evt && evt.pointerType==='mouse';
+              if(evt && evt.type==='pointerdown' && isMouse && evt.button!==0) return;
+              const selected=this.select_relation(relation.id) || relation;
+              if(this.options && typeof this.options.onRelationSelect==='function'){
+                this.options.onRelationSelect(selected, this, evt||null);
+              }
+            };
+            const handleContext=evt=>{
+              if(evt){ evt.preventDefault(); evt.stopPropagation(); }
+              const selected=this.select_relation(relation.id) || relation;
+              if(this.options && typeof this.options.onRelationContext==='function'){
+                this.options.onRelationContext(selected, this, evt||null);
+              }
+            };
+            core.addEventListener('pointerdown',handleSelect);
+            core.addEventListener('contextmenu',handleContext);
             this.updateRelationPath(relation);
           }
+        }
+        get_relation(id){
+          if(!id || !this.relationRegistry) return null;
+          const entry=this.relationRegistry.get(id);
+          return entry?entry.relation||null:null;
+        }
+        select_relation(id){
+          if(!this.relationRegistry) return null;
+          if(this.selectedRelationId && this.relationRegistry.has(this.selectedRelationId)){
+            const prev=this.relationRegistry.get(this.selectedRelationId);
+            if(prev && prev.group){ prev.group.removeAttribute('data-selected'); }
+          }
+          this.selectedRelationId=null;
+          if(!id || !this.relationRegistry.has(id)) return null;
+          const entry=this.relationRegistry.get(id);
+          this.selectedRelationId=id;
+          if(entry && entry.group){ entry.group.dataset.selected='true'; }
+          return entry?entry.relation||null:null;
+        }
+        clear_relation_selection(){
+          if(!this.selectedRelationId) return;
+          if(this.relationRegistry && this.relationRegistry.has(this.selectedRelationId)){
+            const entry=this.relationRegistry.get(this.selectedRelationId);
+            if(entry && entry.group){ entry.group.removeAttribute('data-selected'); }
+          }
+          this.selectedRelationId=null;
+        }
+        get_selected_relation(){
+          if(!this.selectedRelationId || !this.relationRegistry) return null;
+          const entry=this.relationRegistry.get(this.selectedRelationId);
+          return entry?entry.relation||null:null;
         }
         updateNodePosition(node){
           if(!node || !node.el) return;
@@ -6227,6 +6286,7 @@ if ($view === 'map_edit') {
             if(entry && entry.group && entry.group.parentNode){ entry.group.parentNode.removeChild(entry.group); }
             this.relationRegistry.delete(id);
           }
+          if(this.selectedRelationId===id){ this.selectedRelationId=null; }
           this.mind.relations=relations;
           if(removed){ this.renderRelations(); this.emit(SimpleMind.event_type.update); }
           return true;
@@ -6246,6 +6306,7 @@ if ($view === 'map_edit') {
                 if(entry && entry.group && entry.group.parentNode){ entry.group.parentNode.removeChild(entry.group); }
                 this.relationRegistry.delete(rel.id);
               }
+              if(this.selectedRelationId===rel.id){ this.selectedRelationId=null; }
             }
           }
           if(changed){
@@ -6452,6 +6513,8 @@ if ($view === 'map_edit') {
         support_html:true,
         mode:'full',
         onInsertBetween:(parent, child)=>handleInsertBetweenNodes(parent, child),
+        onRelationSelect:(relation, instance, evt)=>handleRelationSelect(relation, evt),
+        onRelationContext:(relation, instance, evt)=>handleRelationContext(relation, evt),
       });
       const blobUrlRegistry=new Set();
       const externalScriptCache=new Map();
@@ -6860,8 +6923,6 @@ if ($view === 'map_edit') {
       const nodeFoldToggle=document.getElementById('node-fold-toggle');
       const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
       const nodeFoldHint=document.getElementById('node-fold-hint');
-      const relationField=document.getElementById('node-relations-field');
-      const relationList=document.getElementById('node-relations-list');
       const mindShell=document.querySelector('.mind-shell');
       const mindInfoBar=document.getElementById('mind-info-bar');
       const mindInfoHandle=document.getElementById('mind-info-handle');
@@ -6886,6 +6947,7 @@ if ($view === 'map_edit') {
       const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
       const relationToast=document.getElementById('mind-relation-toast');
+      const relationContextMenu=document.getElementById('relation-context-menu');
       let pendingImportPayload=null;
       let pendingImportFileName='';
       const foldAllMenuItem=null;
@@ -7272,6 +7334,8 @@ if ($view === 'map_edit') {
       let dirty=false;
       let relationMode=null;
       let relationToastTimer=null;
+      let selectedRelationId=null;
+      let relationBlankClickTs=0;
       let nodeClipboardTemplate=null;
       let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
@@ -7328,6 +7392,15 @@ if ($view === 'map_edit') {
           el.classList.remove('relation-source','relation-target');
         });
       }
+      function clearRelationSelection(){
+        if(typeof jm?.clear_relation_selection==='function'){ jm.clear_relation_selection(); }
+        selectedRelationId=null;
+      }
+      function closeRelationContextMenu(){
+        if(!relationContextMenu) return;
+        relationContextMenu.hidden=true;
+        relationContextMenu.removeAttribute('style');
+      }
       function showRelationToast(message, sticky=false){
         if(!relationToast) return;
         relationToast.textContent=message || '';
@@ -7341,61 +7414,142 @@ if ($view === 'map_edit') {
         if(relationToast){ relationToast.dataset.visible='false'; }
         if(relationToastTimer){ clearTimeout(relationToastTimer); relationToastTimer=null; }
       }
+      function updateRelationModeState(){
+        if(!mindShell) return;
+        if(!relationMode){ mindShell.removeAttribute('data-relation-mode'); return; }
+        mindShell.dataset.relationMode=relationMode.sourceId?'awaiting-target':'ready';
+      }
       function startRelationMode(){
-        const node=ensureNode();
-        if(!node){ alert('请先选择一个节点'); return false; }
         commitInlineEditing();
-        relationMode={from:node.id};
+        relationMode={sourceId:null, options:{}};
         hideHandle();
         clearRelationHighlights();
-        const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
-        if(el){ el.classList.add('relation-source'); }
-        if(mindShell){ mindShell.dataset.relationMode='pending'; }
-        showRelationToast('点击另一个节点以建立关联，或按 Esc 取消', true);
+        clearRelationSelection();
+        closeRelationContextMenu();
+        updateRelationModeState();
+        relationBlankClickTs=0;
+        showRelationToast('关联模式开启：点击节点选择起点', true);
         return true;
+      }
+      function resetRelationSource(message){
+        if(!relationMode) return;
+        relationMode.sourceId=null;
+        clearRelationHighlights();
+        updateRelationModeState();
+        relationBlankClickTs=0;
+        if(message){ showRelationToast(message); }
       }
       function cancelRelationMode(notify=false){
         if(!relationMode) return;
         relationMode=null;
-        if(mindShell){ mindShell.removeAttribute('data-relation-mode'); }
+        updateRelationModeState();
         clearRelationHighlights();
-        if(notify){ showRelationToast('已取消关联'); }
+        closeRelationContextMenu();
+        clearRelationSelection();
+        relationBlankClickTs=0;
+        if(notify){ showRelationToast('已退出关联模式'); }
         else{ hideRelationToast(); }
         scheduleHandleRefresh();
       }
       function updateRelationHover(nodeId){
-        if(!relationMode) return;
-        const targetId=(nodeId && nodeId!==relationMode.from)?nodeId:null;
+        if(!relationMode || !relationMode.sourceId) return;
+        const targetId=(nodeId && nodeId!==relationMode.sourceId)?nodeId:null;
         document.querySelectorAll('.jsmind-node.relation-target').forEach(el=>el.classList.remove('relation-target'));
         if(targetId){
           const el=document.querySelector(`.jsmind-node[nodeid="${targetId}"]`);
           if(el){ el.classList.add('relation-target'); }
         }
       }
-      function completeRelationMode(targetNode){
-        if(!relationMode || !targetNode) return;
-        const sourceId=relationMode.from;
-        if(targetNode.id===sourceId){ showRelationToast('请选择不同的节点'); return; }
+      function handleRelationNodeClick(node){
+        if(!relationMode || !node) return;
+        closeRelationContextMenu();
+        if(!relationMode.sourceId){
+          relationMode.sourceId=node.id;
+          clearRelationHighlights();
+          const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+          if(el){ el.classList.add('relation-source'); }
+          updateRelationModeState();
+          relationBlankClickTs=0;
+          showRelationToast('已选择起点，点击另一节点完成关联');
+          return;
+        }
+        if(node.id===relationMode.sourceId){
+          resetRelationSource('已取消起点选择');
+          return;
+        }
+        const sourceId=relationMode.sourceId;
         const options=relationMode.options || {};
         const existing=typeof jm.get_relations==='function' ? jm.get_relations(sourceId) : [];
-        const duplicate=existing.some(rel=>rel && ((rel.from===sourceId && rel.to===targetNode.id) || (rel.bidirectional && rel.from===targetNode.id && rel.to===sourceId)));
-        cancelRelationMode(false);
-        if(duplicate){ showRelationToast('已存在关联'); return; }
-        if(typeof jm.add_relation==='function'){
-          performUndoable('add-relation',()=>{
-            const relation=jm.add_relation(sourceId, targetNode.id, options);
-            if(!relation) return false;
-            markDirty();
-            scheduleHandleRefresh();
-            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
-            showRelationToast('关联已创建');
-            return true;
-          },{mergeKey:`relation:add:${sourceId}`});
+        const duplicate=existing.some(rel=>rel && ((rel.from===sourceId && rel.to===node.id) || (rel.bidirectional && rel.from===node.id && rel.to===sourceId)));
+        if(duplicate){
+          showRelationToast('已存在关联');
+          return;
+        }
+        let createdRelation=null;
+        const result=performUndoable('add-relation',()=>{
+          const relation=typeof jm.add_relation==='function' ? jm.add_relation(sourceId, node.id, options) : null;
+          if(!relation) return false;
+          createdRelation=relation;
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          return true;
+        },{mergeKey:`relation:add:${sourceId}`});
+        if(result!==false && createdRelation){
+          if(typeof jm.select_relation==='function'){ jm.select_relation(createdRelation.id); }
+          selectedRelationId=createdRelation.id;
+          showRelationToast('关联已创建，可继续选择下一条');
+          resetRelationSource();
+        }
+      }
+      function handleRelationBlankInteraction(){
+        if(!relationMode) return;
+        if(relationMode.sourceId){
+          resetRelationSource('已取消起点选择');
+          return;
+        }
+        const now=Date.now();
+        if(now - relationBlankClickTs < 400){
+          cancelRelationMode(true);
+          relationBlankClickTs=0;
+        }else{
+          relationBlankClickTs=now;
+          showRelationToast('再次点击画布空白处可退出关联模式');
         }
       }
       function toggleRelationMode(){
         if(relationMode){ cancelRelationMode(false); }
         else{ startRelationMode(); }
+      }
+      function handleRelationSelect(relation, evt){
+        if(relation && relation.id){ selectedRelationId=relation.id; }
+        else{ selectedRelationId=null; }
+        closeNodeContextMenu();
+        closeRelationContextMenu();
+        if(evt && evt.type==='contextmenu'){ evt.preventDefault(); }
+      }
+      function handleRelationContext(relation, evt){
+        if(relation && relation.id){ selectedRelationId=relation.id; }
+        else{ selectedRelationId=null; }
+        closeNodeContextMenu();
+        openRelationContextMenu(relation, evt || null);
+      }
+      function deleteSelectedRelation(){
+        if(!selectedRelationId || typeof jm?.remove_relation!=='function') return false;
+        const targetId=selectedRelationId;
+        const result=performUndoable('remove-relation',()=>{
+          const removed=jm.remove_relation(targetId);
+          if(!removed) return false;
+          clearRelationSelection();
+          closeRelationContextMenu();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          markDirty();
+          return true;
+        },{mergeKey:`relation:remove:${targetId}`});
+        if(result===false){ return false; }
+        showRelationToast('关联已删除');
+        return true;
       }
       function toggleSettings(forceShow){
         if(!settingsLayer) return;
@@ -7556,8 +7710,35 @@ if ($view === 'map_edit') {
         nodeContextMenu.removeAttribute('data-mode');
         contextMenuState=null;
       }
+      function isRelationContextMenuOpen(){ return !!(relationContextMenu && !relationContextMenu.hidden); }
+      function openRelationContextMenu(relation, anchorEvent){
+        if(!relationContextMenu || !relation) return;
+        closeRelationContextMenu();
+        relationContextMenu.hidden=false;
+        relationContextMenu.style.left='';
+        relationContextMenu.style.top='';
+        const margin=12;
+        requestAnimationFrame(()=>{
+          const rect=relationContextMenu.getBoundingClientRect();
+          const baseX=anchorEvent && typeof anchorEvent.clientX==='number' ? anchorEvent.clientX : window.innerWidth/2;
+          const baseY=anchorEvent && typeof anchorEvent.clientY==='number' ? anchorEvent.clientY : window.innerHeight/2;
+          let left=baseX - rect.width/2;
+          let top=baseY;
+          if(left<margin) left=margin;
+          if(left+rect.width>window.innerWidth-margin){ left=window.innerWidth-rect.width-margin; }
+          if(top<margin) top=margin;
+          if(top+rect.height>window.innerHeight-margin){ top=window.innerHeight-rect.height-margin; }
+          relationContextMenu.style.left=`${Math.round(left)}px`;
+          relationContextMenu.style.top=`${Math.round(top)}px`;
+        });
+      }
+      function closeAllContextMenus(){
+        closeNodeContextMenu();
+        closeRelationContextMenu();
+      }
       function openNodeContextMenu(node, anchor){
         if(!nodeContextMenu || !node) return;
+        closeRelationContextMenu();
         try{ jm.select_node(node.id); }catch(_){ }
         contextMenuState={nodeId:node.id};
         nodeContextMenu.hidden=false;
@@ -7589,7 +7770,7 @@ if ($view === 'map_edit') {
       function isPopoverOpen(){ return popoverOpen; }
       function openInspectorPopover(node){
         if(!nodePopover || !node) return;
-        closeNodeContextMenu();
+        closeAllContextMenus();
         popoverOpen=true;
         updatePopoverMode();
         nodePopover.hidden=false;
@@ -7632,25 +7813,6 @@ if ($view === 'map_edit') {
         nodePopover.addEventListener('click',e=>{
           if(e.target.closest('[data-pop-close]')){ e.preventDefault(); closeInspectorPopover(); }
           if(e.target.closest('[data-pop-save]')){ e.preventDefault(); commitInlineEditing(); closeInspectorPopover(); }
-        });
-      }
-      if(relationList){
-        relationList.addEventListener('click',e=>{
-          const btn=e.target.closest('button[data-rel-id]');
-          if(!btn) return;
-          const relId=btn.dataset.relId;
-          if(!relId) return;
-          if(!confirm('确定移除该关联吗？')) return;
-          if(typeof jm.remove_relation==='function'){
-            performUndoable('remove-relation',()=>{
-              if(!jm.remove_relation(relId)) return false;
-              markDirty();
-              scheduleHandleRefresh();
-              refreshInspector(jm.get_selected_node());
-              showRelationToast('关联已移除');
-              return true;
-            },{mergeKey:`relation:remove:${relId}`});
-          }
         });
       }
       const startSheetDrag=(e)=>{
@@ -7698,15 +7860,19 @@ if ($view === 'map_edit') {
       });
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){
-          if(relationMode){ cancelRelationMode(true); return; }
+          if(relationMode){
+            if(relationMode.sourceId){ resetRelationSource('已取消起点选择'); }
+            else{ cancelRelationMode(true); }
+            return;
+          }
           if(popoverOpen){ closeInspectorPopover(); }
-          if(isContextMenuOpen()){ closeNodeContextMenu(); }
+          if(isContextMenuOpen() || isRelationContextMenuOpen()){ closeAllContextMenus(); }
         }
       });
       document.addEventListener('pointerdown',e=>{
-        if(!isContextMenuOpen() || !nodeContextMenu) return;
-        if(nodeContextMenu.contains(e.target)) return;
-        closeNodeContextMenu();
+        const target=e.target;
+        if(nodeContextMenu && !nodeContextMenu.hidden && !nodeContextMenu.contains(target)){ closeNodeContextMenu(); }
+        if(relationContextMenu && !relationContextMenu.hidden && !relationContextMenu.contains(target)){ closeRelationContextMenu(); }
       });
       if(nodeContextMenu){
         nodeContextMenu.addEventListener('click',e=>{
@@ -7721,7 +7887,16 @@ if ($view === 'map_edit') {
           }
         });
       }
+      if(relationContextMenu){
+        relationContextMenu.addEventListener('click',e=>{
+          const btn=e.target.closest('[data-relation-menu-action]');
+          if(!btn) return;
+          const action=btn.dataset.relationMenuAction;
+          if(action==='delete'){ deleteSelectedRelation(); }
+        });
+      }
       window.addEventListener('resize',closeNodeContextMenu);
+      window.addEventListener('resize',closeRelationContextMenu);
       const cancelLongPressState=()=>{
         if(longPressState && longPressState.timer){ clearTimeout(longPressState.timer); }
         longPressState=null;
@@ -7773,11 +7948,11 @@ if ($view === 'map_edit') {
         jmContainer.addEventListener('click',e=>{
           if(!relationMode) return;
           const nodeEl=e.target.closest('.jsmind-node');
-          if(!nodeEl) return;
+          if(!nodeEl){ handleRelationBlankInteraction(); return; }
           const nodeId=nodeEl.getAttribute('nodeid');
           if(!nodeId) return;
           const node=jm.get_node(nodeId);
-          if(node){ completeRelationMode(node); }
+          if(node){ handleRelationNodeClick(node); }
         });
         jmContainer.addEventListener('contextmenu',e=>{
           const nodeEl=e.target.closest('.jsmind-node');
@@ -7790,8 +7965,6 @@ if ($view === 'map_edit') {
       }
       function refreshInspector(node){
         inspectorSyncing=true;
-        if(relationList){ relationList.innerHTML=''; }
-        if(relationField){ relationField.classList.add('empty'); }
         if(!node){
           setInspectorEnabled(false);
           if(nodeTopicInput) nodeTopicInput.value='';
@@ -7808,32 +7981,6 @@ if ($view === 'map_edit') {
         if(nodeNoteInput) nodeNoteInput.value=data.note || '';
         updateFoldToggleUI(node);
         updateFoldAllLabel();
-        if(relationList){
-          const relations=typeof jm.get_relations==='function' ? jm.get_relations(node.id) : [];
-          if(relations.length){
-            if(relationField){ relationField.classList.remove('empty'); }
-            relations.forEach(rel=>{
-              if(!rel) return;
-              const partnerId=rel.from===node.id ? rel.to : rel.from;
-              const partner=jm.get_node(partnerId);
-              const name=(partner && partner.topic) ? partner.topic : partnerId;
-              const direction=rel.bidirectional ? '↔' : (rel.from===node.id ? '↦' : '↤');
-              const pill=document.createElement('span');
-              pill.className='relation-pill';
-              const labelSpan=document.createElement('span');
-              labelSpan.textContent=`${direction} ${name}`;
-              if(rel.label){ labelSpan.title=rel.label; }
-              pill.appendChild(labelSpan);
-              const remove=document.createElement('button');
-              remove.type='button';
-              remove.dataset.relId=rel.id;
-              remove.setAttribute('aria-label',`移除与 ${name} 的关联`);
-              remove.textContent='×';
-              pill.appendChild(remove);
-              relationList.appendChild(pill);
-            });
-          }
-        }
         inspectorSyncing=false;
         if(popoverOpen){ positionInspectorPopover(node); }
       }
@@ -8580,6 +8727,7 @@ if ($view === 'map_edit') {
           addChildNode();
         }else if(key==='Delete' || key==='Backspace'){
           e.preventDefault();
+          if(selectedRelationId && deleteSelectedRelation()) return;
           deleteSelectedNode();
         }else if(key===' ' || e.code==='Space'){
           e.preventDefault();
@@ -8650,8 +8798,8 @@ if ($view === 'map_edit') {
       if(titleInput){ titleInput.addEventListener('input', markDirty); }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
-          if(isContextMenuOpen() && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
-            closeNodeContextMenu();
+          if((isContextMenuOpen() || isRelationContextMenuOpen()) && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
+            closeAllContextMenus();
           }
           if(type===jsMind.event_type.select){
             const selected=jm.get_selected_node();
