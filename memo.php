@@ -682,6 +682,52 @@ if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])
   readfile($path); exit;
 }
 
+if (isset($_GET['mindmap_asset_bundle'])) {
+  $rawIds=(string)$_GET['mindmap_asset_bundle'];
+  $parts=preg_split('/[\s,]+/',$rawIds,-1,PREG_SPLIT_NO_EMPTY);
+  $ids=array_values(array_filter(array_map('intval',$parts),fn($v)=>$v>0));
+  if(!$ids){ http_response_code(400); echo 'Invalid asset list'; exit; }
+  $mapHint=(int)($_GET['map'] ?? 0);
+  $entries=[];
+  foreach($ids as $id){
+    $asset=get_mindmap_asset($id);
+    if(!$asset) continue;
+    if($mapHint>0 && (int)($asset['mindmap_id'] ?? 0)!==$mapHint) continue;
+    $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name'];
+    if(!is_file($path)) continue;
+    $entries[]=['asset'=>$asset,'path'=>$path];
+  }
+  if(!$entries){ http_response_code(404); echo 'Attachments not found'; exit; }
+  if(!class_exists('ZipArchive')){ http_response_code(501); echo 'Zip extension unavailable'; exit; }
+  $tmp=tempnam(sys_get_temp_dir(),'mindzip');
+  if($tmp===false){ http_response_code(500); echo 'Failed to create archive'; exit; }
+  $zip=new ZipArchive();
+  if($zip->open($tmp, ZipArchive::CREATE | ZipArchive::OVERWRITE)!==true){ @unlink($tmp); http_response_code(500); echo 'Failed to initialise archive'; exit; }
+  $usedNames=[];
+  foreach($entries as $entry){
+    $meta=$entry['asset'];
+    $original=(string)($meta['orig_name'] ?? ('attachment-'.$meta['id']));
+    $safe=preg_replace('/[\\\\\/:"*?<>|]+/','_', $original);
+    if($safe===''){ $safe='attachment-'.$meta['id']; }
+    $base=$safe; $counter=2;
+    while(isset($usedNames[strtolower($safe)])){
+      $safe=$base.'('.$counter++.')';
+    }
+    $usedNames[strtolower($safe)]=true;
+    $zip->addFile($entry['path'], $safe);
+  }
+  $zip->close();
+  $filename='mindmap_assets_'.date('Ymd_His').'.zip';
+  $size=@filesize($tmp);
+  header('Content-Type: application/zip');
+  header('X-Content-Type-Options: nosniff');
+  header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"');
+  if($size!==false){ header('Content-Length: '.$size); }
+  readfile($tmp);
+  @unlink($tmp);
+  exit;
+}
+
 // —— 导出数据（JSON/CSV） ——
 if (isset($_GET['export'])) {
   $pdo=db(); $cat=$_GET['cat']??'all'; $q=trim((string)($_GET['q']??'')); $params=[]; $where=[];
@@ -1121,6 +1167,19 @@ if (is_post()) {
         if(is_ajax()){
           header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id']]); exit;
         }
+        break;
+      }
+      case 'delete_mindmap_asset': {
+        $id=(int)($_POST['id'] ?? 0);
+        if($id>0){
+          $asset=get_mindmap_asset($id);
+          if($asset){
+            $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name'];
+            if(is_file($path)) @unlink($path);
+            $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
+          }
+        }
+        if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1]); exit; }
         break;
       }
       case 'ping_cats': { if(is_ajax()) json_cats(); break; }
@@ -3875,6 +3934,66 @@ if ($view === 'map_edit') {
       @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
       @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      .mind-asset-layer{position:fixed;inset:0;display:flex;justify-content:flex-end;align-items:stretch;pointer-events:none;z-index:180}
+      .mind-asset-layer::after{content:"";position:absolute;inset:0;background:rgba(5,7,10,.68);backdrop-filter:blur(12px);opacity:0;transition:opacity var(--transition);pointer-events:none}
+      .mind-asset-layer[data-open="true"]{pointer-events:auto}
+      .mind-asset-layer[data-open="true"]::after{opacity:1;pointer-events:auto}
+      .mind-asset-backdrop{position:absolute;inset:0}
+      .mind-asset-panel{position:relative;width:min(420px,calc(100vw - 48px));max-width:100%;height:100%;background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(9,12,14,.94));border-left:1px solid rgba(201,168,106,.32);box-shadow:-18px 0 44px rgba(0,0,0,.62);padding:26px 24px 24px;display:flex;flex-direction:column;gap:18px;transform:translateX(24px);opacity:0;transition:transform var(--transition),opacity var(--transition);pointer-events:auto;overflow:hidden}
+      .mind-asset-layer[data-open="true"] .mind-asset-panel{transform:translateX(0);opacity:1}
+      .mind-asset-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+      .mind-asset-title-wrap{display:flex;flex-direction:column;gap:6px}
+      .mind-asset-title{margin:0;font:600 18px/1.3 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.14em;text-transform:uppercase}
+      .mind-asset-meta{display:flex;flex-wrap:wrap;gap:12px;color:var(--text-muted);font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+      .mind-asset-selection{color:var(--gold-400)}
+      .mind-asset-close{border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.78);color:var(--gold-400);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:border-color var(--transition),transform var(--transition)}
+      .mind-asset-close:hover{border-color:rgba(227,198,139,.56);transform:translateY(-1px)}
+      .mind-asset-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+      .mind-asset-filters{display:flex;flex-wrap:wrap;gap:8px}
+      .mind-asset-filter{padding:8px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(12,16,18,.82);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),transform var(--transition)}
+      .mind-asset-filter[aria-pressed="true"]{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.6);color:var(--bg-void)}
+      .mind-asset-filter:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
+      .mind-asset-filter:hover{transform:translateY(-1px)}
+      .mind-asset-sorter{display:flex;flex-direction:column;gap:4px;font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase}
+      .mind-asset-sorter select{min-width:160px;padding:8px 10px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 13px/1.2 'Inter','Noto Sans SC',sans-serif}
+      .mind-asset-search{flex:1 1 160px;min-width:160px}
+      .mind-asset-search input{width:100%;padding:10px 14px;border-radius:14px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.8);color:var(--text-strong);font:500 13px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.06em}
+      .mind-asset-bulk{display:flex;flex-wrap:wrap;gap:10px}
+      .mind-asset-bulk button{padding:10px 16px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),transform var(--transition)}
+      .mind-asset-bulk button:hover:not([disabled]){border-color:rgba(227,198,139,.62);transform:translateY(-1px)}
+      .mind-asset-bulk button[disabled]{opacity:.5;cursor:not-allowed;transform:none}
+      .mind-asset-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+      .mind-asset-empty{padding:18px;border:1px dashed rgba(201,168,106,.28);border-radius:16px;background:rgba(12,16,18,.7);color:var(--text-muted);text-align:center;font:500 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-asset-list{flex:1 1 auto;min-height:0;overflow:auto;display:grid;gap:12px;padding-right:2px}
+      .mind-asset-row{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.82);box-shadow:var(--shadow-1);transition:border-color var(--transition),box-shadow var(--transition),transform var(--transition);position:relative}
+      .mind-asset-row[data-selected="true"]{border-color:rgba(75,195,209,.52);box-shadow:0 0 0 1px rgba(75,195,209,.32),0 18px 32px rgba(0,0,0,.45)}
+      .mind-asset-row:focus-visible{outline:3px solid rgba(75,195,209,.45);outline-offset:2px}
+      .mind-asset-select{display:flex;align-items:center;justify-content:center}
+      .mind-asset-select input{width:18px;height:18px}
+      .mind-asset-main{display:flex;align-items:flex-start;gap:12px;min-width:0}
+      .mind-asset-icon{font-size:26px;line-height:1}
+      .mind-asset-info{display:flex;flex-direction:column;gap:6px;min-width:0}
+      .mind-asset-name{padding:0;border:0;background:none;color:var(--text-strong);text-align:left;font:600 14px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.06em;cursor:pointer;word-break:break-all}
+      .mind-asset-name:hover{text-decoration:underline;color:var(--gold-400)}
+      .mind-asset-meta-line{display:flex;flex-wrap:wrap;gap:10px;align-items:center;color:var(--text-muted);font:500 12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-asset-node{padding:0 8px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .mind-asset-node:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.24)}
+      .mind-asset-chip{padding:2px 8px;border-radius:999px;border:1px solid rgba(201,168,106,.22);background:rgba(12,16,18,.74);color:var(--text-muted);font:500 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+      .mind-asset-stats{color:var(--text-muted)}
+      .mind-asset-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+      .mind-asset-actions button{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(15,19,22,.8);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),transform var(--transition)}
+      .mind-asset-actions button:hover{border-color:rgba(227,198,139,.54);transform:translateY(-1px)}
+      .mind-asset-actions button[data-asset-action="delete"]{color:#F6D6D6;border-color:rgba(209,75,75,.46);background:rgba(209,75,75,.14)}
+      .mind-asset-actions button[disabled]{opacity:.5;cursor:not-allowed;transform:none}
+      @media (max-width:720px){
+        .mind-asset-panel{width:100%;padding:22px 18px;gap:16px}
+        .mind-asset-row{grid-template-columns:1fr;gap:12px}
+        .mind-asset-actions{justify-content:flex-start}
+        .mind-asset-controls{flex-direction:column;align-items:stretch}
+        .mind-asset-search{width:100%}
+      }
+      @keyframes mindNodeFlash{0%{box-shadow:0 0 0 0 rgba(75,195,209,.55)}60%{box-shadow:0 0 0 10px rgba(75,195,209,0)}100%{box-shadow:0 0 0 0 rgba(75,195,209,0)}}
+      .jsmind-node.flash-focus{border-color:rgba(75,195,209,.6);box-shadow:0 0 0 2px rgba(75,195,209,.45),0 0 42px rgba(75,195,209,.3);animation:mindNodeFlash 1s ease-out 1}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4027,6 +4146,10 @@ if ($view === 'map_edit') {
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
+          <button class="dock-btn" data-action="asset-manager" data-tip="附件管理（Ctrl+Shift+A）" aria-label="附件管理">
+            <span class="icon">🗂</span>
+            <span class="label">管理</span>
+          </button>
           <button class="dock-btn" data-action="relation" data-tip="建立关联" aria-label="关联节点">
             <span class="icon">🪢</span>
             <span class="label">关联</span>
@@ -4040,6 +4163,56 @@ if ($view === 'map_edit') {
             <span class="label">删除</span>
           </button>
         </nav>
+      </div>
+      <div class="mind-asset-layer" id="mind-asset-layer" data-open="false" aria-hidden="true">
+        <div class="mind-asset-backdrop" data-asset-close aria-hidden="true"></div>
+        <aside class="mind-asset-panel" id="mind-asset-panel" role="dialog" aria-modal="false" aria-labelledby="mind-asset-title" tabindex="-1">
+          <header class="mind-asset-header">
+            <div class="mind-asset-title-wrap">
+              <h2 class="mind-asset-title" id="mind-asset-title">附件管理</h2>
+              <div class="mind-asset-meta">
+                <span id="mind-asset-summary">暂无附件</span>
+                <span id="mind-asset-selection" class="mind-asset-selection" hidden>已选 0 项</span>
+              </div>
+            </div>
+            <button type="button" class="mind-asset-close" data-asset-close aria-label="关闭附件管理">×</button>
+          </header>
+          <div class="mind-asset-controls">
+            <div class="mind-asset-filters" role="toolbar" aria-label="附件类型筛选">
+              <button type="button" class="mind-asset-filter" data-asset-filter="all" aria-pressed="true">全部</button>
+              <button type="button" class="mind-asset-filter" data-asset-filter="image" aria-pressed="false">🖼 图片</button>
+              <button type="button" class="mind-asset-filter" data-asset-filter="document" aria-pressed="false">📄 文档</button>
+              <button type="button" class="mind-asset-filter" data-asset-filter="audio" aria-pressed="false">🎵 音频</button>
+              <button type="button" class="mind-asset-filter" data-asset-filter="video" aria-pressed="false">🎞 视频</button>
+              <button type="button" class="mind-asset-filter" data-asset-filter="archive" aria-pressed="false">🗜 压缩包</button>
+              <button type="button" class="mind-asset-filter" data-asset-filter="other" aria-pressed="false">📦 其他</button>
+            </div>
+            <label class="mind-asset-sorter" for="mind-asset-sort">
+              <span>排序</span>
+              <select id="mind-asset-sort">
+                <option value="time-desc">按时间（新→旧）</option>
+                <option value="time-asc">按时间（旧→新）</option>
+                <option value="size-desc">按大小（大→小）</option>
+                <option value="size-asc">按大小（小→大）</option>
+                <option value="type">按类型</option>
+                <option value="name">按名称</option>
+              </select>
+            </label>
+            <div class="mind-asset-search">
+              <label class="sr-only" for="mind-asset-search">搜索附件</label>
+              <input id="mind-asset-search" type="search" placeholder="搜索文件或节点">
+            </div>
+          </div>
+          <div class="mind-asset-bulk">
+            <button type="button" data-bulk-action="delete" disabled>删除所选</button>
+            <button type="button" data-bulk-action="export" disabled>导出清单</button>
+            <button type="button" data-bulk-action="download" disabled>打包下载</button>
+          </div>
+          <div class="mind-asset-body">
+            <div class="mind-asset-empty" id="mind-asset-empty">暂无附件。上传或粘贴文件后，系统会在此集中展示。</div>
+            <div class="mind-asset-list" id="mind-asset-list" role="list"></div>
+          </div>
+        </aside>
       </div>
       <div class="mind-export-overlay" id="mind-export-overlay" role="status" aria-live="polite" aria-hidden="true">
         <div class="export-spinner" aria-hidden="true"></div>
@@ -6948,6 +7121,16 @@ if ($view === 'map_edit') {
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
       const relationToast=document.getElementById('mind-relation-toast');
       const relationContextMenu=document.getElementById('relation-context-menu');
+      const assetLayer=document.getElementById('mind-asset-layer');
+      const assetPanel=document.getElementById('mind-asset-panel');
+      const assetList=document.getElementById('mind-asset-list');
+      const assetEmpty=document.getElementById('mind-asset-empty');
+      const assetSummary=document.getElementById('mind-asset-summary');
+      const assetSelectionMeta=document.getElementById('mind-asset-selection');
+      const assetFilterButtons=assetPanel ? Array.from(assetPanel.querySelectorAll('[data-asset-filter]')) : [];
+      const assetSortSelect=document.getElementById('mind-asset-sort');
+      const assetSearchInput=document.getElementById('mind-asset-search');
+      const assetBulkButtons=assetPanel ? Array.from(assetPanel.querySelectorAll('[data-bulk-action]')) : [];
       let pendingImportPayload=null;
       let pendingImportFileName='';
       const foldAllMenuItem=null;
@@ -6958,6 +7141,7 @@ if ($view === 'map_edit') {
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
       const fisheyeToggle=document.getElementById('setting-fisheye');
+      const assetDockButton=dock ? dock.querySelector('.dock-btn[data-action="asset-manager"]') : null;
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
@@ -7387,6 +7571,729 @@ if ($view === 'map_edit') {
           }
         },1500);
       }
+      const assetState={
+        open:false,
+        needsRefresh:true,
+        filter:'all',
+        sort:'time-desc',
+        search:'',
+        data:[],
+        entryMap:new Map(),
+        selection:new Set(),
+        lastKey:null,
+        visibleKeys:[],
+      };
+      const assetTypeInfo={
+        image:{label:'图片',icon:'🖼'},
+        document:{label:'文档',icon:'📄'},
+        audio:{label:'音频',icon:'🎵'},
+        video:{label:'视频',icon:'🎞'},
+        archive:{label:'压缩包',icon:'🗜'},
+        other:{label:'其他',icon:'📦'},
+      };
+      if(assetFilterButtons.length){
+        assetFilterButtons.forEach(btn=>{
+          const value=btn.dataset.assetFilter || 'all';
+          btn.setAttribute('aria-pressed', value==='all'?'true':'false');
+        });
+      }
+      if(assetSortSelect){ assetSortSelect.value=assetState.sort; }
+      function assetFormatSize(value){
+        if(!Number.isFinite(value) || value<=0) return '';
+        const units=['B','KB','MB','GB','TB'];
+        let idx=0;
+        let num=value;
+        while(num>=1024 && idx<units.length-1){
+          num/=1024;
+          idx++;
+        }
+        const decimals=num>=100 || idx===0 ? 0 : (num>=10 ? 1 : 2);
+        return num.toFixed(decimals)+' '+units[idx];
+      }
+      function assetTimestampFromDescriptor(descriptor){
+        if(!descriptor || typeof descriptor!=='object') return null;
+        const candidates=[
+          descriptor.uploadedAt,
+          descriptor.uploaded_at,
+          descriptor.createdAt,
+          descriptor.created_at,
+          descriptor.updatedAt,
+          descriptor.updated_at,
+          descriptor.timestamp,
+          descriptor.time,
+        ];
+        for(const cand of candidates){
+          if(typeof cand==='number' && Number.isFinite(cand)){
+            if(cand>1e12) return cand;
+            if(cand>0) return cand*1000;
+          }else if(typeof cand==='string' && cand.trim()!==''){
+            const parsed=Date.parse(cand);
+            if(!Number.isNaN(parsed)) return parsed;
+          }
+        }
+        return null;
+      }
+      function assetFormatTime(ts){
+        if(!Number.isFinite(ts)) return '';
+        const date=new Date(ts);
+        if(Number.isNaN(date.getTime())) return '';
+        const pad=n=>String(n).padStart(2,'0');
+        return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+      function assetTypeForDescriptor(mime,name){
+        const lowerMime=(mime||'').toLowerCase();
+        const ext=name && name.includes('.') ? `.${name.split('.').pop().toLowerCase()}` : '';
+        if(lowerMime.startsWith('image/') || imageExts.includes(ext)) return 'image';
+        if(lowerMime.startsWith('video/') || videoExts.includes(ext)) return 'video';
+        if(lowerMime.startsWith('audio/') || audioExts.includes(ext)) return 'audio';
+        if(lowerMime.includes('zip') || lowerMime.includes('rar') || archiveExts.includes(ext)) return 'archive';
+        if(lowerMime.includes('pdf') || lowerMime.includes('word') || lowerMime.includes('excel') || lowerMime.includes('presentation') || officeExts.includes(ext) || ext==='.ppt' || ext==='.pptx') return 'document';
+        if(lowerMime.startsWith('text/') || textExts.includes(ext)) return 'document';
+        return 'other';
+      }
+      function assetBuildKey(nodeId, descriptor, index){
+        const rawId=descriptor ? (descriptor.assetId ?? descriptor.id) : null;
+        const assetId=parseInt(rawId,10);
+        if(Number.isFinite(assetId) && assetId>0){
+          return `asset:${assetId}`;
+        }
+        const name=(descriptor && (descriptor.name || descriptor.filename)) || '';
+        const url=(descriptor && descriptor.url) || '';
+        return `node:${nodeId}:${index}:${name}:${url}`;
+      }
+      function collectMindmapAssets(){
+        const entries=[];
+        if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return entries;
+        jm.nodes.forEach(node=>{
+          if(!node) return;
+          const data=node.data || {};
+          const attachments=gatherAttachments(data);
+          if(!attachments.length) return;
+          attachments.forEach((descriptor,index)=>{
+            if(!descriptor || typeof descriptor!=='object') return;
+            const rawId=descriptor.assetId ?? descriptor.id;
+            const assetId=parseInt(rawId,10);
+            const name=String(descriptor.name || descriptor.filename || `附件 ${index+1}`);
+            const mime=String(descriptor.mime || descriptor.type || '');
+            const sizeRaw=descriptor.size ?? descriptor.filesize ?? descriptor.length ?? 0;
+            const sizeValue=Number.isFinite(Number(sizeRaw)) ? Number(sizeRaw) : 0;
+            const url=descriptor.url || (Number.isFinite(assetId) && assetId>0 ? `?mindmap_asset=${assetId}` : '');
+            const timestamp=assetTimestampFromDescriptor(descriptor);
+            const nodeTitle=(node.topic || '').trim() || '未命名节点';
+            entries.push({
+              key:assetBuildKey(node.id, descriptor, index),
+              assetId:Number.isFinite(assetId) && assetId>0 ? assetId : null,
+              nodeId:node.id,
+              nodeTopic:nodeTitle,
+              name,
+              mime,
+              size:sizeValue>0?sizeValue:0,
+              url,
+              timestamp:timestamp ?? null,
+              sortTime:timestamp ?? (Number.isFinite(assetId) && assetId>0 ? assetId : 0),
+              type:assetTypeForDescriptor(mime,name),
+              descriptor,
+              nameLower:name.toLowerCase(),
+              nodeLower:nodeTitle.toLowerCase(),
+            });
+          });
+        });
+        return entries;
+      }
+      function updateAssetSummary(){
+        if(!assetSummary) return;
+        const total=assetState.data.length;
+        const totalSize=assetState.data.reduce((sum,entry)=>sum + (Number.isFinite(entry.size)?entry.size:0),0);
+        assetSummary.textContent=total ? `共 ${total} 个附件${totalSize?` · 总计 ${assetFormatSize(totalSize)}`:''}` : '暂无附件';
+      }
+      function getSelectedAssetEntries(){
+        const selected=[];
+        assetState.selection.forEach(key=>{
+          const entry=assetState.entryMap.get(key);
+          if(entry) selected.push(entry);
+        });
+        return selected;
+      }
+      function updateAssetBulkState(){
+        if(!assetBulkButtons.length) return;
+        const selectedEntries=getSelectedAssetEntries();
+        const hasSelection=selectedEntries.length>0;
+        const totalSize=selectedEntries.reduce((sum,entry)=>sum + (Number.isFinite(entry.size)?entry.size:0),0);
+        if(assetSelectionMeta){
+          if(hasSelection){
+            assetSelectionMeta.hidden=false;
+            assetSelectionMeta.textContent=`已选 ${selectedEntries.length} 项`+(totalSize?` · ${assetFormatSize(totalSize)}`:'');
+          }else{
+            assetSelectionMeta.hidden=true;
+            assetSelectionMeta.textContent='已选 0 项';
+          }
+        }
+        assetBulkButtons.forEach(btn=>{
+          const action=btn.dataset.bulkAction;
+          let disabled=!hasSelection;
+          if(action==='download'){
+            disabled=!selectedEntries.some(entry=>entry.url);
+          }
+          btn.disabled=disabled;
+        });
+      }
+      function syncAssetSelectionUI(){
+        if(!assetList) return;
+        const rows=assetList.querySelectorAll('.mind-asset-row');
+        rows.forEach(row=>{
+          const key=row.dataset.key;
+          const selected=assetState.selection.has(key);
+          row.dataset.selected=selected?'true':'false';
+          const checkbox=row.querySelector('input[data-asset-select]');
+          if(checkbox) checkbox.checked=selected;
+        });
+        updateAssetBulkState();
+      }
+      function renderAssetList(){
+        if(!assetList || !assetEmpty) return;
+        let entries=assetState.data.slice();
+        if(assetState.filter!=='all'){
+          entries=entries.filter(entry=>entry.type===assetState.filter);
+        }
+        if(assetState.search){
+          const q=assetState.search;
+          entries=entries.filter(entry=>{
+            return entry.nameLower.includes(q) || entry.nodeLower.includes(q) || (entry.mime && entry.mime.toLowerCase().includes(q));
+          });
+        }
+        const sortKey=assetState.sort;
+        entries.sort((a,b)=>{
+          switch(sortKey){
+            case 'time-asc':
+              if(a.sortTime===b.sortTime) return a.name.localeCompare(b.name, undefined, {sensitivity:'base'});
+              return (a.sortTime||0)-(b.sortTime||0);
+            case 'time-desc':
+              if(a.sortTime===b.sortTime) return a.name.localeCompare(b.name, undefined, {sensitivity:'base'});
+              return (b.sortTime||0)-(a.sortTime||0);
+            case 'size-asc':
+              if(a.size===b.size) return a.name.localeCompare(b.name, undefined, {sensitivity:'base'});
+              return (a.size||0)-(b.size||0);
+            case 'size-desc':
+              if(a.size===b.size) return a.name.localeCompare(b.name, undefined, {sensitivity:'base'});
+              return (b.size||0)-(a.size||0);
+            case 'type':
+              if(a.type===b.type) return a.name.localeCompare(b.name, undefined, {sensitivity:'base'});
+              return a.type.localeCompare(b.type);
+            case 'name':
+              return a.name.localeCompare(b.name, undefined, {sensitivity:'base'});
+            default:
+              return 0;
+          }
+        });
+        assetState.visibleKeys=entries.map(entry=>entry.key);
+        assetList.innerHTML='';
+        if(!entries.length){
+          assetList.hidden=true;
+          assetEmpty.hidden=false;
+          assetEmpty.textContent=assetState.data.length ? '没有符合条件的附件' : '暂无附件。上传或粘贴文件后，系统会在此集中展示。';
+          updateAssetBulkState();
+          return;
+        }
+        assetList.hidden=false;
+        assetEmpty.hidden=true;
+        const frag=document.createDocumentFragment();
+        entries.forEach(entry=>{
+          const row=document.createElement('div');
+          row.className='mind-asset-row';
+          row.dataset.key=entry.key;
+          row.dataset.type=entry.type;
+          row.setAttribute('role','listitem');
+          row.tabIndex=0;
+          const selectLabel=document.createElement('label');
+          selectLabel.className='mind-asset-select';
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';
+          checkbox.setAttribute('data-asset-select','true');
+          checkbox.checked=assetState.selection.has(entry.key);
+          selectLabel.appendChild(checkbox);
+          row.appendChild(selectLabel);
+          const main=document.createElement('div');
+          main.className='mind-asset-main';
+          const iconSpan=document.createElement('span');
+          iconSpan.className='mind-asset-icon';
+          iconSpan.textContent=(assetTypeInfo[entry.type]?.icon) || '📎';
+          const infoBox=document.createElement('div');
+          infoBox.className='mind-asset-info';
+          const nameBtn=document.createElement('button');
+          nameBtn.type='button';
+          nameBtn.className='mind-asset-name';
+          nameBtn.dataset.assetAction='preview';
+          nameBtn.textContent=entry.name;
+          nameBtn.title=entry.name;
+          infoBox.appendChild(nameBtn);
+          const metaLine=document.createElement('div');
+          metaLine.className='mind-asset-meta-line';
+          const nodeBtn=document.createElement('button');
+          nodeBtn.type='button';
+          nodeBtn.className='mind-asset-node';
+          nodeBtn.dataset.assetAction='locate';
+          nodeBtn.textContent=entry.nodeTopic;
+          nodeBtn.title='定位到节点：'+entry.nodeTopic;
+          metaLine.appendChild(nodeBtn);
+          const typeBadge=document.createElement('span');
+          typeBadge.className='mind-asset-chip';
+          typeBadge.textContent=(assetTypeInfo[entry.type]?.label) || assetTypeInfo.other.label;
+          metaLine.appendChild(typeBadge);
+          const detailParts=[];
+          if(entry.size){ detailParts.push(assetFormatSize(entry.size)); }
+          if(entry.timestamp){
+            const formatted=assetFormatTime(entry.timestamp);
+            detailParts.push(formatted);
+          }
+          if(detailParts.length){
+            const detailSpan=document.createElement('span');
+            detailSpan.className='mind-asset-stats';
+            detailSpan.textContent=detailParts.join(' · ');
+            detailSpan.title=detailParts.join(' · ');
+            metaLine.appendChild(detailSpan);
+          }
+          infoBox.appendChild(metaLine);
+          main.appendChild(iconSpan);
+          main.appendChild(infoBox);
+          row.appendChild(main);
+          const actions=document.createElement('div');
+          actions.className='mind-asset-actions';
+          const previewBtn=document.createElement('button');
+          previewBtn.type='button';
+          previewBtn.dataset.assetAction='preview';
+          previewBtn.textContent='预览';
+          actions.appendChild(previewBtn);
+          const downloadBtn=document.createElement('button');
+          downloadBtn.type='button';
+          downloadBtn.dataset.assetAction='download';
+          downloadBtn.textContent='下载';
+          if(!entry.url){ downloadBtn.disabled=true; downloadBtn.title='暂无可下载链接'; }
+          actions.appendChild(downloadBtn);
+          const deleteBtn=document.createElement('button');
+          deleteBtn.type='button';
+          deleteBtn.dataset.assetAction='delete';
+          deleteBtn.textContent='删除';
+          actions.appendChild(deleteBtn);
+          row.appendChild(actions);
+          frag.appendChild(row);
+        });
+        assetList.appendChild(frag);
+        syncAssetSelectionUI();
+      }
+      function refreshAssetManager(options={}){
+        if(!assetPanel) return;
+        const preserveSelection=options.preserveSelection===true;
+        assetState.data=collectMindmapAssets();
+        assetState.entryMap=new Map(assetState.data.map(entry=>[entry.key, entry]));
+        assetState.needsRefresh=false;
+        if(preserveSelection){
+          const validKeys=new Set(assetState.data.map(entry=>entry.key));
+          assetState.selection=new Set([...assetState.selection].filter(key=>validKeys.has(key)));
+          if(assetState.lastKey && !validKeys.has(assetState.lastKey)){ assetState.lastKey=null; }
+        }else{
+          assetState.selection.clear();
+          assetState.lastKey=null;
+        }
+        updateAssetSummary();
+        renderAssetList();
+      }
+      function markAssetDataDirty(){
+        assetState.needsRefresh=true;
+        if(assetState.open){ refreshAssetManager({preserveSelection:true}); }
+      }
+      function openAssetManager(){
+        if(!assetLayer || !assetPanel) return;
+        if(assetState.open) return;
+        assetState.open=true;
+        assetLayer.dataset.open='true';
+        assetLayer.setAttribute('aria-hidden','false');
+        if(assetDockButton){ assetDockButton.setAttribute('aria-pressed','true'); }
+        if(assetState.needsRefresh){ refreshAssetManager({preserveSelection:true}); }
+        else { renderAssetList(); updateAssetSummary(); syncAssetSelectionUI(); }
+        if(assetSortSelect){ assetSortSelect.value=assetState.sort; }
+        if(assetSearchInput){ assetSearchInput.value=assetState.search; }
+        updateAssetBulkState();
+        requestAnimationFrame(()=>{
+          if(assetSearchInput){
+            try{ assetSearchInput.focus({preventScroll:true}); }
+            catch(_){ assetSearchInput.focus(); }
+          }else{
+            try{ assetPanel.focus({preventScroll:true}); }
+            catch(_){ assetPanel.focus(); }
+          }
+        });
+      }
+      function closeAssetManager(){
+        if(!assetLayer || !assetPanel) return;
+        if(!assetState.open) return;
+        assetState.open=false;
+        assetLayer.dataset.open='false';
+        assetLayer.setAttribute('aria-hidden','true');
+        if(assetDockButton){ assetDockButton.setAttribute('aria-pressed','false'); try{ assetDockButton.focus({preventScroll:true}); }catch(_){ assetDockButton.focus(); } }
+      }
+      function toggleAssetManager(force){
+        if(force===true){ openAssetManager(); return; }
+        if(force===false){ closeAssetManager(); return; }
+        if(assetState.open){ closeAssetManager(); }
+        else{ openAssetManager(); }
+      }
+      function attachmentMatchesEntry(att, entry){
+        if(!att || !entry) return false;
+        const attId=att.assetId ?? att.id;
+        if(entry.assetId && Number(attId)===entry.assetId) return true;
+        if(att.url && entry.descriptor && entry.descriptor.url && att.url===entry.descriptor.url) return true;
+        if(att.name && att.name===entry.name){
+          const size=Number(att.size ?? att.filesize ?? att.length ?? 0);
+          if(entry.size && Number.isFinite(size) && size===entry.size) return true;
+        }
+        return false;
+      }
+      function updateAssetSelection(key,event){
+        if(!key) return;
+        const useRange=event && event.shiftKey && assetState.lastKey;
+        if(useRange){
+          const visible=assetState.visibleKeys;
+          const start=visible.indexOf(assetState.lastKey);
+          const end=visible.indexOf(key);
+          if(start!==-1 && end!==-1){
+            const [min,max]=start<=end?[start,end]:[end,start];
+            for(let i=min;i<=max;i++){ assetState.selection.add(visible[i]); }
+          }else{
+            assetState.selection.add(key);
+          }
+        }else if(event && (event.metaKey || event.ctrlKey)){
+          if(assetState.selection.has(key)){ assetState.selection.delete(key); }
+          else{ assetState.selection.add(key); assetState.lastKey=key; }
+        }else{
+          assetState.selection.clear();
+          assetState.selection.add(key);
+          assetState.lastKey=key;
+        }
+        syncAssetSelectionUI();
+      }
+      function selectAllVisibleAssets(){
+        assetState.selection=new Set(assetState.visibleKeys);
+        assetState.lastKey=assetState.visibleKeys.length ? assetState.visibleKeys[assetState.visibleKeys.length-1] : null;
+        syncAssetSelectionUI();
+      }
+      function downloadAssetEntry(entry){
+        if(!entry || !entry.url){ alert('附件缺少可下载链接'); return; }
+        const link=document.createElement('a');
+        link.href=entry.url;
+        link.download=entry.name || 'attachment';
+        link.target='_blank';
+        link.rel='noopener';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      function formatAssetTimestampForFile(){
+        const now=new Date();
+        const pad=n=>String(n).padStart(2,'0');
+        return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      }
+      function triggerAssetDownload(blob, filename){
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=filename;
+        a.rel='noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+      }
+      async function downloadAssetBundle(entries){
+        const ids=entries.map(entry=>entry.assetId).filter(id=>Number.isInteger(id) && id>0);
+        if(!ids.length){
+          alert('选中的附件没有可下载文件。');
+          return;
+        }
+        const params=new URLSearchParams();
+        params.set('mindmap_asset_bundle', ids.join(','));
+        if(currentMapId){ params.set('map', String(currentMapId)); }
+        const url=`${location.pathname}?${params.toString()}`;
+        try{
+          const res=await fetch(url,{headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok){
+            const text=await res.text().catch(()=> '');
+            throw new Error(text || '服务器返回错误');
+          }
+          const blob=await res.blob();
+          triggerAssetDownload(blob, `mindmap-attachments-${formatAssetTimestampForFile()}.zip`);
+        }catch(err){
+          console.error(err);
+          if(err instanceof Error && err.message){ alert(err.message); }
+          else{ alert('打包下载失败'); }
+        }
+      }
+      function exportAssetEntries(entries){
+        if(!entries.length){
+          alert('请选择附件后再导出。');
+          return;
+        }
+        const payload=entries.map(entry=>({
+          assetId: entry.assetId,
+          nodeId: entry.nodeId,
+          nodeTitle: entry.nodeTopic,
+          name: entry.name,
+          mime: entry.mime,
+          size: entry.size,
+          type: entry.type,
+          url: entry.url,
+          uploaded_at: entry.timestamp ? new Date(entry.timestamp).toISOString() : null,
+        }));
+        const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+        triggerAssetDownload(blob, `mindmap-attachments-${formatAssetTimestampForFile()}.json`);
+      }
+      function highlightAssetNode(nodeId){
+        if(!nodeId) return;
+        const node=jm.get_node ? jm.get_node(nodeId) : null;
+        if(!node){ alert('节点不存在或已被删除'); return; }
+        jm.select_node(node.id);
+        centerOnNodeSmooth(node);
+        if(node.el){
+          node.el.classList.add('flash-focus');
+          setTimeout(()=>{ if(node.el){ node.el.classList.remove('flash-focus'); } },1200);
+        }
+      }
+      async function requestDeleteMindmapAsset(assetId){
+        const fd=new FormData();
+        fd.append('action','delete_mindmap_asset');
+        fd.append('id', String(assetId));
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(!res.ok){
+          const text=await res.text().catch(()=> '');
+          throw new Error(text || '删除附件失败');
+        }
+        const json=await res.json().catch(()=>null);
+        if(!json || !json.ok){ throw new Error(json && json.error ? json.error : '删除附件失败'); }
+      }
+      async function deleteAssetEntries(entries){
+        if(!entries || !entries.length) return;
+        const assetUsage=new Map();
+        assetState.data.forEach(entry=>{
+          if(entry.assetId){ assetUsage.set(entry.assetId, (assetUsage.get(entry.assetId)||0)+1); }
+        });
+        const removalCount=new Map();
+        const assetsToDelete=new Set();
+        const nodeCache=new Map();
+        entries.forEach(entry=>{
+          const node=jm.get_node ? jm.get_node(entry.nodeId) : null;
+          if(!node) return;
+          let cached=nodeCache.get(node.id);
+          if(!cached){
+            const data=ensureNodeDataObject(node) || {};
+            const list=Array.isArray(data.attachments) ? data.attachments.slice() : [];
+            data.attachments=list;
+            cached={node,data};
+            nodeCache.set(node.id,cached);
+          }
+          const data=cached.data;
+          const currentList=Array.isArray(data.attachments)?data.attachments:[];
+          const filtered=[];
+          let removed=false;
+          for(const att of currentList){
+            if(!removed && attachmentMatchesEntry(att, entry)){
+              removed=true;
+              continue;
+            }
+            filtered.push(att);
+          }
+          if(removed){
+            data.attachments=filtered;
+            if(filtered.length){ data.attachment=filtered[0]; }
+            else{ delete data.attachments; delete data.attachment; }
+            if(entry.assetId){
+              const total=assetUsage.get(entry.assetId) || 0;
+              const removedSoFar=(removalCount.get(entry.assetId)||0)+1;
+              removalCount.set(entry.assetId, removedSoFar);
+              if(total - removedSoFar <= 0){
+                assetsToDelete.add(entry.assetId);
+              }
+            }
+          }
+        });
+        if(nodeCache.size){
+          nodeCache.forEach(({node,data})=>{
+            node.model.data=data;
+            node.data=data;
+          });
+          jm.computeLayout();
+          jm.render();
+          nodeCache.forEach(({node})=>{
+            const latest=jm.get_node(node.id);
+            if(latest && latest.selected){ refreshInspector(latest); }
+          });
+          markDirty();
+          scheduleHandleRefresh();
+        }
+        const errors=[];
+        for(const assetId of assetsToDelete){
+          try{
+            await requestDeleteMindmapAsset(assetId);
+          }catch(err){
+            errors.push(err instanceof Error ? err.message : String(err));
+          }
+        }
+        entries.forEach(entry=>assetState.selection.delete(entry.key));
+        assetState.lastKey=null;
+        markAssetDataDirty();
+        refreshAssetManager({preserveSelection:true});
+        if(entries.length && typeof showRelationToast==='function'){ showRelationToast(`已删除 ${entries.length} 个附件`); }
+        if(errors.length){ alert('部分附件删除失败：'+errors.join('；')); }
+      }
+      function handleAssetListClick(event){
+        const checkbox=event.target instanceof HTMLInputElement && event.target.hasAttribute('data-asset-select') ? event.target : null;
+        if(checkbox){
+          event.stopPropagation();
+          const row=checkbox.closest('.mind-asset-row');
+          if(!row) return;
+          const key=row.dataset.key;
+          if(!key) return;
+          if(checkbox.checked){
+            updateAssetSelection(key,event);
+          }else{
+            assetState.selection.delete(key);
+            if(assetState.lastKey===key){ assetState.lastKey=null; }
+            syncAssetSelectionUI();
+          }
+          return;
+        }
+        const row=event.target.closest('.mind-asset-row');
+        const actionTarget=event.target.closest('[data-asset-action]');
+        if(actionTarget){
+          event.preventDefault();
+          if(!row) return;
+          const key=row.dataset.key;
+          const entry=assetState.entryMap.get(key);
+          if(!entry) return;
+          const action=actionTarget.dataset.assetAction;
+          if(action==='preview'){
+            const payload=Object.assign({}, entry.descriptor, {name:entry.name,mime:entry.mime,size:entry.size,url:entry.url || (entry.descriptor && entry.descriptor.url) || ''});
+            openMindmapAttachment(payload);
+          }else if(action==='download'){
+            downloadAssetEntry(entry);
+          }else if(action==='locate'){
+            highlightAssetNode(entry.nodeId);
+          }else if(action==='delete'){
+            if(!assetState.selection.has(entry.key)){
+              assetState.selection.clear();
+              assetState.selection.add(entry.key);
+              assetState.lastKey=entry.key;
+              syncAssetSelectionUI();
+            }
+            const selected=getSelectedAssetEntries();
+            const totalSize=selected.reduce((sum,item)=>sum+(Number.isFinite(item.size)?item.size:0),0);
+            const message=selected.length>1
+              ? `确认删除选中的 ${selected.length} 个附件${totalSize?`（总计 ${assetFormatSize(totalSize)}）`:''}？删除后不可恢复。`
+              : `确认删除附件“${entry.name}”吗？`;
+            if(confirm(message)){ deleteAssetEntries(selected); }
+          }
+          return;
+        }
+        if(row){
+          updateAssetSelection(row.dataset.key, event);
+        }
+      }
+      if(assetFilterButtons.length){
+        assetFilterButtons.forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            const value=btn.dataset.assetFilter || 'all';
+            assetFilterButtons.forEach(button=>button.setAttribute('aria-pressed', button===btn?'true':'false'));
+            assetState.filter=value;
+            renderAssetList();
+          });
+        });
+      }
+      if(assetSortSelect){
+        assetSortSelect.addEventListener('change',()=>{
+          assetState.sort=assetSortSelect.value || 'time-desc';
+          renderAssetList();
+        });
+      }
+      if(assetSearchInput){
+        assetSearchInput.addEventListener('input',()=>{
+          const value=assetSearchInput.value || '';
+          assetState.search=value.trim().toLowerCase();
+          renderAssetList();
+        });
+      }
+      if(assetBulkButtons.length){
+        assetBulkButtons.forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            const action=btn.dataset.bulkAction;
+            const selected=getSelectedAssetEntries();
+            if(!selected.length){
+              alert('请选择附件后再操作。');
+              return;
+            }
+            if(action==='delete'){
+              const totalSize=selected.reduce((sum,item)=>sum+(Number.isFinite(item.size)?item.size:0),0);
+              const message=selected.length>1
+                ? `确认删除选中的 ${selected.length} 个附件${totalSize?`（总计 ${assetFormatSize(totalSize)}）`:''}？删除后不可恢复。`
+                : `确认删除附件“${selected[0].name}”吗？`;
+              if(confirm(message)){ deleteAssetEntries(selected); }
+            }else if(action==='export'){
+              exportAssetEntries(selected);
+            }else if(action==='download'){
+              downloadAssetBundle(selected);
+            }
+          });
+        });
+      }
+      if(assetList){
+        assetList.addEventListener('click',handleAssetListClick);
+        assetList.addEventListener('dblclick',e=>{
+          const row=e.target.closest('.mind-asset-row');
+          if(!row) return;
+          const entry=assetState.entryMap.get(row.dataset.key || '');
+          if(entry){
+            const payload=Object.assign({}, entry.descriptor, {name:entry.name,mime:entry.mime,size:entry.size,url:entry.url || (entry.descriptor && entry.descriptor.url) || ''});
+            openMindmapAttachment(payload);
+          }
+        });
+      }
+      if(assetLayer){
+        assetLayer.addEventListener('click',e=>{
+          if(e.target && e.target.hasAttribute('data-asset-close')){ e.preventDefault(); closeAssetManager(); }
+        });
+      }
+      if(assetPanel){
+        assetPanel.addEventListener('keydown',e=>{
+          const lower=(e.key||'').toLowerCase();
+          if((e.ctrlKey || e.metaKey) && lower==='a'){
+            e.preventDefault();
+            selectAllVisibleAssets();
+          }
+          if(e.key==='Delete'){
+            const active=document.activeElement;
+            if(active && /input|textarea|select/i.test((active.tagName||''))){ return; }
+            const selected=getSelectedAssetEntries();
+            if(selected.length){
+              e.preventDefault();
+              const totalSize=selected.reduce((sum,item)=>sum+(Number.isFinite(item.size)?item.size:0),0);
+              const message=selected.length>1
+                ? `确认删除选中的 ${selected.length} 个附件${totalSize?`（总计 ${assetFormatSize(totalSize)}）`:''}？删除后不可恢复。`
+                : `确认删除附件“${selected[0].name}”吗？`;
+              if(confirm(message)){ deleteAssetEntries(selected); }
+            }
+          }
+        });
+      }
+      document.addEventListener('keydown',e=>{
+        const lower=(e.key||'').toLowerCase();
+        if((e.ctrlKey || e.metaKey) && e.shiftKey && lower==='a'){
+          const active=document.activeElement;
+          if(active && /input|textarea|select/i.test((active.tagName||'').toLowerCase()) && active!==assetSearchInput){ return; }
+          e.preventDefault();
+          if(assetState.open){ closeAssetManager(); }
+          else{ openAssetManager(); }
+        }else if(e.key==='Escape' && assetState.open){
+          const active=document.activeElement;
+          if(assetPanel && assetPanel.contains(active)){ e.preventDefault(); closeAssetManager(); }
+        }
+      });
       function clearRelationHighlights(){
         document.querySelectorAll('.jsmind-node.relation-source,.jsmind-node.relation-target').forEach(el=>{
           el.classList.remove('relation-source','relation-target');
