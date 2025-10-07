@@ -8054,6 +8054,103 @@ if ($view === 'map_edit') {
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
         });
       }
+      function captureLayoutSnapshot(mind){
+        if(!mind) return null;
+        const captureElementState=(el, includeContent)=>{
+          if(!el) return null;
+          const style=el.style ? {
+            width:el.style.width||'',
+            height:el.style.height||'',
+            transform:el.style.transform||'',
+            left:el.style.left||'',
+            top:el.style.top||'',
+            display:el.style.display||'',
+          } : null;
+          const isSvg=(typeof SVGElement!=='undefined' && el instanceof SVGElement);
+          const attrs=isSvg?{
+            viewBox:el.getAttribute('viewBox'),
+            width:el.getAttribute('width'),
+            height:el.getAttribute('height'),
+          }:null;
+          const html=includeContent?el.innerHTML:null;
+          return {style,attrs,html};
+        };
+        const nodes=[];
+        if(mind.nodes && typeof mind.nodes.forEach==='function'){
+          mind.nodes.forEach(node=>{
+            if(!node) return;
+            nodes.push({
+              id:node.id,
+              x:node.x,
+              y:node.y,
+              absX:node.absX,
+              absY:node.absY,
+              layoutHeight:node._layoutHeight,
+              depth:node.depth,
+              direction:node.direction,
+              dir:node.dir,
+              modelDirection:node.model && typeof node.model.direction!=='undefined'?node.model.direction:undefined,
+            });
+          });
+        }
+        return {
+          bounds:mind.bounds?{...mind.bounds}:null,
+          viewport:captureElementState(mind.viewport,false),
+          nodeLayer:captureElementState(mind.nodeLayer,false),
+          linkLayer:captureElementState(mind.linkLayer,false),
+          relationLayer:captureElementState(mind.relationLayer,false),
+          guideLayer:captureElementState(mind.guideLayer,true),
+          nodes,
+        };
+      }
+      function restoreLayoutSnapshot(mind,snapshot){
+        if(!mind || !snapshot) return;
+        const restoreElementState=(el,state)=>{
+          if(!el || !state) return;
+          if(state.style){
+            Object.entries(state.style).forEach(([key,value])=>{
+              if(el.style){ el.style[key]=value||''; }
+            });
+          }
+          if(state.attrs){
+            Object.entries(state.attrs).forEach(([key,value])=>{
+              if(value==null || value===''){ el.removeAttribute(key); }
+              else{ el.setAttribute(key,value); }
+            });
+          }
+          if(typeof state.html==='string'){ el.innerHTML=state.html; }
+        };
+        mind.bounds=snapshot.bounds?{...snapshot.bounds}:null;
+        restoreElementState(mind.viewport,snapshot.viewport);
+        restoreElementState(mind.nodeLayer,snapshot.nodeLayer);
+        restoreElementState(mind.linkLayer,snapshot.linkLayer);
+        restoreElementState(mind.relationLayer,snapshot.relationLayer);
+        restoreElementState(mind.guideLayer,snapshot.guideLayer);
+        if(Array.isArray(snapshot.nodes) && mind.nodes && typeof mind.nodes.get==='function'){
+          for(const nodeState of snapshot.nodes){
+            if(!nodeState || !nodeState.id) continue;
+            const node=mind.nodes.get(nodeState.id);
+            if(!node) continue;
+            node.x=nodeState.x;
+            node.y=nodeState.y;
+            node.absX=nodeState.absX;
+            node.absY=nodeState.absY;
+            node._layoutHeight=nodeState.layoutHeight;
+            node.depth=nodeState.depth;
+            node.direction=nodeState.direction;
+            node.dir=nodeState.dir;
+            if(node.model && nodeState.modelDirection!==undefined){ node.model.direction=nodeState.modelDirection; }
+            if(node.el){
+              const width=node.el.offsetWidth||0;
+              const height=node.el.offsetHeight||0;
+              if(Number.isFinite(node.absX)){ node.el.style.left=`${node.absX - width/2}px`; }
+              if(Number.isFinite(node.absY)){ node.el.style.top=`${node.absY - height/2}px`; }
+            }
+            if(typeof mind.updateAnchors==='function'){ mind.updateAnchors(node); }
+          }
+        }
+        if(typeof mind.applyTransform==='function'){ mind.applyTransform(); }
+      }
       function exportMindmapAsJson(){
         if(!jm){
           alert('思维导图尚未加载');
@@ -8077,11 +8174,13 @@ if ($view === 'map_edit') {
         const titleValue=titleInput ? titleInput.value.trim() : '';
         const overlayDisplay=overlay ? overlay.style.display : null;
         let exportHost=null;
+        let layoutSnapshot=null;
         try{
           const htmlToImage=await ensureHtmlToImage();
           const computedStyle=getComputedStyle(document.body);
           const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
           if(overlay){ overlay.style.display='none'; }
+          if(jm){ layoutSnapshot=captureLayoutSnapshot(jm); }
           if(typeof jm.computeLayout==='function'){ try{ jm.computeLayout(); }catch(err){ console.warn(err); } }
           const viewport=jm && jm.viewport ? jm.viewport : jmContainer.querySelector('.mind-viewport');
           if(!viewport){ throw new Error('无法定位导出视图'); }
@@ -8179,6 +8278,7 @@ if ($view === 'map_edit') {
           const message=error && error.message ? `导出失败：${error.message}` : '导出失败，请稍后重试。';
           alert(message);
         }finally{
+          if(layoutSnapshot){ restoreLayoutSnapshot(jm, layoutSnapshot); }
           if(exportHost && exportHost.parentElement){ exportHost.remove(); }
           if(overlay){ overlay.style.display=overlayDisplay || ''; }
         }
