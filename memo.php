@@ -4706,6 +4706,12 @@ if ($view === 'map_edit') {
           if(!this.container) throw new Error('Mind container not found');
           this.listeners=[];
           this.scale=1;
+          this.defaultMinScale=0.3;
+          this.defaultMaxScale=2.5;
+          this.minReadableScale=0.05;
+          this.minScale=this.defaultMinScale;
+          this.maxScale=this.defaultMaxScale;
+          this.scalePadding=200;
           this.offsetX=0;
           this.offsetY=0;
           this.mind=null;
@@ -4831,7 +4837,7 @@ if ($view === 'map_edit') {
                 const rect=this.container.getBoundingClientRect();
                 const centerX=((a.x+b.x)/2)-rect.left;
                 const centerY=((a.y+b.y)/2)-rect.top;
-                const nextScale=Math.max(0.3, Math.min(2.5, pinch.baseScale * (distance / pinch.initialDistance)));
+                const nextScale=this.clampScale(pinch.baseScale * (distance / pinch.initialDistance), rect);
                 this.scale=nextScale;
                 this.offsetX=centerX - pinch.originX*this.scale;
                 this.offsetY=centerY - pinch.originY*this.scale;
@@ -4869,6 +4875,64 @@ if ($view === 'map_edit') {
           this.container.addEventListener('pointercancel',endPan);
           this.container.addEventListener('wheel',evt=>this.handleWheel(evt),{passive:false});
         }
+        calculateScaleBounds(rect){
+          const defaultMin=(typeof this.defaultMinScale==='number' && this.defaultMinScale>0)?this.defaultMinScale:0.3;
+          const defaultMax=(typeof this.defaultMaxScale==='number' && this.defaultMaxScale>0)?this.defaultMaxScale:2.5;
+          const readableMin=(typeof this.minReadableScale==='number' && this.minReadableScale>0)?this.minReadableScale:0.05;
+          let min=defaultMin;
+          const containerRect=rect || this.container.getBoundingClientRect();
+          const hasRect=containerRect && containerRect.width>0 && containerRect.height>0;
+          if(this.bounds && hasRect){
+            const padding=(typeof this.scalePadding==='number' && this.scalePadding>=0)?this.scalePadding:0;
+            const widthDenom=(this.bounds.width||0)+padding;
+            const heightDenom=(this.bounds.height||0)+padding;
+            const widthScale=widthDenom>0?containerRect.width/widthDenom:Infinity;
+            const heightScale=heightDenom>0?containerRect.height/heightDenom:Infinity;
+            const fitScale=Math.min(widthScale,heightScale);
+            if(Number.isFinite(fitScale) && fitScale>0){
+              if(fitScale<defaultMin){
+                min=Math.max(readableMin, fitScale);
+              }
+            }
+          }
+          if(min>defaultMax){ min=defaultMax; }
+          return {min, max:defaultMax};
+        }
+        updateScaleBounds(rect){
+          const bounds=this.calculateScaleBounds(rect);
+          this.minScale=bounds.min;
+          this.maxScale=bounds.max;
+          return bounds;
+        }
+        clampScale(value, rect){
+          if(typeof value!=='number' || !isFinite(value)) return this.scale;
+          const bounds=this.updateScaleBounds(rect);
+          if(value<bounds.min) return bounds.min;
+          if(value>bounds.max) return bounds.max;
+          return value;
+        }
+        enforceScaleBounds(rect, options={}){
+          const prevScale=this.scale;
+          const bounds=this.updateScaleBounds(rect);
+          const clamped=Math.min(bounds.max, Math.max(bounds.min, prevScale));
+          if(Math.abs(clamped-prevScale)>0.0001){
+            const adjustOffset=options.adjustOffset!==false;
+            if(adjustOffset){
+              const containerRect=rect || this.container.getBoundingClientRect();
+              if(containerRect && containerRect.width>0 && containerRect.height>0 && prevScale>0){
+                const anchorX=(options.anchor && typeof options.anchor.x==='number')?options.anchor.x:containerRect.width/2;
+                const anchorY=(options.anchor && typeof options.anchor.y==='number')?options.anchor.y:containerRect.height/2;
+                const originX=(anchorX - this.offsetX)/prevScale;
+                const originY=(anchorY - this.offsetY)/prevScale;
+                this.offsetX=anchorX - originX*clamped;
+                this.offsetY=anchorY - originY*clamped;
+              }
+            }
+            this.scale=clamped;
+            return true;
+          }
+          return false;
+        }
         handleWheel(evt){
           if(!evt) return;
           if(evt.ctrlKey || evt.metaKey){
@@ -4876,9 +4940,9 @@ if ($view === 'map_edit') {
             const delta=Math.max(-1, Math.min(1, evt.deltaY));
             const factor=delta<0?1.12:0.9;
             const prevScale=this.scale;
-            const nextScale=Math.max(0.3, Math.min(2.5, prevScale*factor));
-            if(Math.abs(nextScale-prevScale)<0.0001) return;
             const rect=this.container.getBoundingClientRect();
+            const nextScale=this.clampScale(prevScale*factor, rect);
+            if(Math.abs(nextScale-prevScale)<0.0001) return;
             const originX=(evt.clientX-rect.left - this.offsetX)/this.scale;
             const originY=(evt.clientY-rect.top - this.offsetY)/this.scale;
             this.scale=nextScale;
@@ -5724,6 +5788,7 @@ if ($view === 'map_edit') {
           walk(this.root);
           this.renderRelations();
           this.updateEdgeButtonScale();
+          this.enforceScaleBounds(null);
           this.applyTransform(true);
         }
         renderRelations(){
@@ -6099,7 +6164,8 @@ if ($view === 'map_edit') {
         }
         zoom(step){
           const prev=this.scale;
-          this.scale=Math.max(0.3, Math.min(2.5, this.scale*step));
+          const next=this.clampScale(this.scale*step);
+          this.scale=next;
           if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
         }
         viewCommand(cmd){
@@ -6133,20 +6199,22 @@ if ($view === 'map_edit') {
           if(!this.bounds) return false;
           const rect=this.container.getBoundingClientRect();
           if(rect.width<=0 || rect.height<=0) return false;
-          const scale=Math.min(rect.width/(this.bounds.width+200), rect.height/(this.bounds.height+200));
-          this.scale=Math.max(0.3, Math.min(2.5, scale));
+          const padding=(typeof this.scalePadding==='number' && this.scalePadding>=0)?this.scalePadding:0;
+          const scale=Math.min(rect.width/(this.bounds.width+padding), rect.height/(this.bounds.height+padding));
+          this.scale=this.clampScale(scale, rect);
           this.center_root();
           return true;
         }
         set_zoom(z){
           if(typeof z!=='number' || !isFinite(z)) return false;
-          this.scale=Math.max(0.3, Math.min(2.5, z));
+          this.scale=this.clampScale(z);
           this.applyTransform();
           return true;
         }
         center_root(){
           if(!this.root || !this.bounds) return false;
           const rect=this.container.getBoundingClientRect();
+          this.enforceScaleBounds(rect,{adjustOffset:false});
           const centerX=this.root.absX + (this.root.el?this.root.el.offsetWidth/2:0);
           const centerY=this.root.absY + (this.root.el?this.root.el.offsetHeight/2:0);
           this.offsetX=rect.width/2 - centerX*this.scale;
@@ -6160,6 +6228,7 @@ if ($view === 'map_edit') {
           if(!node) return false;
           const rect=this.container.getBoundingClientRect();
           if(rect.width<=0 || rect.height<=0) return false;
+          this.enforceScaleBounds(rect,{adjustOffset:false});
           if(!node.anchors || !node.anchors.center){ this.updateAnchors(node); }
           let anchor=null;
           if(node.anchors && node.anchors.center){ anchor=node.anchors.center; }
@@ -6530,6 +6599,12 @@ if ($view === 'map_edit') {
       }
       function scheduleHandleRefresh(){
         requestAnimationFrame(()=>{
+          if(jm && typeof jm.enforceScaleBounds==='function'){
+            const changed=jm.enforceScaleBounds();
+            if(changed && typeof jm.applyTransform==='function'){
+              jm.applyTransform();
+            }
+          }
           updateHandlePosition();
           if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
         });
