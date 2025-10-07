@@ -3791,9 +3791,14 @@ if ($view === 'map_edit') {
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:none;overflow:visible}
       .mind-link-controls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
-      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;border:1px solid rgba(201,168,106,.6);background:rgba(201,168,106,.18);color:var(--gold-300);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.4);transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition)}
-      .mind-link-controls .edge-insert-btn:hover{background:rgba(201,168,106,.28);border-color:rgba(227,198,139,.85);box-shadow:0 12px 26px rgba(0,0,0,.48)}
-      .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.85);outline-offset:2px}
+      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:14px;border:1px solid rgba(227,198,139,.55);background:linear-gradient(165deg,rgba(21,26,30,.96),rgba(12,16,18,.92));color:var(--gold-400);font:700 18px/1 'Cinzel','Noto Serif SC','Inter',serif;letter-spacing:.12em;pointer-events:auto;cursor:pointer;box-shadow:0 14px 32px rgba(0,0,0,.55),0 0 0 1px rgba(227,198,139,.32) inset;transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),background-color var(--transition);backdrop-filter:blur(6px);overflow:hidden;z-index:15}
+      .mind-link-controls .edge-insert-btn::before{content:"";position:absolute;inset:5px;border-radius:10px;background:radial-gradient(circle at 28% 25%,rgba(227,198,139,.45),rgba(201,168,106,.18) 55%,rgba(12,16,18,.75));box-shadow:inset 0 0 18px rgba(227,198,139,.28);opacity:.92;transition:opacity var(--transition)}
+      .mind-link-controls .edge-insert-btn::after{content:"";position:absolute;inset:-10px;border-radius:18px;background:radial-gradient(circle at 50% 50%,rgba(227,198,139,.2),transparent 65%);opacity:.7;pointer-events:none;transition:opacity var(--transition)}
+      .mind-link-controls .edge-insert-btn .edge-icon{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--gold-400);text-shadow:0 0 10px rgba(227,198,139,.45);font:700 20px/1 'Cinzel','Noto Serif SC','Inter',serif;letter-spacing:.16em}
+      .mind-link-controls .edge-insert-btn:hover{border-color:rgba(227,198,139,.88);background:linear-gradient(165deg,rgba(30,36,42,.98),rgba(18,22,25,.94));box-shadow:0 18px 40px rgba(0,0,0,.62),0 0 0 1px rgba(227,198,139,.38) inset}
+      .mind-link-controls .edge-insert-btn:hover::before{opacity:1}
+      .mind-link-controls .edge-insert-btn:hover::after{opacity:.92}
+      .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.88);outline-offset:4px}
       .mind-links .trace-group{pointer-events:none}
       .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
@@ -3930,7 +3935,7 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+        <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="7" refY="6" orient="auto" markerUnits="strokeWidth">
           <path d="M0 0 L12 6 L0 12 Z" fill="#E3C68B" />
         </marker>
       </defs>
@@ -5814,9 +5819,17 @@ if ($view === 'map_edit') {
             btn=document.createElement('button');
             btn.type='button';
             btn.className='edge-insert-btn';
-            btn.textContent='＋';
             btn.title='在该连线上插入节点';
             btn.setAttribute('aria-label','在该连线上插入节点');
+            const icon=document.createElement('span');
+            icon.className='edge-icon';
+            icon.setAttribute('aria-hidden','true');
+            icon.textContent='＋';
+            btn.appendChild(icon);
+            const sr=document.createElement('span');
+            sr.className='sr-only edge-insert-label';
+            sr.textContent='在该连线上插入节点';
+            btn.appendChild(sr);
             btn.dataset.parent=node.parent.id;
             btn.dataset.child=node.id;
             const stopPropagation=evt=>{ if(evt){ evt.stopPropagation(); } };
@@ -5833,6 +5846,23 @@ if ($view === 'map_edit') {
             });
             this.linkControlLayer.appendChild(btn);
             node.edgeButton=btn;
+          }
+          if(btn){
+            if(!btn.querySelector('.edge-icon')){
+              const icon=document.createElement('span');
+              icon.className='edge-icon';
+              icon.setAttribute('aria-hidden','true');
+              icon.textContent='＋';
+              btn.appendChild(icon);
+            }
+            if(!btn.querySelector('.edge-insert-label')){
+              const sr=document.createElement('span');
+              sr.className='sr-only edge-insert-label';
+              sr.textContent='在该连线上插入节点';
+              btn.appendChild(sr);
+            }
+            btn.title='在该连线上插入节点';
+            btn.setAttribute('aria-label','在该连线上插入节点');
           }
           btn.dataset.parent=node.parent.id;
           btn.dataset.child=node.id;
@@ -5915,17 +5945,18 @@ if ($view === 'map_edit') {
             endInner={x:endCenter.x,y:endCenter.y};
           }
           const norm={x:vector.x/segmentLength,y:vector.y/segmentLength};
-          const arrowBase=Math.min(24, Math.max(8, segmentLength*0.18));
-          const arrowOffset=Math.min(segmentLength*0.45, arrowBase);
-          const startOffset=relation.bidirectional ? arrowOffset : 0;
+          const approachOffset=Math.min(segmentLength*0.35, Math.max(10, segmentLength*0.2));
+          const arrowHeadLength=Math.min(26, Math.max(12, segmentLength*0.22));
+          const forwardOffset=Math.max(arrowHeadLength, Math.min(segmentLength + arrowHeadLength, approachOffset + arrowHeadLength));
+          const startOffset=relation.bidirectional ? Math.min(approachOffset + arrowHeadLength*0.4, segmentLength*0.5) : 0;
           const startPoint={x:startInner.x - norm.x*startOffset,y:startInner.y - norm.y*startOffset};
-          const endPoint={x:endInner.x + norm.x*arrowOffset,y:endInner.y + norm.y*arrowOffset};
+          const endPoint={x:endInner.x + norm.x*forwardOffset,y:endInner.y + norm.y*forwardOffset};
           const dx=endPoint.x-startPoint.x;
           const dy=endPoint.y-startPoint.y;
           const distance=Math.hypot(dx,dy) || 1;
           const normalX=distance?-dy/distance:0;
           const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
+          const offset=Math.min(160, Math.max(34, distance*0.24));
           const ctrl1x=startPoint.x + dx*0.25 + normalX*offset;
           const ctrl1y=startPoint.y + dy*0.25 + normalY*offset;
           const ctrl2x=startPoint.x + dx*0.75 - normalX*offset;
