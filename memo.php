@@ -3946,6 +3946,8 @@ if ($view === 'map_edit') {
       .mind-stage{position:relative;flex:1 1 auto;min-height:0;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
+      .mind-container.mind-container--space-pan{cursor:grab}
+      .mind-container.mind-container--dragging{cursor:grabbing}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:auto;overflow:visible}
@@ -4003,8 +4005,8 @@ if ($view === 'map_edit') {
       .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:auto;max-width:calc(100vw - 32px - var(--safe-left) - var(--safe-right));display:flex;justify-content:center}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:calc(100vw - 32px - var(--safe-left) - var(--safe-right));box-sizing:border-box;touch-action:manipulation}
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
@@ -4026,7 +4028,7 @@ if ($view === 'map_edit') {
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;width:100%;max-width:none}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
       @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
@@ -5084,11 +5086,60 @@ if ($view === 'map_edit') {
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
           this.edgeHoverState=null;
+          this.panKeyActive=false;
+          this.panKeyHandlers=null;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
+          this.setupPanKeyControls();
           this.setupPan();
           this.setupTouchGuards();
         }
+        setupPanKeyControls(){
+          if(!this.container) return;
+          if(this.panKeyHandlers){
+            const {handleKeyDown,handleKeyUp,handleBlur}=this.panKeyHandlers;
+            if(handleKeyDown){ window.removeEventListener('keydown',handleKeyDown,true); }
+            if(handleKeyUp){ window.removeEventListener('keyup',handleKeyUp,true); }
+            if(handleBlur){ window.removeEventListener('blur',handleBlur); }
+          }
+          const isEditableTarget=target=>{
+            if(!target) return false;
+            if(target.isContentEditable) return true;
+            const tag=(target.tagName||'').toUpperCase();
+            return tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT';
+          };
+          const setPanKeyState=active=>{
+            if(active){
+              this.panKeyActive=true;
+              this.container.classList.add('mind-container--space-pan');
+            }else{
+              this.panKeyActive=false;
+              this.container.classList.remove('mind-container--space-pan');
+            }
+          };
+          const handleKeyDown=e=>{
+            if(e.code==='Space' && !e.repeat){
+              if(isEditableTarget(e.target)) return;
+              setPanKeyState(true);
+              e.preventDefault();
+            }
+          };
+          const handleKeyUp=e=>{
+            if(e.code==='Space'){
+              setPanKeyState(false);
+            }
+          };
+          const handleBlur=()=>{ setPanKeyState(false); };
+          window.addEventListener('keydown',handleKeyDown,true);
+          window.addEventListener('keyup',handleKeyUp,true);
+          window.addEventListener('blur',handleBlur);
+          this.panKeyHandlers={handleKeyDown,handleKeyUp,handleBlur};
+        }
         setupPan(){
+          const setDraggingState=active=>{
+            if(!this.container) return;
+            if(active){ this.container.classList.add('mind-container--dragging'); }
+            else{ this.container.classList.remove('mind-container--dragging'); }
+          };
           const updatePinchBaseline=()=>{
             if(this.activePointers.size<2){ this.pinchState=null; return; }
             const pointers=Array.from(this.activePointers.values());
@@ -5102,7 +5153,7 @@ if ($view === 'map_edit') {
             const originY=(centerY - this.offsetY)/this.scale;
             this.pinchState={
               initialDistance:distance,
-              baseScale:this.scale,
+              baseScale=this.scale,
               originX,
               originY,
             };
@@ -5112,15 +5163,20 @@ if ($view === 'map_edit') {
             const isTouch=evt.pointerType==='touch';
             const onNode=!!evt.target.closest('.jsmind-node');
             if(!isTouch){
-              if(evt.button!==0) return;
-              if(onNode) return;
+              const isPrimary=evt.button===0;
+              const isMiddle=evt.button===1;
+              const allowPanKey=this.panKeyActive;
+              if(!(isPrimary || isMiddle)) return;
+              if(isPrimary && onNode && !allowPanKey) return;
+              if(isMiddle || (allowPanKey && isPrimary)){ evt.preventDefault(); }
               this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
               try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
               this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+              setDraggingState(true);
               return;
             }
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
-            if(isTouch && (this.activePointers.size>=2 || !onNode)){
+            if(this.activePointers.size>=2 || !onNode){
               evt.preventDefault();
             }
             if(this.activePointers.size>=2){
@@ -5128,14 +5184,17 @@ if ($view === 'map_edit') {
                 try{ this.container.setPointerCapture(id); }catch(_){ }
               }
               this.dragState=null;
+              setDraggingState(false);
               updatePinchBaseline();
               return;
             }
             if(!onNode){
               try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
               this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+              setDraggingState(true);
             }else{
               this.dragState=null;
+              setDraggingState(false);
             }
           };
           const movePan=(evt)=>{
@@ -5179,6 +5238,7 @@ if ($view === 'map_edit') {
             }
             if(this.dragState && evt.pointerId===this.dragState.pointerId){
               this.dragState=null;
+              setDraggingState(false);
             }
             if(this.activePointers.size<2){
               this.pinchState=null;
@@ -5253,24 +5313,31 @@ if ($view === 'map_edit') {
         }
         handleWheel(evt){
           if(!evt) return;
-          if(evt.ctrlKey || evt.metaKey){
+          const rect=this.container.getBoundingClientRect();
+          if(!rect || rect.width<=0 || rect.height<=0) return;
+          const mode=evt.deltaMode;
+          const multiplier=mode===1?16:(mode===2?240:1);
+          const dominantVertical=Math.abs(evt.deltaY)>=Math.abs(evt.deltaX);
+          const zoomGesture=evt.ctrlKey || evt.metaKey || (!evt.shiftKey && !evt.altKey && dominantVertical);
+          if(zoomGesture){
             evt.preventDefault();
-            const delta=Math.max(-1, Math.min(1, evt.deltaY));
-            const factor=delta<0?1.12:0.9;
+            const normalized=evt.deltaY*multiplier;
+            if(Math.abs(normalized)<0.01) return;
             const prevScale=this.scale;
-            const rect=this.container.getBoundingClientRect();
+            const factor=Math.exp(-normalized*0.0012);
             const nextScale=this.clampScale(prevScale*factor, rect);
             if(Math.abs(nextScale-prevScale)<0.0001) return;
-            const originX=(evt.clientX-rect.left - this.offsetX)/this.scale;
-            const originY=(evt.clientY-rect.top - this.offsetY)/this.scale;
+            const anchorX=evt.clientX-rect.left;
+            const anchorY=evt.clientY-rect.top;
+            const originX=(anchorX - this.offsetX)/this.scale;
+            const originY=(anchorY - this.offsetY)/this.scale;
             this.scale=nextScale;
-            this.offsetX=evt.clientX-rect.left - originX*this.scale;
-            this.offsetY=evt.clientY-rect.top - originY*this.scale;
+            this.offsetX=anchorX - originX*this.scale;
+            this.offsetY=anchorY - originY*this.scale;
             this.applyTransform();
             return;
           }
           evt.preventDefault();
-          const multiplier=evt.deltaMode===1?16:(evt.deltaMode===2?240:1);
           this.offsetX-=evt.deltaX*multiplier;
           this.offsetY-=evt.deltaY*multiplier;
           this.applyTransform();
@@ -9400,23 +9467,42 @@ if ($view === 'map_edit') {
         }
         function removeAttachmentsFromMind(ids){
           if(!ids || !ids.length) return false;
-          const idSet=new Set(ids);
+          const normalizedIds=ids.map(id=>Number(id)).filter(id=>Number.isFinite(id) && id>0);
+          if(!normalizedIds.length) return false;
+          const idSet=new Set(normalizedIds);
           let changed=false;
           performUndoable('delete-attachments',()=>{
             commitInlineEditing();
             jm.nodes.forEach(node=>{
               if(!node) return;
               const data=ensureNodeDataObject(node);
-              if(!Array.isArray(data.attachments) || !data.attachments.length) return;
-              const before=data.attachments.length;
-              data.attachments=data.attachments.filter(att=>!idSet.has(Number(att.assetId||att.id)));
-              if(data.attachments.length!==before){
-                changed=true;
-                if(data.attachments.length){ data.attachment=data.attachments[0]; }
-                else { delete data.attachments; delete data.attachment; }
-                node.model.data=data;
-                node.data=data;
+              const hadArray=Array.isArray(data.attachments);
+              const attachmentsSource=hadArray?data.attachments.filter(att=>att && typeof att==='object'):[];
+              const filtered=hadArray?attachmentsSource.filter(att=>{
+                const attId=Number(att && (att.assetId||att.id));
+                if(!Number.isFinite(attId)) return true;
+                return !idSet.has(attId);
+              }):attachmentsSource;
+              const arrayChanged=hadArray && filtered.length!==attachmentsSource.length;
+              const single=data.attachment && typeof data.attachment==='object'?data.attachment:null;
+              const singleId=single?Number(single.assetId||single.id):NaN;
+              const singleRemoved=Number.isFinite(singleId) && idSet.has(singleId);
+              let nodeChanged=arrayChanged || singleRemoved;
+              if(hadArray && attachmentsSource.length && !filtered.length){
+                nodeChanged=true;
               }
+              if(!nodeChanged) return;
+              if(filtered.length){
+                data.attachments=filtered;
+                const preserved=Number.isFinite(singleId)?filtered.find(att=>Number(att.assetId||att.id)===singleId):null;
+                data.attachment=preserved || filtered[0];
+              }else{
+                if(hadArray){ delete data.attachments; }
+                delete data.attachment;
+              }
+              node.model.data=data;
+              node.data=data;
+              changed=true;
             });
             if(!changed) return false;
             jm.computeLayout();
