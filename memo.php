@@ -4761,6 +4761,13 @@ if ($view === 'map_edit') {
           this.relations=[];
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
+          this.scaleLimits={min:0.3,max:2.5};
+          this.scaleLimitsDirty=true;
+          this.handleViewportResize=()=>{
+            this.scaleLimitsDirty=true;
+            if(this.ensureScaleWithinLimits()){ this.applyTransform(); }
+          };
+          window.addEventListener('resize', this.handleViewportResize);
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
@@ -5530,6 +5537,8 @@ if ($view === 'map_edit') {
           this.nodeLayer.style.height=`${this.bounds.height}px`;
           this.viewport.style.width=`${this.bounds.width}px`;
           this.viewport.style.height=`${this.bounds.height}px`;
+          this.scaleLimitsDirty=true;
+          if(this.ensureScaleWithinLimits()){ this.applyTransform(); }
         }
         updateGuides(layers,columnPositions,shiftX,shiftY){
           if(!this.guideLayer) return;
@@ -6097,9 +6106,53 @@ if ($view === 'map_edit') {
           this.viewport.style.transform=transform;
           this.updateEdgeButtonScale();
         }
+        getScaleLimits(){
+          if(!this.container){
+            return this.scaleLimits || {min:0.3,max:2.5};
+          }
+          if(!this.scaleLimitsDirty && this.scaleLimits){
+            return this.scaleLimits;
+          }
+          if(!this.bounds){
+            return this.scaleLimits || {min:0.3,max:2.5};
+          }
+          const rect=this.container.getBoundingClientRect();
+          if(!rect || rect.width<=0 || rect.height<=0){
+            return this.scaleLimits || {min:0.3,max:2.5};
+          }
+          const FIT_MARGIN=200;
+          const widthTarget=Math.max(1, this.bounds.width + FIT_MARGIN);
+          const heightTarget=Math.max(1, this.bounds.height + FIT_MARGIN);
+          const baseFit=Math.min(rect.width/widthTarget, rect.height/heightTarget);
+          const DEFAULT_MIN=0.3;
+          const ABSOLUTE_MIN=0.02;
+          let minScale=DEFAULT_MIN;
+          if(isFinite(baseFit) && baseFit>0){
+            minScale=Math.min(DEFAULT_MIN, baseFit);
+            if(minScale<ABSOLUTE_MIN){ minScale=ABSOLUTE_MIN; }
+          }
+          const DEFAULT_MAX=2.5;
+          const maxScale=Math.max(DEFAULT_MAX, minScale*10);
+          this.scaleLimits={min:minScale,max:maxScale};
+          this.scaleLimitsDirty=false;
+          return this.scaleLimits;
+        }
+        ensureScaleWithinLimits(){
+          const limits=this.getScaleLimits();
+          if(!limits){ return false; }
+          const {min,max}=limits;
+          const clamped=Math.max(min, Math.min(max, this.scale));
+          if(!isFinite(clamped)){ return false; }
+          if(Math.abs(clamped-this.scale)>0.0001){
+            this.scale=clamped;
+            return true;
+          }
+          return false;
+        }
         zoom(step){
           const prev=this.scale;
-          this.scale=Math.max(0.3, Math.min(2.5, this.scale*step));
+          const {min,max}=this.getScaleLimits();
+          this.scale=Math.max(min, Math.min(max, this.scale*step));
           if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
         }
         viewCommand(cmd){
@@ -6133,14 +6186,21 @@ if ($view === 'map_edit') {
           if(!this.bounds) return false;
           const rect=this.container.getBoundingClientRect();
           if(rect.width<=0 || rect.height<=0) return false;
-          const scale=Math.min(rect.width/(this.bounds.width+200), rect.height/(this.bounds.height+200));
-          this.scale=Math.max(0.3, Math.min(2.5, scale));
+          const FIT_MARGIN=200;
+          const target=Math.min(
+            rect.width/Math.max(1,this.bounds.width+FIT_MARGIN),
+            rect.height/Math.max(1,this.bounds.height+FIT_MARGIN)
+          );
+          const {min,max}=this.getScaleLimits();
+          const clamped=Math.max(min, Math.min(max, target));
+          this.scale=clamped;
           this.center_root();
           return true;
         }
         set_zoom(z){
           if(typeof z!=='number' || !isFinite(z)) return false;
-          this.scale=Math.max(0.3, Math.min(2.5, z));
+          const {min,max}=this.getScaleLimits();
+          this.scale=Math.max(min, Math.min(max, z));
           this.applyTransform();
           return true;
         }
