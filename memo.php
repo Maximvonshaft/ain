@@ -3762,6 +3762,17 @@ if ($view === 'map_edit') {
       .mind-info-row .map-title-input{flex:1;min-width:0}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
+      .mind-shortcuts{border-top:1px solid rgba(201,168,106,.18);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+      .mind-shortcuts-title{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400)}
+      .mind-shortcuts-table{max-height:180px;overflow:auto;border-radius:14px;border:1px solid rgba(201,168,106,.18);background:rgba(15,19,22,.66);padding:8px 12px}
+      .mind-shortcuts table{width:100%;border-collapse:collapse;font:500 11px/1.6 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
+      .mind-shortcuts th{font-weight:600;color:var(--text-strong);padding:4px 0;text-align:left;text-transform:uppercase;letter-spacing:.14em;border-bottom:1px solid rgba(201,168,106,.18)}
+      .mind-shortcuts td{padding:6px 0;vertical-align:top;border-top:1px dashed rgba(201,168,106,.16)}
+      .mind-shortcuts tbody tr:first-child td{border-top:none}
+      .mind-shortcuts .key-combo{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+      .mind-shortcuts .key-combo .kbd{margin:0}
+      .mind-shortcuts .combo-sep{color:var(--text-dim);font-size:10px}
+      .mind-shortcuts .op-desc{color:var(--text-muted);font-size:11px;line-height:1.6}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
@@ -3783,6 +3794,9 @@ if ($view === 'map_edit') {
         .save-state{font-size:10px;padding:4px 10px}
         .map-meta{font-size:10px;gap:8px;letter-spacing:.12em;justify-content:space-between}
         .map-meta span{flex:1 1 auto;min-width:0}
+        .mind-shortcuts{width:100%;padding-top:6px}
+        .mind-shortcuts-table{max-height:none}
+        .mind-shortcuts table{font-size:10px}
       }
       .mind-stage{position:relative;flex:1 1 auto;min-height:0;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
@@ -3969,6 +3983,93 @@ if ($view === 'map_edit') {
               <?php if ($mind['id']): ?>
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
+            </div>
+            <div class="mind-shortcuts" id="mind-shortcuts" aria-labelledby="mind-shortcuts-heading">
+              <div class="mind-shortcuts-title" id="mind-shortcuts-heading">快捷键</div>
+              <div class="mind-shortcuts-table" role="region" aria-labelledby="mind-shortcuts-heading">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">操作</th>
+                      <th scope="col">Win</th>
+                      <th scope="col">Mac</th>
+                      <th scope="col">说明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>新建同级节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Enter</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Return</span></span>
+                      </td>
+                      <td class="op-desc">在当前节点下方创建同级节点</td>
+                    </tr>
+                    <tr>
+                      <td>新建子级节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Tab</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Tab</span></span>
+                      </td>
+                      <td class="op-desc">在当前节点下创建子节点</td>
+                    </tr>
+                    <tr>
+                      <td>新建父级节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Shift</span><span class="combo-sep">+</span><span class="kbd">Tab</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Shift</span><span class="combo-sep">+</span><span class="kbd">Tab</span></span>
+                      </td>
+                      <td class="op-desc">将当前节点提升为父层的兄弟节点</td>
+                    </tr>
+                    <tr>
+                      <td>删除节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Del</span><span class="combo-sep">/</span><span class="kbd">Backspace</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">⌫</span></span>
+                      </td>
+                      <td class="op-desc">删除当前选中节点</td>
+                    </tr>
+                    <tr>
+                      <td>折叠/展开子节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Space</span><span class="combo-sep">/</span><span class="kbd">→</span><span class="combo-sep">/</span><span class="kbd">←</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Space</span><span class="combo-sep">/</span><span class="kbd">→</span><span class="combo-sep">/</span><span class="kbd">←</span></span>
+                      </td>
+                      <td class="op-desc">展开或折叠当前节点分支</td>
+                    </tr>
+                    <tr>
+                      <td>复制节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Ctrl</span><span class="combo-sep">+</span><span class="kbd">C</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">⌘</span><span class="combo-sep">+</span><span class="kbd">C</span></span>
+                      </td>
+                      <td class="op-desc">复制节点及其子节点</td>
+                    </tr>
+                    <tr>
+                      <td>粘贴节点</td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">Ctrl</span><span class="combo-sep">+</span><span class="kbd">V</span></span>
+                      </td>
+                      <td>
+                        <span class="key-combo"><span class="kbd">⌘</span><span class="combo-sep">+</span><span class="kbd">V</span></span>
+                      </td>
+                      <td class="op-desc">粘贴为同级节点</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </header>
@@ -8097,8 +8198,8 @@ if ($view === 'map_edit') {
           bounds:mind.bounds?{...mind.bounds}:null,
           viewport:captureElementState(mind.viewport,false),
           nodeLayer:captureElementState(mind.nodeLayer,false),
-          linkLayer:captureElementState(mind.linkLayer,false),
-          relationLayer:captureElementState(mind.relationLayer,false),
+          linkLayer:captureElementState(mind.linkLayer,true),
+          relationLayer:captureElementState(mind.relationLayer,true),
           guideLayer:captureElementState(mind.guideLayer,true),
           nodes,
         };
@@ -8119,6 +8220,101 @@ if ($view === 'map_edit') {
             });
           }
           if(typeof state.html==='string'){ el.innerHTML=state.html; }
+        };
+        const rebindLinkLayerState=()=>{
+          if(!mind.linkLayer || !mind.nodes || typeof mind.nodes.values!=='function') return;
+          if(!mind.linkRegistry || typeof mind.linkRegistry.clear!=='function'){ mind.linkRegistry=new Map(); }
+          else{ mind.linkRegistry.clear(); }
+          for(const node of mind.nodes.values()){
+            if(!node) continue;
+            node.linkGroup=null;
+            node.linkShadow=null;
+            node.linkPath=null;
+            node.linkHighlight=null;
+          }
+          const groups=mind.linkLayer.querySelectorAll('.trace-group');
+          groups.forEach(group=>{
+            if(!group) return;
+            const childId=group.dataset?group.dataset.to:null;
+            if(!childId) return;
+            const node=mind.nodes.get(childId);
+            if(!node) return;
+            const parentId=group.dataset?group.dataset.from:null;
+            const shadow=group.querySelector('.trace.shadow');
+            const core=group.querySelector('.trace.core');
+            const highlight=group.querySelector('.trace.highlight');
+            node.linkGroup=group;
+            node.linkShadow=shadow||null;
+            node.linkPath=core||null;
+            node.linkHighlight=highlight||null;
+            if(mind.linkRegistry){ mind.linkRegistry.set(node.id,{group,shadow,core,highlight}); }
+            if(core){
+              const resolvedParentId=parentId || (node.parent && node.parent.id ? node.parent.id : null);
+              const enter=()=>{
+                if(resolvedParentId && typeof mind.setEdgeHover==='function'){
+                  mind.setEdgeHover(resolvedParentId, node.id);
+                }
+              };
+              const leave=()=>{
+                if(resolvedParentId && typeof mind.clearEdgeHover==='function'){
+                  mind.clearEdgeHover(resolvedParentId, node.id);
+                }else if(typeof mind.clearEdgeHover==='function'){
+                  mind.clearEdgeHover();
+                }
+              };
+              core.addEventListener('pointerenter',enter);
+              core.addEventListener('pointerleave',leave);
+              core.addEventListener('pointercancel',leave);
+              core._edgeHoverHandlers={enter,leave};
+            }
+          });
+          if(typeof mind.updateLinkPath==='function'){
+            for(const node of mind.nodes.values()){
+              if(!node || !node.parent) continue;
+              try{ mind.updateLinkPath(node); }
+              catch(err){ console.warn(err); }
+            }
+          }
+          if(typeof mind.updateEdgeButtonScale==='function'){
+            try{ mind.updateEdgeButtonScale(); }
+            catch(err){ console.warn(err); }
+          }
+          if(typeof mind.clearEdgeHover==='function'){
+            try{ mind.clearEdgeHover(); }
+            catch(err){ console.warn(err); }
+          }
+        };
+        const rebindRelationLayerState=()=>{
+          if(!mind.relationLayer) return;
+          if(!mind.relationRegistry || typeof mind.relationRegistry.clear!=='function'){ mind.relationRegistry=new Map(); }
+          else{ mind.relationRegistry.clear(); }
+          const groups=mind.relationLayer.querySelectorAll('.relation-group');
+          groups.forEach(group=>{
+            if(!group) return;
+            const id=group.dataset?group.dataset.id:null;
+            if(!id) return;
+            const shadow=group.querySelector('.relation-shadow');
+            const core=group.querySelector('.relation-core');
+            const highlight=group.querySelector('.relation-highlight');
+            mind.relationRegistry.set(id,{group,shadow,core,highlight,relation:null});
+          });
+          if(Array.isArray(mind.relations)){
+            mind.relations.forEach(relation=>{
+              if(!relation || !relation.id) return;
+              const entry=mind.relationRegistry.get(relation.id);
+              if(!entry) return;
+              entry.relation=relation;
+              if(entry.core){
+                entry.core.dataset.bidirectional=relation.bidirectional?'true':'false';
+                if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
+                else{ entry.core.removeAttribute('marker-start'); }
+              }
+              if(typeof mind.updateRelationPath==='function'){
+                try{ mind.updateRelationPath(relation); }
+                catch(err){ console.warn(err); }
+              }
+            });
+          }
         };
         mind.bounds=snapshot.bounds?{...snapshot.bounds}:null;
         restoreElementState(mind.viewport,snapshot.viewport);
@@ -8149,6 +8345,8 @@ if ($view === 'map_edit') {
             if(typeof mind.updateAnchors==='function'){ mind.updateAnchors(node); }
           }
         }
+        rebindLinkLayerState();
+        rebindRelationLayerState();
         if(typeof mind.applyTransform==='function'){ mind.applyTransform(); }
       }
       function exportMindmapAsJson(){
@@ -8265,10 +8463,13 @@ if ($view === 'map_edit') {
             setTimeout(()=>URL.revokeObjectURL(url), 1500);
           }else if(format==='pdf'){
             const jsPDF=await ensureJsPDF();
-            const orientation=canvas.width>=canvas.height?'landscape':'portrait';
-            const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
+            const isLandscape=canvas.width>=canvas.height;
+            const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
+            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
             const dataUrl=canvas.toDataURL('image/png');
-            pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
+            const pageWidth=pdf.internal.pageSize.getWidth();
+            const pageHeight=pdf.internal.pageSize.getHeight();
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'FAST');
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
