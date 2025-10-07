@@ -3797,15 +3797,15 @@ if ($view === 'map_edit') {
       .mind-link-controls .edge-insert-btn:hover{background:linear-gradient(160deg,rgba(36,42,48,.98),rgba(18,22,26,.94));border-color:rgba(227,198,139,.85);box-shadow:0 16px 32px rgba(0,0,0,.55),0 0 0 1px rgba(227,198,139,.4) inset,0 0 34px rgba(227,198,139,.3)}
       .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.85);outline-offset:3px}
       .mind-links .trace-group{pointer-events:none}
-      .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
+      .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel;vector-effect:non-scaling-stroke}
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-relations{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
       .mind-relations .relation-group{pointer-events:none}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);vector-effect:non-scaling-stroke}
+      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);vector-effect:non-scaling-stroke}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0}
@@ -4765,6 +4765,12 @@ if ($view === 'map_edit') {
           this.setupPan();
           this.setupTouchGuards();
         }
+        static get SCALE_PADDING(){ return 200; }
+        static get DEFAULT_MIN_SCALE(){ return 0.3; }
+        static get DEFAULT_MAX_SCALE(){ return 2.5; }
+        static get MIN_SCALE_FLOOR(){ return 0.04; }
+        static get ABSOLUTE_MIN_SCALE(){ return 0.02; }
+        static get SMALL_CONTENT_BOOST(){ return 1.4; }
         setupPan(){
           const updatePinchBaseline=()=>{
             if(this.activePointers.size<2){ this.pinchState=null; return; }
@@ -4831,7 +4837,8 @@ if ($view === 'map_edit') {
                 const rect=this.container.getBoundingClientRect();
                 const centerX=((a.x+b.x)/2)-rect.left;
                 const centerY=((a.y+b.y)/2)-rect.top;
-                const nextScale=Math.max(0.3, Math.min(2.5, pinch.baseScale * (distance / pinch.initialDistance)));
+                const rawScale=pinch.baseScale * (distance / pinch.initialDistance);
+                const nextScale=this.clampScale(rawScale, rect);
                 this.scale=nextScale;
                 this.offsetX=centerX - pinch.originX*this.scale;
                 this.offsetY=centerY - pinch.originY*this.scale;
@@ -4876,9 +4883,9 @@ if ($view === 'map_edit') {
             const delta=Math.max(-1, Math.min(1, evt.deltaY));
             const factor=delta<0?1.12:0.9;
             const prevScale=this.scale;
-            const nextScale=Math.max(0.3, Math.min(2.5, prevScale*factor));
-            if(Math.abs(nextScale-prevScale)<0.0001) return;
             const rect=this.container.getBoundingClientRect();
+            const nextScale=this.clampScale(prevScale*factor, rect);
+            if(Math.abs(nextScale-prevScale)<0.0001) return;
             const originX=(evt.clientX-rect.left - this.offsetX)/this.scale;
             const originY=(evt.clientY-rect.top - this.offsetY)/this.scale;
             this.scale=nextScale;
@@ -6090,7 +6097,48 @@ if ($view === 'map_edit') {
             }
           });
         }
+        getScaleLimits(rect=null){
+          const fallbackMin=SimpleMind.DEFAULT_MIN_SCALE;
+          const fallbackMax=SimpleMind.DEFAULT_MAX_SCALE;
+          let min=fallbackMin;
+          let max=fallbackMax;
+          if(!rect && this.container && typeof this.container.getBoundingClientRect==='function'){
+            rect=this.container.getBoundingClientRect();
+          }
+          if(rect && rect.width>0 && rect.height>0 && this.bounds && Number.isFinite(this.bounds.width) && Number.isFinite(this.bounds.height) && this.bounds.width>0 && this.bounds.height>0){
+            const padding=SimpleMind.SCALE_PADDING;
+            const widthRatio=rect.width/(this.bounds.width+padding);
+            const heightRatio=rect.height/(this.bounds.height+padding);
+            const fitScale=Math.min(widthRatio, heightRatio);
+            if(Number.isFinite(fitScale) && fitScale>0){
+              const baseMin=SimpleMind.DEFAULT_MIN_SCALE;
+              const readableFloor=SimpleMind.MIN_SCALE_FLOOR;
+              const absoluteFloor=SimpleMind.ABSOLUTE_MIN_SCALE;
+              let minCandidate=Math.min(fitScale, baseMin);
+              if(!Number.isFinite(minCandidate) || minCandidate<=0){ minCandidate=readableFloor; }
+              if(minCandidate<absoluteFloor){ minCandidate=absoluteFloor; }
+              if(minCandidate>readableFloor){ minCandidate=Math.max(minCandidate, readableFloor); }
+              min=minCandidate;
+              const baseMax=SimpleMind.DEFAULT_MAX_SCALE;
+              const zoomRatio=baseMax/baseMin;
+              max=Math.max(baseMax, min*zoomRatio);
+              if(fitScale>1){
+                max=Math.max(max, fitScale*SimpleMind.SMALL_CONTENT_BOOST);
+              }
+            }
+          }
+          return {min,max};
+        }
+        clampScale(value, rect=null){
+          const limits=this.getScaleLimits(rect);
+          if(!Number.isFinite(value)){ return limits.min; }
+          if(value<limits.min) return limits.min;
+          if(value>limits.max) return limits.max;
+          return value;
+        }
         applyTransform(initial){
+          const clamped=this.clampScale(this.scale);
+          if(Math.abs(clamped-this.scale)>0.0001){ this.scale=clamped; }
           if(!this.bounds){ return; }
           if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
           const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
@@ -6099,8 +6147,11 @@ if ($view === 'map_edit') {
         }
         zoom(step){
           const prev=this.scale;
-          this.scale=Math.max(0.3, Math.min(2.5, this.scale*step));
-          if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
+          const next=this.clampScale(this.scale*step);
+          if(Math.abs(prev-next)>0.001){
+            this.scale=next;
+            this.applyTransform();
+          }
         }
         viewCommand(cmd){
           switch(cmd){
@@ -6133,14 +6184,15 @@ if ($view === 'map_edit') {
           if(!this.bounds) return false;
           const rect=this.container.getBoundingClientRect();
           if(rect.width<=0 || rect.height<=0) return false;
-          const scale=Math.min(rect.width/(this.bounds.width+200), rect.height/(this.bounds.height+200));
-          this.scale=Math.max(0.3, Math.min(2.5, scale));
+          const padding=SimpleMind.SCALE_PADDING;
+          const candidate=Math.min(rect.width/(this.bounds.width+padding), rect.height/(this.bounds.height+padding));
+          this.scale=this.clampScale(candidate, rect);
           this.center_root();
           return true;
         }
         set_zoom(z){
           if(typeof z!=='number' || !isFinite(z)) return false;
-          this.scale=Math.max(0.3, Math.min(2.5, z));
+          this.scale=this.clampScale(z);
           this.applyTransform();
           return true;
         }
