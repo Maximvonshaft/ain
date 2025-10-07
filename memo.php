@@ -4097,25 +4097,28 @@ if ($view === 'map_edit') {
       .mind-attachment-filter[data-active="true"]{border-color:rgba(227,198,139,.6);background:rgba(227,198,139,.14);color:var(--gold-400)}
       .mind-attachment-sort{display:flex;align-items:center;gap:8px;color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .mind-attachment-sort select{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.82);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-body{flex:1 1 auto;display:grid;grid-template-columns:1fr;gap:16px;min-height:0}
-      .mind-attachment-list{position:relative;overflow:auto;border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.78);box-shadow:inset 0 0 22px rgba(0,0,0,.45);padding:12px;display:grid;gap:10px}
+      .mind-attachment-body{flex:1 1 auto;display:flex;flex-direction:column;gap:16px;min-height:0}
+      .mind-attachment-list{position:relative;overflow:auto;border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.78);box-shadow:inset 0 0 22px rgba(0,0,0,.45);padding:12px;display:grid;gap:10px;flex:1 1 auto;min-height:0}
       .mind-attachment-list::-webkit-scrollbar{width:8px}
       .mind-attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.24);border-radius:999px}
-      .mind-attachment-row{display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
+      .mind-attachment-row{display:grid;grid-template-columns:auto 56px 1fr;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
       .mind-attachment-row[data-selected="true"]{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.12);box-shadow:0 0 0 1px rgba(75,195,209,.25)}
-      .mind-attachment-select{width:18px;height:18px;border-radius:6px;border:1px solid rgba(201,168,106,.32);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(227,198,139,.85)}
+      .mind-attachment-select{width:18px;height:18px;border-radius:6px;border:1px solid rgba(201,168,106,.32);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(227,198,139,.85);grid-row:1/span 3;align-self:flex-start}
       .mind-attachment-row[data-selected="true"] .mind-attachment-select{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.22);color:#d9fbff}
-      .mind-attachment-thumb{width:46px;height:46px;border-radius:14px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--gold-400)}
+      .mind-attachment-thumb{width:54px;height:54px;border-radius:16px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--gold-400);grid-row:1/span 3;align-self:flex-start}
       .mind-attachment-thumb img{width:100%;height:100%;object-fit:cover}
-      .mind-attachment-info{display:grid;gap:6px;min-width:0}
-      .mind-attachment-name{font:600 13px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.04em;overflow-wrap:anywhere}
+      .mind-attachment-content{display:grid;gap:12px;min-width:0}
+      .mind-attachment-header{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+      .mind-attachment-info{display:grid;gap:8px;min-width:0}
+      .mind-attachment-name{font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.04em;overflow-wrap:anywhere;word-break:break-all;flex:1 1 auto;min-width:0}
       .mind-attachment-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-muted);font:11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+      .mind-attachment-attrs{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
       .mind-attachment-tag{padding:2px 8px;border-radius:999px;border:1px solid rgba(201,168,106,.22);background:rgba(21,26,30,.82)}
       .mind-attachment-node{color:var(--gold-400);cursor:pointer;text-decoration:none}
       .mind-attachment-node:hover{text-decoration:underline}
-      .mind-attachment-size{color:var(--text-dim);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-time{color:var(--text-muted);font:11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-actions{display:flex;gap:6px}
+      .mind-attachment-size{color:var(--text-dim);font:12px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-time{color:var(--text-muted);font:11px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-actions{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;justify-content:flex-end}
       .mind-attachment-actions button{padding:6px 10px;border-radius:10px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
       .mind-attachment-actions button:hover{border-color:rgba(227,198,139,.55)}
       .mind-attachment-actions button.danger{color:#fca5a5;border-color:rgba(209,75,75,.5)}
@@ -4130,9 +4133,13 @@ if ($view === 'map_edit') {
       .mind-attachment-alert{color:#fca5a5;font:12px/1.6 'Inter','Noto Sans SC',sans-serif}
       @media (max-width:720px){
         .mind-attachment-backdrop{padding:16px}
-        .mind-attachment-panel{width:100%;border-radius:20px}
+        .mind-attachment-panel{width:100%;border-radius:20px;height:100%;max-height:100svh}
         .mind-attachment-controls{flex-direction:column;align-items:flex-start}
-        .mind-attachment-list{max-height:50vh}
+        .mind-attachment-row{grid-template-columns:auto 48px 1fr;padding:12px 14px}
+        .mind-attachment-thumb{width:48px;height:48px;border-radius:14px}
+        .mind-attachment-header{flex-direction:column;align-items:flex-start}
+        .mind-attachment-actions{width:100%;justify-content:flex-start;margin-left:0}
+        .mind-attachment-list{max-height:none}
       }
       @keyframes mindNodeFlash{
         0%{box-shadow:0 0 0 0 rgba(75,195,209,.0)}
@@ -9166,7 +9173,6 @@ if ($view === 'map_edit') {
           nameEl.className='mind-attachment-name';
           nameEl.textContent=item.name;
           nameEl.title=item.name;
-          info.appendChild(nameEl);
           const metaRow=document.createElement('div');
           metaRow.className='mind-attachment-meta';
           const tag=document.createElement('span');
@@ -9210,12 +9216,22 @@ if ($view === 'map_edit') {
           actions.appendChild(previewBtn);
           actions.appendChild(downloadBtn);
           actions.appendChild(deleteBtn);
+          const attrs=document.createElement('div');
+          attrs.className='mind-attachment-attrs';
+          attrs.appendChild(sizeEl);
+          attrs.appendChild(timeEl);
+          const header=document.createElement('div');
+          header.className='mind-attachment-header';
+          header.appendChild(nameEl);
+          header.appendChild(actions);
+          const content=document.createElement('div');
+          content.className='mind-attachment-content';
+          content.appendChild(header);
+          content.appendChild(info);
+          content.appendChild(attrs);
           row.appendChild(selectBox);
           row.appendChild(thumb);
-          row.appendChild(info);
-          row.appendChild(sizeEl);
-          row.appendChild(timeEl);
-          row.appendChild(actions);
+          row.appendChild(content);
           return row;
         }
         function attachObserver(){
