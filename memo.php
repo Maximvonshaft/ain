@@ -6471,6 +6471,140 @@ if ($view === 'map_edit') {
         if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
         throw new Error('PDF 导出依赖加载失败');
       }
+      function captureElementState(el,{includeTransform=false}={}){
+        if(!el || !el.style) return null;
+        const state={
+          width:el.style.width||'',
+          height:el.style.height||''
+        };
+        if(includeTransform){ state.transform=el.style.transform||''; }
+        return state;
+      }
+      function restoreElementState(el,state,{includeTransform=false}={}){
+        if(!el || !state || !el.style) return;
+        if('width' in state){ el.style.width=state.width||''; }
+        if('height' in state){ el.style.height=state.height||''; }
+        if(includeTransform && 'transform' in state){ el.style.transform=state.transform||''; }
+      }
+      function captureSvgLayerState(el){
+        if(!el) return null;
+        return {
+          styleWidth:el.style?el.style.width||'':'',
+          styleHeight:el.style?el.style.height||'':'',
+          attrWidth:typeof el.getAttribute==='function'?el.getAttribute('width'):null,
+          attrHeight:typeof el.getAttribute==='function'?el.getAttribute('height'):null,
+          attrViewBox:typeof el.getAttribute==='function'?el.getAttribute('viewBox'):null
+        };
+      }
+      function restoreSvgLayerState(el,state){
+        if(!el || !state) return;
+        if(el.style){
+          el.style.width=state.styleWidth||'';
+          el.style.height=state.styleHeight||'';
+        }
+        if(typeof el.setAttribute==='function'){
+          if(state.attrWidth!=null){ el.setAttribute('width', state.attrWidth); }
+          else{ el.removeAttribute('width'); }
+          if(state.attrHeight!=null){ el.setAttribute('height', state.attrHeight); }
+          else{ el.removeAttribute('height'); }
+          if(state.attrViewBox!=null){ el.setAttribute('viewBox', state.attrViewBox); }
+          else{ el.removeAttribute('viewBox'); }
+        }
+      }
+      function captureLayoutState(instance){
+        if(!instance) return null;
+        const snapshot={
+          bounds:instance.bounds?{...instance.bounds}:null,
+          scale:instance.scale,
+          offsetX:instance.offsetX,
+          offsetY:instance.offsetY,
+          hasCentered:instance.hasCentered,
+          viewport:captureElementState(instance.viewport,{includeTransform:true}),
+          nodeLayer:captureElementState(instance.nodeLayer),
+          guideLayer:captureElementState(instance.guideLayer),
+          linkLayer:captureSvgLayerState(instance.linkLayer),
+          relationLayer:captureSvgLayerState(instance.relationLayer),
+          nodeStates:[],
+          sizeCache:null
+        };
+        if(instance.sizeCache && typeof instance.sizeCache.clear==='function'){
+          snapshot.sizeCache=Array.from(instance.sizeCache.entries()).map(([key,value])=>[key,{...(value||{})}]);
+        }
+        if(instance.nodes && typeof instance.nodes.values==='function'){
+          for(const node of instance.nodes.values()){
+            if(!node) continue;
+            snapshot.nodeStates.push([node.id,{
+              x:node.x,
+              y:node.y,
+              absX:node.absX,
+              absY:node.absY,
+              width:node.width,
+              height:node.height,
+              layoutHeight:node._layoutHeight,
+              left:node.el&&node.el.style?node.el.style.left:null,
+              top:node.el&&node.el.style?node.el.style.top:null
+            }]);
+          }
+        }
+        return snapshot;
+      }
+      function restoreLayoutState(instance,snapshot){
+        if(!instance || !snapshot) return;
+        instance.bounds=snapshot.bounds?{...snapshot.bounds}:null;
+        if(typeof snapshot.scale==='number'){ instance.scale=snapshot.scale; }
+        if(typeof snapshot.offsetX==='number'){ instance.offsetX=snapshot.offsetX; }
+        if(typeof snapshot.offsetY==='number'){ instance.offsetY=snapshot.offsetY; }
+        instance.hasCentered=snapshot.hasCentered;
+        restoreElementState(instance.viewport, snapshot.viewport,{includeTransform:true});
+        restoreElementState(instance.nodeLayer, snapshot.nodeLayer);
+        restoreElementState(instance.guideLayer, snapshot.guideLayer);
+        restoreSvgLayerState(instance.linkLayer, snapshot.linkLayer);
+        restoreSvgLayerState(instance.relationLayer, snapshot.relationLayer);
+        if(instance.sizeCache && typeof instance.sizeCache.clear==='function'){
+          instance.sizeCache.clear();
+          if(Array.isArray(snapshot.sizeCache)){
+            snapshot.sizeCache.forEach(([key,value])=>{ instance.sizeCache.set(key,{...(value||{})}); });
+          }
+        }
+        if(instance.nodes && typeof instance.nodes.values==='function' && Array.isArray(snapshot.nodeStates)){
+          const stateMap=new Map(snapshot.nodeStates);
+          for(const node of instance.nodes.values()){
+            if(!node) continue;
+            const saved=stateMap.get(node.id);
+            if(!saved) continue;
+            if('x' in saved) node.x=saved.x;
+            if('y' in saved) node.y=saved.y;
+            if('absX' in saved) node.absX=saved.absX;
+            if('absY' in saved) node.absY=saved.absY;
+            if('width' in saved) node.width=saved.width;
+            if('height' in saved) node.height=saved.height;
+            if('layoutHeight' in saved) node._layoutHeight=saved.layoutHeight;
+            if(node.el && node.el.style){
+              node.el.style.left=saved.left!=null?saved.left:'';
+              node.el.style.top=saved.top!=null?saved.top:'';
+            }
+          }
+        }
+        if(typeof instance.applyTransform==='function'){
+          try{ instance.applyTransform(); }
+          catch(err){ console.warn(err); }
+        }
+      }
+      async function withTemporaryLayout(instance,task){
+        if(typeof task!=='function'){ return undefined; }
+        if(!instance || typeof instance.computeLayout!=='function'){
+          const bounds=instance && instance.bounds?{...instance.bounds}:null;
+          return task(bounds);
+        }
+        const snapshot=captureLayoutState(instance);
+        try{
+          instance.computeLayout();
+          const bounds=instance && instance.bounds?{...instance.bounds}:null;
+          return await task(bounds);
+        }finally{
+          restoreLayoutState(instance,snapshot);
+        }
+      }
       function canvasToBlob(canvas, type, quality){
         return new Promise((resolve,reject)=>{
           if(!canvas || typeof canvas.toBlob!=='function'){
@@ -8082,98 +8216,99 @@ if ($view === 'map_edit') {
           const computedStyle=getComputedStyle(document.body);
           const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
           if(overlay){ overlay.style.display='none'; }
-          if(typeof jm.computeLayout==='function'){ try{ jm.computeLayout(); }catch(err){ console.warn(err); } }
-          const viewport=jm && jm.viewport ? jm.viewport : jmContainer.querySelector('.mind-viewport');
-          if(!viewport){ throw new Error('无法定位导出视图'); }
-          const bounds=jm && jm.bounds ? jm.bounds : null;
-          if(!bounds || !isFinite(bounds.width) || !isFinite(bounds.height)){
-            throw new Error('无法计算导图范围');
-          }
-          const viewportWidth=Math.max(1, Math.ceil(bounds.width));
-          const viewportHeight=Math.max(1, Math.ceil(bounds.height));
-          const SAFE_CANVAS_BOUND=16384;
-          const basePixelRatio=window.devicePixelRatio || 1;
-          const minPixelRatio=2;
-          const maxPixelRatio=4;
-          const sizeLimitedRatio=Math.max(1, Math.floor(SAFE_CANVAS_BOUND / Math.max(viewportWidth, viewportHeight)));
-          const pixelRatio=Math.min(maxPixelRatio, Math.max(minPixelRatio, basePixelRatio), sizeLimitedRatio);
-          exportHost=document.createElement('div');
-          exportHost.style.position='fixed';
-          exportHost.style.left='-120vw';
-          exportHost.style.top='0';
-          exportHost.style.opacity='0';
-          exportHost.style.pointerEvents='none';
-          const clone=viewport.cloneNode(true);
-          clone.style.transform='translate(0px, 0px) scale(1)';
-          clone.style.transformOrigin='top left';
-          clone.style.width=`${viewportWidth}px`;
-          clone.style.height=`${viewportHeight}px`;
-          clone.style.overflow='visible';
-          clone.style.position='absolute';
-          clone.style.left='0';
-          clone.style.top='0';
-          const exportWrapper=document.createElement('div');
-          exportWrapper.style.position='relative';
-          exportWrapper.style.width=`${viewportWidth}px`;
-          exportWrapper.style.height=`${viewportHeight}px`;
-          exportWrapper.style.pointerEvents='none';
-          exportWrapper.style.overflow='visible';
-          exportWrapper.appendChild(clone);
-          if(jm && jm.linkControlLayer){
-            const overlayClone=jm.linkControlLayer.cloneNode(true);
-            overlayClone.style.position='absolute';
-            overlayClone.style.left='0';
-            overlayClone.style.top='0';
-            overlayClone.style.width=`${viewportWidth}px`;
-            overlayClone.style.height=`${viewportHeight}px`;
-            overlayClone.style.pointerEvents='none';
-            overlayClone.style.transform='none';
-            const buttons=overlayClone.querySelectorAll('.edge-insert-btn');
-            buttons.forEach(btn=>{
-              const rawX=btn.dataset ? btn.dataset.logicalX : null;
-              const rawY=btn.dataset ? btn.dataset.logicalY : null;
-              const logicalX=rawX!=null?parseFloat(rawX):NaN;
-              const logicalY=rawY!=null?parseFloat(rawY):NaN;
-              if(Number.isFinite(logicalX) && Number.isFinite(logicalY)){
-                btn.style.left=`${logicalX}px`;
-                btn.style.top=`${logicalY}px`;
-              }else{
-                btn.setAttribute('hidden','');
+          await withTemporaryLayout(jm, async (layoutBounds)=>{
+            const viewport=jm && jm.viewport ? jm.viewport : jmContainer.querySelector('.mind-viewport');
+            if(!viewport){ throw new Error('无法定位导出视图'); }
+            const bounds=layoutBounds || (jm && jm.bounds ? jm.bounds : null);
+            if(!bounds || !isFinite(bounds.width) || !isFinite(bounds.height)){
+              throw new Error('无法计算导图范围');
+            }
+            const viewportWidth=Math.max(1, Math.ceil(bounds.width));
+            const viewportHeight=Math.max(1, Math.ceil(bounds.height));
+            const SAFE_CANVAS_BOUND=16384;
+            const basePixelRatio=window.devicePixelRatio || 1;
+            const minPixelRatio=2;
+            const maxPixelRatio=4;
+            const sizeLimitedRatio=Math.max(1, Math.floor(SAFE_CANVAS_BOUND / Math.max(viewportWidth, viewportHeight)));
+            const pixelRatio=Math.min(maxPixelRatio, Math.max(minPixelRatio, basePixelRatio), sizeLimitedRatio);
+            exportHost=document.createElement('div');
+            exportHost.style.position='fixed';
+            exportHost.style.left='-120vw';
+            exportHost.style.top='0';
+            exportHost.style.opacity='0';
+            exportHost.style.pointerEvents='none';
+            const clone=viewport.cloneNode(true);
+            clone.style.transform='translate(0px, 0px) scale(1)';
+            clone.style.transformOrigin='top left';
+            clone.style.width=`${viewportWidth}px`;
+            clone.style.height=`${viewportHeight}px`;
+            clone.style.overflow='visible';
+            clone.style.position='absolute';
+            clone.style.left='0';
+            clone.style.top='0';
+            const exportWrapper=document.createElement('div');
+            exportWrapper.style.position='relative';
+            exportWrapper.style.width=`${viewportWidth}px`;
+            exportWrapper.style.height=`${viewportHeight}px`;
+            exportWrapper.style.pointerEvents='none';
+            exportWrapper.style.overflow='visible';
+            exportWrapper.appendChild(clone);
+            if(jm && jm.linkControlLayer){
+              const overlayClone=jm.linkControlLayer.cloneNode(true);
+              overlayClone.style.position='absolute';
+              overlayClone.style.left='0';
+              overlayClone.style.top='0';
+              overlayClone.style.width=`${viewportWidth}px`;
+              overlayClone.style.height=`${viewportHeight}px`;
+              overlayClone.style.pointerEvents='none';
+              overlayClone.style.transform='none';
+              const buttons=overlayClone.querySelectorAll('.edge-insert-btn');
+              buttons.forEach(btn=>{
+                const rawX=btn.dataset ? btn.dataset.logicalX : null;
+                const rawY=btn.dataset ? btn.dataset.logicalY : null;
+                const logicalX=rawX!=null?parseFloat(rawX):NaN;
+                const logicalY=rawY!=null?parseFloat(rawY):NaN;
+                if(Number.isFinite(logicalX) && Number.isFinite(logicalY)){
+                  btn.style.left=`${logicalX}px`;
+                  btn.style.top=`${logicalY}px`;
+                }else{
+                  btn.setAttribute('hidden','');
+                }
+              });
+              exportWrapper.appendChild(overlayClone);
+            }
+            exportHost.appendChild(exportWrapper);
+            document.body.appendChild(exportHost);
+            const canvas=await htmlToImage.toCanvas(exportWrapper,{
+              backgroundColor,
+              pixelRatio,
+              filter:node=>{
+                if(!(node instanceof Element)) return true;
+                return node.dataset.exportIgnore!=='true';
               }
             });
-            exportWrapper.appendChild(overlayClone);
-          }
-          exportHost.appendChild(exportWrapper);
-          document.body.appendChild(exportHost);
-          const canvas=await htmlToImage.toCanvas(exportWrapper,{
-            backgroundColor,
-            pixelRatio,
-            filter:node=>{
-              if(!(node instanceof Element)) return true;
-              return node.dataset.exportIgnore!=='true';
+            if(!canvas){ throw new Error('无法生成导出图像'); }
+            if(format==='jpg'){
+              const blob=await canvasToBlob(canvas,'image/jpeg',0.95);
+              const url=URL.createObjectURL(blob);
+              const a=document.createElement('a');
+              a.href=url;
+              a.download=buildExportFilename('jpg', titleValue);
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(()=>URL.revokeObjectURL(url), 1500);
+            }else if(format==='pdf'){
+              const jsPDF=await ensureJsPDF();
+              const orientation=canvas.width>=canvas.height?'landscape':'portrait';
+              const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
+              const dataUrl=canvas.toDataURL('image/png');
+              pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
+              pdf.save(buildExportFilename('pdf', titleValue));
+            }else{
+              throw new Error('不支持的导出格式');
             }
           });
-          if(!canvas){ throw new Error('无法生成导出图像'); }
-          if(format==='jpg'){
-            const blob=await canvasToBlob(canvas,'image/jpeg',0.95);
-            const url=URL.createObjectURL(blob);
-            const a=document.createElement('a');
-            a.href=url;
-            a.download=buildExportFilename('jpg', titleValue);
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(()=>URL.revokeObjectURL(url), 1500);
-          }else if(format==='pdf'){
-            const jsPDF=await ensureJsPDF();
-            const orientation=canvas.width>=canvas.height?'landscape':'portrait';
-            const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
-            const dataUrl=canvas.toDataURL('image/png');
-            pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
-            pdf.save(buildExportFilename('pdf', titleValue));
-          }else{
-            throw new Error('不支持的导出格式');
-          }
         }catch(error){
           console.error(error);
           const message=error && error.message ? `导出失败：${error.message}` : '导出失败，请稍后重试。';
