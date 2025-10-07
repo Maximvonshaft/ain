@@ -1512,7 +1512,13 @@ if ($view === 'new') {
           bodyEl.className='attachment-preview-body';
           const loadingEl=document.createElement('div');
           loadingEl.className='attachment-preview-loading';
-          loadingEl.textContent='载入中…';
+          const spinner=document.createElement('span');
+          spinner.className='attachment-preview-spinner';
+          const loadingText=document.createElement('span');
+          loadingText.className='attachment-preview-loading-text';
+          loadingText.textContent='载入中…';
+          loadingEl.appendChild(spinner);
+          loadingEl.appendChild(loadingText);
           bodyEl.appendChild(loadingEl);
           const footer=document.createElement('div');
           footer.className='attachment-preview-footer';
@@ -1540,13 +1546,24 @@ if ($view === 'new') {
           closeBtn.addEventListener('click',closePreview);
           backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
           document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
-          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,downloadBtn,closePreview};
+          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,loadingTextEl:loadingText,downloadBtn,closePreview};
           return elements;
         };
         const cleanupObjectUrl=()=>{ if(objectUrl){ URL.revokeObjectURL(objectUrl); objectUrl=null; } };
-        const showContent=content=>{
+        const setLoadingMessage=message=>{
+          const {loadingTextEl}=ensureElements();
+          if(loadingTextEl) loadingTextEl.textContent=message || '载入中…';
+        };
+        const showLoading=message=>{
           const {bodyEl,loadingEl}=ensureElements();
-          if(loadingEl && loadingEl.parentNode===bodyEl){ loadingEl.remove(); }
+          bodyEl.classList.add('is-loading');
+          bodyEl.innerHTML='';
+          bodyEl.appendChild(loadingEl);
+          setLoadingMessage(message);
+        };
+        const showContent=content=>{
+          const {bodyEl}=ensureElements();
+          bodyEl.classList.remove('is-loading');
           bodyEl.innerHTML='';
           if(content) bodyEl.appendChild(content);
         };
@@ -1771,9 +1788,8 @@ if ($view === 'new') {
           return msg.includes('password') || msg.includes('decrypt') || msg.includes('encrypted');
         };
         const loadZipPreview=async source=>{
-          const {loadingEl}=ensureElements();
           const attempt=async password=>{
-            loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
             const zipLib=window.zip;
@@ -1818,9 +1834,8 @@ if ($view === 'new') {
           }
         };
         const loadRarPreview=async source=>{
-          const {loadingEl}=ensureElements();
           const attempt=async password=>{
-            loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
@@ -1870,8 +1885,7 @@ if ($view === 'new') {
           }
         };
         const loadDocxPreview=async source=>{
-          const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析文档…';
+          showLoading('解析文档…');
           const buffer=await loadBuffer(source);
           await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
           if(!window.mammoth || typeof window.mammoth.convertToHtml!=='function') throw new Error('转换库未加载');
@@ -1884,8 +1898,7 @@ if ($view === 'new') {
           showContent(wrapper);
         };
         const loadExcelPreview=async source=>{
-          const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析表格…';
+          showLoading('解析表格…');
           const buffer=await loadBuffer(source);
           await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
           if(!window.XLSX || typeof window.XLSX.read!=='function') throw new Error('解析库未加载');
@@ -1916,7 +1929,7 @@ if ($view === 'new') {
         };
         const openPreview=input=>{
           const source=normalizeSource(input);
-          const {backdrop,panel,titleEl,metaEl,loadingEl,downloadBtn}=ensureElements();
+          const {backdrop,panel,titleEl,metaEl,downloadBtn}=ensureElements();
           if(abortController){ abortController.abort(); abortController=null; }
           cleanupObjectUrl();
           lastActive=document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -1928,7 +1941,7 @@ if ($view === 'new') {
           if(Number.isFinite(source.size) && source.size>0) metaParts.push(formatBytes(source.size));
           metaEl.textContent=metaParts.join(' · ');
           const downloadHref=setDownloadLink(downloadBtn, source);
-          loadingEl.textContent='载入中…';
+          showLoading('载入中…');
           const type=detectType(source);
           if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
             const url=(type==='image' && source.kind==='url') ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
@@ -2570,7 +2583,10 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .attachment-preview-body img,.attachment-preview-body video,.attachment-preview-body iframe{display:block;width:100%;height:100%;max-height:70vh;border-radius:14px;background:#050607}
       .attachment-preview-body video{background:#000}
       .attachment-preview-body iframe{border:0;min-height:60vh}
-      .attachment-preview-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font:14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-preview-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);font:14px/1.6 'Inter','Noto Sans SC',sans-serif;text-align:center}
+      .attachment-preview-spinner{width:40px;height:40px;border-radius:50%;border:3px solid rgba(201,168,106,.24);border-top-color:var(--gold-400);animation:attachment-preview-spin .9s linear infinite}
+      .attachment-preview-loading-text{letter-spacing:.08em}
+      @keyframes attachment-preview-spin{to{transform:rotate(360deg)}}
       .attachment-preview-error{color:#fca5a5;font:14px/1.6 'Inter','Noto Sans SC',sans-serif;padding:18px;text-align:center}
       .attachment-preview-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
       .attachment-preview-list li{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);font:13px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.04em;color:var(--text-strong);display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -2833,7 +2849,13 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           bodyEl.className='attachment-preview-body';
           const loadingEl=document.createElement('div');
           loadingEl.className='attachment-preview-loading';
-          loadingEl.textContent='载入中…';
+          const spinner=document.createElement('span');
+          spinner.className='attachment-preview-spinner';
+          const loadingText=document.createElement('span');
+          loadingText.className='attachment-preview-loading-text';
+          loadingText.textContent='载入中…';
+          loadingEl.appendChild(spinner);
+          loadingEl.appendChild(loadingText);
           bodyEl.appendChild(loadingEl);
           const footer=document.createElement('div');
           footer.className='attachment-preview-footer';
@@ -2861,13 +2883,24 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           closeBtn.addEventListener('click',closePreview);
           backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
           document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
-          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,downloadBtn,closePreview};
+          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,loadingTextEl:loadingText,downloadBtn,closePreview};
           return elements;
         };
         const cleanupObjectUrl=()=>{ if(objectUrl){ URL.revokeObjectURL(objectUrl); objectUrl=null; } };
-        const showContent=content=>{
+        const setLoadingMessage=message=>{
+          const {loadingTextEl}=ensureElements();
+          if(loadingTextEl) loadingTextEl.textContent=message || '载入中…';
+        };
+        const showLoading=message=>{
           const {bodyEl,loadingEl}=ensureElements();
-          if(loadingEl && loadingEl.parentNode===bodyEl){ loadingEl.remove(); }
+          bodyEl.classList.add('is-loading');
+          bodyEl.innerHTML='';
+          bodyEl.appendChild(loadingEl);
+          setLoadingMessage(message);
+        };
+        const showContent=content=>{
+          const {bodyEl}=ensureElements();
+          bodyEl.classList.remove('is-loading');
           bodyEl.innerHTML='';
           if(content) bodyEl.appendChild(content);
         };
@@ -3092,9 +3125,8 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           return msg.includes('password') || msg.includes('decrypt') || msg.includes('encrypted');
         };
         const loadZipPreview=async source=>{
-          const {loadingEl}=ensureElements();
           const attempt=async password=>{
-            loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
             const zipLib=window.zip;
@@ -3139,9 +3171,8 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           }
         };
         const loadRarPreview=async source=>{
-          const {loadingEl}=ensureElements();
           const attempt=async password=>{
-            loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
@@ -3191,8 +3222,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           }
         };
         const loadDocxPreview=async source=>{
-          const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析文档…';
+          showLoading('解析文档…');
           const buffer=await loadBuffer(source);
           await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
           if(!window.mammoth || typeof window.mammoth.convertToHtml!=='function') throw new Error('转换库未加载');
@@ -3205,8 +3235,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           showContent(wrapper);
         };
         const loadExcelPreview=async source=>{
-          const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析表格…';
+          showLoading('解析表格…');
           const buffer=await loadBuffer(source);
           await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
           if(!window.XLSX || typeof window.XLSX.read!=='function') throw new Error('解析库未加载');
@@ -3237,7 +3266,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
         };
         const openPreview=input=>{
           const source=normalizeSource(input);
-          const {backdrop,panel,titleEl,metaEl,loadingEl,downloadBtn}=ensureElements();
+          const {backdrop,panel,titleEl,metaEl,downloadBtn}=ensureElements();
           if(abortController){ abortController.abort(); abortController=null; }
           cleanupObjectUrl();
           lastActive=document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -3249,7 +3278,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
           if(Number.isFinite(source.size) && source.size>0) metaParts.push(formatBytes(source.size));
           metaEl.textContent=metaParts.join(' · ');
           const downloadHref=setDownloadLink(downloadBtn, source);
-          loadingEl.textContent='载入中…';
+          showLoading('载入中…');
           const type=detectType(source);
           if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
             const url=(type==='image' && source.kind==='url') ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
@@ -3876,7 +3905,10 @@ if ($view === 'map_edit') {
       .attachment-preview-body img,.attachment-preview-body video,.attachment-preview-body iframe{display:block;width:100%;height:100%;max-height:70vh;border-radius:14px;background:#050607}
       .attachment-preview-body video{background:#000}
       .attachment-preview-body iframe{border:0;min-height:60vh}
-      .attachment-preview-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font:14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-preview-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);font:14px/1.6 'Inter','Noto Sans SC',sans-serif;text-align:center}
+      .attachment-preview-spinner{width:40px;height:40px;border-radius:50%;border:3px solid rgba(201,168,106,.24);border-top-color:var(--gold-400);animation:attachment-preview-spin .9s linear infinite}
+      .attachment-preview-loading-text{letter-spacing:.08em}
+      @keyframes attachment-preview-spin{to{transform:rotate(360deg)}}
       .attachment-preview-error{color:#fca5a5;font:14px/1.6 'Inter','Noto Sans SC',sans-serif;padding:18px;text-align:center}
       .attachment-preview-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
       .attachment-preview-list li{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);font:13px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.04em;color:var(--text-strong);display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -4087,17 +4119,6 @@ if ($view === 'map_edit') {
       .mind-attachment-actions button{padding:6px 10px;border-radius:10px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
       .mind-attachment-actions button:hover{border-color:rgba(227,198,139,.55)}
       .mind-attachment-actions button.danger{color:#fca5a5;border-color:rgba(209,75,75,.5)}
-      .mind-attachment-preview{border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.82);box-shadow:inset 0 0 22px rgba(0,0,0,.45);padding:16px;display:grid;gap:12px;min-height:160px}
-      .mind-attachment-preview h4{margin:0;font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-400)}
-      .mind-attachment-preview .preview-empty{color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-preview .preview-meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--text-muted);font:11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-transform:uppercase}
-      .mind-attachment-preview .preview-body{border-radius:14px;border:1px solid rgba(201,168,106,.2);background:rgba(8,10,12,.82);padding:12px;max-height:240px;overflow:auto;display:grid;place-items:center}
-      .mind-attachment-preview img,.mind-attachment-preview video{max-width:100%;max-height:220px;border-radius:12px}
-      .mind-attachment-preview audio{width:100%}
-      .mind-attachment-preview iframe{width:100%;height:220px;border:0;border-radius:12px;background:#050607}
-      .mind-attachment-preview .preview-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
-      .mind-attachment-preview .preview-actions button,.mind-attachment-preview .preview-actions a{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.34);background:rgba(15,19,22,.86);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;text-decoration:none}
-      .mind-attachment-preview .preview-actions button:hover,.mind-attachment-preview .preview-actions a:hover{border-color:rgba(227,198,139,.55)}
       .mind-attachment-empty{padding:24px;border-radius:18px;border:1px dashed rgba(201,168,106,.28);background:rgba(12,16,18,.72);text-align:center;color:var(--text-muted);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .mind-attachment-footer{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
       .mind-attachment-selection-info{color:var(--text-dim);font:12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
@@ -4332,16 +4353,10 @@ if ($view === 'map_edit') {
         </header>
         <div class="mind-attachment-body">
           <div class="mind-attachment-list" id="mind-attachment-list" role="listbox" aria-multiselectable="true"></div>
-          <div class="mind-attachment-preview" id="mind-attachment-preview">
-            <h4>预览</h4>
-            <div class="preview-empty">选择附件以查看详细信息和预览内容。</div>
-          </div>
         </div>
         <div class="mind-attachment-footer">
           <div class="mind-attachment-selection-info" id="mind-attachment-selection-info">已选择 0 个附件</div>
           <div class="mind-attachment-bulk">
-            <button type="button" id="mind-attachment-export" disabled>导出清单</button>
-            <button type="button" id="mind-attachment-download" disabled>打包下载</button>
             <button type="button" class="danger" id="mind-attachment-delete" disabled>批量删除</button>
           </div>
         </div>
@@ -4396,7 +4411,13 @@ if ($view === 'map_edit') {
           bodyEl.className='attachment-preview-body';
           const loadingEl=document.createElement('div');
           loadingEl.className='attachment-preview-loading';
-          loadingEl.textContent='载入中…';
+          const spinner=document.createElement('span');
+          spinner.className='attachment-preview-spinner';
+          const loadingText=document.createElement('span');
+          loadingText.className='attachment-preview-loading-text';
+          loadingText.textContent='载入中…';
+          loadingEl.appendChild(spinner);
+          loadingEl.appendChild(loadingText);
           bodyEl.appendChild(loadingEl);
           const footer=document.createElement('div');
           footer.className='attachment-preview-footer';
@@ -4424,13 +4445,24 @@ if ($view === 'map_edit') {
           closeBtn.addEventListener('click',closePreview);
           backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
           document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
-          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,downloadBtn,closePreview};
+          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,loadingTextEl:loadingText,downloadBtn,closePreview};
           return elements;
         };
         const cleanupObjectUrl=()=>{ if(objectUrl){ URL.revokeObjectURL(objectUrl); objectUrl=null; } };
-        const showContent=content=>{
+        const setLoadingMessage=message=>{
+          const {loadingTextEl}=ensureElements();
+          if(loadingTextEl) loadingTextEl.textContent=message || '载入中…';
+        };
+        const showLoading=message=>{
           const {bodyEl,loadingEl}=ensureElements();
-          if(loadingEl && loadingEl.parentNode===bodyEl){ loadingEl.remove(); }
+          bodyEl.classList.add('is-loading');
+          bodyEl.innerHTML='';
+          bodyEl.appendChild(loadingEl);
+          setLoadingMessage(message);
+        };
+        const showContent=content=>{
+          const {bodyEl}=ensureElements();
+          bodyEl.classList.remove('is-loading');
           bodyEl.innerHTML='';
           if(content) bodyEl.appendChild(content);
         };
@@ -4655,9 +4687,8 @@ if ($view === 'map_edit') {
           return msg.includes('password') || msg.includes('decrypt') || msg.includes('encrypted');
         };
         const loadZipPreview=async source=>{
-          const {loadingEl}=ensureElements();
           const attempt=async password=>{
-            loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
             const zipLib=window.zip;
@@ -4702,9 +4733,8 @@ if ($view === 'map_edit') {
           }
         };
         const loadRarPreview=async source=>{
-          const {loadingEl}=ensureElements();
           const attempt=async password=>{
-            loadingEl.textContent=password?'验证密码…':'解析压缩包…';
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
             await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
@@ -4754,8 +4784,7 @@ if ($view === 'map_edit') {
           }
         };
         const loadDocxPreview=async source=>{
-          const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析文档…';
+          showLoading('解析文档…');
           const buffer=await loadBuffer(source);
           await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
           if(!window.mammoth || typeof window.mammoth.convertToHtml!=='function') throw new Error('转换库未加载');
@@ -4768,8 +4797,7 @@ if ($view === 'map_edit') {
           showContent(wrapper);
         };
         const loadExcelPreview=async source=>{
-          const {loadingEl}=ensureElements();
-          loadingEl.textContent='解析表格…';
+          showLoading('解析表格…');
           const buffer=await loadBuffer(source);
           await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
           if(!window.XLSX || typeof window.XLSX.read!=='function') throw new Error('解析库未加载');
@@ -4800,7 +4828,7 @@ if ($view === 'map_edit') {
         };
         const openPreview=input=>{
           const source=normalizeSource(input);
-          const {backdrop,panel,titleEl,metaEl,loadingEl,downloadBtn}=ensureElements();
+          const {backdrop,panel,titleEl,metaEl,downloadBtn}=ensureElements();
           if(abortController){ abortController.abort(); abortController=null; }
           cleanupObjectUrl();
           lastActive=document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -4812,7 +4840,7 @@ if ($view === 'map_edit') {
           if(Number.isFinite(source.size) && source.size>0) metaParts.push(formatBytes(source.size));
           metaEl.textContent=metaParts.join(' · ');
           const downloadHref=setDownloadLink(downloadBtn, source);
-          loadingEl.textContent='载入中…';
+          showLoading('载入中…');
           const type=detectType(source);
           if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
             const url=(type==='image' && source.kind==='url') ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
@@ -8857,12 +8885,9 @@ if ($view === 'map_edit') {
           backdrop:document.getElementById('mind-attachment-manager'),
           summary:document.getElementById('mind-attachment-summary'),
           list:document.getElementById('mind-attachment-list'),
-          preview:document.getElementById('mind-attachment-preview'),
           selectionInfo:document.getElementById('mind-attachment-selection-info'),
           sort:document.getElementById('mind-attachment-sort'),
           filters:document.getElementById('mind-attachment-filters'),
-          exportBtn:document.getElementById('mind-attachment-export'),
-          downloadBtn:document.getElementById('mind-attachment-download'),
           deleteBtn:document.getElementById('mind-attachment-delete'),
           closeBtn:document.querySelector('[data-attachment-close]'),
         };
@@ -8875,7 +8900,6 @@ if ($view === 'map_edit') {
           selection:new Set(),
           renderedCount:0,
           lastIndex:null,
-          loadingZip:false,
           initialized:false,
         };
         let loadObserver=null;
@@ -8893,8 +8917,6 @@ if ($view === 'map_edit') {
             elements.list.addEventListener('dblclick',handleListDblClick);
           }
           if(elements.deleteBtn){ elements.deleteBtn.addEventListener('click',()=>handleDelete(Array.from(state.selection))); }
-          if(elements.exportBtn){ elements.exportBtn.addEventListener('click',exportSelection); }
-          if(elements.downloadBtn){ elements.downloadBtn.addEventListener('click',downloadSelectionAsZip); }
           document.addEventListener('keydown',handleManagerKey);
           updateFilterButtons();
           updateSummary();
@@ -9100,7 +9122,6 @@ if ($view === 'map_edit') {
             empty.textContent='未找到符合条件的附件。';
             elements.list.appendChild(empty);
             updateSelectionInfo();
-            renderPreview();
             return;
           }
           if(forceReset || state.renderedCount<=0){ state.renderedCount=Math.min(state.filtered.length,PAGE_SIZE); }
@@ -9157,7 +9178,11 @@ if ($view === 'map_edit') {
             nodeBtn.type='button';
             nodeBtn.className='mind-attachment-node';
             nodeBtn.textContent=item.nodeTopic;
-            nodeBtn.addEventListener('click',evt=>{ evt.stopPropagation(); focusAttachmentNode(item.nodeId); });
+            nodeBtn.addEventListener('click',evt=>{
+              evt.stopPropagation();
+              close();
+              requestAnimationFrame(()=>focusAttachmentNode(item.nodeId));
+            });
             metaRow.appendChild(nodeBtn);
           }
           info.appendChild(metaRow);
@@ -9223,12 +9248,9 @@ if ($view === 'map_edit') {
             row.setAttribute('aria-selected',selected?'true':'false');
           });
           updateSelectionInfo();
-          renderPreview();
         }
         function updateSelectionInfo(){
           if(elements.deleteBtn) elements.deleteBtn.disabled=state.selection.size===0;
-          if(elements.exportBtn) elements.exportBtn.disabled=state.selection.size===0;
-          if(elements.downloadBtn) elements.downloadBtn.disabled=state.selection.size===0 || state.loadingZip;
           if(!elements.selectionInfo) return;
           const count=state.selection.size;
           if(count===0){
@@ -9239,87 +9261,6 @@ if ($view === 'map_edit') {
           state.items.forEach(item=>{ if(state.selection.has(item.assetId)) total+=Number(item.size)||0; });
           const sizeText=total>0?formatBytesLocal(total):'';
           elements.selectionInfo.textContent=sizeText?`已选择 ${count} 个附件 · ${sizeText}`:`已选择 ${count} 个附件`;
-        }
-        function renderPreview(){
-          if(!elements.preview) return;
-          elements.preview.innerHTML='';
-          const title=document.createElement('h4');
-          title.textContent='预览';
-          elements.preview.appendChild(title);
-          if(state.selection.size!==1){
-            const empty=document.createElement('div');
-            empty.className='preview-empty';
-            empty.textContent=state.filtered.length? '选择附件以查看详细信息和预览内容。' : '暂无附件。';
-            elements.preview.appendChild(empty);
-            return;
-          }
-          const id=[...state.selection][0];
-          const item=state.filtered.find(entry=>entry.assetId===id);
-          if(!item){
-            const empty=document.createElement('div');
-            empty.className='preview-empty';
-            empty.textContent='附件已不可用。';
-            elements.preview.appendChild(empty);
-            return;
-          }
-          const meta=document.createElement('div');
-          meta.className='preview-meta';
-          meta.innerHTML=`<span>${getTypeLabel(item.type)}</span><span>${formatBytesLocal(item.size)}</span><span>${formatDateLocal(item.createdAt)}</span>`;
-          elements.preview.appendChild(meta);
-          const body=document.createElement('div');
-          body.className='preview-body';
-          body.appendChild(buildPreviewContent(item));
-          elements.preview.appendChild(body);
-          const actions=document.createElement('div');
-          actions.className='preview-actions';
-          const openBtn=document.createElement('button');
-          openBtn.type='button';
-          openBtn.textContent='打开预览';
-          openBtn.addEventListener('click',()=>openMindmapAttachment(item));
-          actions.appendChild(openBtn);
-          const focusBtn=document.createElement('button');
-          focusBtn.type='button';
-          focusBtn.textContent='定位节点';
-          focusBtn.addEventListener('click',()=>focusAttachmentNode(item.nodeId));
-          actions.appendChild(focusBtn);
-          const downloadLink=document.createElement('a');
-          downloadLink.href=item.url;
-          downloadLink.textContent='下载';
-          downloadLink.setAttribute('download','');
-          actions.appendChild(downloadLink);
-          elements.preview.appendChild(actions);
-        }
-        function buildPreviewContent(item){
-          if(item.type==='image'){
-            const img=document.createElement('img');
-            img.src=item.url;
-            img.alt=item.name;
-            img.loading='lazy';
-            return img;
-          }
-          if(item.type==='video'){
-            const video=document.createElement('video');
-            video.controls=true;
-            video.src=item.url;
-            video.style.maxHeight='220px';
-            return video;
-          }
-          if(item.type==='audio'){
-            const audio=document.createElement('audio');
-            audio.controls=true;
-            audio.src=item.url;
-            return audio;
-          }
-          if(item.type==='document' && /\.pdf(\?|$)/i.test(item.url)){
-            const frame=document.createElement('iframe');
-            frame.src=item.url;
-            frame.title=item.name || '附件预览';
-            return frame;
-          }
-          const note=document.createElement('div');
-          note.className='preview-empty';
-          note.textContent='点击“打开预览”以查看该附件。';
-          return note;
         }
         function handleRowSelection(row,evt){
           const index=Number(row.dataset.index);
@@ -9421,64 +9362,6 @@ if ($view === 'map_edit') {
           const json=await res.json();
           if(!json.ok) throw new Error(json.error||'删除失败');
           return json;
-        }
-        function exportSelection(){
-          if(!state.selection.size) return;
-          const entries=state.items.filter(item=>state.selection.has(item.assetId)).map(item=>(
-            {
-              id:item.assetId,
-              name:item.name,
-              size:item.size,
-              mime:item.mime,
-              url:item.url,
-              nodeId:item.nodeId,
-              nodeTopic:item.nodeTopic,
-              createdAt:item.createdAt,
-              type:item.type,
-            }
-          ));
-          const blob=new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
-          const url=URL.createObjectURL(blob);
-          const link=document.createElement('a');
-          link.href=url;
-          link.download=`attachments-${buildTimestamp()}.json`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }
-        async function downloadSelectionAsZip(){
-          if(!state.selection.size || state.loadingZip) return;
-          state.loadingZip=true;
-          updateSelectionInfo();
-          try{
-            const JSZip=await loadExternalScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',()=>window.JSZip);
-            if(!JSZip) throw new Error('压缩组件加载失败');
-            const zip=new JSZip();
-            const items=state.items.filter(item=>state.selection.has(item.assetId));
-            for(const item of items){
-              const res=await fetch(item.url);
-              if(!res.ok) throw new Error('下载失败：'+item.name);
-              const blob=await res.blob();
-              const buffer=await blob.arrayBuffer();
-              zip.file(sanitizeFilename(item.name || `attachment-${item.assetId}`), buffer);
-            }
-            const content=await zip.generateAsync({type:'blob'});
-            const url=URL.createObjectURL(content);
-            const link=document.createElement('a');
-            link.href=url;
-            link.download=`attachments-${buildTimestamp()}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-          }catch(err){
-            console.error(err);
-            alert(err && err.message ? err.message : '打包下载失败');
-          }finally{
-            state.loadingZip=false;
-            updateSelectionInfo();
-          }
         }
         function updateSummary(){
           if(!elements.summary) return;
@@ -10599,7 +10482,10 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .attachment-preview-body img,.attachment-preview-body video,.attachment-preview-body iframe{display:block;width:100%;height:100%;max-height:70vh;border-radius:14px;background:#050607}
   .attachment-preview-body video{background:#000}
   .attachment-preview-body iframe{border:0;min-height:60vh}
-  .attachment-preview-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font:14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+  .attachment-preview-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);font:14px/1.6 'Inter','Noto Sans SC',sans-serif;text-align:center}
+  .attachment-preview-spinner{width:40px;height:40px;border-radius:50%;border:3px solid rgba(201,168,106,.24);border-top-color:var(--gold-400);animation:attachment-preview-spin .9s linear infinite}
+  .attachment-preview-loading-text{letter-spacing:.08em}
+  @keyframes attachment-preview-spin{to{transform:rotate(360deg)}}
   .attachment-preview-error{color:#fca5a5;font:14px/1.6 'Inter','Noto Sans SC',sans-serif;padding:18px;text-align:center}
   .attachment-preview-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
   .attachment-preview-list li{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);font:13px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.04em;color:var(--text-strong);display:flex;justify-content:space-between;gap:12px;align-items:center}
