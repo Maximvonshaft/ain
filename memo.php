@@ -3796,8 +3796,10 @@ if ($view === 'map_edit') {
       .mind-link-controls .edge-insert-btn::after{content:"";position:absolute;inset:-10px;border-radius:18px;background:radial-gradient(circle,rgba(227,198,139,.18),rgba(227,198,139,0) 70%);filter:blur(4px);opacity:.75;z-index:-2}
       .mind-link-controls .edge-insert-btn:hover{background:linear-gradient(160deg,rgba(36,42,48,.98),rgba(18,22,26,.94));border-color:rgba(227,198,139,.85);box-shadow:0 16px 32px rgba(0,0,0,.55),0 0 0 1px rgba(227,198,139,.4) inset,0 0 34px rgba(227,198,139,.3)}
       .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.85);outline-offset:3px}
-      .mind-links .trace-group{pointer-events:none}
+      .mind-links .trace-group{pointer-events:visibleStroke}
       .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
+      .mind-links .trace.core{pointer-events:stroke}
+      .mind-links .trace.shadow,.mind-links .trace.highlight{pointer-events:none}
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-links .trace.core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
@@ -3822,6 +3824,10 @@ if ($view === 'map_edit') {
       .jsmind-node.isroot::after{opacity:.42;transform:scale(.95);box-shadow:0 0 36px rgba(227,198,139,.28)}
       .jsmind-node.selected{border-color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.32),0 0 40px rgba(227,198,139,.26);transform:translateY(-2px)}
       .jsmind-node.selected::after{opacity:.6;transform:scale(.98);box-shadow:0 0 40px rgba(75,195,209,.3)}
+      .jsmind-node.edge-hover{border-color:rgba(227,198,139,.7);box-shadow:0 0 0 2px rgba(227,198,139,.35),0 0 46px rgba(227,198,139,.28)}
+      .jsmind-node.edge-hover::after{opacity:.55;transform:scale(.99);box-shadow:0 0 44px rgba(227,198,139,.26)}
+      .jsmind-node.edge-hover-source::after{border-style:solid;border-color:rgba(227,198,139,.45)}
+      .jsmind-node.edge-hover-target::after{border-style:dashed;border-color:rgba(227,198,139,.45)}
       .jsmind-node.relation-source{border-color:rgba(75,195,209,.7);box-shadow:0 0 0 2px rgba(75,195,209,.35),0 0 36px rgba(75,195,209,.28)}
       .jsmind-node.relation-target{border-style:dashed;border-color:rgba(75,195,209,.6)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
@@ -4767,9 +4773,11 @@ if ($view === 'map_edit') {
           this.relations=[];
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
+          this.hoveredEdge=null;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
+          this.container.addEventListener('pointerleave',()=>this.clearEdgeHover());
         }
         setupPan(){
           const updatePinchBaseline=()=>{
@@ -5737,6 +5745,7 @@ if ($view === 'map_edit') {
           return el;
         }
         render(){
+          this.clearEdgeHover();
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
           if(this.linkControlLayer){ this.linkControlLayer.innerHTML=''; }
@@ -5767,11 +5776,21 @@ if ($view === 'map_edit') {
               core.setAttribute('stroke','url(#mindGoldTrace)');
               const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
               highlight.classList.add('trace','highlight');
+              group.setAttribute('pointer-events','visibleStroke');
+              shadow.setAttribute('pointer-events','none');
+              core.setAttribute('pointer-events','stroke');
+              highlight.setAttribute('pointer-events','none');
               group.appendChild(shadow);
               group.appendChild(core);
               group.appendChild(highlight);
               group.dataset.from=node.parent.id;
               group.dataset.to=node.id;
+              group.addEventListener('pointerenter',()=>{
+                this.setEdgeHoverState(node.parent.id, node.id);
+              });
+              group.addEventListener('pointerleave',()=>{
+                this.clearEdgeHover({parent:node.parent.id, child:node.id});
+              });
               this.linkLayer.appendChild(group);
               node.linkGroup=group;
               node.linkShadow=shadow;
@@ -5898,12 +5917,72 @@ if ($view === 'map_edit') {
                 catch(err){ console.error(err); }
               }
             });
+            if(!btn._edgeHoverHandlers){
+              const enterHandler=(evt)=>{
+                const target=evt.currentTarget || evt.target;
+                if(!target) return;
+                const parentId=target.dataset ? target.dataset.parent : null;
+                const childId=target.dataset ? target.dataset.child : null;
+                this.setEdgeHoverState(parentId, childId);
+              };
+              const leaveHandler=(evt)=>{
+                const target=evt.currentTarget || evt.target;
+                if(!target) return;
+                const parentId=target.dataset ? target.dataset.parent : null;
+                const childId=target.dataset ? target.dataset.child : null;
+                this.clearEdgeHover({parent:parentId, child:childId});
+              };
+              btn.addEventListener('pointerenter', enterHandler);
+              btn.addEventListener('pointerleave', leaveHandler);
+              btn.addEventListener('focus', enterHandler);
+              btn.addEventListener('blur', leaveHandler);
+              btn._edgeHoverHandlers={enter:enterHandler,leave:leaveHandler};
+            }
             this.linkControlLayer.appendChild(btn);
             node.edgeButton=btn;
           }
           btn.dataset.parent=node.parent.id;
           btn.dataset.child=node.id;
           return btn;
+        }
+        clearEdgeHover(match){
+          if(!this.hoveredEdge) return;
+          if(match){
+            const expectParent=match.parent || null;
+            const expectChild=match.child || null;
+            if(expectParent && this.hoveredEdge.parent!==expectParent) return;
+            if(expectChild && this.hoveredEdge.child!==expectChild) return;
+          }
+          const ids=[this.hoveredEdge.parent,this.hoveredEdge.child];
+          ids.forEach(id=>{
+            if(!id) return;
+            const node=this.nodes.get(id);
+            if(node && node.el){
+              node.el.classList.remove('edge-hover','edge-hover-source','edge-hover-target');
+            }
+          });
+          this.hoveredEdge=null;
+        }
+        setEdgeHoverState(parentId, childId){
+          if(parentId && childId && this.hoveredEdge && this.hoveredEdge.parent===parentId && this.hoveredEdge.child===childId){
+            return;
+          }
+          this.clearEdgeHover();
+          if(!parentId || !childId) return;
+          const parent=this.nodes.get(parentId);
+          const child=this.nodes.get(childId);
+          let applied=false;
+          if(parent && parent.el){
+            parent.el.classList.add('edge-hover','edge-hover-source');
+            applied=true;
+          }
+          if(child && child.el){
+            child.el.classList.add('edge-hover','edge-hover-target');
+            applied=true;
+          }
+          if(applied){
+            this.hoveredEdge={parent:parentId, child:childId};
+          }
         }
         computeRouteMidpoint(points){
           if(!Array.isArray(points) || !points.length) return null;
