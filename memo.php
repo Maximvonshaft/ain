@@ -360,6 +360,15 @@ function mindmap_assets_for_map(int $map_id): array {
   return $st->fetchAll();
 }
 
+function mindmap_assets_for_session(string $session_key): array {
+  $session_key=trim($session_key);
+  if($session_key==='') return [];
+  $pdo=db();
+  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE session_key=?');
+  $st->execute([$session_key]);
+  return $st->fetchAll();
+}
+
 function delete_mindmap_asset(int $id): void {
   $asset=get_mindmap_asset($id);
   if(!$asset) return;
@@ -3626,6 +3635,19 @@ if ($view === 'map_edit') {
   if (isset($initialDataDecoded['data'])) {
     mindmap_force_right_orientation($initialDataDecoded['data']);
   }
+  $sessionKey=session_id();
+  $assetRecords=[];
+  if(!empty($mind['id'])){
+    foreach(mindmap_assets_for_map((int)$mind['id']) as $asset){
+      $assetRecords[(int)$asset['id']]=$asset;
+    }
+  }
+  if($sessionKey!==''){
+    foreach(mindmap_assets_for_session($sessionKey) as $asset){
+      $assetRecords[(int)$asset['id']]=$asset;
+    }
+  }
+  $mindAssetsForView=array_values($assetRecords);
   ?>
   <!doctype html>
   <html lang="zh-Hans">
@@ -3854,6 +3876,81 @@ if ($view === 'map_edit') {
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
+      .mind-attachment-layer{position:fixed;inset:0;display:flex;justify-content:flex-end;pointer-events:none;z-index:170}
+      .mind-attachment-layer[data-open="true"]{pointer-events:auto}
+      .mind-attachment-mask{flex:1;background:rgba(5,7,10,.68);backdrop-filter:blur(14px);opacity:0;transition:opacity var(--transition)}
+      .mind-attachment-layer[data-open="true"] .mind-attachment-mask{opacity:1}
+      .mind-attachment-panel{width:min(520px,100%);max-width:100%;height:100%;background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));border-left:1px solid rgba(201,168,106,.32);box-shadow:-28px 0 60px rgba(0,0,0,.62);transform:translateX(100%);transition:transform var(--transition);display:flex;flex-direction:column;gap:16px;padding:22px 22px 24px;overflow:hidden}
+      .mind-attachment-layer[data-open="true"] .mind-attachment-panel{transform:translateX(0)}
+      .mind-attachment-panel[aria-hidden="true"]{visibility:hidden}
+      .mind-attachment-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+      .mind-attachment-title-wrap{display:grid;gap:6px;min-width:0}
+      .mind-attachment-title-wrap h2{margin:0;font:600 18px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.18em;text-transform:uppercase}
+      .mind-attachment-subtitle{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+      .mind-attachment-header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .mind-attachment-search{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.78);color:var(--text-muted);min-width:200px}
+      .mind-attachment-search .icon{font-size:14px}
+      .mind-attachment-search input{all:unset;flex:1;min-width:120px;color:var(--text-strong);font:13px/1.4 'Inter','Noto Sans SC',sans-serif}
+      .mind-attachment-search input::placeholder{color:var(--text-muted)}
+      .mind-attachment-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+      .mind-attachment-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+      .mind-attachment-filter{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.78);color:var(--text-muted);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),color var(--transition),background var(--transition)}
+      .mind-attachment-filter[data-active="true"]{color:var(--gold-400);border-color:var(--gold-400);background:rgba(201,168,106,.16)}
+      .mind-attachment-sort{display:flex;align-items:center;gap:8px;color:var(--text-muted);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+      .mind-attachment-sort select{appearance:none;-webkit-appearance:none;padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+      .mind-attachment-content{display:flex;gap:18px;flex:1 1 auto;min-height:0}
+      .mind-attachment-list-wrap{flex:1 1 0%;display:flex;flex-direction:column;gap:12px;min-width:0}
+      .mind-attachment-list{flex:1 1 auto;display:grid;gap:10px;overflow:auto;padding-right:6px}
+      .mind-attachment-empty{padding:18px;border:1px dashed rgba(201,168,106,.28);border-radius:18px;background:rgba(12,16,18,.7);color:var(--text-muted);text-align:center;font:500 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.82);box-shadow:0 12px 28px rgba(0,0,0,.4);transition:transform var(--transition),border-color var(--transition),background var(--transition)}
+      .mind-attachment-row:hover{transform:translateY(-2px);border-color:rgba(201,168,106,.45)}
+      .mind-attachment-row.selected{border-color:var(--gold-400);background:rgba(201,168,106,.18)}
+      .mind-attachment-row-select{position:relative;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+      .mind-attachment-row-select input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+      .mind-attachment-row-select span{width:20px;height:20px;border-radius:10px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.7);display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--gold-400);transition:background var(--transition),border-color var(--transition),color var(--transition)}
+      .mind-attachment-row.selected .mind-attachment-row-select span{background:rgba(201,168,106,.24);border-color:var(--gold-400)}
+      .mind-attachment-row-select span::after{content:'✓';opacity:0}
+      .mind-attachment-row.selected .mind-attachment-row-select span::after{opacity:1}
+      .mind-attachment-row-main{display:flex;align-items:flex-start;gap:12px;min-width:0}
+      .mind-attachment-row-icon{font-size:24px;line-height:1}
+      .mind-attachment-row-info{display:grid;gap:6px;min-width:0}
+      .mind-attachment-row-name{font:600 13px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.06em;word-break:break-all}
+      .mind-attachment-row-meta{color:var(--text-muted);font:11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-row-node{padding:0;border:none;background:none;color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;text-align:left}
+      .mind-attachment-row-node:hover{text-decoration:underline}
+      .mind-attachment-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+      .mind-attachment-row-actions .btn{min-width:auto}
+      .mind-attachment-row-actions a{white-space:nowrap}
+      .mind-attachment-preview{flex:0 0 240px;display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:18px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.82);box-shadow:0 12px 30px rgba(0,0,0,.42);min-height:0}
+      .mind-attachment-preview [data-preview-media]{max-height:240px;border-radius:14px;background:#050607;overflow:hidden}
+      .mind-attachment-preview img{max-width:100%;max-height:240px;border-radius:14px;display:block}
+      .mind-attachment-preview video,.mind-attachment-preview audio{width:100%;border-radius:14px;outline:none}
+      .mind-attachment-preview iframe{width:100%;height:220px;border:0;border-radius:14px;background:#050607}
+      .mind-attachment-preview-title{font:600 13px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.08em;word-break:break-all}
+      .mind-attachment-preview-meta{color:var(--text-muted);font:11px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-preview-empty{color:var(--text-muted);font:500 12px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+      .mind-attachment-selection{color:var(--text-muted);font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+      .mind-attachment-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .mind-attachment-status{color:var(--text-muted);font:11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .mind-attachment-sentinel{padding:12px;text-align:center;color:var(--text-muted);font:500 12px/1.5 'Inter','Noto Sans SC',sans-serif}
+      .mind-attachment-panel[data-busy="true"]{cursor:progress}
+      .mind-attachment-panel[data-busy="true"] .mind-attachment-actions .btn{pointer-events:none;opacity:.7}
+      .mind-attachment-panel[data-busy="true"] .mind-attachment-row{pointer-events:none}
+      @media (max-width:1100px){
+        .mind-attachment-content{flex-direction:column}
+        .mind-attachment-preview{flex:0 0 auto}
+      }
+      @media (max-width:760px){
+        .mind-attachment-panel{width:100%;border-left:none;border-top:1px solid rgba(201,168,106,.32);border-radius:24px 24px 0 0;transform:translateY(100%);padding:20px 18px 22px}
+        .mind-attachment-layer{align-items:flex-end}
+        .mind-attachment-layer[data-open="true"] .mind-attachment-panel{transform:translateY(0)}
+        .mind-attachment-header{flex-direction:column;align-items:flex-start}
+        .mind-attachment-header-actions{width:100%;justify-content:space-between}
+        .mind-attachment-search{flex:1}
+      }
+      .jsmind-node.attachment-highlight{animation:attachmentHighlight 1.2s ease-in-out 1;border-color:rgba(75,195,209,.6)!important;box-shadow:0 0 0 2px rgba(75,195,209,.4),0 0 36px rgba(75,195,209,.28)!important}
+      @keyframes attachmentHighlight{0%{transform:translateY(-2px);box-shadow:0 0 0 2px rgba(75,195,209,.5),0 0 30px rgba(75,195,209,.32)}50%{transform:translateY(-4px);box-shadow:0 0 0 3px rgba(75,195,209,.7),0 0 42px rgba(75,195,209,.4)}100%{transform:translateY(-2px);box-shadow:0 0 0 2px rgba(75,195,209,.5),0 0 30px rgba(75,195,209,.32)}}
       @media (hover:hover) and (pointer:fine){
         .dock-btn[data-tip]::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);padding:6px 10px;border-radius:12px;border:1px solid rgba(201,168,106,.38);background:rgba(12,16,18,.92);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);box-shadow:0 12px 28px rgba(0,0,0,.45)}
         .dock-btn[data-tip]::before{content:"";position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);border-width:6px;border-style:solid;border-color:rgba(12,16,18,.92) transparent transparent transparent;opacity:0;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
@@ -4027,6 +4124,10 @@ if ($view === 'map_edit') {
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
+          <button class="dock-btn" data-action="attachment-manager" data-tip="附件管理（Ctrl+Shift+A）" aria-label="附件管理">
+            <span class="icon">📂</span>
+            <span class="label" data-attachment-label>附件管理</span>
+          </button>
           <button class="dock-btn" data-action="relation" data-tip="建立关联" aria-label="关联节点">
             <span class="icon">🪢</span>
             <span class="label">关联</span>
@@ -4040,6 +4141,63 @@ if ($view === 'map_edit') {
             <span class="label">删除</span>
           </button>
         </nav>
+      </div>
+      <div class="mind-attachment-layer" id="mind-attachment-layer" data-open="false" aria-hidden="true">
+        <div class="mind-attachment-mask" data-attachment-mask></div>
+        <section class="mind-attachment-panel" role="dialog" aria-modal="true" aria-labelledby="mind-attachment-title">
+          <header class="mind-attachment-header">
+            <div class="mind-attachment-title-wrap">
+              <h2 id="mind-attachment-title">附件管理</h2>
+              <div class="mind-attachment-subtitle" id="mind-attachment-summary">正在统计附件…</div>
+            </div>
+            <div class="mind-attachment-header-actions">
+              <label class="mind-attachment-search" for="mind-attachment-search">
+                <span class="icon">🔍</span>
+                <input type="search" id="mind-attachment-search" placeholder="搜索文件或节点">
+              </label>
+              <button type="button" class="btn btn-ghost btn-small" data-attachment-close>关闭</button>
+            </div>
+          </header>
+          <div class="mind-attachment-toolbar">
+            <div class="mind-attachment-filters" role="tablist">
+              <button type="button" class="mind-attachment-filter" data-filter="all" data-active="true">全部</button>
+              <button type="button" class="mind-attachment-filter" data-filter="image">图片</button>
+              <button type="button" class="mind-attachment-filter" data-filter="document">文档</button>
+              <button type="button" class="mind-attachment-filter" data-filter="audio">音频</button>
+              <button type="button" class="mind-attachment-filter" data-filter="video">视频</button>
+              <button type="button" class="mind-attachment-filter" data-filter="archive">压缩包</button>
+              <button type="button" class="mind-attachment-filter" data-filter="other">其他</button>
+            </div>
+            <div class="mind-attachment-sort">
+              <span>排序</span>
+              <select id="mind-attachment-sort">
+                <option value="time_desc">最新优先</option>
+                <option value="time_asc">最早优先</option>
+                <option value="size_desc">大小降序</option>
+                <option value="size_asc">大小升序</option>
+                <option value="type_asc">按类型</option>
+              </select>
+            </div>
+          </div>
+          <div class="mind-attachment-content">
+            <div class="mind-attachment-list-wrap">
+              <div class="mind-attachment-list" id="mind-attachment-list" role="listbox" aria-multiselectable="true"></div>
+              <div class="mind-attachment-empty" id="mind-attachment-empty">暂无附件</div>
+            </div>
+            <aside class="mind-attachment-preview" id="mind-attachment-preview" aria-live="polite">
+              <div class="mind-attachment-preview-empty" id="mind-attachment-preview-placeholder">选择附件以查看详细信息</div>
+            </aside>
+          </div>
+          <footer class="mind-attachment-footer">
+            <div class="mind-attachment-selection" id="mind-attachment-selection">未选择附件</div>
+            <div class="mind-attachment-actions">
+              <span class="mind-attachment-status" id="mind-attachment-status"></span>
+              <button type="button" class="btn btn-ghost btn-small" id="mind-attachment-export" disabled>导出清单</button>
+              <button type="button" class="btn btn-outline btn-small" id="mind-attachment-download" disabled>打包下载</button>
+              <button type="button" class="btn btn-danger btn-small" id="mind-attachment-delete" disabled>删除</button>
+            </div>
+          </footer>
+        </section>
       </div>
       <div class="mind-export-overlay" id="mind-export-overlay" role="status" aria-live="polite" aria-hidden="true">
         <div class="export-spinner" aria-hidden="true"></div>
@@ -6482,6 +6640,7 @@ if ($view === 'map_edit') {
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
       if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
       if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+    const initialAssetRecords = <?php echo json_encode($mindAssetsForView, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     const jmContainer=document.getElementById('jsmind-container');
     let currentMapId=0;
     if(jmContainer){
@@ -6506,7 +6665,7 @@ if ($view === 'map_edit') {
     ghostRing.setAttribute('opacity','0');
     overlay.appendChild(ghostLine);
     overlay.appendChild(ghostRing);
-    const jm=new jsMind({
+      const jm=new jsMind({
       container:'jsmind-container',
       editable:true,
         theme:'fresh-blue',
@@ -6518,6 +6677,45 @@ if ($view === 'map_edit') {
       });
       const blobUrlRegistry=new Set();
       const externalScriptCache=new Map();
+      const mindAssetRegistry=new Map();
+      function normalizeAssetRecord(input){
+        if(!input || typeof input!=='object') return null;
+        const id=parseInt(input.id,10);
+        if(!Number.isFinite(id) || id<=0) return null;
+        const sizeValue=Number(input.size);
+        let createdAt=typeof input.created_at==='string'?input.created_at:'';
+        if(!createdAt && typeof input.updated_at==='string'){ createdAt=input.updated_at; }
+        const urlHint=typeof input.url==='string'?input.url:'';
+        const stored=typeof input.stored_name==='string'?input.stored_name:'';
+        const url=urlHint || (stored?`?mindmap_asset=${id}`:'');
+        return {
+          id,
+          orig_name:input.orig_name || input.name || '',
+          mime:input.mime || '',
+          size:Number.isFinite(sizeValue)?sizeValue:0,
+          created_at:createdAt,
+          url,
+        };
+      }
+      function registerMindAsset(record){
+        const normalized=normalizeAssetRecord(record);
+        if(!normalized) return null;
+        mindAssetRegistry.set(normalized.id, normalized);
+        return normalized;
+      }
+      function primeMindAssetRegistry(records){
+        if(!Array.isArray(records)) return;
+        records.forEach(rec=>{
+          if(!rec || typeof rec!=='object') return;
+          const enriched=Object.assign({}, rec);
+          if(!enriched.url && enriched.id){
+            enriched.url='?mindmap_asset='+enriched.id;
+          }
+          registerMindAsset(enriched);
+        });
+      }
+      primeMindAssetRegistry(initialAssetRecords || []);
+      let attachmentManager=null;
       function loadExternalScript(src, resolver){
         if(typeof resolver==='function'){
           try{
@@ -7123,6 +7321,9 @@ if ($view === 'map_edit') {
         updateFoldButtonState();
         if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
         if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+        if(attachmentManager && typeof attachmentManager.notifyMindChanged==='function'){
+          attachmentManager.notifyMindChanged();
+        }
       }
       function updateFoldButtonState(){
         if(!dockFoldButton) return;
@@ -8355,6 +8556,14 @@ if ($view === 'map_edit') {
               url:uploaded.url,
               uploadedAt:Date.now()
             });
+            registerMindAsset({
+              id:uploaded.id,
+              name:uploaded.name || file.name,
+              mime:uploaded.mime || file.type || 'application/octet-stream',
+              size:uploaded.size ?? file.size,
+              url:uploaded.url,
+              created_at:new Date().toISOString()
+            });
           }catch(err){
             console.error(err);
             alert((file.name||'文件')+' 上传失败：'+(err && err.message ? err.message : err));
@@ -8368,7 +8577,796 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        if(attachmentManager && typeof attachmentManager.refresh==='function'){
+          attachmentManager.refresh();
+        }
       }
+      attachmentManager=(function(){
+        const layer=document.getElementById('mind-attachment-layer');
+        if(!layer){
+          return {
+            open(){},
+            close(){},
+            toggle(){},
+            refresh(){},
+            isOpen:()=>false,
+            notifyMindChanged(){},
+            onAssetRegistered(){},
+            clearSelection(){},
+          };
+        }
+        const panel=layer.querySelector('.mind-attachment-panel');
+        const mask=layer.querySelector('[data-attachment-mask]');
+        const closeBtn=panel ? panel.querySelector('[data-attachment-close]') : null;
+        const filterButtons=panel ? Array.from(panel.querySelectorAll('.mind-attachment-filter')) : [];
+        const sortSelect=document.getElementById('mind-attachment-sort');
+        const searchInput=document.getElementById('mind-attachment-search');
+        const listEl=document.getElementById('mind-attachment-list');
+        const emptyEl=document.getElementById('mind-attachment-empty');
+        const summaryEl=document.getElementById('mind-attachment-summary');
+        const selectionEl=document.getElementById('mind-attachment-selection');
+        const statusEl=document.getElementById('mind-attachment-status');
+        const previewEl=document.getElementById('mind-attachment-preview');
+        const previewPlaceholder=document.getElementById('mind-attachment-preview-placeholder');
+        const exportBtn=document.getElementById('mind-attachment-export');
+        const downloadBtn=document.getElementById('mind-attachment-download');
+        const deleteBtn=document.getElementById('mind-attachment-delete');
+        const dockAttachmentButton=dock ? dock.querySelector('.dock-btn[data-action="attachment-manager"]') : null;
+        const dockAttachmentLabel=dockAttachmentButton ? dockAttachmentButton.querySelector('[data-attachment-label]') : null;
+        const typeLabelMap={image:'图片',document:'文档',audio:'音频',video:'视频',archive:'压缩包',other:'其他'};
+        const PAGE_SIZE=40;
+        const state={
+          open:false,
+          filter:'all',
+          sort:'time_desc',
+          search:'',
+          data:[],
+          filtered:[],
+          itemByUid:new Map(),
+          indexByUid:new Map(),
+          totalSize:0,
+          selection:new Set(),
+          selectionOrder:[],
+          lastAnchorIndex:null,
+          rendered:0,
+          sentinel:null,
+          observer:null,
+          busy:false,
+          needsRefresh:false,
+          lastFocused:null,
+        };
+        const typeOrder=['image','document','audio','video','archive','other'];
+        function sanitizeSearch(value){ return (value||'').trim().toLowerCase(); }
+        function resolveAttachmentType(mime,name){
+          const lowerMime=(mime||'').toLowerCase();
+          const ext=(name||'').split('.').pop().toLowerCase();
+          if(lowerMime.startsWith('image/') || ['png','jpg','jpeg','gif','webp','bmp','svg','heic','avif'].includes(ext)) return 'image';
+          if(lowerMime.startsWith('video/') || ['mp4','mov','avi','mkv','webm','m4v'].includes(ext)) return 'video';
+          if(lowerMime.startsWith('audio/') || ['mp3','aac','flac','wav','ogg','m4a'].includes(ext)) return 'audio';
+          if(/zip|rar|7z|tar|gzip|compressed/.test(lowerMime) || ['zip','rar','7z','tar','gz','bz2'].includes(ext)) return 'archive';
+          if(/pdf|word|excel|sheet|presentation|text|json|msword|officedocument/.test(lowerMime) || ['pdf','doc','docx','ppt','pptx','xls','xlsx','csv','txt','md','json'].includes(ext)) return 'document';
+          return 'other';
+        }
+        function toTimestamp(value){
+          if(typeof value==='number' && Number.isFinite(value)){ return value; }
+          if(typeof value==='string' && value){
+            const normalized=value.replace('T',' ').replace(/-/g,'/');
+            const parsed=Date.parse(normalized);
+            if(Number.isFinite(parsed)){ return parsed; }
+          }
+          return 0;
+        }
+        function formatAttachmentTime(ts){
+          if(!Number.isFinite(ts) || ts<=0) return '';
+          const d=new Date(ts);
+          if(Number.isNaN(d.getTime())) return '';
+          const pad=n=>String(n).padStart(2,'0');
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+        function buildNodePath(node){
+          const parts=[];
+          let cursor=node;
+          while(cursor){
+            const topic=(cursor.topic||'').trim();
+            if(topic){ parts.push(topic); }
+            cursor=cursor.parent || null;
+          }
+          return parts.reverse().join(' / ');
+        }
+        function collectData(){
+          const items=[];
+          let totalSize=0;
+          if(jm && jm.nodes && typeof jm.nodes.values==='function'){
+            for(const node of jm.nodes.values()){
+              if(!node) continue;
+              const attachments=gatherAttachments(node.data||{});
+              if(!attachments.length) continue;
+              const path=buildNodePath(node);
+              attachments.forEach((att, idx)=>{
+                if(!att || typeof att!=='object') return;
+                const assetId=parseInt(att.assetId || att.id || 0,10) || null;
+                const assetMeta=assetId?mindAssetRegistry.get(assetId):null;
+                const name=att.name || att.filename || (assetMeta?assetMeta.orig_name:`附件 ${idx+1}`);
+                const mime=(att.mime || att.type || (assetMeta?assetMeta.mime:'')) || '';
+                const sizeValue=Number(att.size ?? att.filesize ?? (assetMeta?assetMeta.size:null));
+                const size=Number.isFinite(sizeValue)?sizeValue:0;
+                const timestamp=toTimestamp(att.uploadedAt ?? att.updatedAt ?? att.createdAt ?? (assetMeta?assetMeta.created_at:null));
+                const url=att.url || (assetMeta && assetMeta.url ? assetMeta.url : (assetId?`?mindmap_asset=${assetId}`:''));
+                const type=resolveAttachmentType(mime, name);
+                const uid=`${node.id}::${assetId || 'local-'+idx}`;
+                items.push({
+                  uid,
+                  assetId,
+                  nodeId:node.id,
+                  nodeTopic:node.topic || '未命名节点',
+                  nodePath:path,
+                  name,
+                  mime,
+                  type,
+                  size,
+                  sizeText:size?humanBytes(size):'—',
+                  url,
+                  descriptor:att,
+                  timestamp,
+                  timeText:timestamp?formatAttachmentTime(timestamp):'',
+                  node,
+                });
+                totalSize+=size;
+              });
+            }
+          }
+          state.data=items;
+          state.totalSize=totalSize;
+        }
+        function sortItems(list){
+          const key=state.sort;
+          const copy=list.slice();
+          switch(key){
+            case 'time_asc':
+              copy.sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+              break;
+            case 'size_desc':
+              copy.sort((a,b)=>(b.size||0)-(a.size||0));
+              break;
+            case 'size_asc':
+              copy.sort((a,b)=>(a.size||0)-(b.size||0));
+              break;
+            case 'type_asc':
+              copy.sort((a,b)=>{
+                const typeCmp=(typeOrder.indexOf(a.type)+1||99)-(typeOrder.indexOf(b.type)+1||99);
+                if(typeCmp!==0) return typeCmp;
+                return (b.timestamp||0)-(a.timestamp||0);
+              });
+              break;
+            default:
+              copy.sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+          }
+          return copy;
+        }
+        function applyFilters(){
+          const filter=state.filter;
+          const search=state.search;
+          let list=state.data;
+          if(filter && filter!=='all'){
+            list=list.filter(item=>item.type===filter);
+          }
+          if(search){
+            list=list.filter(item=>{
+              const text=(item.name+' '+item.nodeTopic+' '+item.nodePath).toLowerCase();
+              return text.includes(search);
+            });
+          }
+          list=sortItems(list);
+          state.filtered=list;
+          state.indexByUid=new Map();
+          state.itemByUid=new Map();
+          list.forEach((item,index)=>{
+            state.indexByUid.set(item.uid,index);
+            state.itemByUid.set(item.uid,item);
+          });
+          const preserved=new Set();
+          state.selection.forEach(uid=>{ if(state.indexByUid.has(uid)){ preserved.add(uid); } });
+          state.selection=preserved;
+          state.selectionOrder=state.selectionOrder.filter(uid=>state.selection.has(uid));
+          if(!state.selection.size){ state.lastAnchorIndex=null; }
+        }
+        function updateSummary(){
+          if(!summaryEl) return;
+          const total=state.data.length;
+          if(!total){ summaryEl.textContent='暂无附件'; return; }
+          const parts=[`${total} 个附件`];
+          if(state.totalSize>0){ parts.push(`共 ${humanBytes(state.totalSize)}`); }
+          summaryEl.textContent=parts.join(' · ');
+        }
+        function updateDockBadge(){
+          if(!dockAttachmentButton) return;
+          const total=state.data.length;
+          const tipBase='附件管理（Ctrl+Shift+A）';
+          dockAttachmentButton.dataset.tip=total?`${tipBase} · ${total} 个`:tipBase;
+          if(dockAttachmentLabel){
+            dockAttachmentLabel.textContent=total?`附件管理 (${total})`:'附件管理';
+          }
+        }
+        function clearList(){
+          if(listEl){ listEl.innerHTML=''; }
+          if(state.observer){ state.observer.disconnect(); state.observer=null; }
+          state.sentinel=null;
+          state.rendered=0;
+        }
+        function ensureSentinel(){
+          if(!listEl) return;
+          if(!state.sentinel){
+            state.sentinel=document.createElement('div');
+            state.sentinel.className='mind-attachment-sentinel';
+            state.sentinel.textContent='加载中…';
+          }
+          if(!state.sentinel.isConnected){ listEl.appendChild(state.sentinel); }
+          if('IntersectionObserver' in window){
+            if(!state.observer){
+              state.observer=new IntersectionObserver(entries=>{
+                entries.forEach(entry=>{
+                  if(entry.isIntersecting){
+                    state.observer.unobserve(entry.target);
+                    renderNextBatch();
+                  }
+                });
+              });
+            }
+            state.observer.observe(state.sentinel);
+          }
+        }
+        function renderList(reset){
+          if(!listEl) return;
+          if(reset){ clearList(); }
+          if(!state.filtered.length){
+            if(emptyEl) emptyEl.style.display='';
+            updateRowsSelection();
+            return;
+          }
+          if(emptyEl) emptyEl.style.display='none';
+          renderNextBatch();
+        }
+        function renderNextBatch(){
+          if(!listEl) return;
+          if(state.rendered>=state.filtered.length){
+            if(state.sentinel && state.sentinel.parentNode){ state.sentinel.remove(); }
+            if(state.observer){ state.observer.disconnect(); state.observer=null; }
+            return;
+          }
+          const end=Math.min(state.filtered.length, state.rendered+PAGE_SIZE);
+          for(let i=state.rendered;i<end;i++){
+            const item=state.filtered[i];
+            const row=createRow(item,i);
+            listEl.appendChild(row);
+          }
+          state.rendered=end;
+          if(state.rendered<state.filtered.length){ ensureSentinel(); }
+          else if(state.sentinel && state.sentinel.parentNode){ state.sentinel.remove(); }
+        }
+        function createRow(item,index){
+          const row=document.createElement('div');
+          row.className='mind-attachment-row';
+          row.dataset.uid=item.uid;
+          row.dataset.index=String(index);
+          row.setAttribute('role','option');
+          const selectLabel=document.createElement('label');
+          selectLabel.className='mind-attachment-row-select';
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';
+          checkbox.setAttribute('aria-label','选择附件');
+          selectLabel.appendChild(checkbox);
+          const boxSpan=document.createElement('span');
+          selectLabel.appendChild(boxSpan);
+          const main=document.createElement('div');
+          main.className='mind-attachment-row-main';
+          const icon=document.createElement('div');
+          icon.className='mind-attachment-row-icon';
+          icon.textContent=attachmentIconForMime(item.mime,item.name);
+          const info=document.createElement('div');
+          info.className='mind-attachment-row-info';
+          const nameEl=document.createElement('div');
+          nameEl.className='mind-attachment-row-name';
+          nameEl.textContent=item.name;
+          const meta=document.createElement('div');
+          meta.className='mind-attachment-row-meta';
+          const metaParts=[item.sizeText,item.timeText,typeLabelMap[item.type]||''];
+          meta.textContent=metaParts.filter(Boolean).join(' · ');
+          const nodeBtn=document.createElement('button');
+          nodeBtn.type='button';
+          nodeBtn.className='mind-attachment-row-node';
+          nodeBtn.dataset.action='locate';
+          nodeBtn.dataset.uid=item.uid;
+          nodeBtn.textContent=item.nodePath || item.nodeTopic;
+          info.appendChild(nameEl);
+          info.appendChild(meta);
+          info.appendChild(nodeBtn);
+          main.appendChild(icon);
+          main.appendChild(info);
+          const actions=document.createElement('div');
+          actions.className='mind-attachment-row-actions';
+          const previewBtn=document.createElement('button');
+          previewBtn.type='button';
+          previewBtn.className='btn btn-primary btn-small';
+          previewBtn.dataset.action='preview';
+          previewBtn.dataset.uid=item.uid;
+          previewBtn.textContent='预览';
+          actions.appendChild(previewBtn);
+          if(item.url){
+            const download=document.createElement('a');
+            download.href=item.url;
+            download.className='btn btn-outline btn-small';
+            download.setAttribute('download','');
+            download.textContent='下载';
+            actions.appendChild(download);
+          }
+          const deleteBtn=document.createElement('button');
+          deleteBtn.type='button';
+          deleteBtn.className='btn btn-ghost btn-small';
+          deleteBtn.dataset.action='delete-one';
+          deleteBtn.dataset.uid=item.uid;
+          deleteBtn.textContent='删除';
+          actions.appendChild(deleteBtn);
+          row.appendChild(selectLabel);
+          row.appendChild(main);
+          row.appendChild(actions);
+          applySelectionToRow(row);
+          return row;
+        }
+        function applySelectionToRow(row){
+          if(!row) return;
+          const uid=row.dataset.uid;
+          const selected=state.selection.has(uid);
+          row.classList.toggle('selected', selected);
+          row.setAttribute('aria-selected', selected?'true':'false');
+          const checkbox=row.querySelector('input[type="checkbox"]');
+          if(checkbox){ checkbox.checked=selected; }
+        }
+        function updateRowsSelection(){
+          if(!listEl) return;
+          listEl.querySelectorAll('.mind-attachment-row').forEach(row=>applySelectionToRow(row));
+        }
+        function updateSelectionSummary(){
+          const count=state.selection.size;
+          if(selectionEl){
+            if(!count){ selectionEl.textContent='未选择附件'; }
+            else{
+              let total=0;
+              state.selection.forEach(uid=>{
+                const item=state.itemByUid.get(uid);
+                if(item){ total+=item.size||0; }
+              });
+              const parts=[`已选择 ${count} 个附件`];
+              if(total>0){ parts.push(humanBytes(total)); }
+              selectionEl.textContent=parts.join(' · ');
+            }
+          }
+          const disabled=!count || state.busy;
+          if(deleteBtn) deleteBtn.disabled=disabled;
+          if(exportBtn) exportBtn.disabled=disabled;
+          if(downloadBtn) downloadBtn.disabled=disabled;
+        }
+        function showPreviewPlaceholder(message){
+          if(!previewEl) return;
+          previewEl.innerHTML='';
+          if(previewPlaceholder){
+            previewPlaceholder.textContent=message || '选择附件以查看详细信息';
+            previewEl.appendChild(previewPlaceholder);
+          }
+        }
+        function renderPreview(){
+          if(!previewEl) return;
+          if(!state.selection.size){
+            const hint=state.filtered.length?'选择附件以查看详细信息':'当前筛选暂无附件';
+            showPreviewPlaceholder(hint);
+            return;
+          }
+          if(state.selection.size>1){
+            showPreviewPlaceholder(`已选择 ${state.selection.size} 个附件`);
+            return;
+          }
+          const uid=state.selectionOrder[state.selectionOrder.length-1];
+          const item=state.itemByUid.get(uid);
+          if(!item){ showPreviewPlaceholder('选择附件以查看详细信息'); return; }
+          renderPreviewItem(item);
+        }
+        function renderPreviewItem(item){
+          if(!previewEl) return;
+          previewEl.innerHTML='';
+          const title=document.createElement('div');
+          title.className='mind-attachment-preview-title';
+          title.textContent=item.name;
+          const meta=document.createElement('div');
+          meta.className='mind-attachment-preview-meta';
+          const metaParts=[item.sizeText,item.timeText,typeLabelMap[item.type]||''];
+          meta.textContent=metaParts.filter(Boolean).join(' · ');
+          const nodeBtn=document.createElement('button');
+          nodeBtn.type='button';
+          nodeBtn.className='mind-attachment-row-node';
+          nodeBtn.textContent=item.nodePath || item.nodeTopic;
+          nodeBtn.addEventListener('click',()=>locateByUid(item.uid));
+          previewEl.appendChild(title);
+          previewEl.appendChild(meta);
+          previewEl.appendChild(nodeBtn);
+          let hasMedia=false;
+          if(item.url){
+            if(item.type==='image'){
+              const img=document.createElement('img');
+              img.src=item.url;
+              img.alt=item.name;
+              img.setAttribute('data-preview-media','');
+              previewEl.appendChild(img);
+              hasMedia=true;
+            }else if(item.type==='video'){
+              const video=document.createElement('video');
+              video.controls=true;
+              video.src=item.url;
+              video.setAttribute('data-preview-media','');
+              previewEl.appendChild(video);
+              hasMedia=true;
+            }else if(item.type==='audio'){
+              const audio=document.createElement('audio');
+              audio.controls=true;
+              audio.src=item.url;
+              audio.setAttribute('data-preview-media','');
+              previewEl.appendChild(audio);
+              hasMedia=true;
+            }else if(item.type==='document' && /pdf/i.test(item.mime||'')){
+              const frame=document.createElement('iframe');
+              frame.src=item.url;
+              frame.setAttribute('data-preview-media','');
+              previewEl.appendChild(frame);
+              hasMedia=true;
+            }
+          }
+          if(!hasMedia){
+            const msg=document.createElement('div');
+            msg.className='mind-attachment-preview-empty';
+            msg.textContent=item.url ? '此类型暂不支持内嵌预览，可使用“打开预览”按钮。' : '附件缺少可用链接。';
+            previewEl.appendChild(msg);
+          }
+          const actions=document.createElement('div');
+          actions.className='mind-attachment-row-actions';
+          const previewBtn=document.createElement('button');
+          previewBtn.type='button';
+          previewBtn.className='btn btn-primary btn-small';
+          previewBtn.textContent='打开预览';
+          previewBtn.addEventListener('click',()=>openPreviewByUid(item.uid));
+          actions.appendChild(previewBtn);
+          if(item.url){
+            const download=document.createElement('a');
+            download.href=item.url;
+            download.className='btn btn-outline btn-small';
+            download.setAttribute('download','');
+            download.textContent='下载';
+            actions.appendChild(download);
+          }
+          const locateBtn=document.createElement('button');
+          locateBtn.type='button';
+          locateBtn.className='btn btn-ghost btn-small';
+          locateBtn.textContent='定位节点';
+          locateBtn.addEventListener('click',()=>locateByUid(item.uid));
+          actions.appendChild(locateBtn);
+          previewEl.appendChild(actions);
+        }
+        function getSelectedItems(){
+          return state.selectionOrder.map(uid=>state.itemByUid.get(uid)).filter(Boolean);
+        }
+        function clearSelection(){
+          state.selection.clear();
+          state.selectionOrder=[];
+          state.lastAnchorIndex=null;
+          updateRowsSelection();
+          updateSelectionSummary();
+          renderPreview();
+        }
+        function handleRowSelection(uid,{toggle=false,range=false}={}){
+          if(!uid || !state.indexByUid.has(uid)) return;
+          const index=state.indexByUid.get(uid);
+          if(range && state.lastAnchorIndex!=null){
+            const start=Math.min(state.lastAnchorIndex,index);
+            const end=Math.max(state.lastAnchorIndex,index);
+            if(!toggle){ state.selection.clear(); state.selectionOrder=[]; }
+            for(let i=start;i<=end;i++){
+              const item=state.filtered[i];
+              if(item && !state.selection.has(item.uid)){
+                state.selection.add(item.uid);
+                state.selectionOrder.push(item.uid);
+              }
+            }
+          }else if(toggle){
+            if(state.selection.has(uid)){
+              state.selection.delete(uid);
+              state.selectionOrder=state.selectionOrder.filter(id=>id!==uid);
+              if(state.selection.size===0){ state.lastAnchorIndex=null; }
+            }else{
+              state.selection.add(uid);
+              state.selectionOrder.push(uid);
+              state.lastAnchorIndex=index;
+            }
+          }else{
+            state.selection.clear();
+            state.selectionOrder=[uid];
+            state.selection.add(uid);
+            state.lastAnchorIndex=index;
+          }
+          updateRowsSelection();
+          updateSelectionSummary();
+          renderPreview();
+        }
+        function handleListClick(event){
+          const actionTarget=event.target.closest('[data-action]');
+          if(actionTarget){
+            const action=actionTarget.dataset.action;
+            const row=actionTarget.closest('.mind-attachment-row');
+            const uid=row ? row.dataset.uid : (actionTarget.dataset.uid || '');
+            if(action==='preview'){ if(uid) openPreviewByUid(uid); return; }
+            if(action==='delete-one'){ if(uid){ const item=state.itemByUid.get(uid); if(item){ deleteItems([item]); } } return; }
+            if(action==='locate'){ if(uid) locateByUid(uid); return; }
+          }
+          const checkbox=event.target.closest('.mind-attachment-row-select input');
+          if(checkbox){
+            const row=checkbox.closest('.mind-attachment-row');
+            if(row){
+              event.preventDefault();
+              handleRowSelection(row.dataset.uid,{toggle:true});
+            }
+            return;
+          }
+          const row=event.target.closest('.mind-attachment-row');
+          if(!row) return;
+          handleRowSelection(row.dataset.uid,{toggle:event.metaKey||event.ctrlKey,range:event.shiftKey});
+        }
+        function openPreviewByUid(uid){
+          const item=state.itemByUid.get(uid);
+          if(item && item.descriptor){ openMindmapAttachment(item.descriptor); }
+        }
+        function locateByUid(uid){
+          const item=state.itemByUid.get(uid);
+          if(item){ locateItem(item); }
+        }
+        function locateItem(item){
+          const node=jm ? jm.get_node(item.nodeId) : null;
+          if(!node) return;
+          centerOnNodeSmooth(node);
+          const el=node.el || document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+          if(el){
+            el.classList.add('attachment-highlight');
+            setTimeout(()=>{ el.classList.remove('attachment-highlight'); },1200);
+          }
+        }
+        function confirmDeletion(items){
+          const count=items.length;
+          if(!count) return false;
+          const total=items.reduce((sum,item)=>sum+(item.size||0),0);
+          const message=`确认删除选中的 ${count} 个附件${total?`（共 ${humanBytes(total)}）`:''}？此操作将从节点中移除附件引用。`;
+          return window.confirm(message);
+        }
+        function deleteItems(items){
+          const valid=items.filter(Boolean);
+          if(!valid.length) return;
+          if(!confirmDeletion(valid)) return;
+          const removalMap=new Map();
+          valid.forEach(item=>{
+            if(!removalMap.has(item.nodeId)){
+              removalMap.set(item.nodeId,{refs:new Set(),ids:new Set(),names:new Map()});
+            }
+            const bucket=removalMap.get(item.nodeId);
+            if(item.descriptor){ bucket.refs.add(item.descriptor); }
+            if(item.assetId){ bucket.ids.add(item.assetId); }
+            const key=(item.name||'')+'|'+(item.mime||'');
+            bucket.names.set(key,(bucket.names.get(key)||0)+1);
+          });
+          const result=performUndoable('delete-attachments',()=>{
+            let changed=false;
+            removalMap.forEach((entry,nodeId)=>{
+              const node=jm.get_node(nodeId);
+              if(!node) return;
+              const data=ensureNodeDataObject(node);
+              if(!Array.isArray(data.attachments) || !data.attachments.length) return;
+              const filtered=[];
+              data.attachments.forEach(att=>{
+                if(!att || typeof att!=='object') return;
+                if(entry.refs.has(att)){ changed=true; return; }
+                const attId=parseInt(att.assetId || att.id || 0,10);
+                if(attId && entry.ids.has(attId)){ entry.ids.delete(attId); changed=true; return; }
+                const key=(att.name||'')+'|'+(att.mime||'');
+                if(entry.names.has(key)){
+                  const remaining=entry.names.get(key);
+                  if(remaining>0){ entry.names.set(key,remaining-1); changed=true; return; }
+                }
+                filtered.push(att);
+              });
+              if(filtered.length){
+                data.attachments=filtered;
+                data.attachment=filtered[0];
+              }else{
+                delete data.attachments;
+                delete data.attachment;
+              }
+              node.model.data=data;
+              node.data=data;
+            });
+            if(!changed) return false;
+            jm.computeLayout();
+            jm.render();
+            return true;
+          });
+          if(result===false) return;
+          markDirty();
+          afterMindStateChange();
+          refresh({force:true});
+        }
+        function deleteSelection(){
+          const items=getSelectedItems();
+          if(!items.length){ alert('请先选择要删除的附件'); return; }
+          deleteItems(items);
+        }
+        function exportSelection(){
+          const items=getSelectedItems();
+          if(!items.length){ alert('请先选择要导出的附件'); return; }
+          const header=['文件名','所属节点','节点路径','类型','大小','上传时间','链接'];
+          const rows=items.map(item=>[
+            escapeCsv(item.name),
+            escapeCsv(item.nodeTopic),
+            escapeCsv(item.nodePath||item.nodeTopic),
+            escapeCsv(typeLabelMap[item.type]||item.type||''),
+            escapeCsv(item.sizeText||''),
+            escapeCsv(item.timeText||''),
+            escapeCsv(item.url||'')
+          ]);
+          const csv=[header,...rows].map(cols=>cols.join(',')).join('\n');
+          const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+          const url=URL.createObjectURL(blob);
+          const link=document.createElement('a');
+          link.href=url;
+          link.download=`attachment-list-${buildTimestampString()}.csv`;
+          link.click();
+          setTimeout(()=>URL.revokeObjectURL(url),1200);
+        }
+        function escapeCsv(value){
+          const text=String(value||'');
+          if(/[",\n]/.test(text)){ return '"'+text.replace(/"/g,'""')+'"'; }
+          return text;
+        }
+        async function downloadSelectionAsZip(){
+          const items=getSelectedItems().filter(item=>item && item.url);
+          if(!items.length){ alert('请选择至少一个可下载的附件'); return; }
+          try{
+            setBusy(true,'正在打包下载…');
+            const JSZipLib=await ensureJsZip();
+            const zip=new JSZipLib();
+            const usedNames=new Map();
+            let processed=0;
+            for(const item of items){
+              processed+=1;
+              if(statusEl) statusEl.textContent=`正在获取 ${processed}/${items.length}…`;
+              const response=await fetch(item.url);
+              if(!response.ok) throw new Error('获取 '+item.name+' 失败');
+              const blob=await response.blob();
+              const filename=buildZipFilename(item, usedNames);
+              zip.file(filename, blob);
+            }
+            if(statusEl) statusEl.textContent='正在生成压缩包…';
+            const content=await zip.generateAsync({type:'blob'});
+            const url=URL.createObjectURL(content);
+            const link=document.createElement('a');
+            link.href=url;
+            link.download=`mind-attachments-${buildTimestampString()}.zip`;
+            link.click();
+            setTimeout(()=>URL.revokeObjectURL(url),2000);
+            if(statusEl) statusEl.textContent='打包完成';
+          }catch(err){
+            console.error(err);
+            alert(err && err.message ? err.message : '打包失败');
+          }finally{
+            setTimeout(()=>{ if(statusEl) statusEl.textContent=''; },1500);
+            setBusy(false);
+          }
+        }
+        async function ensureJsZip(){
+          if(window.JSZip) return window.JSZip;
+          const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',()=>window.JSZip);
+          if(lib) return lib;
+          if(window.JSZip) return window.JSZip;
+          throw new Error('打包依赖加载失败');
+        }
+        function sanitizeFilename(name){
+          return (name||'附件').replace(/[\\/:*?"<>|]+/g,'_');
+        }
+        function buildZipFilename(item, used){
+          const base=sanitizeFilename(item.name || (typeLabelMap[item.type]||'附件'));
+          const ext=(item.name && item.name.includes('.'))?item.name.split('.').pop():'';
+          const key=base.toLowerCase();
+          const count=used.get(key)||0;
+          used.set(key,count+1);
+          if(ext){
+            return count?`${base} (${count+1}).${ext}`:`${base}.${ext}`;
+          }
+          return count?`${base} (${count+1})`:`${base}`;
+        }
+        function buildTimestampString(){
+          const now=new Date();
+          const pad=n=>String(n).padStart(2,'0');
+          return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        }
+        function setBusy(flag,message){
+          state.busy=!!flag;
+          if(panel){ panel.dataset.busy=state.busy?'true':'false'; }
+          if(statusEl){ statusEl.textContent=message || ''; }
+          updateSelectionSummary();
+        }
+        function refresh(options={}){
+          const force=options.force===true;
+          collectData();
+          applyFilters();
+          updateSummary();
+          updateDockBadge();
+          if(state.open || force){
+            renderList(true);
+            updateSelectionSummary();
+            renderPreview();
+            state.needsRefresh=false;
+          }else{
+            state.needsRefresh=true;
+            updateSelectionSummary();
+          }
+        }
+        function open(){
+          if(state.open) return;
+          state.open=true;
+          if(layer){ layer.dataset.open='true'; }
+          if(panel){ panel.setAttribute('aria-hidden','false'); }
+          state.lastFocused=document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          refresh({force:true});
+          if(searchInput){
+            searchInput.focus({preventScroll:true});
+          }else if(closeBtn){
+            closeBtn.focus({preventScroll:true});
+          }
+        }
+        function close(){
+          if(!state.open) return;
+          state.open=false;
+          if(layer){ layer.dataset.open='false'; }
+          if(panel){ panel.setAttribute('aria-hidden','true'); }
+          if(state.lastFocused && typeof state.lastFocused.focus==='function'){
+            try{ state.lastFocused.focus(); }catch(_){ /* ignore */ }
+          }
+          state.lastFocused=null;
+        }
+        function toggle(){ state.open ? close() : open(); }
+        function isOpen(){ return state.open; }
+        function notifyMindChanged(){ refresh(); }
+        function onAssetRegistered(record){
+          registerMindAsset(record);
+          refresh();
+        }
+        if(mask){ mask.addEventListener('click',()=>close()); }
+        if(closeBtn){ closeBtn.addEventListener('click',e=>{ e.preventDefault(); close(); }); }
+        if(listEl){
+          listEl.addEventListener('click',handleListClick);
+          listEl.addEventListener('dblclick',e=>{
+            const row=e.target.closest('.mind-attachment-row');
+            if(row){ openPreviewByUid(row.dataset.uid); }
+          });
+        }
+        filterButtons.forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            const value=btn.dataset.filter || 'all';
+            if(state.filter===value) return;
+            state.filter=value;
+            filterButtons.forEach(b=>{ b.dataset.active = (b===btn)?'true':'false'; });
+            refresh({force:true});
+          });
+        });
+        if(sortSelect){ sortSelect.addEventListener('change',()=>{ state.sort=sortSelect.value || 'time_desc'; refresh({force:true}); }); }
+        if(searchInput){ searchInput.addEventListener('input',()=>{ state.search=sanitizeSearch(searchInput.value); refresh({force:true}); }); }
+        if(exportBtn){ exportBtn.addEventListener('click',exportSelection); }
+        if(downloadBtn){ downloadBtn.addEventListener('click',downloadSelectionAsZip); }
+        if(deleteBtn){ deleteBtn.addEventListener('click',deleteSelection); }
+        if(panel){ panel.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.preventDefault(); close(); } }); }
+        return { open, close, toggle, refresh, isOpen, notifyMindChanged, onAssetRegistered, clearSelection };
+      })();
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
         commitInlineEditing();
@@ -8566,6 +9564,11 @@ if ($view === 'map_edit') {
             break;
           }
           case 'attach': openAttachmentDialog(); break;
+          case 'attachment-manager':
+            if(attachmentManager && typeof attachmentManager.toggle==='function'){
+              attachmentManager.toggle();
+            }
+            break;
           case 'relation': toggleRelationMode(); break;
           case 'link': openLinkPrompt(); break;
           case 'delete': deleteSelectedNode(); break;
@@ -8695,6 +9698,13 @@ if ($view === 'map_edit') {
         if(currentEditingId()) return;
         const key=e.key || '';
         const lowerKey=key.toLowerCase();
+        if((e.ctrlKey || e.metaKey) && e.shiftKey && lowerKey==='a'){
+          e.preventDefault();
+          if(attachmentManager && typeof attachmentManager.toggle==='function'){
+            attachmentManager.toggle();
+          }
+          return;
+        }
         if((e.ctrlKey || e.metaKey) && !e.shiftKey && lowerKey==='z'){
           e.preventDefault();
           undoMindChange();
