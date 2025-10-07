@@ -3763,6 +3763,14 @@ if ($view === 'map_edit') {
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .mind-shortcuts{border-radius:16px;border:1px solid rgba(201,168,106,.22);background:rgba(12,16,18,.78);padding:12px 14px;box-shadow:inset 0 0 18px rgba(0,0,0,.32);display:flex;flex-direction:column;gap:10px}
+      .mind-shortcuts h3{margin:0;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400)}
+      .mind-shortcuts table{width:100%;border-collapse:collapse;font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.04em;color:var(--text-strong)}
+      .mind-shortcuts th,.mind-shortcuts td{padding:6px 8px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(201,168,106,.18)}
+      .mind-shortcuts th{font-weight:600;color:var(--gold-500);text-transform:uppercase;letter-spacing:.12em;font-size:11px}
+      .mind-shortcuts td .kbd{margin-right:6px}
+      .mind-shortcuts tr:last-child th,.mind-shortcuts tr:last-child td{border-bottom:none}
+      .mind-shortcuts td.notes{color:var(--text-muted);font-size:11px;letter-spacing:.08em}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
       .map-delete-btn[disabled]{opacity:.5;cursor:not-allowed}
@@ -3969,6 +3977,63 @@ if ($view === 'map_edit') {
               <?php if ($mind['id']): ?>
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
+            </div>
+            <div class="mind-shortcuts" aria-labelledby="mind-shortcuts-title">
+              <h3 id="mind-shortcuts-title">快捷键</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">操作</th>
+                    <th scope="col">Win</th>
+                    <th scope="col">Mac</th>
+                    <th scope="col">说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">新建同级节点</th>
+                    <td><span class="kbd">Enter</span></td>
+                    <td><span class="kbd">Return</span></td>
+                    <td class="notes">在当前节点下方创建同级节点</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">新建子级节点</th>
+                    <td><span class="kbd">Tab</span></td>
+                    <td><span class="kbd">Tab</span></td>
+                    <td class="notes">在当前节点下创建子节点</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">新建父级节点</th>
+                    <td><span class="kbd">Shift</span> + <span class="kbd">Tab</span></td>
+                    <td><span class="kbd">Shift</span> + <span class="kbd">Tab</span></td>
+                    <td class="notes">将当前节点提升为父层的兄弟节点</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">删除节点</th>
+                    <td><span class="kbd">Del</span> / <span class="kbd">Backspace</span></td>
+                    <td><span class="kbd">⌫</span></td>
+                    <td class="notes">删除当前选中节点</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">折叠/展开子节点</th>
+                    <td><span class="kbd">Space</span> / <span class="kbd">→</span> / <span class="kbd">←</span></td>
+                    <td><span class="kbd">Space</span> / <span class="kbd">→</span> / <span class="kbd">←</span></td>
+                    <td class="notes">展开或折叠当前节点分支</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">复制节点</th>
+                    <td><span class="kbd">Ctrl</span> + <span class="kbd">C</span></td>
+                    <td><span class="kbd">⌘</span> + <span class="kbd">C</span></td>
+                    <td class="notes">复制节点及其子节点</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">粘贴节点</th>
+                    <td><span class="kbd">Ctrl</span> + <span class="kbd">V</span></td>
+                    <td><span class="kbd">⌘</span> + <span class="kbd">V</span></td>
+                    <td class="notes">粘贴为同级节点</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </header>
@@ -8097,10 +8162,11 @@ if ($view === 'map_edit') {
           bounds:mind.bounds?{...mind.bounds}:null,
           viewport:captureElementState(mind.viewport,false),
           nodeLayer:captureElementState(mind.nodeLayer,false),
-          linkLayer:captureElementState(mind.linkLayer,false),
-          relationLayer:captureElementState(mind.relationLayer,false),
+          linkLayer:captureElementState(mind.linkLayer,true),
+          relationLayer:captureElementState(mind.relationLayer,true),
           guideLayer:captureElementState(mind.guideLayer,true),
           nodes,
+          relations:Array.isArray(mind.relations)?JSON.parse(JSON.stringify(mind.relations)):null,
         };
       }
       function restoreLayoutSnapshot(mind,snapshot){
@@ -8120,13 +8186,76 @@ if ($view === 'map_edit') {
           }
           if(typeof state.html==='string'){ el.innerHTML=state.html; }
         };
+        const rehydrateLinkLayer=()=>{
+          if(!mind.linkLayer || !mind.nodes) return;
+          if(!(mind.linkRegistry instanceof Map)){ mind.linkRegistry=new Map(); }
+          else{ mind.linkRegistry.clear(); }
+          mind.nodes.forEach(node=>{
+            if(!node) return;
+            node.linkGroup=null;
+            node.linkShadow=null;
+            node.linkPath=null;
+            node.linkHighlight=null;
+          });
+          const groups=mind.linkLayer.querySelectorAll('g.trace-group');
+          groups.forEach(group=>{
+            if(!group) return;
+            const parentId=group.dataset?group.dataset.from:group.getAttribute('data-from');
+            const childId=group.dataset?group.dataset.to:group.getAttribute('data-to');
+            if(!childId) return;
+            const node=mind.nodes.get(childId);
+            if(!node) return;
+            const shadow=group.querySelector('.trace.shadow');
+            const core=group.querySelector('.trace.core');
+            const highlight=group.querySelector('.trace.highlight');
+            node.linkGroup=group;
+            node.linkShadow=shadow||null;
+            node.linkPath=core||null;
+            node.linkHighlight=highlight||null;
+            if(core){
+              const enterEdge=()=>mind.setEdgeHover(parentId, childId);
+              const leaveEdge=()=>mind.clearEdgeHover(parentId, childId);
+              core.addEventListener('pointerenter', enterEdge);
+              core.addEventListener('pointerleave', leaveEdge);
+              core.addEventListener('pointercancel', leaveEdge);
+            }
+            mind.linkRegistry.set(childId,{group,shadow,core,highlight});
+          });
+        };
+        const rehydrateRelationLayer=()=>{
+          if(!mind.relationLayer) return;
+          if(!(mind.relationRegistry instanceof Map)){ mind.relationRegistry=new Map(); }
+          else{ mind.relationRegistry.clear(); }
+          const groups=mind.relationLayer.querySelectorAll('g.relation-group');
+          groups.forEach(group=>{
+            if(!group) return;
+            const relationId=group.dataset?group.dataset.id:group.getAttribute('data-id');
+            if(!relationId) return;
+            const shadow=group.querySelector('.relation-shadow');
+            const core=group.querySelector('.relation-core');
+            const highlight=group.querySelector('.relation-highlight');
+            let relation=null;
+            if(Array.isArray(mind.relations)){
+              relation=mind.relations.find(rel=>rel && rel.id===relationId) || null;
+            }
+            mind.relationRegistry.set(relationId,{group,shadow,core,highlight,relation});
+          });
+        };
         mind.bounds=snapshot.bounds?{...snapshot.bounds}:null;
         restoreElementState(mind.viewport,snapshot.viewport);
         restoreElementState(mind.nodeLayer,snapshot.nodeLayer);
         restoreElementState(mind.linkLayer,snapshot.linkLayer);
         restoreElementState(mind.relationLayer,snapshot.relationLayer);
         restoreElementState(mind.guideLayer,snapshot.guideLayer);
+        if(Array.isArray(snapshot.relations)){
+          const relClone=JSON.parse(JSON.stringify(snapshot.relations));
+          mind.relations=relClone;
+          if(mind.mind){ mind.mind.relations=relClone; }
+        }
+        rehydrateLinkLayer();
+        rehydrateRelationLayer();
         if(Array.isArray(snapshot.nodes) && mind.nodes && typeof mind.nodes.get==='function'){
+          const nodesNeedingUpdate=[];
           for(const nodeState of snapshot.nodes){
             if(!nodeState || !nodeState.id) continue;
             const node=mind.nodes.get(nodeState.id);
@@ -8147,9 +8276,22 @@ if ($view === 'map_edit') {
               if(Number.isFinite(node.absY)){ node.el.style.top=`${node.absY - height/2}px`; }
             }
             if(typeof mind.updateAnchors==='function'){ mind.updateAnchors(node); }
+            nodesNeedingUpdate.push(node);
+          }
+          if(nodesNeedingUpdate.length){
+            if(typeof mind.updateLinkPath==='function'){
+              nodesNeedingUpdate.forEach(node=>{ mind.updateLinkPath(node); });
+            }
+            if(typeof mind.updateRelationsForNode==='function'){
+              nodesNeedingUpdate.forEach(node=>{ mind.updateRelationsForNode(node); });
+            }
           }
         }
+        if(Array.isArray(mind.relations) && typeof mind.updateRelationPath==='function'){
+          mind.relations.forEach(rel=>{ if(rel){ mind.updateRelationPath(rel); } });
+        }
         if(typeof mind.applyTransform==='function'){ mind.applyTransform(); }
+        if(typeof mind.updateEdgeButtonScale==='function'){ mind.updateEdgeButtonScale(); }
       }
       function exportMindmapAsJson(){
         if(!jm){
@@ -8265,10 +8407,13 @@ if ($view === 'map_edit') {
             setTimeout(()=>URL.revokeObjectURL(url), 1500);
           }else if(format==='pdf'){
             const jsPDF=await ensureJsPDF();
-            const orientation=canvas.width>=canvas.height?'landscape':'portrait';
-            const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
+            const isLandscape=canvas.width>=canvas.height;
+            const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
+            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
             const dataUrl=canvas.toDataURL('image/png');
-            pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
+            const pageWidth=pdf.internal.pageSize.getWidth();
+            const pageHeight=pdf.internal.pageSize.getHeight();
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'FAST');
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
