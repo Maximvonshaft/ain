@@ -3789,7 +3789,7 @@ if ($view === 'map_edit') {
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
-      .mind-links{pointer-events:none;overflow:visible}
+      .mind-links{pointer-events:auto;overflow:visible}
       .mind-link-controls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
       .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(160deg,rgba(28,32,36,.96),rgba(12,16,18,.92));color:var(--gold-400);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 12px 28px rgba(0,0,0,.52),0 0 0 1px rgba(227,198,139,.32) inset,0 0 26px rgba(227,198,139,.22);transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition);text-shadow:0 0 10px rgba(227,198,139,.4);isolation:isolate}
       .mind-link-controls .edge-insert-btn::before{content:"";position:absolute;inset:5px;border-radius:12px;background:radial-gradient(circle at 50% 40%,rgba(227,198,139,.32),rgba(227,198,139,.08) 65%,rgba(227,198,139,0) 100%);box-shadow:inset 0 0 18px rgba(227,198,139,.24);z-index:-1;opacity:.9}
@@ -3808,8 +3808,8 @@ if ($view === 'map_edit') {
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
-      .mind-nodes{position:absolute;top:0;left:0}
-      .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em}
+      .mind-nodes{position:absolute;top:0;left:0;pointer-events:none}
+      .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.18)}
       .jsmind-node::after{content:"";position:absolute;inset:-14px;border-radius:calc(var(--r-md) + 10px);border:1px dashed rgba(201,168,106,.26);opacity:0;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.16)}
       .jsmind-node .node-topic{font:600 16px/1.45 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.06em;text-transform:uppercase}
@@ -3822,6 +3822,10 @@ if ($view === 'map_edit') {
       .jsmind-node.isroot::after{opacity:.42;transform:scale(.95);box-shadow:0 0 36px rgba(227,198,139,.28)}
       .jsmind-node.selected{border-color:var(--gold-400);box-shadow:0 0 0 1px rgba(227,198,139,.32),0 0 40px rgba(227,198,139,.26);transform:translateY(-2px)}
       .jsmind-node.selected::after{opacity:.6;transform:scale(.98);box-shadow:0 0 40px rgba(75,195,209,.3)}
+      .jsmind-node.edge-glow{border-color:rgba(227,198,139,.58);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 32px rgba(227,198,139,.18),0 0 46px rgba(227,198,139,.24)}
+      .jsmind-node.edge-glow::after{opacity:.6;transform:scale(.98);box-shadow:0 0 44px rgba(227,198,139,.28)}
+      .jsmind-node.edge-glow.selected{border-color:var(--gold-400)}
+      .jsmind-node.edge-glow.selected::after{box-shadow:0 0 44px rgba(75,195,209,.3),0 0 40px rgba(227,198,139,.26)}
       .jsmind-node.relation-source{border-color:rgba(75,195,209,.7);box-shadow:0 0 0 2px rgba(75,195,209,.35),0 0 36px rgba(75,195,209,.28)}
       .jsmind-node.relation-target{border-style:dashed;border-color:rgba(75,195,209,.6)}
       .jsmind-node.is-collapsed{border-style:dashed;border-color:rgba(201,168,106,.4);background:linear-gradient(180deg,rgba(21,26,30,.86),rgba(12,16,18,.9))}
@@ -4724,6 +4728,7 @@ if ($view === 'map_edit') {
           this.container.addEventListener('gesturestart',evt=>evt.preventDefault());
           this.container.addEventListener('gesturechange',evt=>evt.preventDefault());
           this.container.addEventListener('gestureend',evt=>evt.preventDefault());
+          this.container.addEventListener('pointerleave',()=>{ this.clearEdgeHover(); });
           this.background=document.createElement('div');
           this.background.className='mind-background';
           this.container.appendChild(this.background);
@@ -4767,6 +4772,7 @@ if ($view === 'map_edit') {
           this.relations=[];
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
+          this.edgeHoverState=null;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
@@ -4791,6 +4797,7 @@ if ($view === 'map_edit') {
             };
           };
           const startPan=(evt)=>{
+            this.clearEdgeHover();
             const isTouch=evt.pointerType==='touch';
             const onNode=!!evt.target.closest('.jsmind-node');
             if(!isTouch){
@@ -5737,6 +5744,7 @@ if ($view === 'map_edit') {
           return el;
         }
         render(){
+          this.clearEdgeHover();
           this.nodeLayer.innerHTML='';
           while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
           if(this.linkControlLayer){ this.linkControlLayer.innerHTML=''; }
@@ -5767,6 +5775,9 @@ if ($view === 'map_edit') {
               core.setAttribute('stroke','url(#mindGoldTrace)');
               const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
               highlight.classList.add('trace','highlight');
+              shadow.style.pointerEvents='none';
+              highlight.style.pointerEvents='none';
+              core.style.pointerEvents='visibleStroke';
               group.appendChild(shadow);
               group.appendChild(core);
               group.appendChild(highlight);
@@ -5777,6 +5788,13 @@ if ($view === 'map_edit') {
               node.linkShadow=shadow;
               node.linkPath=core;
               node.linkHighlight=highlight;
+              const parentId=node.parent.id;
+              const childId=node.id;
+              const enterEdge=()=>this.setEdgeHover(parentId, childId);
+              const leaveEdge=()=>this.clearEdgeHover(parentId, childId);
+              core.addEventListener('pointerenter', enterEdge);
+              core.addEventListener('pointerleave', leaveEdge);
+              core.addEventListener('pointercancel', leaveEdge);
               this.linkRegistry.set(node.id,{group,shadow,core,highlight});
               this.updateLinkPath(node);
             }
@@ -5898,6 +5916,27 @@ if ($view === 'map_edit') {
                 catch(err){ console.error(err); }
               }
             });
+            const handleEnter=()=>{
+              const parentId=btn.dataset.parent;
+              const childId=btn.dataset.child;
+              btn._edgeHoverActivePair={parent:parentId, child:childId};
+              this.setEdgeHover(parentId, childId);
+            };
+            const handleLeave=()=>{
+              const pair=btn._edgeHoverActivePair;
+              if(pair && pair.parent && pair.child){
+                this.clearEdgeHover(pair.parent, pair.child);
+              }else{
+                this.clearEdgeHover();
+              }
+              btn._edgeHoverActivePair=null;
+            };
+            btn.addEventListener('pointerenter',handleEnter);
+            btn.addEventListener('pointerleave',handleLeave);
+            btn.addEventListener('pointercancel',handleLeave);
+            btn.addEventListener('focus',handleEnter);
+            btn.addEventListener('blur',handleLeave);
+            btn._edgeHoverHandlers={enter:handleEnter,leave:handleLeave};
             this.linkControlLayer.appendChild(btn);
             node.edgeButton=btn;
           }
@@ -5943,12 +5982,43 @@ if ($view === 'map_edit') {
           const btn=this.ensureEdgeInsertButton(node);
           if(!btn) return;
           const mid=this.computeRouteMidpoint(points);
-          if(!mid){ btn.hidden=true; return; }
+          if(!mid){
+            btn.hidden=true;
+            this.clearEdgeHover(node.parent.id, node.id);
+            if(btn._edgeHoverActivePair){ btn._edgeHoverActivePair=null; }
+            return;
+          }
           btn.hidden=false;
           btn.style.left=`${mid.x}px`;
           btn.style.top=`${mid.y}px`;
           const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
           btn.style.setProperty('--edge-scale', (1/scale).toFixed(3));
+        }
+        setEdgeHover(fromId,toId){
+          if(!fromId || !toId) return;
+          if(this.edgeHoverState && this.edgeHoverState.from===fromId && this.edgeHoverState.to===toId){
+            return;
+          }
+          this.clearEdgeHover();
+          this.edgeHoverState={from:fromId,to:toId};
+          const parent=this.nodes.get(fromId);
+          if(parent && parent.el){ parent.el.classList.add('edge-glow'); }
+          const child=this.nodes.get(toId);
+          if(child && child.el){ child.el.classList.add('edge-glow'); }
+        }
+        clearEdgeHover(expectedFrom, expectedTo){
+          if(!this.edgeHoverState) return;
+          if(expectedFrom && expectedTo){
+            if(this.edgeHoverState.from!==expectedFrom || this.edgeHoverState.to!==expectedTo){
+              return;
+            }
+          }
+          const {from,to}=this.edgeHoverState;
+          this.edgeHoverState=null;
+          const parent=this.nodes.get(from);
+          if(parent && parent.el){ parent.el.classList.remove('edge-glow'); }
+          const child=this.nodes.get(to);
+          if(child && child.el){ child.el.classList.remove('edge-glow'); }
         }
         updateEdgeButtonScale(){
           if(!this.linkControlLayer) return;
