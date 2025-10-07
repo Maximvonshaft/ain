@@ -4097,25 +4097,25 @@ if ($view === 'map_edit') {
       .mind-attachment-filter[data-active="true"]{border-color:rgba(227,198,139,.6);background:rgba(227,198,139,.14);color:var(--gold-400)}
       .mind-attachment-sort{display:flex;align-items:center;gap:8px;color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .mind-attachment-sort select{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.82);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-body{flex:1 1 auto;display:grid;grid-template-columns:1fr;gap:16px;min-height:0}
-      .mind-attachment-list{position:relative;overflow:auto;border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.78);box-shadow:inset 0 0 22px rgba(0,0,0,.45);padding:12px;display:grid;gap:10px}
+      .mind-attachment-body{flex:1 1 auto;display:flex;flex-direction:column;gap:16px;min-height:0}
+      .mind-attachment-list{position:relative;overflow:auto;border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.78);box-shadow:inset 0 0 22px rgba(0,0,0,.45);padding:12px;display:grid;gap:10px;flex:1 1 auto}
       .mind-attachment-list::-webkit-scrollbar{width:8px}
       .mind-attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.24);border-radius:999px}
-      .mind-attachment-row{display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
+      .mind-attachment-row{display:grid;grid-template-columns:auto auto 1fr auto;grid-auto-rows:auto;column-gap:12px;row-gap:10px;align-items:flex-start;padding:12px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
       .mind-attachment-row[data-selected="true"]{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.12);box-shadow:0 0 0 1px rgba(75,195,209,.25)}
       .mind-attachment-select{width:18px;height:18px;border-radius:6px;border:1px solid rgba(201,168,106,.32);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(227,198,139,.85)}
       .mind-attachment-row[data-selected="true"] .mind-attachment-select{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.22);color:#d9fbff}
       .mind-attachment-thumb{width:46px;height:46px;border-radius:14px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--gold-400)}
       .mind-attachment-thumb img{width:100%;height:100%;object-fit:cover}
-      .mind-attachment-info{display:grid;gap:6px;min-width:0}
-      .mind-attachment-name{font:600 13px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.04em;overflow-wrap:anywhere}
+      .mind-attachment-info{display:flex;flex-direction:column;gap:8px;min-width:0}
+      .mind-attachment-name{font:600 14px/1.45 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.04em;overflow-wrap:anywhere}
       .mind-attachment-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-muted);font:11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase}
       .mind-attachment-tag{padding:2px 8px;border-radius:999px;border:1px solid rgba(201,168,106,.22);background:rgba(21,26,30,.82)}
       .mind-attachment-node{color:var(--gold-400);cursor:pointer;text-decoration:none}
       .mind-attachment-node:hover{text-decoration:underline}
-      .mind-attachment-size{color:var(--text-dim);font:12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-time{color:var(--text-muted);font:11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
-      .mind-attachment-actions{display:flex;gap:6px}
+      .mind-attachment-stats{display:flex;flex-wrap:wrap;gap:10px;color:var(--text-dim);font:11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-transform:uppercase}
+      .mind-attachment-size,.mind-attachment-time{color:inherit}
+      .mind-attachment-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
       .mind-attachment-actions button{padding:6px 10px;border-radius:10px;border:1px solid rgba(201,168,106,.3);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
       .mind-attachment-actions button:hover{border-color:rgba(227,198,139,.55)}
       .mind-attachment-actions button.danger{color:#fca5a5;border-color:rgba(209,75,75,.5)}
@@ -4132,7 +4132,7 @@ if ($view === 'map_edit') {
         .mind-attachment-backdrop{padding:16px}
         .mind-attachment-panel{width:100%;border-radius:20px}
         .mind-attachment-controls{flex-direction:column;align-items:flex-start}
-        .mind-attachment-list{max-height:50vh}
+        .mind-attachment-actions{justify-content:flex-start}
       }
       @keyframes mindNodeFlash{
         0%{box-shadow:0 0 0 0 rgba(75,195,209,.0)}
@@ -9167,6 +9167,17 @@ if ($view === 'map_edit') {
           nameEl.textContent=item.name;
           nameEl.title=item.name;
           info.appendChild(nameEl);
+          const stats=document.createElement('div');
+          stats.className='mind-attachment-stats';
+          const sizeEl=document.createElement('div');
+          sizeEl.className='mind-attachment-size';
+          sizeEl.textContent=formatBytesLocal(item.size);
+          stats.appendChild(sizeEl);
+          const timeEl=document.createElement('div');
+          timeEl.className='mind-attachment-time';
+          timeEl.textContent=formatDateLocal(item.createdAt);
+          stats.appendChild(timeEl);
+          info.appendChild(stats);
           const metaRow=document.createElement('div');
           metaRow.className='mind-attachment-meta';
           const tag=document.createElement('span');
@@ -9186,12 +9197,6 @@ if ($view === 'map_edit') {
             metaRow.appendChild(nodeBtn);
           }
           info.appendChild(metaRow);
-          const sizeEl=document.createElement('div');
-          sizeEl.className='mind-attachment-size';
-          sizeEl.textContent=formatBytesLocal(item.size);
-          const timeEl=document.createElement('div');
-          timeEl.className='mind-attachment-time';
-          timeEl.textContent=formatDateLocal(item.createdAt);
           const actions=document.createElement('div');
           actions.className='mind-attachment-actions';
           const previewBtn=document.createElement('button');
@@ -9213,8 +9218,6 @@ if ($view === 'map_edit') {
           row.appendChild(selectBox);
           row.appendChild(thumb);
           row.appendChild(info);
-          row.appendChild(sizeEl);
-          row.appendChild(timeEl);
           row.appendChild(actions);
           return row;
         }
