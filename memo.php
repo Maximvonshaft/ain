@@ -3962,14 +3962,15 @@ if ($view === 'map_edit') {
       .mind-links .trace.highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
       .mind-relations{position:absolute;top:0;left:0;overflow:visible}
       .mind-relations .relation-group{pointer-events:auto}
-      .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+      .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round;transition:stroke var(--transition),stroke-width var(--transition),filter var(--transition),opacity var(--transition)}
       .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow)}
-      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8}
+      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),filter var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-highlight{pointer-events:none}
-      .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2;stroke:url(#mindGoldTrace);filter:url(#mindSoftGlow)}
-      .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(255,242,218,.72);stroke-width:1.4}
+      .mind-relations .relation-group[data-selected="true"] .relation-shadow{stroke:rgba(75,195,209,.68);opacity:.92;filter:url(#mindSoftGlow)}
+      .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2.4;stroke:url(#mindGoldTrace);filter:url(#mindSoftGlow) drop-shadow(0 0 6px rgba(164,246,255,.65)) drop-shadow(0 0 16px rgba(75,195,209,.45))}
+      .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(226,255,252,.95);stroke-width:2;opacity:1;filter:drop-shadow(0 0 12px rgba(164,246,255,.72));animation:relationSelectedPulse 1.6s ease-in-out infinite}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0;pointer-events:none}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto}
@@ -4031,6 +4032,7 @@ if ($view === 'map_edit') {
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
       @keyframes relationPulse{0%{opacity:.35}50%{opacity:.8}100%{opacity:.35}}
+      @keyframes relationSelectedPulse{0%{opacity:.85}50%{opacity:1}100%{opacity:.85}}
       .node-popover{position:fixed;z-index:140;min-width:320px;max-width:360px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 24px 60px rgba(0,0,0,.65),0 0 28px rgba(227,198,139,.14) inset;padding:16px;display:grid;gap:14px;backdrop-filter:blur(12px);transition:transform .24s ease,opacity .24s ease}
       .node-popover[hidden]{display:none!important}
       .node-popover[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding-bottom:28px;touch-action:pan-y}
@@ -4103,8 +4105,14 @@ if ($view === 'map_edit') {
       .mind-attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.24);border-radius:999px}
       .mind-attachment-row{display:grid;grid-template-columns:auto 56px 1fr;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
       .mind-attachment-row[data-selected="true"]{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.12);box-shadow:0 0 0 1px rgba(75,195,209,.25)}
-      .mind-attachment-select{width:18px;height:18px;border-radius:6px;border:1px solid rgba(201,168,106,.32);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(227,198,139,.85);grid-row:1/span 3;align-self:flex-start}
-      .mind-attachment-row[data-selected="true"] .mind-attachment-select{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.22);color:#d9fbff}
+      .mind-attachment-select{grid-row:1/span 3;align-self:flex-start;display:flex;align-items:center;justify-content:center;padding:2px}
+      .mind-attachment-checkbox{appearance:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.85);display:grid;place-items:center;cursor:pointer;transition:border-color var(--transition),background-color var(--transition),box-shadow var(--transition);position:relative}
+      .mind-attachment-checkbox::after{content:"";width:10px;height:6px;border:2px solid transparent;border-top:none;border-right:none;transform:rotate(-45deg) scale(.6);transition:transform var(--transition),border-color var(--transition)}
+      .mind-attachment-checkbox:hover{border-color:rgba(227,198,139,.55)}
+      .mind-attachment-checkbox:focus-visible{outline:2px solid rgba(75,195,209,.6);outline-offset:2px}
+      .mind-attachment-checkbox:checked{border-color:rgba(75,195,209,.65);background:rgba(75,195,209,.24);box-shadow:0 0 0 1px rgba(75,195,209,.35),0 0 10px rgba(75,195,209,.35)}
+      .mind-attachment-checkbox:checked::after{border-color:#d9fbff;transform:rotate(-45deg) scale(1)}
+      .mind-attachment-row[data-selected="true"] .mind-attachment-checkbox{border-color:rgba(75,195,209,.65);background:rgba(75,195,209,.24);box-shadow:0 0 0 1px rgba(75,195,209,.35),0 0 10px rgba(75,195,209,.35)}
       .mind-attachment-thumb{width:54px;height:54px;border-radius:16px;overflow:hidden;background:rgba(12,16,18,.82);border:1px solid rgba(201,168,106,.2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--gold-400);grid-row:1/span 3;align-self:flex-start}
       .mind-attachment-thumb img{width:100%;height:100%;object-fit:cover}
       .mind-attachment-content{display:grid;gap:12px;min-width:0}
@@ -4136,6 +4144,7 @@ if ($view === 'map_edit') {
         .mind-attachment-panel{width:100%;border-radius:20px;height:100%;max-height:100svh}
         .mind-attachment-controls{flex-direction:column;align-items:flex-start}
         .mind-attachment-row{grid-template-columns:auto 48px 1fr;padding:12px 14px}
+        .mind-attachment-checkbox{width:18px;height:18px}
         .mind-attachment-thumb{width:48px;height:48px;border-radius:14px}
         .mind-attachment-header{flex-direction:column;align-items:flex-start}
         .mind-attachment-actions{width:100%;justify-content:flex-start;margin-left:0}
@@ -7744,8 +7753,8 @@ if ($view === 'map_edit') {
         closeRelationContextMenu();
         clearRelationSelection();
         relationBlankClickTs=0;
-        if(notify){ showRelationToast('已退出关联模式'); }
-        else{ hideRelationToast(); }
+        const message=typeof notify==='string' && notify ? notify : '已退出关联模式';
+        showRelationToast(message);
         scheduleHandleRefresh();
       }
       function updateRelationHover(nodeId){
@@ -8484,7 +8493,7 @@ if ($view === 'map_edit') {
             if(latest){
               refreshInspector(latest);
               updateHandlePosition();
-              centerOnNodeSmooth(latest);
+              centerOnNodeSmooth(latest,{animate:false});
             }
             updateFoldAllLabel();
             if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
@@ -8546,7 +8555,7 @@ if ($view === 'map_edit') {
             if(latest){
               refreshInspector(latest);
               updateHandlePosition();
-              centerOnNodeSmooth(latest);
+              centerOnNodeSmooth(latest,{animate:false});
             }
             updateFoldAllLabel();
             if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
@@ -8739,7 +8748,7 @@ if ($view === 'map_edit') {
               jm.select_node(latest.id);
               refreshInspector(latest);
               startInlineEditing(latest);
-              centerOnNodeSmooth(latest);
+              centerOnNodeSmooth(latest,{animate:false});
             }
           });
           return true;
@@ -8949,6 +8958,7 @@ if ($view === 'map_edit') {
         function handleListClick(evt){
           const actionBtn=evt.target.closest('[data-action]');
           const row=evt.target.closest('.mind-attachment-row');
+          if(evt.target.closest('.mind-attachment-select')) return;
           if(actionBtn && row){
             const id=Number(row.dataset.assetId);
             const item=state.filtered.find(entry=>entry.assetId===id);
@@ -9153,9 +9163,19 @@ if ($view === 'map_edit') {
           const selected=state.selection.has(item.assetId);
           if(selected) row.dataset.selected='true';
           row.setAttribute('aria-selected',selected?'true':'false');
-          const selectBox=document.createElement('div');
+          const selectBox=document.createElement('label');
           selectBox.className='mind-attachment-select';
-          selectBox.textContent='✓';
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';
+          checkbox.className='mind-attachment-checkbox';
+          checkbox.checked=selected;
+          checkbox.setAttribute('aria-label',`选择附件：${item.name}`);
+          checkbox.addEventListener('click',evt=>{
+            evt.stopPropagation();
+            toggleSelectionByCheckbox(row, checkbox, evt);
+          });
+          selectBox.addEventListener('click',evt=>evt.stopPropagation());
+          selectBox.appendChild(checkbox);
           const thumb=document.createElement('div');
           thumb.className='mind-attachment-thumb';
           if(item.type==='image'){
@@ -9262,6 +9282,8 @@ if ($view === 'map_edit') {
             if(selected) row.dataset.selected='true';
             else row.removeAttribute('data-selected');
             row.setAttribute('aria-selected',selected?'true':'false');
+            const checkbox=row.querySelector('.mind-attachment-checkbox');
+            if(checkbox) checkbox.checked=selected;
           });
           updateSelectionInfo();
         }
@@ -9277,6 +9299,30 @@ if ($view === 'map_edit') {
           state.items.forEach(item=>{ if(state.selection.has(item.assetId)) total+=Number(item.size)||0; });
           const sizeText=total>0?formatBytesLocal(total):'';
           elements.selectionInfo.textContent=sizeText?`已选择 ${count} 个附件 · ${sizeText}`:`已选择 ${count} 个附件`;
+        }
+        function toggleSelectionByCheckbox(row, checkbox, evt){
+          const index=Number(row.dataset.index);
+          const id=Number(row.dataset.assetId);
+          if(!Number.isFinite(index) || !Number.isFinite(id)) return;
+          const selection=new Set(state.selection);
+          if(evt && evt.shiftKey && state.lastIndex!==null){
+            const start=Math.min(state.lastIndex,index);
+            const end=Math.max(state.lastIndex,index);
+            const shouldSelect=checkbox.checked;
+            if(shouldSelect && !(evt.ctrlKey || evt.metaKey)) selection.clear();
+            for(let i=start;i<=end;i++){
+              const item=state.filtered[i];
+              if(!item) continue;
+              if(shouldSelect) selection.add(item.assetId);
+              else selection.delete(item.assetId);
+            }
+          }else{
+            if(checkbox.checked) selection.add(id);
+            else selection.delete(id);
+          }
+          state.selection=selection;
+          state.lastIndex=index;
+          syncSelectionState();
         }
         function handleRowSelection(row,evt){
           const index=Number(row.dataset.index);
@@ -9313,7 +9359,7 @@ if ($view === 'map_edit') {
           const node=jm.get_node(nodeId);
           if(!node) return;
           try{ jm.select_node(node.id); }catch(_){ }
-          centerOnNodeSmooth(node,{animate:true});
+          centerOnNodeSmooth(node,{animate:false});
           const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
           if(el){
             el.classList.add('mind-node-highlight');
