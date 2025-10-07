@@ -3725,6 +3725,13 @@ if ($view === 'map_edit') {
       .map-io[aria-expanded="true"] .map-io-menu{display:flex}
       .map-io-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition),color var(--transition);text-align:left}
       .map-io-menu button:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
+      .mind-export-overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;background:rgba(6,8,10,.82);backdrop-filter:blur(20px);z-index:400;opacity:0;visibility:hidden;pointer-events:none;transition:opacity var(--transition),visibility var(--transition)}
+      .mind-export-overlay[data-active="true"]{opacity:1;visibility:visible;pointer-events:auto}
+      .mind-export-overlay .export-spinner{width:74px;height:74px;border-radius:50%;border:3px solid rgba(201,168,106,.18);border-top-color:rgba(227,198,139,.78);animation:exportSpin 1s linear infinite}
+      .mind-export-overlay .export-label{font:600 14px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-400);text-align:center}
+      .mind-export-overlay .export-subtext{font:12px/1.6 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.12em;text-align:center;max-width:320px}
+      @media (prefers-reduced-motion: reduce){.mind-export-overlay{transition:none}.mind-export-overlay .export-spinner{animation-duration:1.6s}}
+      @keyframes exportSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
       .mind-import-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.78);backdrop-filter:blur(18px);z-index:180}
       .mind-import-backdrop[data-open="true"]{display:flex}
       .mind-import-panel{background:linear-gradient(165deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.36);border-radius:24px;box-shadow:0 32px 68px rgba(0,0,0,.68),0 0 32px rgba(227,198,139,.18);padding:24px;max-width:420px;width:100%;display:grid;gap:16px;position:relative}
@@ -3835,15 +3842,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 26px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 40px - var(--safe-left) - var(--safe-right)),720px)}
-      .mind-dock-wrap::before,.mind-dock-wrap::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:26px;height:70%;pointer-events:none;opacity:0;transition:opacity var(--t-fast) var(--ease);z-index:0}
-      .mind-dock-wrap::before{left:8px;background:linear-gradient(90deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
-      .mind-dock-wrap::after{right:8px;background:linear-gradient(270deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
-      .mind-dock-wrap[data-scroll-left="true"]::before{opacity:.8}
-      .mind-dock-wrap[data-scroll-right="true"]::after{opacity:.8}
-      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x proximity}
-      .mind-dock::-webkit-scrollbar{display:none}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 auto;scroll-snap-align:center}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),860px)}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 18px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;box-sizing:border-box;touch-action:manipulation}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -3863,9 +3864,9 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 32px),660px)}.mind-dock{gap:10px;padding:10px 14px}.dock-btn{width:84px;height:60px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:10px 14px;border-radius:24px;gap:10px}.dock-btn{width:78px;height:56px}.dock-btn .label{font-size:11px}}
-      @media (max-width:600px){.dock-btn{width:72px;height:54px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),760px)}.mind-dock{gap:12px 16px;padding:14px 20px;border-radius:30px}.dock-btn{width:88px;height:62px;flex:0 0 88px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:12px}.dock-btn{width:84px;height:58px;flex:0 0 84px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:10px}.dock-btn{width:78px;height:56px;flex:0 0 78px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -4034,6 +4035,11 @@ if ($view === 'map_edit') {
             <span class="label">删除</span>
           </button>
         </nav>
+      </div>
+      <div class="mind-export-overlay" id="mind-export-overlay" role="status" aria-live="polite" aria-hidden="true">
+        <div class="export-spinner" aria-hidden="true"></div>
+        <div class="export-label">正在导出</div>
+        <div class="export-subtext">请稍候，我们正在生成高清导出文件…</div>
       </div>
       <div class="mind-relation-toast" id="mind-relation-toast" role="status" aria-live="polite"></div>
     </div>
@@ -6862,7 +6868,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockWrap=document.querySelector('.mind-dock-wrap');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
@@ -6871,6 +6876,7 @@ if ($view === 'map_edit') {
       const dockFoldButton=dock ? dock.querySelector('.dock-btn[data-action="fold"]') : null;
       const dockFoldLabel=dockFoldButton ? dockFoldButton.querySelector('[data-fold-label]') : null;
       const dockFoldIcon=dockFoldButton ? dockFoldButton.querySelector('[data-fold-icon]') : null;
+      const exportOverlay=document.getElementById('mind-export-overlay');
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
@@ -6892,6 +6898,7 @@ if ($view === 'map_edit') {
       const fisheyeToggle=document.getElementById('setting-fisheye');
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
+      let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
@@ -6935,16 +6942,25 @@ if ($view === 'map_edit') {
       if(mindInfoBar){
         mindInfoBar.addEventListener('focusin',()=>{ expandInfoBar(); });
       }
-      function updateDockScrollMarkers(){
-        if(!dock || !dockWrap) return;
-        const maxScroll=Math.max(0, dock.scrollWidth - dock.clientWidth);
-        if(maxScroll <= 1){
-          dockWrap.dataset.scrollLeft='false';
-          dockWrap.dataset.scrollRight='false';
-          return;
+      function showExportOverlay(){
+        if(!exportOverlay) return;
+        if(exportOverlayHideTimer){
+          clearTimeout(exportOverlayHideTimer);
+          exportOverlayHideTimer=null;
         }
-        dockWrap.dataset.scrollLeft=dock.scrollLeft > 4 ? 'true' : 'false';
-        dockWrap.dataset.scrollRight=dock.scrollLeft < maxScroll - 4 ? 'true' : 'false';
+        exportOverlay.dataset.active='true';
+        exportOverlay.setAttribute('aria-hidden','false');
+      }
+      function hideExportOverlay(){
+        if(!exportOverlay) return;
+        exportOverlay.dataset.active='false';
+        if(exportOverlayHideTimer){
+          clearTimeout(exportOverlayHideTimer);
+        }
+        exportOverlayHideTimer=setTimeout(()=>{
+          exportOverlay.setAttribute('aria-hidden','true');
+          exportOverlayHideTimer=null;
+        },360);
       }
       function isFisheyeEnabled(){
         return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
@@ -8420,16 +8436,6 @@ if ($view === 'map_edit') {
         });
       }
       if(dock){
-        updateDockScrollMarkers();
-        window.addEventListener('resize',updateDockScrollMarkers);
-        dock.addEventListener('scroll',updateDockScrollMarkers);
-        dock.addEventListener('wheel',e=>{
-          const dominant=Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-          if(!dominant) return;
-          dock.scrollLeft += dominant;
-          updateDockScrollMarkers();
-          e.preventDefault();
-        });
         dock.addEventListener('click',e=>{
           const btn=e.target.closest('.dock-btn');
           if(!btn || !dock.contains(btn)) return;
@@ -8811,6 +8817,11 @@ if ($view === 'map_edit') {
         }
         const titleValue=titleInput ? titleInput.value.trim() : '';
         const overlayDisplay=overlay ? overlay.style.display : null;
+        const shouldAnimate=format==='pdf' || format==='jpg';
+        if(shouldAnimate){
+          showExportOverlay();
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        }
         let exportHost=null;
         let layoutSnapshot=null;
         try{
@@ -8922,6 +8933,7 @@ if ($view === 'map_edit') {
           if(layoutSnapshot){ restoreLayoutSnapshot(jm, layoutSnapshot); }
           if(exportHost && exportHost.parentElement){ exportHost.remove(); }
           if(overlay){ overlay.style.display=overlayDisplay || ''; }
+          if(shouldAnimate){ hideExportOverlay(); }
         }
       }
       function openImportModeDialog(fileName, data){
