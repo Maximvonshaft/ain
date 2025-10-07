@@ -3791,7 +3791,7 @@ if ($view === 'map_edit') {
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:auto;overflow:visible}
       .mind-link-controls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
-      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(160deg,rgba(28,32,36,.96),rgba(12,16,18,.92));color:var(--gold-400);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 12px 28px rgba(0,0,0,.52),0 0 0 1px rgba(227,198,139,.32) inset,0 0 26px rgba(227,198,139,.22);transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition);text-shadow:0 0 10px rgba(227,198,139,.4);isolation:isolate}
+      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(160deg,rgba(28,32,36,.96),rgba(12,16,18,.92));color:var(--gold-400);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 12px 28px rgba(0,0,0,.52),0 0 0 1px rgba(227,198,139,.32) inset,0 0 26px rgba(227,198,139,.22);transform:translate(-50%,-50%);transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition);text-shadow:0 0 10px rgba(227,198,139,.4);isolation:isolate}
       .mind-link-controls .edge-insert-btn::before{content:"";position:absolute;inset:5px;border-radius:12px;background:radial-gradient(circle at 50% 40%,rgba(227,198,139,.32),rgba(227,198,139,.08) 65%,rgba(227,198,139,0) 100%);box-shadow:inset 0 0 18px rgba(227,198,139,.24);z-index:-1;opacity:.9}
       .mind-link-controls .edge-insert-btn::after{content:"";position:absolute;inset:-10px;border-radius:18px;background:radial-gradient(circle,rgba(227,198,139,.18),rgba(227,198,139,0) 70%);filter:blur(4px);opacity:.75;z-index:-2}
       .mind-link-controls .edge-insert-btn:hover{background:linear-gradient(160deg,rgba(36,42,48,.98),rgba(18,22,26,.94));border-color:rgba(227,198,139,.85);box-shadow:0 16px 32px rgba(0,0,0,.55),0 0 0 1px rgba(227,198,139,.4) inset,0 0 34px rgba(227,198,139,.3)}
@@ -4740,9 +4740,6 @@ if ($view === 'map_edit') {
           this.relationLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
           this.relationLayer.classList.add('mind-relations');
           this.viewport.appendChild(this.relationLayer);
-          this.linkControlLayer=document.createElement('div');
-          this.linkControlLayer.className='mind-link-controls';
-          this.viewport.appendChild(this.linkControlLayer);
           this.guideLayer=document.createElement('div');
           this.guideLayer.className='mind-guides';
           this.guideLayer.style.position='absolute';
@@ -4758,6 +4755,11 @@ if ($view === 'map_edit') {
           this.nodeLayer.className='mind-nodes';
           this.viewport.appendChild(this.nodeLayer);
           this.container.appendChild(this.viewport);
+          this.linkControlLayer=document.createElement('div');
+          this.linkControlLayer.className='mind-link-controls';
+          this.linkControlLayer.style.width='100%';
+          this.linkControlLayer.style.height='100%';
+          this.container.appendChild(this.linkControlLayer);
           this.sizeCache=new Map();
           this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
           if(!this.measureHost.classList.contains('mind-measure')){
@@ -5594,8 +5596,8 @@ if ($view === 'map_edit') {
             this.relationLayer.style.height=`${this.bounds.height}px`;
           }
           if(this.linkControlLayer){
-            this.linkControlLayer.style.width=`${this.bounds.width}px`;
-            this.linkControlLayer.style.height=`${this.bounds.height}px`;
+            this.linkControlLayer.style.width='100%';
+            this.linkControlLayer.style.height='100%';
           }
           this.nodeLayer.style.width=`${this.bounds.width}px`;
           this.nodeLayer.style.height=`${this.bounds.height}px`;
@@ -5986,13 +5988,30 @@ if ($view === 'map_edit') {
             btn.hidden=true;
             this.clearEdgeHover(node.parent.id, node.id);
             if(btn._edgeHoverActivePair){ btn._edgeHoverActivePair=null; }
+            btn._logicalPosition=null;
+            delete btn.dataset.logicalX;
+            delete btn.dataset.logicalY;
+            return;
+          }
+          if(!Number.isFinite(mid.x) || !Number.isFinite(mid.y)){
+            btn.hidden=true;
+            btn._logicalPosition=null;
+            delete btn.dataset.logicalX;
+            delete btn.dataset.logicalY;
             return;
           }
           btn.hidden=false;
-          btn.style.left=`${mid.x}px`;
-          btn.style.top=`${mid.y}px`;
+          const logical={x:mid.x, y:mid.y};
+          btn._logicalPosition=logical;
+          btn.dataset.logicalX=String(logical.x);
+          btn.dataset.logicalY=String(logical.y);
           const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
-          btn.style.setProperty('--edge-scale', (1/scale).toFixed(3));
+          const offsetX=Number.isFinite(this.offsetX)?this.offsetX:0;
+          const offsetY=Number.isFinite(this.offsetY)?this.offsetY:0;
+          const screenX=logical.x*scale + offsetX;
+          const screenY=logical.y*scale + offsetY;
+          btn.style.left=`${screenX}px`;
+          btn.style.top=`${screenY}px`;
         }
         setEdgeHover(fromId,toId){
           if(!fromId || !toId) return;
@@ -6021,11 +6040,29 @@ if ($view === 'map_edit') {
           if(child && child.el){ child.el.classList.remove('edge-glow'); }
         }
         updateEdgeButtonScale(){
-          if(!this.linkControlLayer) return;
+          if(!this.linkControlLayer || !this.nodes) return;
           const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
-          const factor=(1/scale).toFixed(3);
-          const buttons=this.linkControlLayer.querySelectorAll('.edge-insert-btn');
-          buttons.forEach(btn=>btn.style.setProperty('--edge-scale', factor));
+          const offsetX=Number.isFinite(this.offsetX)?this.offsetX:0;
+          const offsetY=Number.isFinite(this.offsetY)?this.offsetY:0;
+          for(const node of this.nodes.values()){
+            if(!node) continue;
+            const btn=node.edgeButton;
+            if(!btn || !btn.isConnected || btn.hidden) continue;
+            let logical=btn._logicalPosition || null;
+            if((!logical || !Number.isFinite(logical.x) || !Number.isFinite(logical.y)) && btn.dataset){
+              const parsedX=parseFloat(btn.dataset.logicalX || '');
+              const parsedY=parseFloat(btn.dataset.logicalY || '');
+              if(Number.isFinite(parsedX) && Number.isFinite(parsedY)){
+                logical={x:parsedX,y:parsedY};
+                btn._logicalPosition=logical;
+              }
+            }
+            if(!logical || !Number.isFinite(logical.x) || !Number.isFinite(logical.y)) continue;
+            const screenX=logical.x*scale + offsetX;
+            const screenY=logical.y*scale + offsetY;
+            btn.style.left=`${screenX}px`;
+            btn.style.top=`${screenY}px`;
+          }
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -8072,9 +8109,43 @@ if ($view === 'map_edit') {
           clone.style.width=`${viewportWidth}px`;
           clone.style.height=`${viewportHeight}px`;
           clone.style.overflow='visible';
-          exportHost.appendChild(clone);
+          clone.style.position='absolute';
+          clone.style.left='0';
+          clone.style.top='0';
+          const exportWrapper=document.createElement('div');
+          exportWrapper.style.position='relative';
+          exportWrapper.style.width=`${viewportWidth}px`;
+          exportWrapper.style.height=`${viewportHeight}px`;
+          exportWrapper.style.pointerEvents='none';
+          exportWrapper.style.overflow='visible';
+          exportWrapper.appendChild(clone);
+          if(jm && jm.linkControlLayer){
+            const overlayClone=jm.linkControlLayer.cloneNode(true);
+            overlayClone.style.position='absolute';
+            overlayClone.style.left='0';
+            overlayClone.style.top='0';
+            overlayClone.style.width=`${viewportWidth}px`;
+            overlayClone.style.height=`${viewportHeight}px`;
+            overlayClone.style.pointerEvents='none';
+            overlayClone.style.transform='none';
+            const buttons=overlayClone.querySelectorAll('.edge-insert-btn');
+            buttons.forEach(btn=>{
+              const rawX=btn.dataset ? btn.dataset.logicalX : null;
+              const rawY=btn.dataset ? btn.dataset.logicalY : null;
+              const logicalX=rawX!=null?parseFloat(rawX):NaN;
+              const logicalY=rawY!=null?parseFloat(rawY):NaN;
+              if(Number.isFinite(logicalX) && Number.isFinite(logicalY)){
+                btn.style.left=`${logicalX}px`;
+                btn.style.top=`${logicalY}px`;
+              }else{
+                btn.setAttribute('hidden','');
+              }
+            });
+            exportWrapper.appendChild(overlayClone);
+          }
+          exportHost.appendChild(exportWrapper);
           document.body.appendChild(exportHost);
-          const canvas=await htmlToImage.toCanvas(clone,{
+          const canvas=await htmlToImage.toCanvas(exportWrapper,{
             backgroundColor,
             pixelRatio,
             filter:node=>{
