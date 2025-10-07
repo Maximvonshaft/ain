@@ -2526,6 +2526,47 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
       .attachment-preview-footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
       .attachment-preview-download{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(15,19,22,.85);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:transform var(--transition),box-shadow var(--transition)}
       .attachment-preview-download:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(227,198,139,.25)}
+      .attachment-manager{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(5,7,10,.78);backdrop-filter:blur(18px);z-index:260}
+      .attachment-manager[data-open="true"]{display:flex}
+      .attachment-manager-panel{width:min(780px,calc(100vw - 32px));max-height:min(90vh,96svh);display:flex;flex-direction:column;gap:16px;padding:24px;border-radius:24px;border:1px solid rgba(75,195,209,.42);background:linear-gradient(165deg,rgba(21,26,30,.95),rgba(12,16,18,.92));box-shadow:0 32px 64px rgba(0,0,0,.7),0 0 36px rgba(75,195,209,.22);position:relative}
+      .attachment-manager-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+      .attachment-manager-header h3{margin:0;font:600 17px/1.3 'Cinzel','Noto Serif SC',serif;color:rgba(191,242,255,.92);letter-spacing:.16em;text-transform:uppercase}
+      .attachment-manager-meta{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-manager-close{border:1px solid rgba(75,195,209,.42);background:rgba(15,19,22,.78);color:rgba(191,242,255,.92);border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:border-color var(--transition),transform var(--transition)}
+      .attachment-manager-close:hover{border-color:rgba(75,195,209,.62);transform:translateY(-1px)}
+      .attachment-manager-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+      .attachment-manager-select-all{display:inline-flex;align-items:center;gap:8px;color:var(--text-muted);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+      .attachment-manager-select-all input{width:16px;height:16px}
+      .attachment-manager-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
+      .attachment-manager-refresh{padding:6px 12px;border-radius:12px;border:1px solid rgba(75,195,209,.38);background:rgba(75,195,209,.12);color:rgba(191,242,255,.92);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),transform var(--transition)}
+      .attachment-manager-refresh:hover{border-color:rgba(75,195,209,.58);background:rgba(75,195,209,.18);transform:translateY(-1px)}
+      .attachment-manager-refresh:focus-visible{outline:3px solid rgba(75,195,209,.45);outline-offset:2px}
+      .attachment-manager-table{display:flex;flex-direction:column;gap:6px;max-height:420px}
+      .attachment-manager-row{display:grid;grid-template-columns:auto minmax(160px,1.1fr) minmax(200px,1.4fr) minmax(200px,1fr) auto;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;border:1px solid rgba(75,195,209,.22);background:rgba(15,19,22,.82);box-shadow:inset 0 0 0 1px rgba(75,195,209,.12)}
+      .attachment-manager-header-row{background:transparent;border-style:dashed;border-color:rgba(75,195,209,.28);color:var(--text-muted);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;pointer-events:none}
+      .attachment-manager-header-row .attachment-manager-cell{color:inherit;font-size:11px}
+      .attachment-manager-list{display:flex;flex-direction:column;gap:6px;overflow:auto;padding-right:4px}
+      .attachment-manager-list::-webkit-scrollbar{width:8px}
+      .attachment-manager-list::-webkit-scrollbar-thumb{background:rgba(75,195,209,.28);border-radius:999px}
+      .attachment-manager-row[data-selected="true"]{border-color:rgba(75,195,209,.48);box-shadow:0 18px 36px rgba(75,195,209,.18),inset 0 0 0 1px rgba(75,195,209,.25);background:rgba(75,195,209,.12)}
+      .attachment-manager-cell{display:flex;align-items:center;gap:6px;color:var(--text-strong);font:600 13px/1.4 'Inter','Noto Sans SC',sans-serif;min-width:0}
+      .attachment-manager-cell.select{justify-content:center}
+      .attachment-manager-cell.info{color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;flex-wrap:wrap}
+      .attachment-manager-cell.info span{white-space:nowrap}
+      .attachment-manager-cell.actions{justify-content:flex-end}
+      .attachment-manager-node,.attachment-manager-preview{padding:6px 10px;border-radius:12px;border:1px solid rgba(75,195,209,.28);background:rgba(12,16,18,.78);color:rgba(191,242,255,.92);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),transform var(--transition);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .attachment-manager-node{color:var(--gold-400);border-color:rgba(201,168,106,.32);background:rgba(201,168,106,.12)}
+      .attachment-manager-node:hover{border-color:rgba(201,168,106,.55);background:rgba(201,168,106,.18);transform:translateY(-1px)}
+      .attachment-manager-node:focus-visible,.attachment-manager-preview:focus-visible{outline:3px solid rgba(75,195,209,.45);outline-offset:2px}
+      .attachment-manager-preview{display:inline-flex;align-items:center;gap:6px}
+      .attachment-manager-preview::before{content:"📎"}
+      .attachment-manager-preview:hover{border-color:rgba(75,195,209,.52);background:rgba(75,195,209,.18);transform:translateY(-1px)}
+      .attachment-manager-remove{padding:6px 10px;border-radius:12px;border:1px solid rgba(209,75,75,.42);background:rgba(209,75,75,.12);color:#fda4a4;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),transform var(--transition)}
+      .attachment-manager-remove:hover{border-color:rgba(209,75,75,.65);background:rgba(209,75,75,.18);transform:translateY(-1px)}
+      .attachment-manager-empty{margin:6px 0 0;text-align:center;color:var(--text-muted);font:13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      @media (max-width:900px){.attachment-manager-row{grid-template-columns:auto minmax(140px,1fr) minmax(180px,1.2fr) minmax(180px,1fr) auto}}
+      @media (max-width:700px){.attachment-manager-panel{width:calc(100vw - 28px);padding:20px}.attachment-manager-row{grid-template-columns:auto minmax(140px,1fr);grid-auto-rows:auto}.attachment-manager-cell.info{grid-column:2/span 1}.attachment-manager-cell.actions{grid-column:2/span 1;justify-content:flex-start}.attachment-manager-row .attachment-manager-cell.name{grid-column:2/span 1}}
+      @media (max-width:520px){.attachment-manager-row{grid-template-columns:auto minmax(0,1fr);gap:10px}.attachment-manager-cell.select{grid-row:1/span 3}.attachment-manager-cell.node,.attachment-manager-cell.name,.attachment-manager-cell.info,.attachment-manager-cell.actions{grid-column:2/span 1}.attachment-manager-node,.attachment-manager-preview{width:100%}}
     </style>
 
   </head>
@@ -3773,6 +3814,11 @@ if ($view === 'map_edit') {
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
       .map-delete-btn[disabled]{opacity:.5;cursor:not-allowed}
+      .map-attachment-btn{padding:6px 14px;border-radius:14px;border:1px solid rgba(75,195,209,.38);background:rgba(75,195,209,.12);color:rgba(191,242,255,.92);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:border-color var(--transition),background var(--transition),transform var(--transition)}
+      .map-attachment-btn .count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;padding:2px 6px;border-radius:999px;background:rgba(75,195,209,.28);color:rgba(191,242,255,.92);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+      .map-attachment-btn .count[hidden]{display:none}
+      .map-attachment-btn:hover{border-color:rgba(75,195,209,.58);background:rgba(75,195,209,.18);transform:translateY(-1px)}
+      .map-attachment-btn:focus-visible{outline:3px solid rgba(75,195,209,.45);outline-offset:2px}
       .map-title-input{width:100%;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 17px/1.35 'Cinzel','Noto Serif SC',serif;letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
       .save-state{margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
@@ -3981,6 +4027,9 @@ if ($view === 'map_edit') {
             <div class="map-meta">
               <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
               <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+              <button type="button" class="map-attachment-btn" id="map-attachment-manager-btn" aria-haspopup="dialog" aria-controls="attachment-manager" aria-expanded="false">
+                附件管理<span class="count" id="map-attachment-count" hidden>0</span>
+              </button>
               <?php if ($mind['id']): ?>
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
@@ -4060,6 +4109,38 @@ if ($view === 'map_edit') {
         <div class="mind-import-footer">
           <button type="button" data-import-cancel>取消</button>
         </div>
+      </div>
+    </div>
+    <div class="attachment-manager" id="attachment-manager" data-open="false" role="dialog" aria-modal="true" aria-labelledby="attachment-manager-title" aria-hidden="true">
+      <div class="attachment-manager-panel">
+        <header class="attachment-manager-header">
+          <div>
+            <h3 id="attachment-manager-title">附件管理</h3>
+            <div class="attachment-manager-meta" id="attachment-manager-meta">当前导图暂无附件。</div>
+          </div>
+          <button type="button" class="attachment-manager-close" data-attachment-close aria-label="关闭">×</button>
+        </header>
+        <div class="attachment-manager-toolbar">
+          <label class="attachment-manager-select-all" for="attachment-manager-select-all">
+            <input type="checkbox" id="attachment-manager-select-all">
+            <span>全选</span>
+          </label>
+          <div class="attachment-manager-toolbar-actions">
+            <button type="button" class="attachment-manager-refresh" data-attachment-refresh>刷新</button>
+            <button type="button" class="attachment-manager-remove" id="attachment-manager-delete" disabled>删除选中</button>
+          </div>
+        </div>
+        <div class="attachment-manager-table" role="table" aria-describedby="attachment-manager-meta">
+          <div class="attachment-manager-row attachment-manager-header-row" role="row">
+            <div class="attachment-manager-cell select" role="columnheader" aria-label="选择"></div>
+            <div class="attachment-manager-cell node" role="columnheader">所属节点</div>
+            <div class="attachment-manager-cell name" role="columnheader">附件</div>
+            <div class="attachment-manager-cell info" role="columnheader">详情</div>
+            <div class="attachment-manager-cell actions" role="columnheader">操作</div>
+          </div>
+          <div class="attachment-manager-list" id="attachment-manager-list" role="rowgroup"></div>
+        </div>
+        <div class="attachment-manager-empty" id="attachment-manager-empty">当前导图暂无附件。</div>
       </div>
     </div>
     <div class="node-popover" id="node-popover" hidden>
@@ -6639,6 +6720,55 @@ if ($view === 'map_edit') {
         label=String(label || '附件');
         return label.length>16 ? label.slice(0,15)+'…' : label;
       }
+      function fullAttachmentName(descriptor){
+        if(!descriptor) return '附件';
+        const name=typeof descriptor.name==='string' && descriptor.name.trim() ? descriptor.name.trim() : '';
+        if(name) return name;
+        const filename=typeof descriptor.filename==='string' && descriptor.filename.trim() ? descriptor.filename.trim() : '';
+        if(filename) return filename;
+        if(descriptor.assetId) return `附件 #${descriptor.assetId}`;
+        return '附件';
+      }
+      function attachmentSignature(descriptor){
+        if(!descriptor) return '';
+        if(descriptor.assetId) return `id:${descriptor.assetId}`;
+        if(descriptor.url) return `url:${descriptor.url}`;
+        const name=typeof descriptor.name==='string'?descriptor.name:(typeof descriptor.filename==='string'?descriptor.filename:'');
+        const size=Number.isFinite(descriptor.size)?descriptor.size:(Number.isFinite(descriptor.filesize)?descriptor.filesize:(Number.isFinite(descriptor.length)?descriptor.length:''));
+        const mime=descriptor.mime || descriptor.type || '';
+        const stamp=descriptor.uploadedAt || descriptor.updatedAt || descriptor.createdAt || '';
+        const content=typeof descriptor.content==='string'?descriptor.content.slice(0,32):'';
+        return `meta:${name ?? ''}|${size ?? ''}|${mime}|${stamp}|${content}`;
+      }
+      function formatAttachmentSize(value){
+        if(!Number.isFinite(value) || value<=0) return '';
+        const units=['B','KB','MB','GB','TB'];
+        let idx=0; let num=value;
+        while(num>=1024 && idx<units.length-1){ num/=1024; idx++; }
+        const decimals=num>=100 || idx===0 ? 0 : 1;
+        return num.toFixed(decimals)+' '+units[idx];
+      }
+      function formatAttachmentTime(value){
+        if(!value) return '';
+        let date=null;
+        if(value instanceof Date){ date=value; }
+        else if(typeof value==='number'){ date=new Date(value); }
+        else if(typeof value==='string'){ const parsed=Date.parse(value); if(!Number.isNaN(parsed)) date=new Date(parsed); }
+        if(!date || Number.isNaN(date.getTime())) return '';
+        const pad=num=>String(num).padStart(2,'0');
+        return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+      function describeNodePath(node){
+        if(!node) return '';
+        const parts=[];
+        let current=node;
+        while(current){
+          const title=typeof current.topic==='string' && current.topic.trim() ? current.topic.trim() : '未命名节点';
+          parts.push(title);
+          current=current.parent || null;
+        }
+        return parts.reverse().join(' / ');
+      }
       async function uploadMindmapFile(file, nodeId){
         const fd=new FormData();
         fd.append('action','upload_mindmap_asset');
@@ -6948,8 +7078,21 @@ if ($view === 'map_edit') {
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
       const relationToast=document.getElementById('mind-relation-toast');
       const relationContextMenu=document.getElementById('relation-context-menu');
+      const attachmentManager=document.getElementById('attachment-manager');
+      const attachmentManagerList=attachmentManager ? attachmentManager.querySelector('#attachment-manager-list') : null;
+      const attachmentManagerMeta=attachmentManager ? attachmentManager.querySelector('#attachment-manager-meta') : null;
+      const attachmentManagerEmpty=attachmentManager ? attachmentManager.querySelector('#attachment-manager-empty') : null;
+      const attachmentManagerSelectAll=attachmentManager ? attachmentManager.querySelector('#attachment-manager-select-all') : null;
+      const attachmentManagerDelete=attachmentManager ? document.getElementById('attachment-manager-delete') : null;
+      const attachmentManagerRefresh=attachmentManager ? attachmentManager.querySelector('[data-attachment-refresh]') : null;
+      const attachmentManagerClose=attachmentManager ? attachmentManager.querySelector('[data-attachment-close]') : null;
+      const attachmentManagerButton=document.getElementById('map-attachment-manager-btn');
+      const attachmentManagerCount=document.getElementById('map-attachment-count');
       let pendingImportPayload=null;
       let pendingImportFileName='';
+      const attachmentManagerSelection=new Set();
+      let attachmentManagerIndex=[];
+      let attachmentManagerLastActive=null;
       const foldAllMenuItem=null;
       const nodePopover=document.getElementById('node-popover');
       const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
@@ -7985,6 +8128,7 @@ if ($view === 'map_edit') {
         if(popoverOpen){ positionInspectorPopover(node); }
       }
       refreshInspector(jm.get_selected_node());
+      renderAttachmentManagerList();
       if(jm.options){ jm.options.onNodeDetails=openInspectorPopover; }
       updateFoldButtonState();
       updateUndoRedoButtons();
@@ -8368,6 +8512,253 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        renderAttachmentManagerList();
+      }
+      function isAttachmentManagerOpen(){
+        return !!(attachmentManager && attachmentManager.dataset.open==='true');
+      }
+      function collectAttachmentEntries(){
+        const entries=[];
+        if(!jm || !jm.nodes) return entries;
+        const visited=new Set();
+        const pushForNode=node=>{
+          if(!node) return;
+          const attachments=gatherAttachments(node.data);
+          if(!attachments.length) return;
+          const path=describeNodePath(node);
+          const nodeTitle=typeof node.topic==='string' && node.topic.trim() ? node.topic.trim() : '未命名节点';
+          attachments.forEach((att,index)=>{
+            if(!att || typeof att!=='object') return;
+            const signature=attachmentSignature(att);
+            const safeSignature=signature || `index-${index}`;
+            const key=`${node.id}:${safeSignature}:${index}`;
+            const sizeValue=Number.isFinite(att.size)?att.size:(Number.isFinite(att.filesize)?att.filesize:(Number.isFinite(att.length)?att.length:null));
+            const timeValue=att.uploadedAt || att.updatedAt || att.createdAt || null;
+            entries.push({
+              key,
+              signature:safeSignature,
+              nodeId:node.id,
+              nodeTopic:nodeTitle,
+              nodePath:path,
+              attachment:att,
+              name:fullAttachmentName(att),
+              size:sizeValue,
+              sizeText:formatAttachmentSize(sizeValue),
+              mime:att.mime || att.type || '',
+              assetId:att.assetId || null,
+              time:timeValue,
+              timeText:formatAttachmentTime(timeValue)
+            });
+          });
+        };
+        const walk=node=>{
+          if(!node || visited.has(node.id)) return;
+          visited.add(node.id);
+          pushForNode(node);
+          if(Array.isArray(node.children)){
+            node.children.forEach(child=>walk(child));
+          }
+        };
+        const root=typeof jm.get_root==='function' ? jm.get_root() : null;
+        if(root){ walk(root); }
+        if(jm.nodes && typeof jm.nodes.forEach==='function'){
+          jm.nodes.forEach(node=>{ if(!node || visited.has(node.id)) return; walk(node); });
+        }
+        return entries;
+      }
+      function getAttachmentEntryByKey(key){
+        if(!key) return null;
+        return attachmentManagerIndex.find(entry=>entry.key===key) || null;
+      }
+      function renderAttachmentManagerList(){
+        if(!attachmentManager) return;
+        const entries=collectAttachmentEntries();
+        attachmentManagerIndex=entries;
+        const validKeys=new Set(entries.map(entry=>entry.key));
+        Array.from(attachmentManagerSelection).forEach(key=>{ if(!validKeys.has(key)) attachmentManagerSelection.delete(key); });
+        if(attachmentManagerList){
+          const previousScroll=attachmentManagerList.scrollTop;
+          attachmentManagerList.innerHTML='';
+          entries.forEach(entry=>{
+            const row=document.createElement('div');
+            row.className='attachment-manager-row';
+            row.dataset.key=entry.key;
+            row.setAttribute('role','row');
+            if(attachmentManagerSelection.has(entry.key)) row.dataset.selected='true';
+            else row.removeAttribute('data-selected');
+            const selectCell=document.createElement('label');
+            selectCell.className='attachment-manager-cell select';
+            selectCell.setAttribute('role','cell');
+            const checkbox=document.createElement('input');
+            checkbox.type='checkbox';
+            checkbox.dataset.attachmentSelect='true';
+            checkbox.checked=attachmentManagerSelection.has(entry.key);
+            checkbox.setAttribute('aria-label','选择附件');
+            selectCell.appendChild(checkbox);
+            row.appendChild(selectCell);
+            const nodeCell=document.createElement('div');
+            nodeCell.className='attachment-manager-cell node';
+            nodeCell.setAttribute('role','cell');
+            const nodeButton=document.createElement('button');
+            nodeButton.type='button';
+            nodeButton.className='attachment-manager-node';
+            nodeButton.dataset.attachmentFocus=entry.key;
+            nodeButton.textContent=entry.nodeTopic;
+            nodeButton.title=entry.nodePath || entry.nodeTopic;
+            nodeCell.appendChild(nodeButton);
+            row.appendChild(nodeCell);
+            const nameCell=document.createElement('div');
+            nameCell.className='attachment-manager-cell name';
+            nameCell.setAttribute('role','cell');
+            const previewButton=document.createElement('button');
+            previewButton.type='button';
+            previewButton.className='attachment-manager-preview';
+            previewButton.dataset.attachmentPreview=entry.key;
+            previewButton.textContent=entry.name;
+            previewButton.title=entry.name;
+            nameCell.appendChild(previewButton);
+            row.appendChild(nameCell);
+            const infoCell=document.createElement('div');
+            infoCell.className='attachment-manager-cell info';
+            infoCell.setAttribute('role','cell');
+            const metaParts=[];
+            if(entry.sizeText) metaParts.push(entry.sizeText);
+            if(entry.mime) metaParts.push(entry.mime);
+            if(entry.assetId) metaParts.push(`#${entry.assetId}`);
+            if(entry.timeText) metaParts.push(entry.timeText);
+            infoCell.textContent=metaParts.join(' · ');
+            row.appendChild(infoCell);
+            const actionsCell=document.createElement('div');
+            actionsCell.className='attachment-manager-cell actions';
+            actionsCell.setAttribute('role','cell');
+            const removeButton=document.createElement('button');
+            removeButton.type='button';
+            removeButton.className='attachment-manager-remove';
+            removeButton.dataset.attachmentRemove=entry.key;
+            removeButton.textContent='删除';
+            actionsCell.appendChild(removeButton);
+            row.appendChild(actionsCell);
+            attachmentManagerList.appendChild(row);
+          });
+          attachmentManagerList.scrollTop=previousScroll;
+          if(attachmentManagerEmpty){ attachmentManagerEmpty.hidden=entries.length>0; }
+        }
+        if(attachmentManagerMeta){
+          if(!entries.length){
+            attachmentManagerMeta.textContent='当前导图暂无附件。';
+          }else{
+            const totalSize=entries.reduce((sum,item)=>sum+(Number.isFinite(item.size)?item.size:0),0);
+            const sizeText=formatAttachmentSize(totalSize);
+            attachmentManagerMeta.textContent=`共 ${entries.length} 个附件${sizeText ? ' · 总计 '+sizeText : ''}`;
+          }
+        }
+        if(attachmentManagerCount){
+          attachmentManagerCount.textContent=String(entries.length);
+          attachmentManagerCount.hidden=entries.length===0;
+        }
+        if(attachmentManagerSelectAll){
+          attachmentManagerSelectAll.disabled=!entries.length;
+          attachmentManagerSelectAll.indeterminate=attachmentManagerSelection.size>0 && attachmentManagerSelection.size<entries.length;
+          attachmentManagerSelectAll.checked=entries.length>0 && attachmentManagerSelection.size===entries.length;
+        }
+        if(attachmentManagerDelete){
+          const selected=attachmentManagerSelection.size;
+          attachmentManagerDelete.disabled=selected===0;
+          attachmentManagerDelete.textContent=selected>0 ? `删除选中（${selected}）` : '删除选中';
+        }
+      }
+      function handleAttachmentManagerKeydown(event){
+        if(event.key==='Escape' && isAttachmentManagerOpen()){
+          event.preventDefault();
+          closeAttachmentManagerPanel();
+        }
+      }
+      function openAttachmentManagerPanel(){
+        if(!attachmentManager) return;
+        renderAttachmentManagerList();
+        attachmentManager.dataset.open='true';
+        attachmentManager.setAttribute('aria-hidden','false');
+        if(attachmentManagerButton){ attachmentManagerButton.setAttribute('aria-expanded','true'); }
+        attachmentManagerLastActive=document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        document.addEventListener('keydown', handleAttachmentManagerKeydown, true);
+        let focusTarget=null;
+        if(attachmentManagerSelectAll && !attachmentManagerSelectAll.disabled){
+          focusTarget=attachmentManagerSelectAll;
+        }else if(attachmentManagerClose){
+          focusTarget=attachmentManagerClose;
+        }else if(attachmentManagerDelete){
+          focusTarget=attachmentManagerDelete;
+        }
+        if(focusTarget){
+          try{ focusTarget.focus({preventScroll:true}); }
+          catch(_){ try{ focusTarget.focus(); }catch(__){ } }
+        }
+      }
+      function closeAttachmentManagerPanel(){
+        if(!attachmentManager || !isAttachmentManagerOpen()) return;
+        attachmentManager.dataset.open='false';
+        attachmentManager.setAttribute('aria-hidden','true');
+        if(attachmentManagerButton){ attachmentManagerButton.setAttribute('aria-expanded','false'); }
+        document.removeEventListener('keydown', handleAttachmentManagerKeydown, true);
+        attachmentManagerSelection.clear();
+        renderAttachmentManagerList();
+        if(attachmentManagerLastActive && typeof attachmentManagerLastActive.focus==='function'){
+          try{ attachmentManagerLastActive.focus(); }
+          catch(_){ }
+        }
+        attachmentManagerLastActive=null;
+      }
+      function deleteAttachmentEntries(entries){
+        if(!Array.isArray(entries) || !entries.length) return;
+        performUndoable('delete-attachments',()=>{
+          commitInlineEditing();
+          let changed=false;
+          const affectedNodes=new Set();
+          entries.forEach(entry=>{
+            if(!entry) return;
+            const node=jm.get_node(entry.nodeId);
+            if(!node) return;
+            const data=ensureNodeDataObject(node);
+            const attachments=gatherAttachments(data);
+            if(!attachments.length) return;
+            const filtered=[];
+            let removed=false;
+            attachments.forEach(att=>{
+              if(!removed && attachmentSignature(att)===entry.signature){
+                removed=true;
+                return;
+              }
+              filtered.push(att);
+            });
+            if(!removed) return;
+            changed=true;
+            if(filtered.length){
+              data.attachments=filtered;
+              data.attachment=filtered[0];
+            }else{
+              delete data.attachments;
+              delete data.attachment;
+            }
+            node.model.data=data;
+            node.data=data;
+            affectedNodes.add(node.id);
+          });
+          if(!changed) return false;
+          jm.computeLayout();
+          jm.render();
+          affectedNodes.forEach(id=>{
+            const latest=jm.get_node(id);
+            const selected=jm.get_selected_node();
+            if(latest && selected && selected.id===id){
+              refreshInspector(latest);
+            }
+          });
+          markDirty();
+          scheduleHandleRefresh();
+          entries.forEach(entry=>attachmentManagerSelection.delete(entry.key));
+          renderAttachmentManagerList();
+          return true;
+        },{mergeKey:'delete-attachments'});
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -8489,6 +8880,95 @@ if ($view === 'map_edit') {
           if(!node){ alert('请先选择一个节点'); return; }
           await attachFilesToNode(node, files);
           refreshInspector(jm.get_node(node.id));
+        });
+      }
+      if(attachmentManagerButton){
+        attachmentManagerButton.addEventListener('click',e=>{
+          e.preventDefault();
+          openAttachmentManagerPanel();
+        });
+      }
+      if(attachmentManagerClose){
+        attachmentManagerClose.addEventListener('click',e=>{
+          e.preventDefault();
+          closeAttachmentManagerPanel();
+        });
+      }
+      if(attachmentManager){
+        attachmentManager.addEventListener('click',e=>{
+          if(e.target===attachmentManager){ closeAttachmentManagerPanel(); }
+        });
+      }
+      if(attachmentManagerRefresh){
+        attachmentManagerRefresh.addEventListener('click',e=>{
+          e.preventDefault();
+          renderAttachmentManagerList();
+        });
+      }
+      if(attachmentManagerSelectAll){
+        attachmentManagerSelectAll.addEventListener('change',e=>{
+          if(!attachmentManagerIndex.length){
+            attachmentManagerSelection.clear();
+            renderAttachmentManagerList();
+            return;
+          }
+          if(e.target.checked){
+            attachmentManagerSelection.clear();
+            attachmentManagerIndex.forEach(entry=>attachmentManagerSelection.add(entry.key));
+          }else{
+            attachmentManagerSelection.clear();
+          }
+          renderAttachmentManagerList();
+        });
+      }
+      if(attachmentManagerDelete){
+        attachmentManagerDelete.addEventListener('click',()=>{
+          if(!attachmentManagerSelection.size) return;
+          if(!confirm(`确定要删除选中的 ${attachmentManagerSelection.size} 个附件吗？`)) return;
+          const entries=Array.from(attachmentManagerSelection).map(getAttachmentEntryByKey).filter(Boolean);
+          deleteAttachmentEntries(entries);
+        });
+      }
+      if(attachmentManagerList){
+        attachmentManagerList.addEventListener('change',e=>{
+          const checkbox=e.target.closest('input[data-attachment-select]');
+          if(!checkbox) return;
+          const row=checkbox.closest('.attachment-manager-row');
+          if(!row) return;
+          const key=row.dataset.key;
+          if(!key) return;
+          if(checkbox.checked){ attachmentManagerSelection.add(key); }
+          else{ attachmentManagerSelection.delete(key); }
+          renderAttachmentManagerList();
+        });
+        attachmentManagerList.addEventListener('click',e=>{
+          const previewBtn=e.target.closest('[data-attachment-preview]');
+          if(previewBtn){
+            e.preventDefault();
+            const entry=getAttachmentEntryByKey(previewBtn.dataset.attachmentPreview);
+            if(entry){ openMindmapAttachment(entry.attachment); }
+            return;
+          }
+          const focusBtn=e.target.closest('[data-attachment-focus]');
+          if(focusBtn){
+            e.preventDefault();
+            const entry=getAttachmentEntryByKey(focusBtn.dataset.attachmentFocus);
+            if(entry){
+              const node=jm.get_node(entry.nodeId);
+              if(node){
+                jm.select_node(node.id);
+                scheduleHandleRefresh();
+                centerOnNodeSmooth(node);
+              }
+            }
+            return;
+          }
+          const removeBtn=e.target.closest('[data-attachment-remove]');
+          if(removeBtn){
+            e.preventDefault();
+            const entry=getAttachmentEntryByKey(removeBtn.dataset.attachmentRemove);
+            if(entry){ deleteAttachmentEntries([entry]); }
+          }
         });
       }
       if(nodeTopicInput){
@@ -8814,8 +9294,12 @@ if ($view === 'map_edit') {
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             updateFoldAllLabel();
             updateFoldButtonState();
+            if(type!==jsMind.event_type.select){ renderAttachmentManagerList(); }
           }
-          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
+          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){
+            markDirty();
+            if(type===jsMind.event_type.update){ renderAttachmentManagerList(); }
+          }
           updateUndoRedoButtons();
         });
       }
