@@ -6099,7 +6099,8 @@ if ($view === 'map_edit') {
         }
         zoom(step){
           const prev=this.scale;
-          this.scale=Math.max(0.3, Math.min(2.5, this.scale*step));
+          const {minScale,maxScale}=this.getScaleLimits();
+          this.scale=Math.max(minScale, Math.min(maxScale, this.scale*step));
           if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
         }
         viewCommand(cmd){
@@ -6133,16 +6134,79 @@ if ($view === 'map_edit') {
           if(!this.bounds) return false;
           const rect=this.container.getBoundingClientRect();
           if(rect.width<=0 || rect.height<=0) return false;
+          const {minScale,maxScale}=this.getScaleLimits();
           const scale=Math.min(rect.width/(this.bounds.width+200), rect.height/(this.bounds.height+200));
-          this.scale=Math.max(0.3, Math.min(2.5, scale));
+          this.scale=Math.max(minScale, Math.min(maxScale, scale));
           this.center_root();
           return true;
         }
         set_zoom(z){
           if(typeof z!=='number' || !isFinite(z)) return false;
-          this.scale=Math.max(0.3, Math.min(2.5, z));
+          const {minScale,maxScale}=this.getScaleLimits();
+          this.scale=Math.max(minScale, Math.min(maxScale, z));
           this.applyTransform();
           return true;
+        }
+        getScaleLimits(){
+          const FALLBACK_MIN=0.08;
+          const FALLBACK_MAX=2.5;
+          const {container,bounds}=this;
+          let minScale=FALLBACK_MIN;
+          let maxScale=FALLBACK_MAX;
+          if(!container){ return {minScale,maxScale}; }
+          const rect=container.getBoundingClientRect();
+          if(!rect || rect.width<=0 || rect.height<=0){ return {minScale,maxScale}; }
+          let fitScale=Number.POSITIVE_INFINITY;
+          if(bounds){
+            const padding=200;
+            const widthScale=rect.width/(bounds.width+padding);
+            const heightScale=rect.height/(bounds.height+padding);
+            const candidate=Math.min(widthScale, heightScale);
+            if(Number.isFinite(candidate) && candidate>0){
+              fitScale=candidate;
+            }
+          }
+          const readableScale=this.computeReadableScale();
+          let readabilityLimit=(Number.isFinite(readableScale) && readableScale>0)?readableScale:0;
+          if(Number.isFinite(fitScale) && fitScale>0 && readabilityLimit>0){
+            const ratio=fitScale/readabilityLimit;
+            if(ratio<1){
+              readabilityLimit*=Math.max(0.6, ratio);
+            }
+          }
+          const lowerBound=Math.max(readabilityLimit||0, FALLBACK_MIN);
+          minScale=lowerBound;
+          if(Number.isFinite(fitScale) && fitScale>0){
+            minScale=Math.min(minScale, fitScale);
+            minScale=Math.max(minScale, lowerBound);
+          }
+          if(minScale>maxScale){
+            minScale=maxScale;
+          }
+          maxScale=Math.max(maxScale, lowerBound*8);
+          return {minScale,maxScale};
+        }
+        computeReadableScale(){
+          if(!this.nodes || !this.nodes.size) return 0.15;
+          let maxDimension=0;
+          this.nodes.forEach(node=>{
+            if(!node) return;
+            let width=0;
+            let height=0;
+            if(node.el){
+              width=node.el.offsetWidth||0;
+              height=node.el.offsetHeight||0;
+            }else if(this.sizeCache && this.sizeCache.has(node.id)){
+              const cached=this.sizeCache.get(node.id)||{};
+              width=cached.width||0;
+              height=cached.height||0;
+            }
+            maxDimension=Math.max(maxDimension, width, height);
+          });
+          if(!(maxDimension>0)){ return 0.1; }
+          const desired=28;
+          const scale=desired/maxDimension;
+          return Math.max(Math.min(scale, 1), 0.08);
         }
         center_root(){
           if(!this.root || !this.bounds) return false;
