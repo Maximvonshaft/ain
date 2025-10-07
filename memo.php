@@ -1123,6 +1123,39 @@ if (is_post()) {
         }
         break;
       }
+      case 'delete_mindmap_assets': {
+        $rawIds=$_POST['ids'] ?? [];
+        if(is_string($rawIds)){
+          $rawIds=preg_split('/[^0-9]+/', $rawIds) ?: [];
+        }
+        if(!is_array($rawIds)){
+          $rawIds=[];
+        }
+        $ids=[];
+        foreach($rawIds as $raw){
+          if($raw===null || $raw==='') continue;
+          $val=(int)$raw;
+          if($val>0){ $ids[$val]=$val; }
+        }
+        $ids=array_values($ids);
+        if($ids){
+          $mapId=isset($_POST['map_id']) ? (int)$_POST['map_id'] : 0;
+          $sessionKey=session_id();
+          foreach($ids as $assetId){
+            $asset=get_mindmap_asset($assetId);
+            if(!$asset) continue;
+            $assetMapId=isset($asset['mindmap_id']) ? (int)$asset['mindmap_id'] : null;
+            $assetSession=$asset['session_key'] ?? null;
+            if(($mapId>0 && $assetMapId === $mapId) || ($assetMapId===null && $assetSession && $assetSession === $sessionKey)){
+              delete_mindmap_asset($assetId);
+            }
+          }
+        }
+        if(is_ajax()){
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1]); exit;
+        }
+        break;
+      }
       case 'ping_cats': { if(is_ajax()) json_cats(); break; }
       case 'delete_attachment': {
         $id=(int)($_POST['id'] ?? 0);
@@ -3769,6 +3802,45 @@ if ($view === 'map_edit') {
       .mind-info-row .map-title-input{flex:1;min-width:0}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
+      .map-attachments-btn{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:14px;border:1px solid var(--border-soft);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),transform var(--transition)}
+      .map-attachments-btn:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.14);transform:translateY(-1px)}
+      .map-attachments-btn:focus-visible{outline:3px solid rgba(75,195,209,.32);outline-offset:2px}
+      .map-attachments-btn .count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;padding:2px 8px;border-radius:999px;background:rgba(227,198,139,.16);color:var(--gold-400);font-size:11px;letter-spacing:.12em}
+      .map-attachments-btn[data-has-attachments="false"]{opacity:.82}
+      .map-attachments-btn[data-has-attachments="false"] .count{opacity:.6}
+      .mind-attachments-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(6,8,10,.78);backdrop-filter:blur(18px);z-index:220}
+      .mind-attachments-backdrop[data-open="true"]{display:flex}
+      .mind-attachments-panel{background:linear-gradient(165deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.34);border-radius:24px;box-shadow:0 32px 68px rgba(0,0,0,.7),0 0 32px rgba(227,198,139,.2);padding:20px;display:grid;gap:16px;max-width:540px;width:100%;max-height:min(80vh,86svh);overflow:hidden;position:relative}
+      .mind-attachments-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .mind-attachments-panel h3{margin:0;font:600 18px/1.2 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.16em;text-transform:uppercase}
+      .mind-attachments-close{border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.8);color:var(--gold-400);width:34px;height:34px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:border-color var(--transition),transform var(--transition)}
+      .mind-attachments-close:hover{border-color:rgba(227,198,139,.6);transform:translateY(-1px)}
+      .mind-attachments-summary{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+      .mind-attachments-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+      .mind-attachments-toolbar label{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+      .mind-attachments-toolbar input[type="checkbox"]{width:16px;height:16px;accent-color:var(--gold-500)}
+      .mind-attachments-actions{display:flex;align-items:center;gap:10px}
+      .mind-attachments-actions button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.85);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .mind-attachments-actions button:hover:not([disabled]){border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.18)}
+      .mind-attachments-actions button[disabled]{opacity:.6;cursor:not-allowed}
+      .mind-attachments-empty{padding:18px;border:1px dashed rgba(201,168,106,.28);border-radius:16px;background:rgba(12,16,18,.66);color:var(--text-muted);font:500 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.06em;text-align:center}
+      .mind-attachments-scroll{overflow:auto;max-height:calc(100% - 140px);padding-right:4px}
+      .mind-attachments-scroll::-webkit-scrollbar{width:8px}
+      .mind-attachments-scroll::-webkit-scrollbar-thumb{background:rgba(201,168,106,.22);border-radius:999px}
+      .mind-attachments-scroll::-webkit-scrollbar-thumb:hover{background:rgba(201,168,106,.32)}
+      .mind-attachments-panel .attachment-list{display:grid;gap:12px}
+      .mind-attachments-panel .attachment-row{align-items:flex-start}
+      .mind-attachment-select{display:flex;align-items:flex-start;margin-top:2px}
+      .mind-attachment-select input{width:18px;height:18px;accent-color:var(--gold-500)}
+      .mind-attachments-panel .attachment-main{align-items:flex-start}
+      .mind-attachments-panel .attachment-name{font-size:14px}
+      .mind-attachments-panel .attachment-detail{display:flex;flex-wrap:wrap;gap:6px}
+      .mind-attachments-panel .attachment-detail span{display:inline-flex;align-items:center;gap:4px}
+      .mind-attachments-panel .attachment-detail span::before{content:"";display:none}
+      .mind-attachments-panel .attachment-actions{display:flex;align-items:center;gap:8px}
+      .mind-attachments-panel .attachment-actions button{padding:6px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .mind-attachments-panel .attachment-actions button:hover:not([disabled]){border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16)}
+      .mind-attachments-panel .attachment-actions button[disabled]{opacity:.6;cursor:not-allowed}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
@@ -3981,6 +4053,9 @@ if ($view === 'map_edit') {
             <div class="map-meta">
               <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
               <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+              <button type="button" class="map-attachments-btn" id="map-attachments-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="mind-attachments-panel">
+                附件管理 <span class="count" id="map-attachments-count">0</span>
+              </button>
               <?php if ($mind['id']): ?>
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
@@ -4059,6 +4134,25 @@ if ($view === 'map_edit') {
         </div>
         <div class="mind-import-footer">
           <button type="button" data-import-cancel>取消</button>
+        </div>
+      </div>
+    </div>
+    <div class="mind-attachments-backdrop" id="mind-attachments-panel" data-open="false" role="dialog" aria-modal="true" aria-labelledby="mind-attachments-title" aria-hidden="true">
+      <div class="mind-attachments-panel" tabindex="-1">
+        <header>
+          <h3 id="mind-attachments-title">附件管理</h3>
+          <button type="button" class="mind-attachments-close" data-attachment-close aria-label="关闭">×</button>
+        </header>
+        <div class="mind-attachments-summary" id="mind-attachments-summary">暂无附件</div>
+        <div class="mind-attachments-toolbar">
+          <label><input type="checkbox" id="mind-attachments-select-all"> 全选</label>
+          <div class="mind-attachments-actions">
+            <button type="button" id="mind-attachments-delete" disabled>删除选中</button>
+          </div>
+        </div>
+        <div class="mind-attachments-empty" id="mind-attachments-empty">暂无附件。上传后可在此集中管理、预览与删除。</div>
+        <div class="mind-attachments-scroll">
+          <div class="attachment-list" id="mind-attachments-list"></div>
         </div>
       </div>
     </div>
@@ -6763,6 +6857,7 @@ if ($view === 'map_edit') {
       function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
       jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
+      scheduleAttachmentManagerUpdate(true);
       jmContainer.appendChild(overlay);
       syncOverlaySize();
       if(!jm.get_selected_node() && initialData && initialData.data){
@@ -6946,9 +7041,426 @@ if ($view === 'map_edit') {
       const importModalName=importModal ? importModal.querySelector('[data-import-name]') : null;
       const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
+      const attachmentsBackdrop=document.getElementById('mind-attachments-panel');
+      const attachmentsPanel=attachmentsBackdrop ? attachmentsBackdrop.querySelector('.mind-attachments-panel') : null;
+      const attachmentsList=document.getElementById('mind-attachments-list');
+      const attachmentsSummary=document.getElementById('mind-attachments-summary');
+      const attachmentsEmpty=document.getElementById('mind-attachments-empty');
+      const attachmentsSelectAll=document.getElementById('mind-attachments-select-all');
+      const attachmentsDeleteBtn=document.getElementById('mind-attachments-delete');
+      const attachmentsCloseBtn=attachmentsBackdrop ? attachmentsBackdrop.querySelector('[data-attachment-close]') : null;
+      const mapAttachmentsBtn=document.getElementById('map-attachments-btn');
+      const mapAttachmentsCount=document.getElementById('map-attachments-count');
       const relationToast=document.getElementById('mind-relation-toast');
       const relationContextMenu=document.getElementById('relation-context-menu');
+      let attachmentPanelOpen=false;
+      let attachmentPanelLastFocus=null;
+      let attachmentEntries=[];
+      let attachmentEntryByKey=new Map();
+      let selectedAttachmentKeys=new Set();
+      let attachmentRefreshToken=null;
+      let attachmentDeleteBusy=false;
       let pendingImportPayload=null;
+      function prettyFileSize(value){
+        if(!Number.isFinite(value) || value<=0) return '';
+        const units=['B','KB','MB','GB','TB'];
+        let size=value;
+        let idx=0;
+        while(size>=1024 && idx<units.length-1){
+          size/=1024;
+          idx++;
+        }
+        const decimals=size>=100 || idx===0 ? 0 : 1;
+        return size.toFixed(decimals)+' '+units[idx];
+      }
+      function normalizeNumeric(raw){
+        if(typeof raw==='number' && Number.isFinite(raw)) return raw;
+        if(typeof raw==='string'){
+          const parsed=parseInt(raw,10);
+          if(Number.isFinite(parsed)) return parsed;
+        }
+        return null;
+      }
+      function deriveAttachmentName(descriptor){
+        if(!descriptor || typeof descriptor!=='object') return '附件';
+        const candidates=[descriptor.name, descriptor.filename, descriptor.title, descriptor.label];
+        for(const candidate of candidates){
+          if(typeof candidate==='string'){
+            const trimmed=candidate.trim();
+            if(trimmed) return trimmed;
+          }
+        }
+        const assetId=normalizeNumeric(descriptor.assetId ?? descriptor.id);
+        if(assetId!==null) return `附件 #${assetId}`;
+        if(typeof descriptor.url==='string' && descriptor.url.trim()){
+          const raw=descriptor.url.trim();
+          try{
+            const parsed=new URL(raw, window.location.href);
+            const parts=parsed.pathname.split('/').filter(Boolean);
+            if(parts.length){
+              const last=decodeURIComponent(parts[parts.length-1]);
+              if(last) return last;
+            }
+          }catch(_){ }
+          return raw;
+        }
+        return '附件';
+      }
+      function collectMindmapAttachments(){
+        const results=[];
+        if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return results;
+        jm.nodes.forEach(node=>{
+          if(!node) return;
+          const attachments=gatherAttachments(node.data);
+          if(!attachments || !attachments.length) return;
+          attachments.forEach((att,index)=>{
+            if(!att || typeof att!=='object') return;
+            const assetId=normalizeNumeric(att.assetId ?? att.id);
+            const sizeValue=normalizeNumeric(att.size ?? att.filesize ?? att.length);
+            const mime=typeof att.mime==='string' && att.mime ? att.mime : (typeof att.type==='string' ? att.type : '');
+            const name=deriveAttachmentName(att);
+            const key=assetId!==null ? `asset:${assetId}:${node.id}:${index}` : `node:${node.id}:${index}`;
+            results.push({key, assetId:assetId!==null?assetId:null, size:Number.isFinite(sizeValue)?sizeValue:null, mime, name, nodeId:node.id, nodeTopic:node.topic||'', attachment:att});
+          });
+        });
+        results.sort((a,b)=>{
+          const topicA=a.nodeTopic||'';
+          const topicB=b.nodeTopic||'';
+          const topicCompare=topicA.localeCompare(topicB,'zh-CN');
+          if(topicCompare!==0) return topicCompare;
+          return (a.name||'').localeCompare(b.name||'','zh-CN');
+        });
+        return results;
+      }
+      function pruneAttachmentSelection(entries){
+        const validKeys=new Set(entries.map(entry=>entry.key));
+        selectedAttachmentKeys=new Set([...selectedAttachmentKeys].filter(key=>validKeys.has(key)));
+      }
+      function buildAttachmentRow(entry){
+        const row=document.createElement('div');
+        row.className='attachment-row mind-attachment-row';
+        row.dataset.key=entry.key;
+        if(entry.assetId!==null) row.dataset.assetId=String(entry.assetId);
+        if(Number.isFinite(entry.size)) row.dataset.size=String(entry.size);
+        row.dataset.nodeId=entry.nodeId;
+        const selectWrap=document.createElement('label');
+        selectWrap.className='mind-attachment-select';
+        const checkbox=document.createElement('input');
+        checkbox.type='checkbox';
+        checkbox.dataset.attachmentSelect=entry.key;
+        checkbox.checked=selectedAttachmentKeys.has(entry.key);
+        checkbox.disabled=attachmentDeleteBusy;
+        checkbox.addEventListener('change',()=>{
+          if(checkbox.checked){ selectedAttachmentKeys.add(entry.key); }
+          else{ selectedAttachmentKeys.delete(entry.key); }
+          syncAttachmentSelectionUI();
+        });
+        selectWrap.appendChild(checkbox);
+        row.appendChild(selectWrap);
+        const main=document.createElement('div');
+        main.className='attachment-main';
+        const icon=document.createElement('span');
+        icon.className='attachment-icon';
+        icon.textContent=attachmentIconForMime(entry.mime, entry.name);
+        const info=document.createElement('div');
+        info.className='attachment-info';
+        const nameEl=document.createElement('div');
+        nameEl.className='attachment-name';
+        nameEl.textContent=entry.name;
+        const detailEl=document.createElement('div');
+        detailEl.className='attachment-detail';
+        const detailParts=[];
+        detailParts.push(`节点：${entry.nodeTopic||'未命名节点'}`);
+        if(Number.isFinite(entry.size) && entry.size>0){ detailParts.push(prettyFileSize(entry.size)); }
+        if(entry.mime){ detailParts.push(entry.mime); }
+        if(entry.assetId!==null){ detailParts.push('ID '+entry.assetId); }
+        detailEl.textContent=detailParts.join(' · ');
+        info.appendChild(nameEl);
+        info.appendChild(detailEl);
+        main.appendChild(icon);
+        main.appendChild(info);
+        main.addEventListener('click',()=>{
+          if(attachmentDeleteBusy) return;
+          openMindmapAttachment(entry.attachment);
+        });
+        row.appendChild(main);
+        const actions=document.createElement('div');
+        actions.className='attachment-actions';
+        const previewBtn=document.createElement('button');
+        previewBtn.type='button';
+        previewBtn.textContent='预览';
+        previewBtn.addEventListener('click',e=>{ e.stopPropagation(); openMindmapAttachment(entry.attachment); });
+        const focusBtn=document.createElement('button');
+        focusBtn.type='button';
+        focusBtn.textContent='定位';
+        focusBtn.addEventListener('click',e=>{ e.stopPropagation(); focusOnAttachmentNode(entry.nodeId); });
+        const removeBtn=document.createElement('button');
+        removeBtn.type='button';
+        removeBtn.textContent='移除';
+        removeBtn.dataset.attachmentRemove=entry.key;
+        removeBtn.disabled=attachmentDeleteBusy;
+        removeBtn.addEventListener('click',e=>{ e.stopPropagation(); if(attachmentDeleteBusy) return; handleRemoveSingleAttachment(entry); });
+        actions.append(previewBtn, focusBtn, removeBtn);
+        row.appendChild(actions);
+        return row;
+      }
+      function renderAttachmentList(entries){
+        if(!attachmentsList) return;
+        pruneAttachmentSelection(entries);
+        attachmentsList.innerHTML='';
+        entries.forEach(entry=>{
+          attachmentsList.appendChild(buildAttachmentRow(entry));
+        });
+        if(attachmentsEmpty){ attachmentsEmpty.hidden=entries.length>0; }
+        const totalSize=entries.reduce((sum,item)=>sum + (Number.isFinite(item.size)?item.size:0),0);
+        if(attachmentsSummary){
+          attachmentsSummary.textContent=entries.length
+            ? `共 ${entries.length} 个附件${totalSize>0 ? ' · 总计 '+prettyFileSize(totalSize) : ''}`
+            : '暂无附件';
+        }
+        syncAttachmentSelectionUI();
+      }
+      function updateAttachmentButtonState(entries){
+        if(!mapAttachmentsBtn) return;
+        const count=entries.length;
+        const totalSize=entries.reduce((sum,item)=>sum + (Number.isFinite(item.size)?item.size:0),0);
+        if(mapAttachmentsCount){ mapAttachmentsCount.textContent=String(count); }
+        mapAttachmentsBtn.dataset.hasAttachments=count>0?'true':'false';
+        const summary=count
+          ? `附件管理，共 ${count} 个附件${totalSize>0 ? ` · 总计 ${prettyFileSize(totalSize)}` : ''}`
+          : '附件管理，暂无附件';
+        mapAttachmentsBtn.setAttribute('aria-label', summary);
+        mapAttachmentsBtn.setAttribute('title', summary);
+      }
+      function syncAttachmentSelectionUI(){
+        if(attachmentsDeleteBtn){
+          attachmentsDeleteBtn.disabled=attachmentDeleteBusy || selectedAttachmentKeys.size===0;
+        }
+        if(attachmentsSelectAll){
+          const total=attachmentEntries.length;
+          const selected=selectedAttachmentKeys.size;
+          attachmentsSelectAll.disabled=attachmentDeleteBusy || total===0;
+          attachmentsSelectAll.indeterminate=selected>0 && selected<total;
+          attachmentsSelectAll.checked=total>0 && selected===total;
+        }
+        if(attachmentsList){
+          attachmentsList.querySelectorAll('input[data-attachment-select]').forEach(cb=>{
+            cb.disabled=attachmentDeleteBusy;
+          });
+          attachmentsList.querySelectorAll('button[data-attachment-remove]').forEach(btn=>{
+            btn.disabled=attachmentDeleteBusy;
+          });
+        }
+      }
+      function updateAttachmentManager(forceRender=false){
+        const entries=collectMindmapAttachments();
+        attachmentEntries=entries;
+        attachmentEntryByKey=new Map(entries.map(entry=>[entry.key, entry]));
+        pruneAttachmentSelection(entries);
+        updateAttachmentButtonState(entries);
+        if(forceRender || attachmentPanelOpen){
+          renderAttachmentList(entries);
+        }else{
+          syncAttachmentSelectionUI();
+        }
+      }
+      function scheduleAttachmentManagerUpdate(force=false){
+        if(force){
+          if(attachmentRefreshToken){ cancelAnimationFrame(attachmentRefreshToken); attachmentRefreshToken=null; }
+          updateAttachmentManager(true);
+          return;
+        }
+        if(attachmentRefreshToken) return;
+        attachmentRefreshToken=requestAnimationFrame(()=>{
+          attachmentRefreshToken=null;
+          updateAttachmentManager(false);
+        });
+      }
+      function setAttachmentBusy(busy){
+        attachmentDeleteBusy=!!busy;
+        if(attachmentsBackdrop){ attachmentsBackdrop.dataset.busy=busy?'true':'false'; }
+        syncAttachmentSelectionUI();
+      }
+      function getSelectedAttachmentEntries(){
+        return Array.from(selectedAttachmentKeys).map(key=>attachmentEntryByKey.get(key)).filter(Boolean);
+      }
+      function focusOnAttachmentNode(nodeId){
+        if(!nodeId || !jm) return;
+        const node=jm.get_node(nodeId);
+        if(!node) return;
+        jm.select_node(node.id);
+        centerOnNodeSmooth(node);
+      }
+      function openAttachmentPanel(){
+        if(!attachmentsBackdrop || !attachmentsPanel) return;
+        attachmentPanelOpen=true;
+        attachmentPanelLastFocus=document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        attachmentsBackdrop.dataset.open='true';
+        attachmentsBackdrop.setAttribute('aria-hidden','false');
+        if(mapAttachmentsBtn){ mapAttachmentsBtn.setAttribute('aria-expanded','true'); }
+        scheduleAttachmentManagerUpdate(true);
+        requestAnimationFrame(()=>{
+          try{ attachmentsPanel.focus({preventScroll:true}); }
+          catch(_){ attachmentsPanel.focus(); }
+        });
+      }
+      function closeAttachmentPanel(){
+        if(!attachmentsBackdrop) return;
+        attachmentPanelOpen=false;
+        attachmentsBackdrop.dataset.open='false';
+        attachmentsBackdrop.setAttribute('aria-hidden','true');
+        if(mapAttachmentsBtn){ mapAttachmentsBtn.setAttribute('aria-expanded','false'); }
+        selectedAttachmentKeys.clear();
+        syncAttachmentSelectionUI();
+        if(attachmentPanelLastFocus && typeof attachmentPanelLastFocus.focus==='function'){
+          try{ attachmentPanelLastFocus.focus(); }
+          catch(_){ }
+        }
+        attachmentPanelLastFocus=null;
+      }
+      async function deleteMindmapAssets(ids){
+        if(!ids || !ids.length) return;
+        const fd=new FormData();
+        fd.append('action','delete_mindmap_assets');
+        fd.append('map_id', String(currentMapId||0));
+        fd.append('ids', ids.join(','));
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(!res.ok) throw new Error('网络异常');
+        const json=await res.json().catch(()=>null);
+        if(!json || !json.ok){
+          throw new Error(json && json.error ? json.error : '删除失败');
+        }
+      }
+      function detachAttachments(entries){
+        if(!entries || !entries.length) return {changed:false, assetIds:[]};
+        const removedAssetIds=new Set();
+        const changed=performUndoable('remove-attachments',()=>{
+          commitInlineEditing();
+          let modified=false;
+          entries.forEach(entry=>{
+            const node=entry ? jm.get_node(entry.nodeId) : null;
+            if(!node) return;
+            const data=ensureNodeDataObject(node);
+            if(!Array.isArray(data.attachments) || !data.attachments.length) return;
+            const beforeLen=data.attachments.length;
+            data.attachments=data.attachments.filter(att=>{
+              if(att===entry.attachment) return false;
+              const attId=normalizeNumeric(att && (att.assetId ?? att.id));
+              if(entry.assetId!==null && attId===entry.assetId) return false;
+              return true;
+            });
+            if(beforeLen!==data.attachments.length){
+              modified=true;
+              if(!data.attachments.length){
+                delete data.attachments;
+                if('attachment' in data){ delete data.attachment; }
+              }else{
+                data.attachment=data.attachments[0];
+              }
+              node.model.data=data;
+              node.data=data;
+              if(entry.assetId!==null){ removedAssetIds.add(entry.assetId); }
+            }
+          });
+          if(modified){
+            jm.computeLayout();
+            jm.render();
+            markDirty();
+            afterMindStateChange();
+          }
+          return modified;
+        },{mergeKey:'attachments:remove'});
+        if(!changed){
+          removedAssetIds.clear();
+          return {changed:false, assetIds:[]};
+        }
+        const remainingIds=new Set(collectMindmapAttachments().map(item=>item.assetId).filter(id=>id!==null));
+        const toDelete=[...removedAssetIds].filter(id=>!remainingIds.has(id));
+        return {changed:true, assetIds:toDelete};
+      }
+      async function removeAttachmentEntries(entries){
+        if(!entries || !entries.length) return;
+        setAttachmentBusy(true);
+        try{
+          const result=detachAttachments(entries);
+          selectedAttachmentKeys.clear();
+          scheduleAttachmentManagerUpdate(true);
+          if(result.changed && result.assetIds.length){
+            await deleteMindmapAssets(result.assetIds);
+          }
+        }catch(err){
+          console.error(err);
+          alert('删除附件失败：'+(err && err.message ? err.message : err));
+        }finally{
+          setAttachmentBusy(false);
+          syncAttachmentSelectionUI();
+        }
+      }
+      async function handleBulkDelete(){
+        if(attachmentDeleteBusy) return;
+        const entries=getSelectedAttachmentEntries();
+        if(!entries.length){
+          alert('请选择要删除的附件');
+          return;
+        }
+        const message=entries.length>1
+          ? `确定删除选中的 ${entries.length} 个附件吗？删除后需保存导图以同步更新。`
+          : `确定删除附件「${entries[0].name}」吗？删除后需保存导图以同步更新。`;
+        if(!window.confirm(message)) return;
+        await removeAttachmentEntries(entries);
+      }
+      function handleRemoveSingleAttachment(entry){
+        if(!entry) return;
+        const message=`确定删除附件「${entry.name}」吗？删除后需保存导图以同步更新。`;
+        if(!window.confirm(message)) return;
+        removeAttachmentEntries([entry]);
+      }
+      if(mapAttachmentsBtn){
+        mapAttachmentsBtn.addEventListener('click',e=>{
+          e.preventDefault();
+          if(attachmentPanelOpen){ closeAttachmentPanel(); }
+          else{ openAttachmentPanel(); }
+        });
+      }
+      if(attachmentsCloseBtn){
+        attachmentsCloseBtn.addEventListener('click',e=>{
+          e.preventDefault();
+          closeAttachmentPanel();
+        });
+      }
+      if(attachmentsBackdrop){
+        attachmentsBackdrop.addEventListener('click',e=>{
+          if(e.target===attachmentsBackdrop){ closeAttachmentPanel(); }
+        });
+      }
+      if(attachmentsSelectAll){
+        attachmentsSelectAll.addEventListener('change',()=>{
+          if(attachmentDeleteBusy) return;
+          if(attachmentsSelectAll.checked){
+            attachmentEntries.forEach(entry=>selectedAttachmentKeys.add(entry.key));
+          }else{
+            selectedAttachmentKeys.clear();
+          }
+          if(attachmentsList){
+            attachmentsList.querySelectorAll('input[data-attachment-select]').forEach(cb=>{
+              cb.checked=attachmentsSelectAll.checked;
+            });
+          }
+          syncAttachmentSelectionUI();
+        });
+      }
+      if(attachmentsDeleteBtn){
+        attachmentsDeleteBtn.addEventListener('click',e=>{
+          e.preventDefault();
+          handleBulkDelete();
+        });
+      }
+      document.addEventListener('keydown',e=>{
+        if(attachmentPanelOpen && e.key==='Escape'){
+          e.preventDefault();
+          closeAttachmentPanel();
+        }
+      });
       let pendingImportFileName='';
       const foldAllMenuItem=null;
       const nodePopover=document.getElementById('node-popover');
@@ -7121,6 +7633,7 @@ if ($view === 'map_edit') {
         requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
         updateFoldAllLabel();
         updateFoldButtonState();
+        scheduleAttachmentManagerUpdate();
         if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
         if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
       }
@@ -8368,6 +8881,7 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        scheduleAttachmentManagerUpdate(true);
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -8814,8 +9328,9 @@ if ($view === 'map_edit') {
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             updateFoldAllLabel();
             updateFoldButtonState();
+            scheduleAttachmentManagerUpdate();
           }
-          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
+          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); scheduleAttachmentManagerUpdate(); }
           updateUndoRedoButtons();
         });
       }
