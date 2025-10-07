@@ -659,6 +659,135 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
   $payload['relations']=$normalizedRelations;
 }
 
+function sync_mindmap_payload_with_assets(array &$payload, array $asset_pool): void {
+  if(!isset($payload['data']) || !is_array($payload['data'])) return;
+  $assets_by_node=[];
+  $asset_index=[];
+  foreach($asset_pool as $asset){
+    if(!is_array($asset)) continue;
+    $id=(int)($asset['id'] ?? 0);
+    if($id<=0) continue;
+    $node_uid=isset($asset['node_uid']) && is_string($asset['node_uid']) ? trim($asset['node_uid']) : '';
+    $name=$asset['orig_name'] ?? ($asset['name'] ?? ('附件#'.$id));
+    $normalized=[
+      'assetId'=>$id,
+      'name'=>$name,
+      'size'=>(int)($asset['size'] ?? 0),
+      'mime'=>$asset['mime'] ?? 'application/octet-stream',
+      'url'=>'?mindmap_asset='.$id,
+    ];
+    $created=(int)($asset['created_at'] ?? 0);
+    if($created>0){ $normalized['createdAt']=$created; }
+    $asset_index[$id]=[
+      'base'=>$normalized,
+      'node'=>$node_uid,
+    ];
+    if($node_uid!==''){
+      if(!isset($assets_by_node[$node_uid])){ $assets_by_node[$node_uid]=[]; }
+      $assets_by_node[$node_uid][$id]=$normalized;
+    }
+  }
+  $normalizeExisting=function($raw) use ($asset_index){
+    if(!is_array($raw)) return null;
+    $asset_id=(int)($raw['assetId'] ?? ($raw['id'] ?? 0));
+    if($asset_id<=0 || !isset($asset_index[$asset_id])) return null;
+    $base=$asset_index[$asset_id]['base'];
+    $normalized=$base;
+    if(isset($raw['name']) && is_string($raw['name'])){
+      $trimmed=trim($raw['name']);
+      if($trimmed!==''){ $normalized['name']=$trimmed; }
+    }
+    if(isset($raw['size']) && is_numeric($raw['size'])){
+      $normalized['size']=(int)$raw['size'];
+    }
+    if(isset($raw['mime']) && is_string($raw['mime']) && $raw['mime']!==''){
+      $normalized['mime']=$raw['mime'];
+    }
+    if(isset($raw['url']) && is_string($raw['url']) && $raw['url']!==''){
+      $normalized['url']=$raw['url'];
+    }
+    $created_candidates=[
+      $raw['createdAt'] ?? null,
+      $raw['created_at'] ?? null,
+      $raw['uploadedAt'] ?? null,
+      $base['createdAt'] ?? null,
+    ];
+    foreach($created_candidates as $candidate){
+      if(is_numeric($candidate)){
+        $timestamp=(int)$candidate;
+        if($timestamp>0){
+          $normalized['createdAt']=$timestamp;
+          break;
+        }
+      }
+    }
+    if(isset($normalized['createdAt']) && $normalized['createdAt']<=0){
+      unset($normalized['createdAt']);
+    }
+    return $normalized;
+  };
+  $walk=function (&$node) use (&$walk,$assets_by_node,$normalizeExisting){
+    if(!is_array($node)) return;
+    $node_id=null;
+    if(isset($node['id'])){
+      $node_id=is_string($node['id']) ? $node['id'] : (is_numeric($node['id']) ? (string)$node['id'] : null);
+    }
+    $data=(isset($node['data']) && is_array($node['data'])) ? $node['data'] : [];
+    $attachments=[];
+    if(isset($data['attachments']) && is_array($data['attachments'])){
+      foreach($data['attachments'] as $att){
+        $normalized=$normalizeExisting($att);
+        if($normalized){ $attachments[$normalized['assetId']]=$normalized; }
+      }
+    }
+    if(isset($data['attachment']) && is_array($data['attachment'])){
+      $normalized=$normalizeExisting($data['attachment']);
+      if($normalized){ $attachments[$normalized['assetId']]=$normalized; }
+    }
+    if($node_id!==null && isset($assets_by_node[$node_id])){
+      foreach($assets_by_node[$node_id] as $asset_id=>$asset_data){
+        if(isset($attachments[$asset_id])){
+          $existing=$attachments[$asset_id];
+          if(!isset($existing['name']) || $existing['name']===''){
+            $existing['name']=$asset_data['name'];
+          }
+          if(!isset($existing['size']) || $existing['size']<=0){
+            $existing['size']=$asset_data['size'];
+          }
+          if(!isset($existing['mime']) || $existing['mime']===''){
+            $existing['mime']=$asset_data['mime'];
+          }
+          if(!isset($existing['url']) || $existing['url']===''){
+            $existing['url']=$asset_data['url'];
+          }
+          if(isset($asset_data['createdAt']) && (!isset($existing['createdAt']) || $existing['createdAt']<=0)){
+            $existing['createdAt']=$asset_data['createdAt'];
+          }
+          if(isset($existing['createdAt']) && $existing['createdAt']<=0){
+            unset($existing['createdAt']);
+          }
+          $attachments[$asset_id]=$existing;
+        }else{
+          $attachments[$asset_id]=$asset_data;
+        }
+      }
+    }
+    if($attachments){
+      $data['attachments']=array_values($attachments);
+      $data['attachment']=$data['attachments'][0];
+    }else{
+      unset($data['attachments'],$data['attachment']);
+    }
+    if($data){ $node['data']=$data; }
+    elseif(isset($node['data'])){ unset($node['data']); }
+    if(isset($node['children']) && is_array($node['children'])){
+      foreach($node['children'] as &$child){ $walk($child); }
+      unset($child);
+    }
+  };
+  $walk($payload['data']);
+}
+
 function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key): void {
   $pdo=db();
   $keep_ids=[];
@@ -3761,6 +3890,9 @@ if ($view === 'map_edit') {
       $assetPool[(int)$asset['id']] = $asset;
     }
   }
+  if ($assetPool) {
+    sync_mindmap_payload_with_assets($initialDataDecoded, $assetPool);
+  }
   $mindmapAssetsMeta = array_values(array_map(function ($asset) {
     $id = (int)($asset['id'] ?? 0);
     return [
@@ -4007,8 +4139,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 auto;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4017,21 +4150,19 @@ if ($view === 'map_edit') {
         .dock-btn[data-tip]:hover::after,.dock-btn[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,-4px)}
         .dock-btn[data-tip]:hover::before,.dock-btn[data-tip]:focus-visible::before{opacity:1;transform:translate(-50%,-4px)}
       }
-      .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
-      .dock-btn:active{transform:translateY(-1px)}
+      .dock-btn:hover{border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
-      .dock-btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
+      .dock-btn[disabled]{opacity:.5;cursor:not-allowed}
       .dock-btn.danger{color:#F6D6D6;border-color:rgba(209,75,75,.52);background:rgba(209,75,75,.12)}
       .dock-btn.ghost{background:rgba(201,168,106,.04);border-style:dashed}
       .dock-btn[data-state="dirty"]{color:#F6D6D6;border-color:rgba(209,75,75,.6);background:rgba(209,75,75,.18)}
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;min-width:70px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px}.dock-btn{height:58px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px}.dock-btn{height:56px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (prefers-reduced-motion: reduce){.dock-btn{transition:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4321,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -7358,7 +7489,11 @@ if ($view === 'map_edit') {
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
+      if(fisheyeToggle){
+        fisheyeToggle.checked=false;
+        fisheyeToggle.disabled=true;
+        fisheyeToggle.setAttribute('aria-disabled','true');
+      }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7421,16 +7556,14 @@ if ($view === 'map_edit') {
         },360);
       }
       function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
+        return false;
       }
       function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
+        if(mindShell){ mindShell.dataset.fisheye='off'; }
+        if(dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
       }
       function handlePointerPrecisionChange(event){
         pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
         syncFisheyeState();
       }
       syncFisheyeState();
@@ -9725,25 +9858,13 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
         if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
+          dockButtons.forEach(btn=>btn.style.transform='');
+          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(button=>button.style.transform=''); });
         }
         if(fisheyeToggle){
           fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
+            fisheyeToggle.checked=false;
           });
         }
       }
