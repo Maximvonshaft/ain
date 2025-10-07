@@ -3842,10 +3842,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),860px);display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-padding:0 calc(24px + var(--safe-right, 0px))}
-      .mind-dock::-webkit-scrollbar{display:none}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);display:flex;justify-content:center}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -3865,9 +3864,9 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),760px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px;scroll-padding:0 calc(20px + var(--safe-right, 0px))}.dock-btn{width:88px;height:62px;flex:0 0 88px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:12px;justify-content:flex-start;scroll-padding:0 calc(18px + var(--safe-right, 0px))}.dock-btn{width:84px;height:58px;flex:0 0 84px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:10px;justify-content:flex-start;scroll-padding:0 calc(16px + var(--safe-right, 0px))}.dock-btn{width:78px;height:56px;flex:0 0 78px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:1 1 88px;min-width:70px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:center}.dock-btn{height:58px;flex:1 1 78px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:center}.dock-btn{height:56px;flex:1 1 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -7166,7 +7165,7 @@ if ($view === 'map_edit') {
         if(panAnimation && panAnimation.raf){ cancelAnimationFrame(panAnimation.raf); }
         panAnimation=null;
       }
-      function centerOnNodeSmooth(node){
+      function centerOnNodeSmooth(node, options={}){
         if(!jm || !node || typeof jm.center_node!=='function') return false;
         const container=jm.container || (jm.view && jm.view.container) || null;
         const rect=container ? container.getBoundingClientRect() : null;
@@ -7177,6 +7176,7 @@ if ($view === 'map_edit') {
         const startY=Number.isFinite(jm.offsetY)?jm.offsetY:0;
         const startScale=Number.isFinite(jm.scale)?jm.scale:1;
         const prevHasCentered=jm.hasCentered;
+        const animate=options.animate!==false;
         const startCenterWorld=(hasRect && startScale)
           ? {x:(halfWidth-startX)/startScale,y:(halfHeight-startY)/startScale}
           : null;
@@ -7200,6 +7200,14 @@ if ($view === 'map_edit') {
         const deltaScale=targetScale-startScale;
         const canInterpolateCenter=!!(startCenterWorld && targetCenterWorld && hasRect);
         if(Math.abs(deltaOffsetX)<0.5 && Math.abs(deltaOffsetY)<0.5 && Math.abs(deltaScale)<0.0001){
+          jm.offsetX=targetX;
+          jm.offsetY=targetY;
+          jm.scale=targetScale;
+          jm.hasCentered=targetHasCentered;
+          if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          return true;
+        }
+        if(!animate){
           jm.offsetX=targetX;
           jm.offsetY=targetY;
           jm.scale=targetScale;
@@ -7898,7 +7906,7 @@ if ($view === 'map_edit') {
           refreshInspector(jm.get_node(newNode.id));
           requestAnimationFrame(()=>{
             const target=jm.get_node(newNode.id);
-            if(target){ centerOnNodeSmooth(target); }
+            if(target){ centerOnNodeSmooth(target,{animate:false}); }
           });
           return newNode;
         },{mergeKey});
