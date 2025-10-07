@@ -3716,6 +3716,14 @@ if ($view === 'map_edit') {
       .mind-info-handle:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .mind-info-bar[data-collapsed="true"] .mind-info-handle{margin-bottom:0}
       .mind-info-row{display:flex;align-items:center;gap:12px}
+      .mind-shortcuts{margin-top:6px;padding-top:8px;border-top:1px solid rgba(201,168,106,.18);display:flex;flex-direction:column;gap:6px}
+      .mind-shortcuts h4{margin:0;font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-400)}
+      .mind-shortcuts table{width:100%;border-collapse:collapse;font-size:12px;color:var(--text-muted)}
+      .mind-shortcuts th,.mind-shortcuts td{text-align:left;padding:4px 0;vertical-align:top}
+      .mind-shortcuts thead th{font-weight:600;color:var(--text-strong);border-bottom:1px solid rgba(201,168,106,.22);text-transform:uppercase;letter-spacing:.08em;font-size:11px}
+      .mind-shortcuts tbody tr+tr td{border-top:1px solid rgba(201,168,106,.14)}
+      .mind-shortcuts .shortcut-keys{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+      .mind-shortcuts .shortcut-sep{opacity:.7}
       .map-io{position:relative;flex:0 0 auto}
       .map-io-button{padding:10px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.36);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .map-io-button:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5)}
@@ -3970,6 +3978,63 @@ if ($view === 'map_edit') {
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
             </div>
+            <div class="mind-shortcuts" id="mind-shortcuts">
+              <h4>常用快捷键</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">操作</th>
+                    <th scope="col">Windows</th>
+                    <th scope="col">macOS</th>
+                    <th scope="col">说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>新建同级节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Enter</span></td>
+                    <td class="shortcut-keys"><span class="kbd">Return</span></td>
+                    <td>在当前节点下方创建同级节点</td>
+                  </tr>
+                  <tr>
+                    <td>新建子级节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Tab</span></td>
+                    <td class="shortcut-keys"><span class="kbd">Tab</span></td>
+                    <td>在当前节点下创建子节点</td>
+                  </tr>
+                  <tr>
+                    <td>新建父级节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Shift</span><span class="shortcut-sep">+</span><span class="kbd">Tab</span></td>
+                    <td class="shortcut-keys"><span class="kbd">Shift</span><span class="shortcut-sep">+</span><span class="kbd">Tab</span></td>
+                    <td>将当前节点提升为父层的兄弟节点</td>
+                  </tr>
+                  <tr>
+                    <td>删除节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Del</span><span class="shortcut-sep">/</span><span class="kbd">Backspace</span></td>
+                    <td class="shortcut-keys"><span class="kbd">⌫</span></td>
+                    <td>删除当前选中节点</td>
+                  </tr>
+                  <tr>
+                    <td>折叠/展开子节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Space</span><span class="shortcut-sep">/</span><span class="kbd">→</span><span class="shortcut-sep">/</span><span class="kbd">←</span></td>
+                    <td class="shortcut-keys"><span class="kbd">Space</span><span class="shortcut-sep">/</span><span class="kbd">→</span><span class="shortcut-sep">/</span><span class="kbd">←</span></td>
+                    <td>展开或折叠当前节点分支</td>
+                  </tr>
+                  <tr>
+                    <td>复制节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Ctrl</span><span class="shortcut-sep">+</span><span class="kbd">C</span></td>
+                    <td class="shortcut-keys"><span class="kbd">⌘</span><span class="shortcut-sep">+</span><span class="kbd">C</span></td>
+                    <td>复制节点及其子节点</td>
+                  </tr>
+                  <tr>
+                    <td>粘贴节点</td>
+                    <td class="shortcut-keys"><span class="kbd">Ctrl</span><span class="shortcut-sep">+</span><span class="kbd">V</span></td>
+                    <td class="shortcut-keys"><span class="kbd">⌘</span><span class="shortcut-sep">+</span><span class="kbd">V</span></td>
+                    <td>粘贴为同级节点</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </header>
         <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
@@ -3988,7 +4053,7 @@ if ($view === 'map_edit') {
             <span class="icon">💾</span>
             <span class="label">保存</span>
           </button>
-          <button class="dock-btn" data-action="sibling" title="新增同级 (Enter)" aria-label="新增同级节点">
+          <button class="dock-btn" data-action="sibling" title="新增同级 (Enter / Return)" aria-label="新增同级节点">
             <span class="icon">⧉</span>
             <span class="label">同级</span>
           </button>
@@ -4008,7 +4073,7 @@ if ($view === 'map_edit') {
             <span class="icon">🔗</span>
             <span class="label">链接</span>
           </button>
-          <button class="dock-btn danger" data-action="delete" title="删除节点 (Del)" aria-label="删除节点">
+          <button class="dock-btn danger" data-action="delete" title="删除节点 (Del / Backspace)" aria-label="删除节点">
             <span class="icon">🗑</span>
             <span class="label">删除</span>
           </button>
@@ -6933,6 +6998,7 @@ if ($view === 'map_edit') {
       let relationToastTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
+      let nodeClipboard=null;
       let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
@@ -7729,6 +7795,91 @@ if ($view === 'map_edit') {
         const node=ensureNode();
         if(node && node.parent){ jm.select_node(node.parent.id); scheduleHandleRefresh(); }
       }
+      function copySelectedNode(){
+        const node=ensureNode();
+        if(!node || node.isroot) return;
+        const snapshot=deepClone(node.model);
+        if(snapshot){ nodeClipboard=snapshot; }
+      }
+      function pasteNodeAsSibling(){
+        if(!nodeClipboard) return;
+        const target=ensureNode();
+        if(!target) return;
+        const tree=jm.get_data('node_tree');
+        if(!tree || !tree.data) return;
+        const targetModel=findModelById(tree.data, target.id);
+        if(!targetModel) return;
+        let parentModel=null;
+        if(target.isroot){
+          parentModel=targetModel;
+        }else{
+          parentModel=findModelById(tree.data, target.parent.id);
+        }
+        if(!parentModel) return;
+        const cloned=cloneImportSubtree(nodeClipboard);
+        if(!cloned) return;
+        commitInlineEditing();
+        if(target.isroot){
+          if(!Array.isArray(targetModel.children)){ targetModel.children=[]; }
+          targetModel.children.push(cloned);
+        }else{
+          if(!Array.isArray(parentModel.children)){ parentModel.children=[]; }
+          const index=parentModel.children.findIndex(child=>child && child.id===target.id);
+          const insertIndex=index===-1?parentModel.children.length:index+1;
+          parentModel.children.splice(insertIndex,0,cloned);
+        }
+        enforceRightOrientation(tree.data);
+        jm.show(tree);
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const inserted=jm.get_node(cloned.id);
+          if(inserted){
+            jm.select_node(inserted.id);
+            refreshInspector(inserted);
+            startInlineEditing(inserted);
+          }
+        });
+        markDirty();
+      }
+      function promoteSelectedNode(){
+        const node=ensureNode();
+        if(!node || node.isroot || !node.parent || !node.parent.parent) return;
+        const parent=node.parent;
+        const grand=parent.parent;
+        commitInlineEditing();
+        const tree=jm.get_data('node_tree');
+        if(!tree || !tree.data) return;
+        const nodeModel=findModelById(tree.data, node.id);
+        const parentModel=findModelById(tree.data, parent.id);
+        const grandModel=findModelById(tree.data, grand.id);
+        if(!nodeModel || !parentModel || !grandModel || !Array.isArray(parentModel.children)) return;
+        const index=parentModel.children.findIndex(child=>child && child.id===node.id);
+        if(index<0) return;
+        parentModel.children.splice(index,1);
+        if(!Array.isArray(grandModel.children)){ grandModel.children=[]; }
+        const parentIndex=grandModel.children.findIndex(child=>child && child.id===parent.id);
+        const insertIndex=parentIndex>=0?parentIndex+1:grandModel.children.length;
+        grandModel.children.splice(insertIndex,0,nodeModel);
+        parentModel.expanded=true;
+        grandModel.expanded=true;
+        enforceRightOrientation(tree.data);
+        jm.show(tree);
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const refreshed=jm.get_node(node.id);
+          if(refreshed){
+            jm.select_node(refreshed.id);
+            refreshInspector(refreshed);
+          }
+        });
+        markDirty();
+      }
+      function toggleSelectedNodeExpanded(forced){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return;
+        if(typeof forced==='boolean'){ setNodeExpandedState(node, forced); }
+        else{ setNodeExpandedState(node, node.expanded===false); }
+      }
       function openAttachmentDialog(){
         commitInlineEditing();
         const node=ensureNode();
@@ -7970,15 +8121,57 @@ if ($view === 'map_edit') {
       document.addEventListener('keydown',e=>{
         const activeEl=document.activeElement;
         if(activeEl){
-          const tag=activeEl.tagName || '';
-          if(activeEl.isContentEditable || /input|textarea|select/i.test(tag)) return;
+          const tag=(activeEl.tagName || '').toUpperCase();
+          if(activeEl.isContentEditable) return;
+          if(/INPUT|TEXTAREA|SELECT|BUTTON/.test(tag)) return;
+          if(tag==='A' && activeEl.getAttribute('href')) return;
         }
         if(currentEditingId()) return;
-        if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); addSiblingNode(); }
-        else if(e.key==='Tab' && e.shiftKey){ e.preventDefault(); focusParentNode(); }
-        else if(e.key==='Tab'){ e.preventDefault(); addChildNode(); }
-        else if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); deleteSelectedNode(); }
-        else if(e.key==='F2'){ e.preventDefault(); renameSelectedNode(); }
+        const key=e.key||'';
+        const lowerKey=key.toLowerCase();
+        if((e.ctrlKey || e.metaKey) && !e.altKey){
+          if(lowerKey==='c'){ e.preventDefault(); copySelectedNode(); return; }
+          if(lowerKey==='v'){ e.preventDefault(); pasteNodeAsSibling(); return; }
+        }
+        if(key==='Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey){
+          e.preventDefault();
+          addSiblingNode();
+          return;
+        }
+        if(key==='Tab' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey){
+          e.preventDefault();
+          promoteSelectedNode();
+          return;
+        }
+        if(key==='Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey){
+          e.preventDefault();
+          addChildNode();
+          return;
+        }
+        if((key==='Delete' || key==='Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey){
+          e.preventDefault();
+          deleteSelectedNode();
+          return;
+        }
+        if((key===' ' || key==='Spacebar' || key==='Space') && !e.ctrlKey && !e.metaKey && !e.altKey){
+          e.preventDefault();
+          toggleSelectedNodeExpanded();
+          return;
+        }
+        if(key==='ArrowRight' && !e.ctrlKey && !e.metaKey && !e.altKey){
+          e.preventDefault();
+          toggleSelectedNodeExpanded(true);
+          return;
+        }
+        if(key==='ArrowLeft' && !e.ctrlKey && !e.metaKey && !e.altKey){
+          e.preventDefault();
+          toggleSelectedNodeExpanded(false);
+          return;
+        }
+        if(key==='F2' && !e.ctrlKey && !e.metaKey && !e.altKey){
+          e.preventDefault();
+          renameSelectedNode();
+        }
       });
       function callView(method, ...args){
         if(jm.view && typeof jm.view[method] === 'function'){
@@ -8072,8 +8265,11 @@ if ($view === 'map_edit') {
             width:el.getAttribute('width'),
             height:el.getAttribute('height'),
           }:null;
-          const html=includeContent?el.innerHTML:null;
-          return {style,attrs,html};
+          let content=null;
+          if(includeContent){
+            content=Array.from(el.childNodes).map(node=>node.cloneNode(true));
+          }
+          return {style,attrs,content};
         };
         const nodes=[];
         if(mind.nodes && typeof mind.nodes.forEach==='function'){
@@ -8097,10 +8293,15 @@ if ($view === 'map_edit') {
           bounds:mind.bounds?{...mind.bounds}:null,
           viewport:captureElementState(mind.viewport,false),
           nodeLayer:captureElementState(mind.nodeLayer,false),
-          linkLayer:captureElementState(mind.linkLayer,false),
-          relationLayer:captureElementState(mind.relationLayer,false),
+          linkLayer:captureElementState(mind.linkLayer,true),
+          relationLayer:captureElementState(mind.relationLayer,true),
           guideLayer:captureElementState(mind.guideLayer,true),
           nodes,
+          transform:{
+            offsetX:Number.isFinite(mind.offsetX)?mind.offsetX:0,
+            offsetY:Number.isFinite(mind.offsetY)?mind.offsetY:0,
+            scale:Number.isFinite(mind.scale)?mind.scale:1,
+          }
         };
       }
       function restoreLayoutSnapshot(mind,snapshot){
@@ -8118,7 +8319,75 @@ if ($view === 'map_edit') {
               else{ el.setAttribute(key,value); }
             });
           }
-          if(typeof state.html==='string'){ el.innerHTML=state.html; }
+          if(Array.isArray(state.content)){
+            while(el.firstChild){ el.removeChild(el.firstChild); }
+            state.content.forEach(node=>{
+              try{ el.appendChild(node.cloneNode(true)); }
+              catch(_){ /* ignore append errors */ }
+            });
+          }
+        };
+        const rebindLinkLayer=()=>{
+          if(!mind.linkLayer || !mind.nodes || typeof mind.nodes.forEach!=='function') return;
+          if(!mind.linkRegistry || typeof mind.linkRegistry.clear!=='function'){ mind.linkRegistry=new Map(); }
+          else{ mind.linkRegistry.clear(); }
+          mind.nodes.forEach(node=>{
+            if(!node) return;
+            node.linkGroup=null;
+            node.linkShadow=null;
+            node.linkPath=null;
+            node.linkHighlight=null;
+          });
+          const groups=mind.linkLayer.querySelectorAll('g.trace-group');
+          groups.forEach(group=>{
+            if(!group || !group.dataset) return;
+            const from=group.dataset.from||'';
+            const to=group.dataset.to||'';
+            if(!to) return;
+            const node=typeof mind.get_node==='function'?mind.get_node(to):(mind.nodes.get?mind.nodes.get(to):null);
+            if(!node) return;
+            const shadow=group.querySelector('path.shadow');
+            const core=group.querySelector('path.core');
+            const highlight=group.querySelector('path.highlight');
+            node.linkGroup=group;
+            node.linkShadow=shadow||null;
+            node.linkPath=core||null;
+            node.linkHighlight=highlight||null;
+            if(core){
+              const enter=()=>{ if(typeof mind.setEdgeHover==='function'){ mind.setEdgeHover(from,to); } };
+              const leave=()=>{ if(typeof mind.clearEdgeHover==='function'){ mind.clearEdgeHover(from,to); } };
+              core.addEventListener('pointerenter',enter);
+              core.addEventListener('pointerleave',leave);
+              core.addEventListener('pointercancel',leave);
+            }
+            if(mind.linkRegistry && typeof mind.linkRegistry.set==='function'){
+              mind.linkRegistry.set(node.id,{group,shadow,core,highlight});
+            }
+          });
+        };
+        const rebindRelationLayer=()=>{
+          if(!mind.relationLayer) return;
+          if(!mind.relationRegistry || typeof mind.relationRegistry.clear!=='function'){ mind.relationRegistry=new Map(); }
+          else{ mind.relationRegistry.clear(); }
+          const groups=mind.relationLayer.querySelectorAll('g.relation-group');
+          groups.forEach(group=>{
+            if(!group || !group.dataset) return;
+            const id=group.dataset.id||'';
+            if(!id) return;
+            const shadow=group.querySelector('.relation-shadow');
+            const core=group.querySelector('.relation-core');
+            const highlight=group.querySelector('.relation-highlight');
+            let relation=null;
+            if(Array.isArray(mind.relations)){
+              relation=mind.relations.find(rel=>rel && rel.id===id) || null;
+            }
+            if(mind.relationRegistry && typeof mind.relationRegistry.set==='function'){
+              mind.relationRegistry.set(id,{group,shadow,core,highlight,relation});
+            }
+            if(relation && typeof mind.updateRelationPath==='function'){
+              mind.updateRelationPath(relation);
+            }
+          });
         };
         mind.bounds=snapshot.bounds?{...snapshot.bounds}:null;
         restoreElementState(mind.viewport,snapshot.viewport);
@@ -8126,6 +8395,11 @@ if ($view === 'map_edit') {
         restoreElementState(mind.linkLayer,snapshot.linkLayer);
         restoreElementState(mind.relationLayer,snapshot.relationLayer);
         restoreElementState(mind.guideLayer,snapshot.guideLayer);
+        if(snapshot.transform){
+          if(Number.isFinite(snapshot.transform.offsetX)){ mind.offsetX=snapshot.transform.offsetX; }
+          if(Number.isFinite(snapshot.transform.offsetY)){ mind.offsetY=snapshot.transform.offsetY; }
+          if(Number.isFinite(snapshot.transform.scale)){ mind.scale=snapshot.transform.scale; }
+        }
         if(Array.isArray(snapshot.nodes) && mind.nodes && typeof mind.nodes.get==='function'){
           for(const nodeState of snapshot.nodes){
             if(!nodeState || !nodeState.id) continue;
@@ -8149,6 +8423,14 @@ if ($view === 'map_edit') {
             if(typeof mind.updateAnchors==='function'){ mind.updateAnchors(node); }
           }
         }
+        rebindLinkLayer();
+        rebindRelationLayer();
+        if(mind.nodes && typeof mind.nodes.forEach==='function' && typeof mind.updateLinkPath==='function'){
+          mind.nodes.forEach(node=>{
+            if(node && node.parent){ mind.updateLinkPath(node); }
+          });
+        }
+        if(typeof mind.updateEdgeButtonScale==='function'){ mind.updateEdgeButtonScale(); }
         if(typeof mind.applyTransform==='function'){ mind.applyTransform(); }
       }
       function exportMindmapAsJson(){
@@ -8265,10 +8547,13 @@ if ($view === 'map_edit') {
             setTimeout(()=>URL.revokeObjectURL(url), 1500);
           }else if(format==='pdf'){
             const jsPDF=await ensureJsPDF();
-            const orientation=canvas.width>=canvas.height?'landscape':'portrait';
-            const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
+            const isLandscape=canvas.width>=canvas.height;
+            const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
+            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
             const dataUrl=canvas.toDataURL('image/png');
-            pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
+            const pageWidth=pdf.internal.pageSize.getWidth();
+            const pageHeight=pdf.internal.pageSize.getHeight();
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'FAST');
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
