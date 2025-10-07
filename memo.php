@@ -297,7 +297,17 @@ function get_categories(): array {
   $map=[]; foreach($cats as $c) $map[$c['id']] = 0;
   $rows=$pdo->query('SELECT category_id, COUNT(*) AS c FROM items GROUP BY category_id')->fetchAll();
   foreach($rows as $r){ $cid=$r['category_id']; if($cid!==null&&isset($map[$cid])) $map[$cid]=(int)$r['c']; }
-  return [$cats,$map];
+  $statsRow=$pdo->query('SELECT
+    (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
+    (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized,
+    (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
+  ')->fetch() ?: [];
+  $stats=[
+    'active_total'=>(int)($statsRow['active_total'] ?? 0),
+    'active_uncategorized'=>(int)($statsRow['active_uncategorized'] ?? 0),
+    'mindmap_total'=>(int)($statsRow['mindmap_total'] ?? 0),
+  ];
+  return [$cats,$map,$stats];
 }
 
 function ensure_done_category(): int {
@@ -336,6 +346,34 @@ function get_steps(int $item_id): array {
 function get_steps_by_time(int $item_id): array {
   $pdo=db(); $st=$pdo->prepare('SELECT * FROM steps WHERE item_id=? ORDER BY created_at ASC, id ASC');
   $st->execute([$item_id]); return $st->fetchAll();
+}
+
+function get_steps_grouped(array $item_ids): array {
+  $ids=array_values(array_unique(array_map('intval',$item_ids)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM steps WHERE item_id IN ($placeholders) ORDER BY item_id ASC, order_index ASC, id ASC");
+  $st->execute($ids);
+  $group=[];
+  foreach($st->fetchAll() as $row){
+    $iid=(int)$row['item_id'];
+    if(!isset($group[$iid])) $group[$iid]=[];
+    $group[$iid][]=$row;
+  }
+  return $group;
+}
+
+function get_step_counts(array $item_ids): array {
+  $ids=array_values(array_unique(array_map('intval',$item_ids)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT item_id, COUNT(*) AS cnt FROM steps WHERE item_id IN ($placeholders) GROUP BY item_id");
+  $st->execute($ids);
+  $counts=[];
+  foreach($st->fetchAll() as $row){ $counts[(int)$row['item_id']]=(int)$row['cnt']; }
+  return $counts;
 }
 
 function get_attachment(int $id): ?array {
@@ -648,11 +686,10 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
 
 // —— JSON 帮助：返回分类 ——
 function json_cats(): void {
-  [$cats,$counts] = get_categories();
-  $pdo=db();
-  $total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
-  $uncat = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE category_id IS NULL AND done = 0')->fetchColumn();
-  $mindmapTotal = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
+  [$cats,$counts,$stats] = get_categories();
+  $total = (int)($stats['active_total'] ?? 0);
+  $uncat = (int)($stats['active_uncategorized'] ?? 0);
+  $mindmapTotal = (int)($stats['mindmap_total'] ?? 0);
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode([
     'ok'=>1,
@@ -704,7 +741,13 @@ if (isset($_GET['export'])) {
   $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
   $type=strtolower((string)$_GET['export']);
   if($type==='json'){
-    foreach($rows as &$r){ $r['steps']=get_steps((int)$r['id']); }
+    $itemIds=array_column($rows,'id');
+    $stepsGrouped=$itemIds?get_steps_grouped($itemIds):[];
+    foreach($rows as &$r){
+      $id=(int)$r['id'];
+      $r['steps']=$stepsGrouped[$id] ?? [];
+    }
+    unset($r);
     header('Content-Type: application/json; charset=utf-8');
     header('Content-Disposition: attachment; filename="memo_export_'.date('Ymd_His').'.json"');
     echo json_encode($rows, JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT); exit;
@@ -714,7 +757,9 @@ if (isset($_GET['export'])) {
     header('Content-Disposition: attachment; filename="memo_export_'.date('Ymd_His').'.csv"');
     $out=fopen('php://output','w'); fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
     fputcsv($out,['id','title','description(MD)','done','category','created_at','updated_at','steps(count)']);
-    foreach($rows as $r){ $cnt=count(get_steps((int)$r['id']));
+    $itemIds=array_column($rows,'id');
+    $stepCounts=$itemIds?get_step_counts($itemIds):[];
+    foreach($rows as $r){ $cnt=$stepCounts[(int)$r['id']] ?? 0;
       fputcsv($out,[$r['id'],$r['title'],$r['description'],$r['done']?'1':'0',$r['cat_name']??'',dt((int)$r['created_at']),dt((int)$r['updated_at']),$cnt]);
     }
     fclose($out); exit;
@@ -10298,10 +10343,10 @@ if ($view === 'maps') {
 }
 
 // —— 首页 ——
-$pdo=db(); [$cats,$counts]=get_categories();
+$pdo=db(); [$cats,$counts,$stats]=get_categories();
 $cat=$_GET['cat'] ?? 'all';
 $q=trim((string)($_GET['q'] ?? ''));
-$mindmap_total = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
+$mindmap_total = (int)($stats['mindmap_total'] ?? 0);
 $isMindmapCategory = $cat === 'mindmaps';
 $items=[];
 $mindmapsAll=[];
@@ -10323,7 +10368,7 @@ if($isMindmapCategory){
   $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
   $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
 }
-$all_total = (int)$pdo->query('SELECT COUNT(*) FROM items WHERE done = 0')->fetchColumn();
+$all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];
 foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
 ?>
