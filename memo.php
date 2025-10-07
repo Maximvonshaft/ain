@@ -3762,6 +3762,15 @@ if ($view === 'map_edit') {
       .mind-info-row .map-title-input{flex:1;min-width:0}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
+      .map-shortcuts{margin-top:10px;padding-top:10px;border-top:1px solid rgba(201,168,106,.18);display:flex;flex-direction:column;gap:6px}
+      .map-shortcuts table{width:100%;border-collapse:collapse;font:500 11px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;color:var(--text-dim)}
+      .map-shortcuts thead th{text-align:left;font:600 10px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--text-strong);padding-bottom:4px}
+      .map-shortcuts td{padding:3px 6px 3px 0;vertical-align:top;white-space:normal}
+      .map-shortcuts td:first-child{color:var(--text-strong)}
+      .map-shortcuts .key-set{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+      .map-shortcuts .key-set span{font-weight:600;letter-spacing:.12em;color:var(--text-dim)}
+      .map-shortcuts kbd{display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;border-radius:6px;border:1px solid rgba(201,168,106,.26);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 0 12px rgba(227,198,139,.12)}
+      .map-shortcuts .key-set .key-join{font-size:12px}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
@@ -3969,6 +3978,62 @@ if ($view === 'map_edit') {
               <?php if ($mind['id']): ?>
               <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
               <?php endif; ?>
+            </div>
+            <div class="map-shortcuts" aria-label="思维导图快捷键">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">操作</th>
+                    <th scope="col">Win</th>
+                    <th scope="col">Mac</th>
+                    <th scope="col">说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>新建同级节点</td>
+                    <td><div class="key-set"><kbd>Enter</kbd></div></td>
+                    <td><div class="key-set"><kbd>Return</kbd></div></td>
+                    <td>在当前节点下方创建同级节点</td>
+                  </tr>
+                  <tr>
+                    <td>新建子级节点</td>
+                    <td><div class="key-set"><kbd>Tab</kbd></div></td>
+                    <td><div class="key-set"><kbd>Tab</kbd></div></td>
+                    <td>在当前节点下创建子节点</td>
+                  </tr>
+                  <tr>
+                    <td>新建父级节点</td>
+                    <td><div class="key-set"><kbd>Shift</kbd><span class="key-join">+</span><kbd>Tab</kbd></div></td>
+                    <td><div class="key-set"><kbd>Shift</kbd><span class="key-join">+</span><kbd>Tab</kbd></div></td>
+                    <td>将当前节点提升为父层的兄弟节点</td>
+                  </tr>
+                  <tr>
+                    <td>删除节点</td>
+                    <td><div class="key-set"><kbd>Del</kbd><span>/</span><kbd>Backspace</kbd></div></td>
+                    <td><div class="key-set"><kbd>⌫</kbd></div></td>
+                    <td>删除当前选中节点</td>
+                  </tr>
+                  <tr>
+                    <td>折叠 / 展开</td>
+                    <td><div class="key-set"><kbd>Space</kbd><span>/</span><kbd>→</kbd><span>/</span><kbd>←</kbd></div></td>
+                    <td><div class="key-set"><kbd>Space</kbd><span>/</span><kbd>→</kbd><span>/</span><kbd>←</kbd></div></td>
+                    <td>展开或折叠当前节点分支</td>
+                  </tr>
+                  <tr>
+                    <td>复制节点</td>
+                    <td><div class="key-set"><kbd>Ctrl</kbd><span class="key-join">+</span><kbd>C</kbd></div></td>
+                    <td><div class="key-set"><kbd>⌘</kbd><span class="key-join">+</span><kbd>C</kbd></div></td>
+                    <td>复制节点及其子节点</td>
+                  </tr>
+                  <tr>
+                    <td>粘贴节点</td>
+                    <td><div class="key-set"><kbd>Ctrl</kbd><span class="key-join">+</span><kbd>V</kbd></div></td>
+                    <td><div class="key-set"><kbd>⌘</kbd><span class="key-join">+</span><kbd>V</kbd></div></td>
+                    <td>粘贴为同级节点</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </header>
@@ -6933,6 +6998,7 @@ if ($view === 'map_edit') {
       let relationToastTimer=null;
       const commandLog=[];
       window.__mindmapCommands=commandLog;
+      let nodeClipboardTemplate=null;
       let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
@@ -7558,6 +7624,207 @@ if ($view === 'map_edit') {
         return newNode;
       }
       function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
+      function generateUniqueNodeId(){
+        let candidate;
+        do { candidate=randomId(); }
+        while(jm && jm.nodes && typeof jm.nodes.has==='function' && jm.nodes.has(candidate));
+        return candidate;
+      }
+      function prepareClipboardTemplate(template, options={}){
+        if(!template) return null;
+        const baseDirection=(options.baseDirection==='left')?'left':'right';
+        const normalize=(node, depth)=>{
+          if(!node || typeof node!=='object') return null;
+          const normalized={
+            topic:typeof node.topic==='string'?node.topic:'',
+            data:node.data?deepClone(node.data):{},
+            style:node.style?deepClone(node.style):null,
+            meta:node.meta?deepClone(node.meta):null,
+            expanded:node.expanded!==false,
+            direction:depth===0?baseDirection:(node.direction==='left' || node.dir===-1?'left':'right'),
+            children:[],
+          };
+          if(Array.isArray(node.children)){
+            normalized.children=node.children.map(child=>normalize(child, depth+1)).filter(Boolean);
+          }
+          return normalized;
+        };
+        return normalize(template,0);
+      }
+      function buildNodeFromTemplate(template,parentNode,options={}){
+        if(!template || !parentNode) return null;
+        const parentChildren=parentNode.children || (parentNode.children=[]);
+        const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+          ? jm.ensureModelChildren(parentNode)
+          : (parentNode.model.children = parentNode.model.children || []);
+        let childIndex=typeof options.insertIndex==='number'?options.insertIndex:parentChildren.length;
+        if(childIndex<0 || childIndex>parentChildren.length){ childIndex=parentChildren.length; }
+        let modelIndex=typeof options.modelIndex==='number'?options.modelIndex:parentModelChildren.length;
+        if(modelIndex<0 || modelIndex>parentModelChildren.length){ modelIndex=parentModelChildren.length; }
+        const id=generateUniqueNodeId();
+        const normalizedData=normalizeNodeData(deepClone(template.data)||{});
+        const style=template.style?deepClone(template.style):null;
+        const meta=template.meta?deepClone(template.meta):null;
+        const direction=template.direction==='left'?'left':'right';
+        const expanded=template.expanded!==false;
+        const model={
+          id,
+          topic:template.topic || '新节点',
+          data:normalizedData,
+          children:[],
+          direction,
+          expanded,
+        };
+        if(style){ model.style=deepClone(style); }
+        if(meta){ model.meta=deepClone(meta); }
+        model.parentId=parentNode.id;
+        const node={
+          id,
+          topic:model.topic,
+          data:normalizedData,
+          parent:parentNode,
+          children:[],
+          direction,
+          expanded,
+          isroot:false,
+          style:style,
+          meta:meta,
+          model:model,
+          depth:(parentNode.depth||0)+1,
+        };
+        node.dir=direction==='left'?-1:1;
+        parentChildren.splice(childIndex,0,node);
+        parentModelChildren.splice(modelIndex,0,model);
+        jm.nodes.set(id,node);
+        const childTemplates=Array.isArray(template.children)?template.children:[];
+        if(childTemplates.length){
+          childTemplates.forEach(childTpl=>{ buildNodeFromTemplate(childTpl, node); });
+        }
+        return node;
+      }
+      function copySelectedNode(){
+        const node=ensureNode();
+        if(!node || !node.model) return false;
+        nodeClipboardTemplate=deepClone(node.model);
+        return !!nodeClipboardTemplate;
+      }
+      function pasteNodeAsSibling(){
+        if(!nodeClipboardTemplate){
+          showRelationToast('请先复制一个节点');
+          return null;
+        }
+        const target=ensureNode();
+        if(!target || !target.parent){
+          showRelationToast('根节点无法粘贴为同级');
+          return null;
+        }
+        commitInlineEditing();
+        const parent=target.parent;
+        const baseDirection=(target.direction==='left' || target.dir===-1)?'left':'right';
+        const template=prepareClipboardTemplate(nodeClipboardTemplate,{baseDirection});
+        if(!template) return null;
+        const parentChildren=parent.children || [];
+        const insertIndex=parentChildren.indexOf(target)+1;
+        const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+          ? jm.ensureModelChildren(parent)
+          : (parent.model.children = parent.model.children || []);
+        const modelIndex=parentModelChildren.findIndex(child=>child && child.id===target.id)+1;
+        const created=buildNodeFromTemplate(template,parent,{insertIndex,modelIndex});
+        if(!created) return null;
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(created.id);
+        if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
+        markDirty();
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const latest=jm.get_node(created.id);
+          if(latest){
+            refreshInspector(latest);
+            updateHandlePosition();
+          }
+          updateFoldAllLabel();
+          if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+        });
+        return created;
+      }
+      function promoteNodeLevel(){
+        const node=ensureNode();
+        if(!node || !node.parent || node.parent.isroot) return false;
+        commitInlineEditing();
+        const parent=node.parent;
+        const grand=parent.parent;
+        if(!grand) return false;
+        const parentChildren=parent.children || (parent.children=[]);
+        const parentIndex=parentChildren.indexOf(node);
+        if(parentIndex!==-1){ parentChildren.splice(parentIndex,1); }
+        const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+          ? jm.ensureModelChildren(parent)
+          : (parent.model.children = parent.model.children || []);
+        const modelIdx=parentModelChildren.findIndex(child=>child && child.id===node.id);
+        if(modelIdx!==-1){ parentModelChildren.splice(modelIdx,1); }
+        const direction=(parent.direction==='left' || parent.dir===-1)?'left':'right';
+        node.parent=grand;
+        node.direction=direction;
+        node.dir=direction==='left'?-1:1;
+        if(node.model){
+          node.model.direction=direction;
+          node.model.parentId=grand.id;
+        }
+        const grandChildren=grand.children || (grand.children=[]);
+        const grandModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+          ? jm.ensureModelChildren(grand)
+          : (grand.model.children = grand.model.children || []);
+        const parentPosition=grandChildren.indexOf(parent);
+        const insertIndex=parentPosition===-1?grandChildren.length:parentPosition+1;
+        const parentModelPosition=grandModelChildren.findIndex(child=>child && child.id===parent.id);
+        const modelInsertIndex=parentModelPosition===-1?grandModelChildren.length:parentModelPosition+1;
+        grandChildren.splice(insertIndex,0,node);
+        grandModelChildren.splice(modelInsertIndex,0,node.model);
+        const updateDepth=(current, depth)=>{
+          if(!current) return;
+          current.depth=depth;
+          if(current.model){ current.model.depth=depth; }
+          if(current.children && current.children.length){
+            current.children.forEach(child=>updateDepth(child, depth+1));
+          }
+        };
+        updateDepth(node,(grand.depth||0)+1);
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(node.id);
+        if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
+        markDirty();
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>{
+          const latest=jm.get_node(node.id);
+          if(latest){ refreshInspector(latest); updateHandlePosition(); }
+          updateFoldAllLabel();
+          if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+        });
+        return true;
+      }
+      function toggleBranch(){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return false;
+        const next=node.expanded===false;
+        setNodeExpandedState(node, next);
+        return true;
+      }
+      function expandSelectedNode(){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return false;
+        if(node.expanded!==false) return false;
+        setNodeExpandedState(node,true);
+        return true;
+      }
+      function collapseSelectedNode(){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return false;
+        if(node.expanded===false) return false;
+        setNodeExpandedState(node,false);
+        return true;
+      }
       function isProbablyUrl(text){
         const value=(text||'').trim();
         return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
@@ -7974,11 +8241,44 @@ if ($view === 'map_edit') {
           if(activeEl.isContentEditable || /input|textarea|select/i.test(tag)) return;
         }
         if(currentEditingId()) return;
-        if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); addSiblingNode(); }
-        else if(e.key==='Tab' && e.shiftKey){ e.preventDefault(); focusParentNode(); }
-        else if(e.key==='Tab'){ e.preventDefault(); addChildNode(); }
-        else if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); deleteSelectedNode(); }
-        else if(e.key==='F2'){ e.preventDefault(); renameSelectedNode(); }
+        const key=e.key || '';
+        const lowerKey=key.toLowerCase();
+        if((e.ctrlKey || e.metaKey) && lowerKey==='c'){
+          e.preventDefault();
+          if(copySelectedNode()){ showRelationToast('节点已复制'); }
+          return;
+        }
+        if((e.ctrlKey || e.metaKey) && lowerKey==='v'){
+          e.preventDefault();
+          const pasted=pasteNodeAsSibling();
+          if(pasted){ showRelationToast('已粘贴节点'); }
+          return;
+        }
+        if(key==='Enter' && !e.shiftKey){
+          e.preventDefault();
+          addSiblingNode();
+        }else if(key==='Tab' && e.shiftKey){
+          e.preventDefault();
+          if(!promoteNodeLevel()){ focusParentNode(); }
+        }else if(key==='Tab'){
+          e.preventDefault();
+          addChildNode();
+        }else if(key==='Delete' || key==='Backspace'){
+          e.preventDefault();
+          deleteSelectedNode();
+        }else if(key===' ' || e.code==='Space'){
+          e.preventDefault();
+          toggleBranch();
+        }else if(key==='ArrowRight'){
+          e.preventDefault();
+          expandSelectedNode();
+        }else if(key==='ArrowLeft'){
+          e.preventDefault();
+          if(!collapseSelectedNode()){ focusParentNode(); }
+        }else if(key==='F2'){
+          e.preventDefault();
+          renameSelectedNode();
+        }
       });
       function callView(method, ...args){
         if(jm.view && typeof jm.view[method] === 'function'){
@@ -8097,14 +8397,82 @@ if ($view === 'map_edit') {
           bounds:mind.bounds?{...mind.bounds}:null,
           viewport:captureElementState(mind.viewport,false),
           nodeLayer:captureElementState(mind.nodeLayer,false),
-          linkLayer:captureElementState(mind.linkLayer,false),
-          relationLayer:captureElementState(mind.relationLayer,false),
+          linkLayer:captureElementState(mind.linkLayer,true),
+          relationLayer:captureElementState(mind.relationLayer,true),
           guideLayer:captureElementState(mind.guideLayer,true),
+          view:{
+            scale:typeof mind.scale==='number'?mind.scale:null,
+            offsetX:typeof mind.offsetX==='number'?mind.offsetX:null,
+            offsetY:typeof mind.offsetY==='number'?mind.offsetY:null,
+          },
           nodes,
         };
       }
       function restoreLayoutSnapshot(mind,snapshot){
         if(!mind || !snapshot) return;
+        const rebuildLinkRegistry=(mindInstance)=>{
+          if(!mindInstance || !mindInstance.nodes || !mindInstance.linkLayer) return;
+          if(mindInstance.linkRegistry && typeof mindInstance.linkRegistry.clear==='function'){
+            mindInstance.linkRegistry.clear();
+          }
+          mindInstance.nodes.forEach(node=>{
+            if(!node) return;
+            if(!node.parent){
+              node.linkGroup=null;
+              node.linkShadow=null;
+              node.linkPath=null;
+              node.linkHighlight=null;
+              return;
+            }
+            const selector=`g.trace-group[data-from="${node.parent.id}"][data-to="${node.id}"]`;
+            const group=mindInstance.linkLayer.querySelector(selector);
+            if(!group){
+              node.linkGroup=null;
+              node.linkShadow=null;
+              node.linkPath=null;
+              node.linkHighlight=null;
+              return;
+            }
+            const shadow=group.querySelector('.trace.shadow');
+            const core=group.querySelector('.trace.core');
+            const highlight=group.querySelector('.trace.highlight');
+            node.linkGroup=group;
+            node.linkShadow=shadow||null;
+            node.linkPath=core||null;
+            node.linkHighlight=highlight||null;
+            if(core){
+              const parentId=node.parent.id;
+              const childId=node.id;
+              const enterEdge=()=>{ if(typeof mindInstance.setEdgeHover==='function'){ mindInstance.setEdgeHover(parentId, childId); } };
+              const leaveEdge=()=>{ if(typeof mindInstance.clearEdgeHover==='function'){ mindInstance.clearEdgeHover(parentId, childId); } };
+              core.addEventListener('pointerenter', enterEdge);
+              core.addEventListener('pointerleave', leaveEdge);
+              core.addEventListener('pointercancel', leaveEdge);
+            }
+            if(mindInstance.linkRegistry){
+              mindInstance.linkRegistry.set(node.id,{group,shadow,core,highlight});
+            }
+          });
+        };
+        const rebuildRelationRegistry=(mindInstance)=>{
+          if(!mindInstance || !mindInstance.relationLayer) return;
+          if(mindInstance.relationRegistry && typeof mindInstance.relationRegistry.clear==='function'){
+            mindInstance.relationRegistry.clear();
+          }
+          if(!Array.isArray(mindInstance.relations)) return;
+          for(const relation of mindInstance.relations){
+            if(!relation) continue;
+            const group=mindInstance.relationLayer.querySelector(`g.relation-group[data-id="${relation.id}"]`);
+            if(!group) continue;
+            const shadow=group.querySelector('.relation-shadow');
+            const core=group.querySelector('.relation-core');
+            const highlight=group.querySelector('.relation-highlight');
+            if(core){ core.dataset.bidirectional=relation.bidirectional?'true':'false'; }
+            if(mindInstance.relationRegistry){
+              mindInstance.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            }
+          }
+        };
         const restoreElementState=(el,state)=>{
           if(!el || !state) return;
           if(state.style){
@@ -8126,6 +8494,13 @@ if ($view === 'map_edit') {
         restoreElementState(mind.linkLayer,snapshot.linkLayer);
         restoreElementState(mind.relationLayer,snapshot.relationLayer);
         restoreElementState(mind.guideLayer,snapshot.guideLayer);
+        if(snapshot.view){
+          if(typeof snapshot.view.scale==='number' && isFinite(snapshot.view.scale)){ mind.scale=snapshot.view.scale; }
+          if(typeof snapshot.view.offsetX==='number' && isFinite(snapshot.view.offsetX)){ mind.offsetX=snapshot.view.offsetX; }
+          if(typeof snapshot.view.offsetY==='number' && isFinite(snapshot.view.offsetY)){ mind.offsetY=snapshot.view.offsetY; }
+        }
+        rebuildLinkRegistry(mind);
+        rebuildRelationRegistry(mind);
         if(Array.isArray(snapshot.nodes) && mind.nodes && typeof mind.nodes.get==='function'){
           for(const nodeState of snapshot.nodes){
             if(!nodeState || !nodeState.id) continue;
@@ -8147,9 +8522,15 @@ if ($view === 'map_edit') {
               if(Number.isFinite(node.absY)){ node.el.style.top=`${node.absY - height/2}px`; }
             }
             if(typeof mind.updateAnchors==='function'){ mind.updateAnchors(node); }
+            if(typeof mind.updateLinkPath==='function'){ mind.updateLinkPath(node); }
+            if(typeof mind.updateRelationsForNode==='function'){ mind.updateRelationsForNode(node); }
           }
         }
+        if(typeof mind.updateEdgeButtonScale==='function'){ mind.updateEdgeButtonScale(); }
         if(typeof mind.applyTransform==='function'){ mind.applyTransform(); }
+        if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+        if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
+        updateFoldAllLabel();
       }
       function exportMindmapAsJson(){
         if(!jm){
@@ -8265,10 +8646,13 @@ if ($view === 'map_edit') {
             setTimeout(()=>URL.revokeObjectURL(url), 1500);
           }else if(format==='pdf'){
             const jsPDF=await ensureJsPDF();
-            const orientation=canvas.width>=canvas.height?'landscape':'portrait';
-            const pdf=new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height]});
+            const isLandscape=canvas.width>=canvas.height;
+            const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
+            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
             const dataUrl=canvas.toDataURL('image/png');
-            pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height,undefined,'FAST');
+            const pageWidth=pdf.internal.pageSize.getWidth();
+            const pageHeight=pdf.internal.pageSize.getHeight();
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'FAST');
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
