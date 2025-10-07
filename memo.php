@@ -3842,8 +3842,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),860px)}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 18px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;box-sizing:border-box;touch-action:manipulation}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),860px);display:flex;justify-content:center}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-padding:0 calc(24px + var(--safe-right, 0px))}
+      .mind-dock::-webkit-scrollbar{display:none}
       .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
@@ -3864,9 +3865,9 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),760px)}.mind-dock{gap:12px 16px;padding:14px 20px;border-radius:30px}.dock-btn{width:88px;height:62px;flex:0 0 88px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:12px}.dock-btn{width:84px;height:58px;flex:0 0 84px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:10px}.dock-btn{width:78px;height:56px;flex:0 0 78px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 28px),760px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px;scroll-padding:0 calc(20px + var(--safe-right, 0px))}.dock-btn{width:88px;height:62px;flex:0 0 88px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:12px;justify-content:flex-start;scroll-padding:0 calc(18px + var(--safe-right, 0px))}.dock-btn{width:84px;height:58px;flex:0 0 84px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:10px;justify-content:flex-start;scroll-padding:0 calc(16px + var(--safe-right, 0px))}.dock-btn{width:78px;height:56px;flex:0 0 78px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -7167,38 +7168,83 @@ if ($view === 'map_edit') {
       }
       function centerOnNodeSmooth(node){
         if(!jm || !node || typeof jm.center_node!=='function') return false;
+        const container=jm.container || (jm.view && jm.view.container) || null;
+        const rect=container ? container.getBoundingClientRect() : null;
+        const hasRect=!!(rect && rect.width>0 && rect.height>0);
+        const halfWidth=hasRect ? rect.width/2 : 0;
+        const halfHeight=hasRect ? rect.height/2 : 0;
         const startX=Number.isFinite(jm.offsetX)?jm.offsetX:0;
         const startY=Number.isFinite(jm.offsetY)?jm.offsetY:0;
-        const startScale=jm.scale;
+        const startScale=Number.isFinite(jm.scale)?jm.scale:1;
         const prevHasCentered=jm.hasCentered;
+        const startCenterWorld=(hasRect && startScale)
+          ? {x:(halfWidth-startX)/startScale,y:(halfHeight-startY)/startScale}
+          : null;
         const centered=jm.center_node(node);
         if(!centered){ return false; }
         const targetX=Number.isFinite(jm.offsetX)?jm.offsetX:startX;
         const targetY=Number.isFinite(jm.offsetY)?jm.offsetY:startY;
+        const targetScale=Number.isFinite(jm.scale)?jm.scale:startScale;
+        const targetHasCentered=jm.hasCentered;
+        const targetCenterWorld=(hasRect && targetScale)
+          ? {x:(halfWidth-targetX)/targetScale,y:(halfHeight-targetY)/targetScale}
+          : null;
         jm.offsetX=startX;
         jm.offsetY=startY;
         jm.scale=startScale;
         jm.hasCentered=prevHasCentered;
         if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
         stopPanAnimation();
-        if(Math.abs(targetX-startX)<0.5 && Math.abs(targetY-startY)<0.5){
+        const deltaOffsetX=targetX-startX;
+        const deltaOffsetY=targetY-startY;
+        const deltaScale=targetScale-startScale;
+        const canInterpolateCenter=!!(startCenterWorld && targetCenterWorld && hasRect);
+        if(Math.abs(deltaOffsetX)<0.5 && Math.abs(deltaOffsetY)<0.5 && Math.abs(deltaScale)<0.0001){
           jm.offsetX=targetX;
           jm.offsetY=targetY;
+          jm.scale=targetScale;
+          jm.hasCentered=targetHasCentered;
           if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
           return true;
         }
-        const duration=260;
+        const avgScale=(startScale+targetScale)/2 || 1;
+        let pixelDistance=Math.hypot(deltaOffsetX, deltaOffsetY);
+        if(canInterpolateCenter){
+          const worldDx=targetCenterWorld.x-startCenterWorld.x;
+          const worldDy=targetCenterWorld.y-startCenterWorld.y;
+          pixelDistance=Math.hypot(worldDx, worldDy)*Math.max(avgScale,0.01);
+        }
+        const baseDuration=260;
+        const scaleContribution=Math.min(360, Math.abs(deltaScale)*420);
+        const duration=Math.min(720, Math.max(220, baseDuration + pixelDistance*0.35 + scaleContribution));
         const startTime=performance.now();
         const ease=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
         function step(now){
           const elapsed=now-startTime;
           const progress=Math.min(1, elapsed/duration);
           const eased=ease(progress);
-          jm.offsetX=startX + (targetX-startX)*eased;
-          jm.offsetY=startY + (targetY-startY)*eased;
+          const currentScale=startScale + deltaScale*eased;
+          jm.scale=currentScale;
+          if(canInterpolateCenter && currentScale){
+            const centerX=startCenterWorld.x + (targetCenterWorld.x-startCenterWorld.x)*eased;
+            const centerY=startCenterWorld.y + (targetCenterWorld.y-startCenterWorld.y)*eased;
+            jm.offsetX=halfWidth - centerX*currentScale;
+            jm.offsetY=halfHeight - centerY*currentScale;
+          }else{
+            jm.offsetX=startX + deltaOffsetX*eased;
+            jm.offsetY=startY + deltaOffsetY*eased;
+          }
           if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
-          if(progress<1){ panAnimation={raf:requestAnimationFrame(step)}; }
-          else{ panAnimation=null; }
+          if(progress<1){
+            panAnimation={raf:requestAnimationFrame(step)};
+          }else{
+            panAnimation=null;
+            jm.offsetX=targetX;
+            jm.offsetY=targetY;
+            jm.scale=targetScale;
+            jm.hasCentered=targetHasCentered;
+            if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          }
         }
         panAnimation={raf:requestAnimationFrame(step)};
         return true;
