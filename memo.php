@@ -3791,9 +3791,11 @@ if ($view === 'map_edit') {
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
       .mind-links{pointer-events:none;overflow:visible}
       .mind-link-controls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
-      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;border:1px solid rgba(201,168,106,.6);background:rgba(201,168,106,.18);color:var(--gold-300);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.4);transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition)}
-      .mind-link-controls .edge-insert-btn:hover{background:rgba(201,168,106,.28);border-color:rgba(227,198,139,.85);box-shadow:0 12px 26px rgba(0,0,0,.48)}
-      .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.85);outline-offset:2px}
+      .mind-link-controls .edge-insert-btn{position:absolute;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:14px;border:1px solid rgba(227,198,139,.65);background:linear-gradient(160deg,rgba(28,32,36,.96),rgba(12,16,18,.92));color:var(--gold-400);font:600 18px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;pointer-events:auto;cursor:pointer;box-shadow:0 12px 28px rgba(0,0,0,.52),0 0 0 1px rgba(227,198,139,.32) inset,0 0 26px rgba(227,198,139,.22);transform:translate(-50%,-50%) scale(var(--edge-scale,1));transition:transform var(--transition),background-color var(--transition),border-color var(--transition),box-shadow var(--transition);text-shadow:0 0 10px rgba(227,198,139,.4);isolation:isolate}
+      .mind-link-controls .edge-insert-btn::before{content:"";position:absolute;inset:5px;border-radius:12px;background:radial-gradient(circle at 50% 40%,rgba(227,198,139,.32),rgba(227,198,139,.08) 65%,rgba(227,198,139,0) 100%);box-shadow:inset 0 0 18px rgba(227,198,139,.24);z-index:-1;opacity:.9}
+      .mind-link-controls .edge-insert-btn::after{content:"";position:absolute;inset:-10px;border-radius:18px;background:radial-gradient(circle,rgba(227,198,139,.18),rgba(227,198,139,0) 70%);filter:blur(4px);opacity:.75;z-index:-2}
+      .mind-link-controls .edge-insert-btn:hover{background:linear-gradient(160deg,rgba(36,42,48,.98),rgba(18,22,26,.94));border-color:rgba(227,198,139,.85);box-shadow:0 16px 32px rgba(0,0,0,.55),0 0 0 1px rgba(227,198,139,.4) inset,0 0 34px rgba(227,198,139,.3)}
+      .mind-link-controls .edge-insert-btn:focus-visible{outline:2px solid rgba(227,198,139,.85);outline-offset:3px}
       .mind-links .trace-group{pointer-events:none}
       .mind-links .trace{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
       .mind-links .trace.shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow)}
@@ -5915,11 +5917,14 @@ if ($view === 'map_edit') {
             endInner={x:endCenter.x,y:endCenter.y};
           }
           const norm={x:vector.x/segmentLength,y:vector.y/segmentLength};
-          const arrowBase=Math.min(24, Math.max(8, segmentLength*0.18));
-          const arrowOffset=Math.min(segmentLength*0.45, arrowBase);
-          const startOffset=relation.bidirectional ? arrowOffset : 0;
-          const startPoint={x:startInner.x - norm.x*startOffset,y:startInner.y - norm.y*startOffset};
-          const endPoint={x:endInner.x + norm.x*arrowOffset,y:endInner.y + norm.y*arrowOffset};
+          const arrowBase=Math.min(22, Math.max(10, segmentLength*0.18));
+          const halfDistance=segmentLength/2;
+          const clearanceLimit=Math.max(0, halfDistance - 6);
+          const effectiveClearance=Math.max(0, Math.min(arrowBase, clearanceLimit, segmentLength - 8));
+          const endClearance=effectiveClearance;
+          const startClearance=relation.bidirectional ? effectiveClearance : 0;
+          const startPoint={x:startInner.x - norm.x*startClearance,y:startInner.y - norm.y*startClearance};
+          const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
           const dx=endPoint.x-startPoint.x;
           const dy=endPoint.y-startPoint.y;
           const distance=Math.hypot(dx,dy) || 1;
