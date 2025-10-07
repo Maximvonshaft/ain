@@ -360,6 +360,15 @@ function mindmap_assets_for_map(int $map_id): array {
   return $st->fetchAll();
 }
 
+function mindmap_assets_for_session(string $session_key): array {
+  $session_key=trim($session_key);
+  if($session_key==='') return [];
+  $pdo=db();
+  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE session_key=?');
+  $st->execute([$session_key]);
+  return $st->fetchAll();
+}
+
 function delete_mindmap_asset(int $id): void {
   $asset=get_mindmap_asset($id);
   if(!$asset) return;
@@ -1119,11 +1128,37 @@ if (is_post()) {
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
         if(is_ajax()){
-          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id']]); exit;
+          header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>(int)$asset['id'],'name'=>$asset['orig_name'],'size'=>(int)$asset['size'],'mime'=>$asset['mime'],'url'=>'?mindmap_asset='.(int)$asset['id'],'createdAt'=>$asset['created_at'] ?? now(),'mapId'=>(int)($asset['mindmap_id'] ?? 0)]); exit;
         }
         break;
       }
       case 'ping_cats': { if(is_ajax()) json_cats(); break; }
+      case 'delete_mindmap_assets': {
+        $idsRaw=(string)($_POST['ids'] ?? '');
+        $mapId=(int)($_POST['map_id'] ?? 0);
+        $ids=array_values(array_filter(array_map('intval',preg_split('/[\s,]+/',$idsRaw,-1,PREG_SPLIT_NO_EMPTY)),fn($n)=>$n>0));
+        $deleted=[];
+        $sessionKey=session_id();
+        foreach($ids as $id){
+          $asset=get_mindmap_asset($id);
+          if(!$asset) continue;
+          $assetMapId=(int)($asset['mindmap_id'] ?? 0);
+          $assetSession=(string)($asset['session_key'] ?? '');
+          $allowed=false;
+          if($mapId>0 && $assetMapId===$mapId){ $allowed=true; }
+          if(!$allowed && $assetMapId===0 && $assetSession!=='' && $assetSession===$sessionKey){ $allowed=true; }
+          if(!$allowed) continue;
+          delete_mindmap_asset($id);
+          $deleted[]=$id;
+        }
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode(['ok'=>1,'deleted'=>$deleted]);
+          exit;
+        }
+        redirect('?view=map_edit'.($mapId>0?'&id='.$mapId:''));
+        break;
+      }
       case 'delete_attachment': {
         $id=(int)($_POST['id'] ?? 0);
         if($id>0){
@@ -3626,6 +3661,42 @@ if ($view === 'map_edit') {
   if (isset($initialDataDecoded['data'])) {
     mindmap_force_right_orientation($initialDataDecoded['data']);
   }
+  $assetMetaIndex = [];
+  if ($id > 0) {
+    foreach (mindmap_assets_for_map($id) as $assetRow) {
+      $assetId = (int)($assetRow['id'] ?? 0);
+      if ($assetId <= 0) { continue; }
+      $assetMetaIndex[$assetId] = [
+        'id' => $assetId,
+        'node_uid' => (string)($assetRow['node_uid'] ?? ''),
+        'name' => (string)($assetRow['orig_name'] ?? ''),
+        'size' => (int)($assetRow['size'] ?? 0),
+        'mime' => (string)($assetRow['mime'] ?? ''),
+        'created_at' => (string)($assetRow['created_at'] ?? ''),
+        'map_id' => (int)($assetRow['mindmap_id'] ?? 0),
+        'pending' => false,
+      ];
+    }
+  }
+  $sessionKey = session_id();
+  if (is_string($sessionKey) && $sessionKey !== '') {
+    foreach (mindmap_assets_for_session($sessionKey) as $assetRow) {
+      $assetId = (int)($assetRow['id'] ?? 0);
+      if ($assetId <= 0) { continue; }
+      if (isset($assetMetaIndex[$assetId])) { continue; }
+      $assetMetaIndex[$assetId] = [
+        'id' => $assetId,
+        'node_uid' => (string)($assetRow['node_uid'] ?? ''),
+        'name' => (string)($assetRow['orig_name'] ?? ''),
+        'size' => (int)($assetRow['size'] ?? 0),
+        'mime' => (string)($assetRow['mime'] ?? ''),
+        'created_at' => (string)($assetRow['created_at'] ?? ''),
+        'map_id' => (int)($assetRow['mindmap_id'] ?? 0),
+        'pending' => true,
+      ];
+    }
+  }
+  $initialAssetMeta = array_values($assetMetaIndex);
   ?>
   <!doctype html>
   <html lang="zh-Hans">
@@ -3744,6 +3815,69 @@ if ($view === 'map_edit') {
       .mind-import-footer{display:flex;justify-content:flex-end}
       .mind-import-footer button{padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(21,26,30,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.14em;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition)}
       .mind-import-footer button:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(227,198,139,.22)}
+      .attachment-manager-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(5,7,10,.78);backdrop-filter:blur(18px);z-index:360}
+      .attachment-manager-backdrop[data-open="true"]{display:flex}
+      .attachment-manager-panel{width:min(1120px,calc(100% - 32px));max-height:min(92vh,96svh);background:linear-gradient(170deg,rgba(21,26,30,.95),rgba(12,16,18,.9));border:1px solid rgba(201,168,106,.34);border-radius:26px;box-shadow:0 36px 72px rgba(0,0,0,.72),0 0 36px rgba(227,198,139,.22);padding:22px;display:flex;flex-direction:column;gap:18px;position:relative}
+      .attachment-manager-panel::before{content:"";position:absolute;inset:12px;border-radius:20px;border:1px dashed rgba(201,168,106,.22);opacity:.6;pointer-events:none}
+      .attachment-manager-header{display:flex;align-items:center;justify-content:space-between;gap:16px;position:relative;z-index:1}
+      .attachment-manager-title{margin:0;font:600 18px/1 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.18em;text-transform:uppercase}
+      .attachment-manager-summary{color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em}
+      .attachment-manager-close{width:38px;height:38px;border-radius:999px;border:1px solid rgba(201,168,106,.36);background:rgba(15,19,22,.82);color:var(--gold-400);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:transform var(--transition),border-color var(--transition)}
+      .attachment-manager-close:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.56)}
+      .attachment-manager-body{display:grid;grid-template-columns:minmax(200px,220px) minmax(320px,1fr) minmax(260px,1fr);gap:20px;position:relative;z-index:1;flex:1 1 auto;min-height:0}
+      .attachment-manager-filter{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:18px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.82);box-shadow:inset 0 0 22px rgba(0,0,0,.36)}
+      .attachment-manager-filter h3{margin:0;font:600 12px/1.2 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
+      .attachment-manager-filter .chip-group{display:flex;flex-wrap:wrap;gap:10px}
+      .attachment-manager-chip{padding:8px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.26);background:rgba(15,19,22,.78);color:var(--text-muted);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition),color var(--transition)}
+      .attachment-manager-chip[data-active="true"]{color:var(--gold-400);border-color:rgba(227,198,139,.56);background:rgba(227,198,139,.16)}
+      .attachment-manager-chip:focus-visible{outline:2px solid rgba(75,195,209,.45);outline-offset:2px}
+      .attachment-manager-sort{display:grid;gap:8px}
+      .attachment-manager-sort select{padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.28);background:rgba(12,16,18,.78);color:var(--text-strong);font:500 13px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em}
+      .attachment-manager-main{display:flex;flex-direction:column;gap:12px;min-height:0}
+      .attachment-manager-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+      .attachment-manager-selection{font:12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.08em}
+      .attachment-manager-actions{display:flex;flex-wrap:wrap;gap:10px}
+      .attachment-manager-actions button{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:14px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.82);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:transform var(--transition),border-color var(--transition)}
+      .attachment-manager-actions button:hover{transform:translateY(-2px);border-color:rgba(227,198,139,.54)}
+      .attachment-manager-actions button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+      .attachment-manager-list{flex:1 1 auto;min-height:0;overflow:auto;border-radius:18px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.78);box-shadow:inset 0 0 18px rgba(0,0,0,.32);padding:6px;display:grid;gap:8px}
+      .attachment-manager-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid transparent;background:rgba(21,26,30,.82);transition:border-color var(--transition),background var(--transition)}
+      .attachment-manager-row:hover{border-color:rgba(201,168,106,.32);background:rgba(27,34,40,.9)}
+      .attachment-manager-row[data-selected="true"]{border-color:rgba(75,195,209,.55);background:rgba(36,52,60,.82);box-shadow:0 0 0 1px rgba(75,195,209,.26)}
+      .attachment-manager-checkbox{width:20px;height:20px;border-radius:6px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.88);display:flex;align-items:center;justify-content:center;color:var(--gold-400);font-size:12px;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+      .attachment-manager-row[data-selected="true"] .attachment-manager-checkbox{border-color:rgba(75,195,209,.6);background:rgba(75,195,209,.18)}
+      .attachment-manager-file{display:flex;align-items:center;gap:12px;min-width:0}
+      .attachment-manager-icon{font-size:26px}
+      .attachment-manager-info{display:grid;gap:4px;min-width:0}
+      .attachment-manager-name{font:600 14px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);letter-spacing:.04em;word-break:break-all;background:none;border:none;padding:0;text-align:left;cursor:pointer;transition:color var(--transition)}
+      .attachment-manager-name:hover{color:var(--gold-400)}
+      .attachment-manager-name:focus-visible{outline:2px solid rgba(75,195,209,.45);outline-offset:2px}
+      .attachment-manager-meta{font:12px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.08em;display:flex;gap:10px;flex-wrap:wrap}
+      .attachment-manager-meta span{display:inline-flex;align-items:center;gap:4px}
+      .attachment-manager-node{display:grid;gap:6px;justify-items:end;text-align:right}
+      .attachment-row-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+      .attachment-row-action{padding:6px 10px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),transform var(--transition)}
+      .attachment-row-action:hover{border-color:rgba(227,198,139,.52);transform:translateY(-1px)}
+      .attachment-row-action:disabled{opacity:.5;cursor:not-allowed;transform:none}
+      .attachment-row-action.danger{border-color:rgba(209,75,75,.48);color:#f6d6d6;background:rgba(209,75,75,.18)}
+      .attachment-row-action.danger:hover{border-color:rgba(209,75,75,.64)}
+      .attachment-manager-node .node-label{color:var(--text-muted);font:11px/1.3 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-manager-preview{border-radius:18px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.78);box-shadow:inset 0 0 18px rgba(0,0,0,.32);padding:16px;display:grid;gap:12px;min-height:0}
+      .attachment-manager-preview header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .attachment-manager-preview h4{margin:0;font:600 13px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase}
+      .attachment-manager-preview button{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),transform var(--transition)}
+      .attachment-manager-preview button:hover{transform:translateY(-1px);border-color:rgba(227,198,139,.48)}
+      .attachment-manager-preview button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+      .attachment-manager-preview .preview-body{position:relative;flex:1 1 auto;min-height:160px;border-radius:14px;border:1px solid rgba(201,168,106,.22);background:rgba(9,12,14,.78);display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto}
+      .attachment-manager-preview .preview-placeholder{color:var(--text-muted);font:12px/1.5 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-align:center;padding:12px}
+      .attachment-manager-empty{padding:28px;border-radius:18px;border:1px dashed rgba(201,168,106,.28);background:rgba(12,16,18,.78);text-align:center;color:var(--text-muted);font:600 13px/1.6 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
+      .attachment-manager-search{width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(201,168,106,.26);background:rgba(12,16,18,.78);color:var(--text-strong);font:500 13px/1.4 'Noto Sans SC','Inter',sans-serif;letter-spacing:.04em}
+      .attachment-manager-search::placeholder{color:var(--text-muted)}
+      @media (max-width:1080px){.attachment-manager-body{grid-template-columns:minmax(180px,200px) minmax(260px,1fr);grid-template-areas:"filter list" "filter preview"}.attachment-manager-filter{grid-area:filter}.attachment-manager-main{grid-area:list}.attachment-manager-preview{grid-area:preview;min-height:200px}}
+      @media (max-width:860px){.attachment-manager-body{grid-template-columns:1fr;grid-template-areas:"filter" "list" "preview"}.attachment-manager-filter{flex-direction:row;flex-wrap:wrap}.attachment-manager-filter .chip-group{width:100%}}
+      @media (max-width:720px){.attachment-manager-panel{padding:18px}.attachment-manager-header{flex-direction:column;align-items:flex-start}.attachment-manager-actions{width:100%}.attachment-manager-actions button{flex:1 1 auto;justify-content:center}.attachment-manager-row{grid-template-columns:minmax(0,1fr);gap:10px}.attachment-manager-node{justify-items:start;text-align:left}.attachment-manager-checkbox{order:-1}}
+      .jsmind-node.highlight-flash{box-shadow:0 0 0 3px rgba(75,195,209,.6),0 0 22px rgba(75,195,209,.45) !important;border-radius:18px;animation:highlightPulse 1s ease-in-out}
+      @keyframes highlightPulse{0%{transform:scale(1)}50%{transform:scale(1.03)}100%{transform:scale(1)}}
       .attachment-preview-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(5,7,10,.78);backdrop-filter:blur(18px);z-index:280}
       .attachment-preview-backdrop[data-open="true"]{display:flex}
       .attachment-preview-panel{width:min(960px,calc(100vw - 32px));max-height:min(90vh,96svh);background:linear-gradient(165deg,rgba(21,26,30,.95),rgba(12,16,18,.92));border:1px solid rgba(201,168,106,.34);border-radius:24px;box-shadow:0 32px 64px rgba(0,0,0,.72),0 0 34px rgba(227,198,139,.2);padding:20px;display:flex;flex-direction:column;gap:16px;position:relative}
@@ -4027,6 +4161,10 @@ if ($view === 'map_edit') {
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
+          <button class="dock-btn" data-action="manage-attachments" data-tip="附件管理（Ctrl+Shift+A）" aria-label="附件管理">
+            <span class="icon">🗂</span>
+            <span class="label">附件管理</span>
+          </button>
           <button class="dock-btn" data-action="relation" data-tip="建立关联" aria-label="关联节点">
             <span class="icon">🪢</span>
             <span class="label">关联</span>
@@ -4059,6 +4197,70 @@ if ($view === 'map_edit') {
         </div>
         <div class="mind-import-footer">
           <button type="button" data-import-cancel>取消</button>
+        </div>
+      </div>
+    </div>
+    <div class="attachment-manager-backdrop" id="attachment-manager" data-open="false" role="dialog" aria-modal="true" aria-labelledby="attachment-manager-title" aria-hidden="true">
+      <div class="attachment-manager-panel">
+        <header class="attachment-manager-header">
+          <div>
+            <h3 class="attachment-manager-title" id="attachment-manager-title">附件管理</h3>
+            <div class="attachment-manager-summary" id="attachment-manager-count">正在统计附件…</div>
+          </div>
+          <button type="button" class="attachment-manager-close" data-attachment-close aria-label="关闭附件管理">×</button>
+        </header>
+        <div class="attachment-manager-body">
+          <aside class="attachment-manager-filter">
+            <h3>类型筛选</h3>
+            <div class="chip-group" id="attachment-filter-group">
+              <button type="button" class="attachment-manager-chip" data-filter="all" data-active="true">全部</button>
+              <button type="button" class="attachment-manager-chip" data-filter="image">图片</button>
+              <button type="button" class="attachment-manager-chip" data-filter="document">文档</button>
+              <button type="button" class="attachment-manager-chip" data-filter="audio">音频</button>
+              <button type="button" class="attachment-manager-chip" data-filter="video">视频</button>
+              <button type="button" class="attachment-manager-chip" data-filter="archive">压缩包</button>
+              <button type="button" class="attachment-manager-chip" data-filter="other">其他</button>
+            </div>
+            <div class="attachment-manager-sort">
+              <h3>排序</h3>
+              <select id="attachment-sort">
+                <option value="recent">按时间（最新）</option>
+                <option value="oldest">按时间（最早）</option>
+                <option value="size-desc">按大小（从大到小）</option>
+                <option value="size-asc">按大小（从小到大）</option>
+                <option value="type">按类型</option>
+                <option value="name">按名称</option>
+              </select>
+            </div>
+          </aside>
+          <section class="attachment-manager-main">
+            <div class="attachment-manager-toolbar">
+              <div class="attachment-manager-selection" id="attachment-selection-info">未选择附件</div>
+              <div class="attachment-manager-actions">
+                <button type="button" id="attachment-select-all">全选</button>
+                <button type="button" id="attachment-clear-selection">清除</button>
+                <button type="button" id="attachment-export" disabled>导出清单</button>
+                <button type="button" id="attachment-download" disabled>打包下载</button>
+                <button type="button" id="attachment-delete" disabled>批量删除</button>
+              </div>
+            </div>
+            <input type="search" class="attachment-manager-search" id="attachment-search" placeholder="搜索文件名或节点标题…" aria-label="搜索附件">
+            <div class="attachment-manager-list" id="attachment-manager-list" role="list"></div>
+            <div class="attachment-manager-empty" id="attachment-manager-empty" hidden>当前导图暂无附件。</div>
+          </section>
+          <aside class="attachment-manager-preview" id="attachment-manager-preview">
+            <header>
+              <h4>预览</h4>
+              <button type="button" id="attachment-preview-open" disabled>打开预览</button>
+            </header>
+            <div class="preview-body" id="attachment-preview-body">
+              <div class="preview-placeholder">选择附件后将在此快速预览或显示摘要。</div>
+            </div>
+            <div class="attachment-manager-meta" id="attachment-preview-meta"></div>
+            <div class="attachment-manager-actions" id="attachment-preview-actions">
+              <button type="button" id="attachment-preview-download" disabled>下载</button>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
@@ -6479,6 +6681,7 @@ if ($view === 'map_edit') {
       if(typeof window.jsMind==='undefined'){ window.jsMind=SimpleMind; }
       const defaultData = <?php echo json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       let initialData = <?php echo json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+      const initialAssetMeta = <?php echo json_encode($initialAssetMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
       if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
       if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
@@ -6948,6 +7151,697 @@ if ($view === 'map_edit') {
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
       const relationToast=document.getElementById('mind-relation-toast');
       const relationContextMenu=document.getElementById('relation-context-menu');
+      const attachmentManagerBackdrop=document.getElementById('attachment-manager');
+      const attachmentManagerList=document.getElementById('attachment-manager-list');
+      const attachmentManagerEmpty=document.getElementById('attachment-manager-empty');
+      const attachmentFilterGroup=document.getElementById('attachment-filter-group');
+      const attachmentSortSelect=document.getElementById('attachment-sort');
+      const attachmentSearchInput=document.getElementById('attachment-search');
+      const attachmentSelectionInfo=document.getElementById('attachment-selection-info');
+      const attachmentSelectAllButton=document.getElementById('attachment-select-all');
+      const attachmentClearSelectionButton=document.getElementById('attachment-clear-selection');
+      const attachmentExportButton=document.getElementById('attachment-export');
+      const attachmentDownloadButton=document.getElementById('attachment-download');
+      const attachmentDeleteButton=document.getElementById('attachment-delete');
+      const attachmentCountLabel=document.getElementById('attachment-manager-count');
+      const attachmentPreviewOpenButton=document.getElementById('attachment-preview-open');
+      const attachmentPreviewDownloadButton=document.getElementById('attachment-preview-download');
+      const attachmentPreviewBody=document.getElementById('attachment-preview-body');
+      const attachmentPreviewMeta=document.getElementById('attachment-preview-meta');
+      const attachmentManagerCloseButtons=Array.from(document.querySelectorAll('[data-attachment-close]'));
+      const attachmentMetaMap=new Map();
+      if(Array.isArray(initialAssetMeta)){
+        initialAssetMeta.forEach(raw=>{
+          if(!raw) return;
+          const assetId=parseInt(raw.id ?? raw.asset_id ?? raw.assetId ?? 0,10);
+          if(!Number.isFinite(assetId) || assetId<=0) return;
+          const meta={
+            id:assetId,
+            nodeUid:typeof raw.node_uid==='string'?raw.node_uid:'',
+            name:typeof raw.name==='string'?raw.name:(typeof raw.orig_name==='string'?raw.orig_name:''),
+            size:Number(raw.size ?? 0) || 0,
+            mime:typeof raw.mime==='string'?raw.mime:'',
+            createdAt:raw.created_at?Date.parse(raw.created_at):null,
+            mapId:Number(raw.map_id ?? raw.mindmap_id ?? 0) || 0,
+            pending:!!raw.pending,
+          };
+          attachmentMetaMap.set(assetId,meta);
+        });
+      }
+      let attachmentManagerOpen=false;
+      let attachmentNeedsRefresh=true;
+      let attachmentEntriesCache=[];
+      let renderedAttachmentEntries=[];
+      let attachmentRenderToken=0;
+      const attachmentEntryMap=new Map();
+      const attachmentRowElements=new Map();
+      const selectedAttachmentKeys=new Set();
+      let lastSelectedIndex=null;
+      let attachmentFilter='all';
+      let attachmentSearchQuery='';
+      let attachmentSort='recent';
+      function markAttachmentsDirty(){ attachmentNeedsRefresh=true; }
+      function pruneSelectedKeys(){
+        for(const key of Array.from(selectedAttachmentKeys)){
+          if(!attachmentEntryMap.has(key)) selectedAttachmentKeys.delete(key);
+        }
+      }
+      function classifyAttachment(mime,name){
+        const lower=(mime||'').toLowerCase();
+        const ext=name && name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+        if(lower.startsWith('image/')) return 'image';
+        if(lower.startsWith('video/')) return 'video';
+        if(lower.startsWith('audio/')) return 'audio';
+        if(lower.includes('zip') || ext==='zip' || lower.includes('rar') || ext==='rar' || ext==='7z' || ext==='tar' || ext==='gz') return 'archive';
+        if(lower==='application/pdf' || ext==='pdf') return 'document';
+        if(lower.includes('word') || ['doc','docx','docm','dotx','dotm','rtf'].includes(ext)) return 'document';
+        if(lower.includes('sheet') || ['xls','xlsx','xlsm','xlsb','csv','tsv','xltx','xltm','ods'].includes(ext)) return 'document';
+        if(lower.startsWith('text/') || ['txt','md','json','yaml','yml','csv','tsv'].includes(ext)) return 'document';
+        return 'other';
+      }
+      function formatDate(ts){
+        if(!Number.isFinite(ts) || ts<=0) return '';
+        const d=new Date(ts);
+        if(Number.isNaN(d.getTime())) return '';
+        const pad=num=>String(num).padStart(2,'0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+      function sanitizeFileName(name){
+        const fallback='attachment';
+        if(!name) return fallback;
+        return name.replace(/[\\/:*?"<>|]/g,'_');
+      }
+      function buildAttachmentEntries(){
+        if(!attachmentNeedsRefresh) return attachmentEntriesCache;
+        attachmentEntryMap.clear();
+        const entries=[];
+        if(jm && jm.nodes){
+          jm.nodes.forEach(node=>{
+            if(!node) return;
+            const attachments=gatherAttachments(node.data);
+            if(!attachments.length) return;
+            attachments.forEach((att,index)=>{
+              if(!att) return;
+              const assetIdRaw=att.assetId ?? att.id ?? att.asset_id ?? null;
+              const assetId=parseInt(assetIdRaw,10);
+              const meta=Number.isFinite(assetId) && assetId>0 ? (attachmentMetaMap.get(assetId) || null) : null;
+              const baseName=typeof att.name==='string' && att.name.trim()!=='' ? att.name.trim() : (typeof att.filename==='string' && att.filename.trim()!=='' ? att.filename.trim() : (meta && meta.name ? meta.name : '附件'));
+              const mime=att.mime || att.type || (meta ? meta.mime : '');
+              const sizeValue=Number(att.size ?? att.filesize);
+              const resolvedSize=Number.isFinite(sizeValue) && sizeValue>0 ? sizeValue : (meta ? meta.size : 0);
+              const url=att.url || (meta ? `?mindmap_asset=${meta.id}` : '');
+              const createdAtRaw=typeof att.uploadedAt==='number' ? att.uploadedAt : (meta && Number.isFinite(meta.createdAt) ? meta.createdAt : null);
+              const key=Number.isFinite(assetId) && assetId>0 ? `asset:${assetId}` : `node:${node.id}:${index}`;
+              const entry={
+                key,
+                assetId:Number.isFinite(assetId) && assetId>0 ? assetId : null,
+                nodeId:node.id,
+                nodeTitle:node.topic || '未命名',
+                name:baseName,
+                mime:mime||'',
+                size:resolvedSize>0?resolvedSize:0,
+                url:url||'',
+                createdAt:createdAtRaw,
+                category:classifyAttachment(mime,baseName),
+                pending:!!(meta ? meta.pending : false),
+              };
+              entries.push(entry);
+              attachmentEntryMap.set(key,entry);
+              if(meta && meta.nodeUid!==node.id){ meta.nodeUid=node.id; }
+            });
+          });
+        }
+        attachmentEntriesCache=entries;
+        attachmentNeedsRefresh=false;
+        pruneSelectedKeys();
+        return attachmentEntriesCache;
+      }
+      function getFilteredAttachmentEntries(){
+        const entries=buildAttachmentEntries();
+        const query=attachmentSearchQuery.trim().toLowerCase();
+        return entries.filter(entry=>{
+          if(attachmentFilter!=='all' && entry.category!==attachmentFilter) return false;
+          if(query){
+            const nameText=(entry.name||'').toLowerCase();
+            const nodeText=(entry.nodeTitle||'').toLowerCase();
+            if(!nameText.includes(query) && !nodeText.includes(query)) return false;
+          }
+          return true;
+        });
+      }
+      function sortAttachmentEntries(entries){
+        const sorted=[...entries];
+        const getCreated=value=>Number.isFinite(value) ? value : -Infinity;
+        sorted.sort((a,b)=>{
+          switch(attachmentSort){
+            case 'oldest':
+              return getCreated(a.createdAt) - getCreated(b.createdAt);
+            case 'size-desc':
+              return (b.size||0) - (a.size||0) || a.name.localeCompare(b.name,'zh-Hans');
+            case 'size-asc':
+              return (a.size||0) - (b.size||0) || a.name.localeCompare(b.name,'zh-Hans');
+            case 'type':
+              if(a.category!==b.category) return a.category.localeCompare(b.category,'zh-Hans');
+              return a.name.localeCompare(b.name,'zh-Hans');
+            case 'name':
+              return a.name.localeCompare(b.name,'zh-Hans');
+            case 'recent':
+            default:
+              return getCreated(b.createdAt) - getCreated(a.createdAt) || a.name.localeCompare(b.name,'zh-Hans');
+          }
+        });
+        return sorted;
+      }
+      function refreshRowSelectionVisual(){
+        attachmentRowElements.forEach((row,key)=>{
+          if(!row) return;
+          const checkbox=row.querySelector('.attachment-manager-checkbox');
+          const selected=selectedAttachmentKeys.has(key);
+          row.dataset.selected=selected?'true':'false';
+          if(checkbox){ checkbox.textContent=selected?'✓':''; }
+        });
+      }
+      function showAttachmentPreview(entry){
+        if(!attachmentPreviewBody || !attachmentPreviewMeta){ return; }
+        attachmentPreviewBody.innerHTML='';
+        attachmentPreviewMeta.textContent='';
+        if(!entry){
+          const placeholder=document.createElement('div');
+          placeholder.className='preview-placeholder';
+          placeholder.textContent='选择附件后将在此快速预览或显示摘要。';
+          attachmentPreviewBody.appendChild(placeholder);
+          if(attachmentPreviewOpenButton) attachmentPreviewOpenButton.disabled=true;
+          if(attachmentPreviewDownloadButton) attachmentPreviewDownloadButton.disabled=true;
+          return;
+        }
+        const url=entry.url||'';
+        const mime=(entry.mime||'').toLowerCase();
+        let contentEl=null;
+        if(url && mime.startsWith('image/')){
+          const img=document.createElement('img');
+          img.src=url;
+          img.alt=entry.name||'附件预览';
+          img.style.maxWidth='100%';
+          img.style.maxHeight='100%';
+          contentEl=img;
+        }else if(url && mime.startsWith('video/')){
+          const video=document.createElement('video');
+          video.controls=true;
+          video.src=url;
+          video.style.maxWidth='100%';
+          contentEl=video;
+        }else if(url && mime.startsWith('audio/')){
+          const audio=document.createElement('audio');
+          audio.controls=true;
+          audio.src=url;
+          audio.style.width='100%';
+          contentEl=audio;
+        }else{
+          const placeholder=document.createElement('div');
+          placeholder.className='preview-placeholder';
+          placeholder.textContent=url ? '点击“打开预览”按钮以查看详细内容。' : '该附件暂无可用预览。';
+          contentEl=placeholder;
+        }
+        attachmentPreviewBody.appendChild(contentEl);
+        const metaParts=[];
+        if(entry.size>0) metaParts.push(`大小：${humanBytes(entry.size)}`);
+        if(entry.mime) metaParts.push(`类型：${entry.mime}`);
+        if(entry.createdAt) metaParts.push(`上传：${formatDate(entry.createdAt)}`);
+        metaParts.push(`节点：${entry.nodeTitle || '未命名'}`);
+        attachmentPreviewMeta.textContent=metaParts.join(' · ');
+        if(attachmentPreviewOpenButton) attachmentPreviewOpenButton.disabled=!url;
+        if(attachmentPreviewDownloadButton) attachmentPreviewDownloadButton.disabled=!url;
+      }
+      function updateSelectionUI(){
+        const selectedEntries=getSelectedEntries();
+        const count=selectedEntries.length;
+        const totalSize=selectedEntries.reduce((sum,item)=>sum+(Number(item.size)||0),0);
+        if(attachmentSelectionInfo){
+          attachmentSelectionInfo.textContent = count ? `已选择 ${count} 个附件${totalSize>0?` · 总计 ${humanBytes(totalSize)}`:''}` : '未选择附件';
+        }
+        if(attachmentExportButton) attachmentExportButton.disabled=!count;
+        if(attachmentDownloadButton) attachmentDownloadButton.disabled=!count;
+        if(attachmentDeleteButton) attachmentDeleteButton.disabled=!count;
+        const single=count===1 ? selectedEntries[0] : null;
+        showAttachmentPreview(single);
+      }
+      function createAttachmentRow(entry,index){
+        const row=document.createElement('div');
+        row.className='attachment-manager-row';
+        row.dataset.key=entry.key;
+        row.dataset.index=String(index);
+        if(selectedAttachmentKeys.has(entry.key)) row.dataset.selected='true';
+        const checkbox=document.createElement('button');
+        checkbox.type='button';
+        checkbox.className='attachment-manager-checkbox';
+        checkbox.textContent=selectedAttachmentKeys.has(entry.key)?'✓':'';
+        checkbox.setAttribute('aria-label','选择附件');
+        const fileBox=document.createElement('div');
+        fileBox.className='attachment-manager-file';
+        const iconSpan=document.createElement('span');
+        iconSpan.className='attachment-manager-icon';
+        iconSpan.textContent=attachmentIconForMime(entry.mime, entry.name);
+        const infoBox=document.createElement('div');
+        infoBox.className='attachment-manager-info';
+        const nameBtn=document.createElement('button');
+        nameBtn.type='button';
+        nameBtn.className='attachment-manager-name';
+        nameBtn.textContent=entry.name || '附件';
+        nameBtn.title=entry.name || '附件';
+        const metaLine=document.createElement('div');
+        metaLine.className='attachment-manager-meta';
+        if(entry.size>0){
+          const sizeSpan=document.createElement('span');
+          sizeSpan.textContent=humanBytes(entry.size);
+          metaLine.appendChild(sizeSpan);
+        }
+        if(entry.mime){
+          const typeSpan=document.createElement('span');
+          typeSpan.textContent=entry.mime;
+          metaLine.appendChild(typeSpan);
+        }
+        if(entry.createdAt){
+          const timeSpan=document.createElement('span');
+          timeSpan.textContent=formatDate(entry.createdAt);
+          metaLine.appendChild(timeSpan);
+        }
+        if(entry.pending){
+          const badge=document.createElement('span');
+          badge.textContent='未保存';
+          metaLine.appendChild(badge);
+        }
+        infoBox.appendChild(nameBtn);
+        infoBox.appendChild(metaLine);
+        fileBox.appendChild(iconSpan);
+        fileBox.appendChild(infoBox);
+        const actionBox=document.createElement('div');
+        actionBox.className='attachment-manager-node';
+        const nodeLabel=document.createElement('div');
+        nodeLabel.className='node-label';
+        nodeLabel.textContent=`节点：${entry.nodeTitle || '未命名'}`;
+        const actionGroup=document.createElement('div');
+        actionGroup.className='attachment-row-actions';
+        const locateBtn=document.createElement('button');
+        locateBtn.type='button';
+        locateBtn.className='attachment-row-action';
+        locateBtn.textContent='定位';
+        const previewBtn=document.createElement('button');
+        previewBtn.type='button';
+        previewBtn.className='attachment-row-action';
+        previewBtn.textContent='预览';
+        const downloadBtn=document.createElement('button');
+        downloadBtn.type='button';
+        downloadBtn.className='attachment-row-action';
+        downloadBtn.textContent='下载';
+        if(!entry.url) downloadBtn.disabled=true;
+        const deleteBtn=document.createElement('button');
+        deleteBtn.type='button';
+        deleteBtn.className='attachment-row-action danger';
+        deleteBtn.textContent='删除';
+        actionGroup.appendChild(locateBtn);
+        actionGroup.appendChild(previewBtn);
+        actionGroup.appendChild(downloadBtn);
+        actionGroup.appendChild(deleteBtn);
+        actionBox.appendChild(nodeLabel);
+        actionBox.appendChild(actionGroup);
+        row.appendChild(checkbox);
+        row.appendChild(fileBox);
+        row.appendChild(actionBox);
+        checkbox.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); handleRowSelection(entry,index,e); });
+        nameBtn.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); handleRowSelection(entry,index,e); });
+        row.addEventListener('click',e=>{
+          if(e.target instanceof HTMLElement && e.target.closest('.attachment-row-action')) return;
+          handleRowSelection(entry,index,e);
+        });
+        locateBtn.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); focusAttachmentNode(entry); });
+        previewBtn.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); selectedAttachmentKeys.clear(); selectedAttachmentKeys.add(entry.key); lastSelectedIndex=index; updateSelectionUI(); refreshRowSelectionVisual(); });
+        downloadBtn.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); if(entry.url) downloadAttachment(entry); });
+        deleteBtn.addEventListener('click',async e=>{ e.preventDefault(); e.stopPropagation(); if(!confirm(`确认删除附件「${entry.name}」？`)) return; await deleteAttachmentEntries([entry]); });
+        return row;
+      }
+      function renderAttachmentManagerList(){
+        if(!attachmentManagerList) return;
+        const totalEntries=buildAttachmentEntries();
+        const totalSize=totalEntries.reduce((sum,item)=>sum+(Number(item.size)||0),0);
+        if(attachmentCountLabel){
+          attachmentCountLabel.textContent=totalEntries.length ? `共 ${totalEntries.length} 个附件${totalSize>0?` · 总计 ${humanBytes(totalSize)}`:''}` : '暂无附件';
+        }
+        const filtered=sortAttachmentEntries(getFilteredAttachmentEntries());
+        renderedAttachmentEntries=filtered;
+        attachmentRowElements.clear();
+        attachmentManagerList.innerHTML='';
+        if(attachmentManagerEmpty){ attachmentManagerEmpty.hidden=filtered.length>0; }
+        if(!filtered.length){
+          updateSelectionUI();
+          return;
+        }
+        const token=++attachmentRenderToken;
+        let index=0;
+        const chunkSize=24;
+        const renderChunk=()=>{
+          if(token!==attachmentRenderToken) return;
+          const fragment=document.createDocumentFragment();
+          for(let i=0;i<chunkSize && index<filtered.length;i++,index++){
+            const entry=filtered[index];
+            const row=createAttachmentRow(entry,index);
+            attachmentRowElements.set(entry.key,row);
+            fragment.appendChild(row);
+          }
+          attachmentManagerList.appendChild(fragment);
+          if(index<filtered.length){
+            requestAnimationFrame(renderChunk);
+          }else{
+            refreshRowSelectionVisual();
+            updateSelectionUI();
+          }
+        };
+        renderChunk();
+      }
+      function getSelectedEntries(){
+        const entries=[];
+        selectedAttachmentKeys.forEach(key=>{
+          const entry=attachmentEntryMap.get(key);
+          if(entry) entries.push(entry);
+        });
+        return entries;
+      }
+      function getSingleSelectedEntry(){
+        const entries=getSelectedEntries();
+        return entries.length===1 ? entries[0] : null;
+      }
+      function handleRowSelection(entry,index,event){
+        const key=entry.key;
+        const isShift=event && event.shiftKey;
+        const isMulti=event && (event.metaKey || event.ctrlKey);
+        if(isShift && lastSelectedIndex!=null && renderedAttachmentEntries[lastSelectedIndex]){
+          const start=Math.min(lastSelectedIndex,index);
+          const end=Math.max(lastSelectedIndex,index);
+          for(let i=start;i<=end;i++){
+            const item=renderedAttachmentEntries[i];
+            if(item) selectedAttachmentKeys.add(item.key);
+          }
+        }else if(isMulti){
+          if(selectedAttachmentKeys.has(key)) selectedAttachmentKeys.delete(key);
+          else selectedAttachmentKeys.add(key);
+          lastSelectedIndex=index;
+        }else{
+          if(selectedAttachmentKeys.size===1 && selectedAttachmentKeys.has(key)){
+            selectedAttachmentKeys.clear();
+            lastSelectedIndex=null;
+          }else{
+            selectedAttachmentKeys.clear();
+            selectedAttachmentKeys.add(key);
+            lastSelectedIndex=index;
+          }
+        }
+        refreshRowSelectionVisual();
+        updateSelectionUI();
+      }
+      function focusAttachmentNode(entry){
+        if(!entry) return;
+        const node=jm.get_node(entry.nodeId);
+        if(node){
+          jm.select_node(node.id);
+          centerOnNodeSmooth(node,{animate:true});
+          highlightMindNode(node.id);
+        }
+      }
+      function highlightMindNode(nodeId){
+        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+        if(!el) return;
+        el.classList.add('highlight-flash');
+        setTimeout(()=>{ el.classList.remove('highlight-flash'); }, 1000);
+      }
+      function downloadAttachment(entry){
+        if(!entry || !entry.url) return;
+        const link=document.createElement('a');
+        link.href=entry.url;
+        link.download=sanitizeFileName(entry.name || 'attachment');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      async function ensureJSZip(){
+        if(window.JSZip) return window.JSZip;
+        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',()=>window.JSZip);
+        if(lib) return lib;
+        if(window.JSZip) return window.JSZip;
+        throw new Error('压缩模块加载失败');
+      }
+      async function deleteAttachmentEntries(entries){
+        if(!entries || !entries.length) return;
+        const nodeBuckets=new Map();
+        const assetIds=[];
+        entries.forEach(entry=>{
+          const bucket=nodeBuckets.get(entry.nodeId) || [];
+          bucket.push(entry);
+          nodeBuckets.set(entry.nodeId,bucket);
+          if(entry.assetId) assetIds.push(entry.assetId);
+        });
+        const removalResult=performUndoable('remove-attachments',()=>{
+          let changed=false;
+          nodeBuckets.forEach((items,nodeId)=>{
+            const node=jm.get_node(nodeId);
+            if(!node) return;
+            const data=ensureNodeDataObject(node);
+            const beforeCount=Array.isArray(data.attachments)?data.attachments.length:0;
+            if(!beforeCount) return;
+            const filtered=data.attachments.filter(att=>{
+              const attIdRaw=att && (att.assetId ?? att.id ?? att.asset_id ?? null);
+              const attId=parseInt(attIdRaw,10);
+              const attUrl=att && att.url ? att.url : '';
+              return !items.some(entry=>{
+                if(entry.assetId && Number.isFinite(attId) && attId===entry.assetId) return false;
+                if(!entry.assetId && attUrl && entry.url && attUrl===entry.url) return false;
+                return true;
+              });
+            });
+            if(filtered.length!==beforeCount){
+              if(filtered.length){
+                data.attachments=filtered;
+                data.attachment=filtered[0];
+              }else{
+                delete data.attachments;
+                delete data.attachment;
+              }
+              node.model.data=data;
+              node.data=data;
+              changed=true;
+            }
+          });
+          if(changed){
+            jm.computeLayout();
+            jm.render();
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          }
+          return changed;
+        });
+        if(!removalResult){ return; }
+        markAttachmentsDirty();
+        entries.forEach(entry=>selectedAttachmentKeys.delete(entry.key));
+        renderAttachmentManagerList();
+        if(assetIds.length){
+          try{
+            const fd=new FormData();
+            fd.append('action','delete_mindmap_assets');
+            fd.append('ids', assetIds.join(','));
+            fd.append('map_id', String(currentMapId||0));
+            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            if(res.ok){
+              const json=await res.json();
+              if(json && Array.isArray(json.deleted)){
+                json.deleted.forEach(id=>attachmentMetaMap.delete(parseInt(id,10)));
+              }
+            }
+          }catch(err){
+            console.error(err);
+            alert('删除附件文件时出现问题，请稍后重试。');
+          }
+        }
+        markAttachmentsDirty();
+        renderAttachmentManagerList();
+      }
+      async function downloadSelectedAttachments(entries){
+        if(!entries || !entries.length) return;
+        const JSZip=await ensureJSZip();
+        const zip=new JSZip();
+        const nameUsage=new Map();
+        const failures=[];
+        let processed=0;
+        for(const entry of entries){
+          if(!entry.url){ failures.push(entry.name||'附件'); continue; }
+          try{
+            const response=await fetch(entry.url);
+            if(!response.ok) throw new Error('响应异常');
+            const blob=await response.blob();
+            let base=sanitizeFileName(entry.name || `附件-${processed+1}`);
+            if(!base || base==='attachment') base=`附件-${processed+1}`;
+            let uniqueName=base;
+            if(nameUsage.has(base)){
+              const count=nameUsage.get(base)+1;
+              nameUsage.set(base,count);
+              const dot=base.lastIndexOf('.');
+              uniqueName=dot>0 ? `${base.slice(0,dot)}(${count})${base.slice(dot)}` : `${base}(${count})`;
+            }else{
+              nameUsage.set(base,1);
+            }
+            zip.file(uniqueName, blob);
+            processed++;
+          }catch(err){
+            console.error(err);
+            failures.push(entry.name||'附件');
+          }
+        }
+        if(processed){
+          const blob=await zip.generateAsync({type:'blob'});
+          const url=URL.createObjectURL(blob);
+          const link=document.createElement('a');
+          link.href=url;
+          link.download=`mindmap-attachments-${buildTimestamp()}.zip`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(()=>URL.revokeObjectURL(url),1500);
+        }
+        if(failures.length){
+          alert(`以下附件打包失败：\n${failures.join('\n')}`);
+        }
+      }
+      function exportSelectedAttachments(entries){
+        if(!entries || !entries.length) return;
+        const payload=entries.map(entry=>({
+          name:entry.name,
+          nodeTitle:entry.nodeTitle,
+          nodeId:entry.nodeId,
+          size:entry.size,
+          mime:entry.mime,
+          url:entry.url,
+          createdAt:entry.createdAt ? new Date(entry.createdAt).toISOString() : null,
+          category:entry.category,
+        }));
+        const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+        const link=document.createElement('a');
+        link.href=URL.createObjectURL(blob);
+        link.download=`mindmap-attachments-${buildTimestamp()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(()=>URL.revokeObjectURL(link.href),1500);
+        link.remove();
+      }
+      function openAttachmentManager(){
+        if(!attachmentManagerBackdrop) return;
+        attachmentManagerBackdrop.dataset.open='true';
+        attachmentManagerBackdrop.setAttribute('aria-hidden','false');
+        attachmentManagerOpen=true;
+        markAttachmentsDirty();
+        renderAttachmentManagerList();
+      }
+      function closeAttachmentManager(){
+        if(!attachmentManagerBackdrop) return;
+        attachmentManagerBackdrop.dataset.open='false';
+        attachmentManagerBackdrop.setAttribute('aria-hidden','true');
+        attachmentManagerOpen=false;
+      }
+      function toggleAttachmentManager(){
+        if(attachmentManagerOpen) closeAttachmentManager();
+        else openAttachmentManager();
+      }
+      function getFilteredTotalSize(entries){
+        return entries.reduce((sum,item)=>sum+(Number(item.size)||0),0);
+      }
+      if(attachmentManagerBackdrop){
+        attachmentManagerBackdrop.addEventListener('click',e=>{ if(e.target===attachmentManagerBackdrop) closeAttachmentManager(); });
+      }
+      if(attachmentManagerCloseButtons.length){
+        attachmentManagerCloseButtons.forEach(btn=>btn.addEventListener('click',e=>{ e.preventDefault(); closeAttachmentManager(); }));
+      }
+      if(attachmentFilterGroup){
+        attachmentFilterGroup.addEventListener('click',e=>{
+          const chip=e.target.closest('.attachment-manager-chip');
+          if(!chip) return;
+          const value=chip.dataset.filter || 'all';
+          attachmentFilter=value;
+          attachmentFilterGroup.querySelectorAll('.attachment-manager-chip').forEach(el=>{ el.dataset.active = el===chip ? 'true' : 'false'; });
+          renderAttachmentManagerList();
+        });
+      }
+      if(attachmentSortSelect){
+        attachmentSortSelect.addEventListener('change',e=>{
+          attachmentSort=e.target.value || 'recent';
+          renderAttachmentManagerList();
+        });
+      }
+      if(attachmentSearchInput){
+        attachmentSearchInput.addEventListener('input',e=>{
+          attachmentSearchQuery=e.target.value || '';
+          renderAttachmentManagerList();
+        });
+      }
+      if(attachmentSelectAllButton){
+        attachmentSelectAllButton.addEventListener('click',()=>{
+          renderedAttachmentEntries.forEach(entry=>selectedAttachmentKeys.add(entry.key));
+          refreshRowSelectionVisual();
+          updateSelectionUI();
+        });
+      }
+      if(attachmentClearSelectionButton){
+        attachmentClearSelectionButton.addEventListener('click',()=>{
+          selectedAttachmentKeys.clear();
+          lastSelectedIndex=null;
+          refreshRowSelectionVisual();
+          updateSelectionUI();
+        });
+      }
+      if(attachmentExportButton){
+        attachmentExportButton.addEventListener('click',()=>{
+          const entries=getSelectedEntries();
+          if(!entries.length) return;
+          exportSelectedAttachments(entries);
+        });
+      }
+      if(attachmentDownloadButton){
+        attachmentDownloadButton.addEventListener('click',async()=>{
+          const entries=getSelectedEntries();
+          if(!entries.length) return;
+          attachmentDownloadButton.disabled=true;
+          try{ await downloadSelectedAttachments(entries); }
+          catch(err){ console.error(err); alert(err && err.message ? err.message : '打包失败'); }
+          finally{ attachmentDownloadButton.disabled=false; }
+        });
+      }
+      if(attachmentDeleteButton){
+        attachmentDeleteButton.addEventListener('click',async()=>{
+          const entries=getSelectedEntries();
+          if(!entries.length) return;
+          const totalSize=getFilteredTotalSize(entries);
+          const confirmText=`确认删除选中的 ${entries.length} 个附件${totalSize>0?`（总计 ${humanBytes(totalSize)}）`:''}？`;
+          if(!confirm(confirmText)) return;
+          await deleteAttachmentEntries(entries);
+        });
+      }
+      if(attachmentPreviewOpenButton){
+        attachmentPreviewOpenButton.addEventListener('click',()=>{
+          const entry=getSingleSelectedEntry();
+          if(!entry || !entry.url) return;
+          if(window.AttachmentPreview){
+            window.AttachmentPreview.open({kind:'url',url:entry.url,name:entry.name||'附件',mime:entry.mime||'',size:entry.size||null});
+          }else{
+            window.open(entry.url,'_blank','noopener');
+          }
+        });
+      }
+      if(attachmentPreviewDownloadButton){
+        attachmentPreviewDownloadButton.addEventListener('click',()=>{
+          const entry=getSingleSelectedEntry();
+          if(!entry || !entry.url) return;
+          downloadAttachment(entry);
+        });
+      }
+      if(attachmentManagerList){
+        renderAttachmentManagerList();
+      }
       let pendingImportPayload=null;
       let pendingImportFileName='';
       const foldAllMenuItem=null;
@@ -7860,6 +8754,7 @@ if ($view === 'map_edit') {
       });
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){
+          if(attachmentManagerOpen){ closeAttachmentManager(); return; }
           if(relationMode){
             if(relationMode.sourceId){ resetRelationSource('已取消起点选择'); }
             else{ cancelRelationMode(true); }
@@ -8347,13 +9242,25 @@ if ($view === 'map_edit') {
         for(const file of accepted){
           try{
             const uploaded=await uploadMindmapFile(file, targetNode.id);
+            const createdAtMillis=uploaded.createdAt ? Date.parse(uploaded.createdAt) : Date.now();
+            const assetMeta={
+              id:uploaded.id,
+              nodeUid:targetNode.id,
+              name:uploaded.name || file.name,
+              size:Number(uploaded.size ?? file.size) || 0,
+              mime:uploaded.mime || file.type || 'application/octet-stream',
+              createdAt:Number.isFinite(createdAtMillis)?createdAtMillis:Date.now(),
+              mapId:Number(uploaded.mapId ?? currentMapId ?? 0) || 0,
+              pending:!(uploaded.mapId && uploaded.mapId>0),
+            };
+            attachmentMetaMap.set(uploaded.id, assetMeta);
             data.attachments.push({
               assetId:uploaded.id,
               name:uploaded.name || file.name,
               size:uploaded.size ?? file.size,
               mime:uploaded.mime || file.type || 'application/octet-stream',
               url:uploaded.url,
-              uploadedAt:Date.now()
+              uploadedAt:assetMeta.createdAt
             });
           }catch(err){
             console.error(err);
@@ -8368,6 +9275,8 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        markAttachmentsDirty();
+        if(attachmentManagerOpen){ renderAttachmentManagerList(); }
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -8566,6 +9475,7 @@ if ($view === 'map_edit') {
             break;
           }
           case 'attach': openAttachmentDialog(); break;
+          case 'manage-attachments': toggleAttachmentManager(); break;
           case 'relation': toggleRelationMode(); break;
           case 'link': openLinkPrompt(); break;
           case 'delete': deleteSelectedNode(); break;
@@ -8679,6 +9589,17 @@ if ($view === 'map_edit') {
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
       }, true);
+      document.addEventListener('keydown',e=>{
+        const key=(e.key||'').toLowerCase();
+        if(!(e.shiftKey && (e.ctrlKey || e.metaKey) && key==='a')) return;
+        const active=document.activeElement;
+        if(active){
+          const tag=active.tagName || '';
+          if(active.isContentEditable || /input|textarea|select/i.test(tag)) return;
+        }
+        e.preventDefault();
+        toggleAttachmentManager();
+      });
       document.addEventListener('keydown',e=>{
         const key=(e.key||'').toLowerCase();
         if(key==='s' && (e.ctrlKey || e.metaKey)){
@@ -8814,8 +9735,14 @@ if ($view === 'map_edit') {
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             updateFoldAllLabel();
             updateFoldButtonState();
+            markAttachmentsDirty();
+            if(attachmentManagerOpen){ renderAttachmentManagerList(); }
           }
           if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){ markDirty(); }
+          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){
+            markAttachmentsDirty();
+            if(attachmentManagerOpen){ renderAttachmentManagerList(); }
+          }
           updateUndoRedoButtons();
         });
       }
