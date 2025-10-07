@@ -4007,8 +4007,8 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:rgba(201,168,106,.28) transparent;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4017,8 +4017,10 @@ if ($view === 'map_edit') {
         .dock-btn[data-tip]:hover::after,.dock-btn[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,-4px)}
         .dock-btn[data-tip]:hover::before,.dock-btn[data-tip]:focus-visible::before{opacity:1;transform:translate(-50%,-4px)}
       }
-      .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
-      .dock-btn:active{transform:translateY(-1px)}
+      .mind-dock::-webkit-scrollbar{height:6px}
+      .mind-dock::-webkit-scrollbar-thumb{background:rgba(201,168,106,.28);border-radius:999px}
+      .dock-btn:hover{border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.22)}
+      .dock-btn:active{background:rgba(201,168,106,.12);box-shadow:0 0 18px rgba(227,198,139,.24) inset}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .dock-btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
       .dock-btn.danger{color:#F6D6D6;border-color:rgba(209,75,75,.52);background:rgba(209,75,75,.12)}
@@ -4027,11 +4029,10 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4191,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -4338,7 +4339,6 @@ if ($view === 'map_edit') {
           <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
         </header>
         <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
-        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
         <div class="settings-actions">
           <button type="button" data-settings-close>关闭</button>
         </div>
@@ -7159,6 +7159,7 @@ if ($view === 'map_edit') {
       function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
       jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
+      syncAttachmentsFromMeta({render:true});
       jmContainer.appendChild(overlay);
       syncOverlaySize();
       if(!jm.get_selected_node() && initialData && initialData.data){
@@ -7325,7 +7326,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
       const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
@@ -7353,12 +7353,8 @@ if ($view === 'map_edit') {
       const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
-      const fisheyeToggle=document.getElementById('setting-fisheye');
-      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7419,24 +7415,6 @@ if ($view === 'map_edit') {
           exportOverlay.setAttribute('aria-hidden','true');
           exportOverlayHideTimer=null;
         },360);
-      }
-      function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
-      }
-      function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
-      }
-      function handlePointerPrecisionChange(event){
-        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
-        syncFisheyeState();
-      }
-      syncFisheyeState();
-      if(pointerMedia){
-        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
-        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -8434,6 +8412,110 @@ if ($view === 'map_edit') {
         node.data=normalized;
         return normalized;
       }
+      function buildAttachmentFromMeta(meta){
+        if(!meta || typeof meta!=='object') return null;
+        const id=Number(meta.id);
+        if(!Number.isFinite(id) || id<=0) return null;
+        const nameRaw=typeof meta.name==='string'?meta.name:'';
+        const name=nameRaw && nameRaw.trim()?nameRaw.trim():`附件 #${id}`;
+        const mime=typeof meta.mime==='string' && meta.mime?meta.mime:'application/octet-stream';
+        const url=typeof meta.url==='string' && meta.url?meta.url:`?mindmap_asset=${id}`;
+        const entry={
+          assetId:id,
+          name,
+          size:Number(meta.size)||0,
+          mime,
+          url,
+        };
+        const created=Number(meta.created_at || meta.createdAt || 0);
+        if(created>0){ entry.createdAt=created; }
+        return entry;
+      }
+      function mergeAttachmentWithMeta(att, meta){
+        if(!att || typeof att!=='object') return null;
+        const id=Number(att.assetId || att.id);
+        if(!Number.isFinite(id) || id<=0) return null;
+        const fallback=buildAttachmentFromMeta(meta) || {assetId:id,name:`附件 #${id}`,size:0,mime:'application/octet-stream',url:`?mindmap_asset=${id}`};
+        const nameRaw=typeof att.name==='string'?att.name:'';
+        const merged={
+          assetId:id,
+          name:nameRaw && nameRaw.trim()?nameRaw.trim():fallback.name,
+          size:Number(att.size ?? fallback.size) || 0,
+          mime:typeof att.mime==='string' && att.mime?att.mime:fallback.mime,
+          url:typeof att.url==='string' && att.url?att.url:fallback.url,
+        };
+        const created=Number(att.createdAt || att.created_at || fallback.createdAt || 0);
+        if(created>0){ merged.createdAt=created; }
+        return merged;
+      }
+      function syncAttachmentsFromMeta(options={}){
+        const render=options.render!==false;
+        const shouldMarkDirty=options.markDirty===true;
+        if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return false;
+        const assetsByNode=new Map();
+        assetMeta.forEach(meta=>{
+          if(!meta || typeof meta!=='object') return;
+          const nodeId=typeof meta.node_uid==='string'?meta.node_uid.trim():'';
+          const id=Number(meta.id);
+          if(!nodeId || !Number.isFinite(id) || id<=0) return;
+          if(!assetsByNode.has(nodeId)){ assetsByNode.set(nodeId, []); }
+          assetsByNode.get(nodeId).push(meta);
+        });
+        let changed=false;
+        jm.nodes.forEach(node=>{
+          if(!node) return;
+          const data=ensureNodeDataObject(node) || {};
+          const existing=Array.isArray(data.attachments)
+            ? data.attachments.map(item=>item && typeof item==='object'?{...item}:null).filter(Boolean)
+            : [];
+          const existingSerialized=JSON.stringify(existing);
+          const seen=new Set();
+          const normalized=[];
+          existing.forEach(att=>{
+            const id=Number(att.assetId || att.id);
+            if(Number.isFinite(id) && id>0){
+              if(assetMeta.has(id)){
+                const merged=mergeAttachmentWithMeta(att, assetMeta.get(id));
+                if(merged){ normalized.push(merged); seen.add(id); }
+              }else{
+                changed=true;
+              }
+            }else{
+              normalized.push(att);
+            }
+          });
+          const metas=assetsByNode.get(node.id) || [];
+          metas.forEach(meta=>{
+            const built=buildAttachmentFromMeta(meta);
+            if(!built) return;
+            if(seen.has(built.assetId)) return;
+            normalized.push(built);
+            seen.add(built.assetId);
+            changed=true;
+          });
+          const afterSerialized=JSON.stringify(normalized);
+          if(normalized.length){
+            data.attachments=normalized;
+            data.attachment=normalized[0];
+          }else{
+            delete data.attachments;
+            delete data.attachment;
+          }
+          if(afterSerialized!==existingSerialized){
+            node.model.data=data;
+            node.data=data;
+            changed=true;
+          }
+        });
+        if(changed && render){
+          jm.computeLayout();
+          jm.render();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+        }
+        if(changed && shouldMarkDirty){ markDirty(); }
+        return changed;
+      }
       function executeCreateNodeCommand(input){
         const mergeKey=input && input.meta && input.meta.source ? `create:${input.meta.source}` : null;
         return performUndoable('create-node',()=>{
@@ -8793,7 +8875,6 @@ if ($view === 'map_edit') {
         jm.computeLayout();
         jm.render();
         jm.select_node(targetNode.id);
-        markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
         if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
@@ -9532,7 +9613,6 @@ if ($view === 'map_edit') {
             if(!changed) return false;
             jm.computeLayout();
             jm.render();
-            markDirty();
             scheduleHandleRefresh();
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             return true;
@@ -9606,10 +9686,12 @@ if ($view === 'map_edit') {
           }
           if(state.open){ refresh(true); }
           else{ refreshWhenClosed(); }
+          syncAttachmentsFromMeta({render:true});
         }
         function onMindUpdate(){
           if(state.open){ refresh(); }
           else{ refreshWhenClosed(); }
+          syncAttachmentsFromMeta({render:false});
         }
         return { open, close, toggle, refresh, onFilesUploaded, onMindUpdate };
       }
@@ -9725,27 +9807,6 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
-        if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
-        }
-        if(fisheyeToggle){
-          fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
-          });
-        }
       }
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
