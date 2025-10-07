@@ -3835,15 +3835,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
-      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 26px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 40px - var(--safe-left) - var(--safe-right)),720px)}
-      .mind-dock-wrap::before,.mind-dock-wrap::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:26px;height:70%;pointer-events:none;opacity:0;transition:opacity var(--t-fast) var(--ease);z-index:0}
-      .mind-dock-wrap::before{left:8px;background:linear-gradient(90deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
-      .mind-dock-wrap::after{right:8px;background:linear-gradient(270deg,rgba(10,12,14,.8),rgba(10,12,14,0))}
-      .mind-dock-wrap[data-scroll-left="true"]::before{opacity:.8}
-      .mind-dock-wrap[data-scroll-right="true"]::after{opacity:.8}
-      .mind-dock{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x proximity}
-      .mind-dock::-webkit-scrollbar{display:none}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:92px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 auto;scroll-snap-align:center}
+      .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 20px);transform:translateX(-50%);pointer-events:none;z-index:120;width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1100px)}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;padding:12px 20px;border-radius:28px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;max-width:100%}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;width:96px;height:60px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 auto}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -3863,8 +3857,12 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
       .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{width:min(calc(100vw - 32px),660px)}.mind-dock{gap:10px;padding:10px 14px}.dock-btn{width:84px;height:60px}}
-      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 24px)}.mind-dock{padding:10px 14px;border-radius:24px;gap:10px}.dock-btn{width:78px;height:56px}.dock-btn .label{font-size:11px}}
+      @media (max-width:720px){.mind-dock-wrap{width:calc(100vw - 20px)}.mind-dock{gap:10px;padding:12px 14px;border-radius:24px}.dock-btn{width:88px;height:56px}.dock-btn .label{font-size:11px}}
+      .mind-export-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at center,rgba(17,24,28,.92) 0%,rgba(10,12,14,.96) 70%);backdrop-filter:blur(14px);opacity:0;pointer-events:none;transition:opacity .36s var(--ease);z-index:220;flex-direction:column;gap:18px}
+      .mind-export-overlay[data-active="true"]{opacity:1;pointer-events:auto}
+      .mind-export-overlay .export-spinner{width:56px;height:56px;border-radius:50%;border:3px solid rgba(227,198,139,.28);border-top-color:var(--gold-400);animation:spin 1.1s linear infinite}
+      .mind-export-overlay .export-text{font:600 16px/1.6 'Noto Sans SC','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-400);text-align:center}
+      @keyframes spin{to{transform:rotate(360deg)}}
       @media (max-width:600px){.dock-btn{width:72px;height:54px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
@@ -4096,6 +4094,10 @@ if ($view === 'map_edit') {
           <button type="button" data-settings-close>关闭</button>
         </div>
       </div>
+    </div>
+    <div class="mind-export-overlay" id="mind-export-overlay" aria-hidden="true">
+      <div class="export-spinner" aria-hidden="true"></div>
+      <div class="export-text">正在导出，请稍候…</div>
     </div>
     <script>
       (function(){
@@ -6862,7 +6864,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockWrap=document.querySelector('.mind-dock-wrap');
       const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
@@ -6890,8 +6891,10 @@ if ($view === 'map_edit') {
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
       const fisheyeToggle=document.getElementById('setting-fisheye');
+      const exportTransitionOverlay=document.getElementById('mind-export-overlay');
       const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
       let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
+      let exportTransitionHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
@@ -6935,17 +6938,6 @@ if ($view === 'map_edit') {
       if(mindInfoBar){
         mindInfoBar.addEventListener('focusin',()=>{ expandInfoBar(); });
       }
-      function updateDockScrollMarkers(){
-        if(!dock || !dockWrap) return;
-        const maxScroll=Math.max(0, dock.scrollWidth - dock.clientWidth);
-        if(maxScroll <= 1){
-          dockWrap.dataset.scrollLeft='false';
-          dockWrap.dataset.scrollRight='false';
-          return;
-        }
-        dockWrap.dataset.scrollLeft=dock.scrollLeft > 4 ? 'true' : 'false';
-        dockWrap.dataset.scrollRight=dock.scrollLeft < maxScroll - 4 ? 'true' : 'false';
-      }
       function isFisheyeEnabled(){
         return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
       }
@@ -6963,6 +6955,31 @@ if ($view === 'map_edit') {
       if(pointerMedia){
         if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
         else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
+      }
+      function beginExportTransition(){
+        if(!exportTransitionOverlay) return ()=>{};
+        if(exportTransitionHideTimer){
+          clearTimeout(exportTransitionHideTimer);
+          exportTransitionHideTimer=null;
+        }
+        exportTransitionOverlay.dataset.active='true';
+        exportTransitionOverlay.setAttribute('aria-hidden','false');
+        return ()=>{
+          if(!exportTransitionOverlay) return;
+          const finalize=()=>{
+            exportTransitionOverlay.removeEventListener('transitionend', finalize);
+            exportTransitionHideTimer=null;
+            if(exportTransitionOverlay.dataset.active!=='true'){
+              exportTransitionOverlay.setAttribute('aria-hidden','true');
+            }
+          };
+          exportTransitionOverlay.addEventListener('transitionend',finalize,{once:true});
+          exportTransitionOverlay.dataset.active='false';
+          exportTransitionHideTimer=setTimeout(finalize, 700);
+        };
+      }
+      function waitNextFrame(){
+        return new Promise(resolve=>requestAnimationFrame(()=>resolve()));
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -8420,16 +8437,6 @@ if ($view === 'map_edit') {
         });
       }
       if(dock){
-        updateDockScrollMarkers();
-        window.addEventListener('resize',updateDockScrollMarkers);
-        dock.addEventListener('scroll',updateDockScrollMarkers);
-        dock.addEventListener('wheel',e=>{
-          const dominant=Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-          if(!dominant) return;
-          dock.scrollLeft += dominant;
-          updateDockScrollMarkers();
-          e.preventDefault();
-        });
         dock.addEventListener('click',e=>{
           const btn=e.target.closest('.dock-btn');
           if(!btn || !dock.contains(btn)) return;
@@ -8451,11 +8458,13 @@ if ($view === 'map_edit') {
           if(!dockButtons.length) return;
           if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
           const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
+          const centerX=event.clientX-rect.left;
+          const centerY=event.clientY-rect.top;
           dockButtons.forEach(btn=>{
             const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
+            const by=btn.offsetTop + btn.offsetHeight/2;
+            const dist=Math.hypot(centerX-bx, centerY-by);
+            const scale=Math.max(1, 1.18 - dist/700);
             btn.style.transform=`scale(${scale})`;
           });
         };
@@ -8809,11 +8818,13 @@ if ($view === 'map_edit') {
           alert('思维导图尚未加载');
           return;
         }
+        const endExportTransition=beginExportTransition();
         const titleValue=titleInput ? titleInput.value.trim() : '';
         const overlayDisplay=overlay ? overlay.style.display : null;
         let exportHost=null;
         let layoutSnapshot=null;
         try{
+          await waitNextFrame();
           const htmlToImage=await ensureHtmlToImage();
           const computedStyle=getComputedStyle(document.body);
           const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
@@ -8919,6 +8930,7 @@ if ($view === 'map_edit') {
           const message=error && error.message ? `导出失败：${error.message}` : '导出失败，请稍后重试。';
           alert(message);
         }finally{
+          if(typeof endExportTransition==='function'){ endExportTransition(); }
           if(layoutSnapshot){ restoreLayoutSnapshot(jm, layoutSnapshot); }
           if(exportHost && exportHost.parentElement){ exportHost.remove(); }
           if(overlay){ overlay.style.display=overlayDisplay || ''; }
