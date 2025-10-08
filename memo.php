@@ -265,6 +265,7 @@ function db(): PDO {
   );');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_created_at ON mindmap_assets(created_at)');
   $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
   if ($hasMap === 0) {
     $nowTs = now();
@@ -413,6 +414,32 @@ function delete_mindmap_asset(int $id): void {
   if(is_file($path)) @unlink($path);
   $pdo=db();
   $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
+}
+
+function cleanup_stale_mindmap_assets(int $ttlSeconds = 604800): int {
+  $ttl=max(0,$ttlSeconds);
+  if($ttl===0){ return 0; }
+  $threshold=now()-$ttl;
+  if($threshold<=0){ return 0; }
+  $pdo=db();
+  $st=$pdo->prepare('SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id IS NULL AND session_key IS NOT NULL AND session_key<>"" AND created_at<?');
+  $st->execute([$threshold]);
+  $rows=$st->fetchAll();
+  if(!$rows){ return 0; }
+  $deleteStmt=$pdo->prepare('DELETE FROM mindmap_assets WHERE id=?');
+  $deleted=0;
+  foreach($rows as $row){
+    $id=(int)($row['id'] ?? 0);
+    if($id<=0){ continue; }
+    $stored=$row['stored_name'] ?? '';
+    if($stored!==''){
+      $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored;
+      if(is_file($path)) @unlink($path);
+    }
+    $deleteStmt->execute([$id]);
+    $deleted++;
+  }
+  return $deleted;
 }
 
 function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name, string $stored_name, string $mime, int $size, string $session_key): array {
@@ -1186,6 +1213,47 @@ if (is_post()) {
           ]); exit;
         }
         break;
+      }
+      case 'purge_mindmap_session_assets': {
+        $sessionKey=session_id();
+        if($sessionKey==='') throw new RuntimeException('会话未初始化');
+        $raw=$_POST['ids'] ?? [];
+        $ids=[];
+        if(is_string($raw)){
+          $decoded=json_decode($raw,true);
+          if(is_array($decoded)){
+            $raw=$decoded;
+          }elseif(trim($raw)!==''){
+            $ids=array_map('intval',explode(',',$raw));
+          }
+        }
+        if(is_array($raw)){
+          foreach($raw as $val){
+            if(is_int($val) || ctype_digit((string)$val)){
+              $ids[]=(int)$val;
+            }
+          }
+        }
+        $ids=array_values(array_unique(array_filter($ids,fn($v)=>$v>0)));
+        $pdo=db();
+        if($ids){
+          $placeholders=implode(',',array_fill(0,count($ids),'?'));
+          $params=$ids;
+          array_unshift($params,$sessionKey);
+          $st=$pdo->prepare("SELECT id FROM mindmap_assets WHERE session_key=? AND mindmap_id IS NULL AND id IN ($placeholders)");
+          $st->execute($params);
+        }else{
+          $st=$pdo->prepare('SELECT id FROM mindmap_assets WHERE session_key=? AND mindmap_id IS NULL');
+          $st->execute([$sessionKey]);
+        }
+        $deleted=0;
+        foreach($st->fetchAll() as $row){
+          delete_mindmap_asset((int)$row['id']);
+          $deleted++;
+        }
+        header('Content-Type: application/json');
+        echo json_encode(['ok'=>1,'deleted'=>$deleted]);
+        exit;
       }
       case 'ping_cats': { if(is_ajax()) json_cats(); break; }
       case 'delete_attachment': {
@@ -3722,6 +3790,7 @@ if ($view === 'map') {
 }
 
 if ($view === 'map_edit') {
+  cleanup_stale_mindmap_assets();
   $id = isset($_GET['id']) && ctype_digit((string)$_GET['id']) ? (int)$_GET['id'] : 0;
   if ($id > 0) {
     $mind = get_mindmap($id);
@@ -4103,7 +4172,29 @@ if ($view === 'map_edit') {
       .mind-attachment-sort{display:flex;align-items:center;gap:8px;color:var(--text-muted);font:12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .mind-attachment-sort select{padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.32);background:rgba(15,19,22,.82);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em}
       .mind-attachment-body{flex:1 1 auto;display:flex;flex-direction:column;gap:16px;min-height:0}
+      .mind-attachment-uploads{display:flex;flex-direction:column;gap:10px;margin-bottom:8px;padding:12px;border-radius:16px;border:1px solid rgba(201,168,106,.22);background:rgba(12,16,18,.82);box-shadow:inset 0 0 14px rgba(0,0,0,.38)}
+      .mind-attachment-uploads[hidden]{display:none}
+      .mind-attachment-uploads-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .mind-attachment-uploads-title{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;color:var(--gold-400);text-transform:uppercase}
+      .mind-attachment-uploads-cancel{padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.34);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),color var(--transition)}
+      .mind-attachment-uploads-cancel:hover{border-color:rgba(227,198,139,.55)}
+      .mind-attachment-uploads-cancel:disabled{opacity:.5;cursor:not-allowed;border-color:rgba(201,168,106,.24)}
+      .mind-attachment-uploads-list{display:flex;flex-direction:column;gap:10px}
       .mind-attachment-list{position:relative;overflow:auto;border-radius:18px;border:1px solid rgba(201,168,106,.24);background:rgba(12,16,18,.78);box-shadow:inset 0 0 22px rgba(0,0,0,.45);padding:12px;display:grid;gap:10px;flex:1 1 auto;min-height:0}
+      .mind-attachment-upload{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.2);background:rgba(15,19,22,.88)}
+      .mind-attachment-upload[data-status="error"]{border-color:rgba(209,75,75,.6)}
+      .mind-attachment-upload[data-status="cancelled"]{opacity:.72;border-color:rgba(201,168,106,.18)}
+      .mind-attachment-upload-info{display:flex;flex-direction:column;gap:4px;min-width:0}
+      .mind-attachment-upload-name{font:600 13px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-strong);word-break:break-all}
+      .mind-attachment-upload-meta{font:11px/1.4 'Inter','Noto Sans SC',sans-serif;color:var(--text-muted)}
+      .mind-attachment-upload-actions{display:flex;align-items:center;gap:8px}
+      .mind-attachment-upload-actions button{padding:4px 10px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition),color var(--transition)}
+      .mind-attachment-upload-actions button:hover{border-color:rgba(227,198,139,.55)}
+      .mind-attachment-upload-actions button:disabled{opacity:.5;cursor:not-allowed;border-color:rgba(201,168,106,.2)}
+      .mind-attachment-progress{grid-column:1/-1;height:6px;border-radius:999px;background:rgba(201,168,106,.18);overflow:hidden;position:relative}
+      .mind-attachment-progress-bar{position:absolute;inset:0;background:linear-gradient(90deg,rgba(227,198,139,.6),rgba(75,195,209,.82));width:0;height:100%;transition:width .2s var(--ease)}
+      .mind-attachment-upload[data-status="error"] .mind-attachment-progress-bar{background:linear-gradient(90deg,rgba(209,75,75,.6),rgba(209,75,75,.85))}
+      .mind-attachment-upload[data-status="cancelled"] .mind-attachment-progress-bar{background:rgba(201,168,106,.32)}
       .mind-attachment-list::-webkit-scrollbar{width:8px}
       .mind-attachment-list::-webkit-scrollbar-thumb{background:rgba(201,168,106,.24);border-radius:999px}
       .mind-attachment-row{display:grid;grid-template-columns:auto 56px 1fr;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.24);background:rgba(15,19,22,.9);transition:border-color var(--transition),background var(--transition),transform var(--transition);cursor:pointer}
@@ -4375,6 +4466,13 @@ if ($view === 'map_edit') {
           </div>
         </header>
         <div class="mind-attachment-body">
+          <div class="mind-attachment-uploads" id="mind-attachment-uploads" hidden>
+            <div class="mind-attachment-uploads-header">
+              <div class="mind-attachment-uploads-title">上传队列</div>
+              <button type="button" class="mind-attachment-uploads-cancel" id="mind-attachment-cancel-all">取消全部</button>
+            </div>
+            <div class="mind-attachment-uploads-list" id="mind-attachment-uploads-list"></div>
+          </div>
           <div class="mind-attachment-list" id="mind-attachment-list" role="listbox" aria-multiselectable="true"></div>
         </div>
         <div class="mind-attachment-footer">
@@ -6857,6 +6955,63 @@ if ($view === 'map_edit') {
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
       if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
       if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+      const jmContainer=document.getElementById('jsmind-container');
+      let currentMapId=0;
+      if(jmContainer){
+        const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
+        currentMapId=Number.isFinite(parsed)?parsed:0;
+      }
+      const unsavedMindmapAssetIds=new Set();
+      let unsavedMindmapAssetBeaconSent=false;
+      function registerUnsavedMindmapAsset(assetId){
+        const id=Number(assetId);
+        if(!Number.isFinite(id) || id<=0) return;
+        if(currentMapId>0){
+          unsavedMindmapAssetIds.delete(id);
+          return;
+        }
+        unsavedMindmapAssetIds.add(id);
+        unsavedMindmapAssetBeaconSent=false;
+      }
+      function unregisterUnsavedMindmapAssets(values){
+        if(!values) return;
+        const list=Array.isArray(values)?values:[values];
+        list.forEach(val=>{
+          const id=Number(val);
+          if(Number.isFinite(id) && id>0){ unsavedMindmapAssetIds.delete(id); }
+        });
+      }
+      function clearUnsavedMindmapAssets(){
+        unsavedMindmapAssetIds.clear();
+        unsavedMindmapAssetBeaconSent=false;
+      }
+      function purgeUnsavedMindmapAssetsViaBeacon(){
+        if(currentMapId>0 || unsavedMindmapAssetIds.size===0 || unsavedMindmapAssetBeaconSent) return;
+        const ids=Array.from(unsavedMindmapAssetIds);
+        if(!ids.length) return;
+        unsavedMindmapAssetBeaconSent=true;
+        const params=new URLSearchParams();
+        params.set('action','purge_mindmap_session_assets');
+        params.set('ids', JSON.stringify(ids));
+        const body=params.toString();
+        let sent=false;
+        if(typeof navigator!=='undefined' && navigator && typeof navigator.sendBeacon==='function'){
+          try{
+            const blob=new Blob([body],{ type:'application/x-www-form-urlencoded' });
+            sent=navigator.sendBeacon(location.href, blob);
+          }catch(_){ }
+        }
+        if(!sent){
+          try{
+            fetch(location.href,{
+              method:'POST',
+              body:body,
+              headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},
+              keepalive:true,
+            }).catch(()=>{});
+          }catch(_){ }
+        }
+      }
       const initialAssetMeta = <?php echo json_encode($mindmapAssetsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       const assetMeta=new Map();
       if(Array.isArray(initialAssetMeta)){
@@ -6875,15 +7030,249 @@ if ($view === 'map_edit') {
             session_key:typeof entry.session_key==='string'?entry.session_key:null,
             url:typeof entry.url==='string' && entry.url?entry.url:`?mindmap_asset=${id}`,
           });
+          if(!currentMapId){ registerUnsavedMindmapAsset(id); }
         });
       }
-      let attachmentManager=null;
-    const jmContainer=document.getElementById('jsmind-container');
-    let currentMapId=0;
-    if(jmContainer){
-      const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
-      currentMapId=Number.isFinite(parsed)?parsed:0;
-    }
+      const mindAttachmentIndex=new Map();
+      let attachmentIndexInitialized=false;
+      function attachmentIndexKey(nodeId){
+        if(nodeId===null || typeof nodeId==='undefined') return '';
+        return String(nodeId);
+      }
+      function cloneAttachmentRecord(raw){
+        if(!raw || typeof raw!=='object') return null;
+        const assetId=Number(raw.assetId ?? raw.id);
+        if(!Number.isFinite(assetId) || assetId<=0) return null;
+        const entry={
+          assetId,
+          name:typeof raw.name==='string'?raw.name:'',
+          mime:typeof raw.mime==='string'?raw.mime:'',
+          url:typeof raw.url==='string'?raw.url:'',
+        };
+        const sizeValue=Number(raw.size ?? raw.filesize ?? 0);
+        if(Number.isFinite(sizeValue) && sizeValue>=0){ entry.size=sizeValue; }
+        const createdValue=Number(raw.createdAt ?? raw.created_at ?? 0);
+        if(Number.isFinite(createdValue) && createdValue>0){ entry.createdAt=createdValue; }
+        return entry;
+      }
+      function setAttachmentIndexForNode(nodeId, attachments){
+        const key=attachmentIndexKey(nodeId);
+        if(!key) return;
+        const list=Array.isArray(attachments)?attachments.map(cloneAttachmentRecord).filter(Boolean):[];
+        if(list.length){ mindAttachmentIndex.set(key,list); }
+        else{ mindAttachmentIndex.delete(key); }
+        attachmentIndexInitialized=true;
+      }
+      function removeAttachmentIndexForNodes(nodeIds){
+        if(!Array.isArray(nodeIds)) return;
+        nodeIds.forEach(id=>{
+          const key=attachmentIndexKey(id);
+          if(!key) return;
+          mindAttachmentIndex.delete(key);
+        });
+      }
+      function rebuildAttachmentIndex(){
+        mindAttachmentIndex.clear();
+        if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function'){ attachmentIndexInitialized=true; return; }
+        jm.nodes.forEach(node=>{
+          if(!node) return;
+          const attachments=gatherAttachments(node.data||{});
+          if(attachments.length){ setAttachmentIndexForNode(node.id, attachments); }
+        });
+        attachmentIndexInitialized=true;
+      }
+      function ensureAttachmentIndex(){ if(!attachmentIndexInitialized){ rebuildAttachmentIndex(); } }
+      function collectNodeIds(node){
+        const ids=[];
+        const walk=current=>{
+          if(!current || !current.id) return;
+          ids.push(current.id);
+          if(Array.isArray(current.children)){ current.children.forEach(child=>walk(child)); }
+        };
+        walk(node);
+        return ids;
+      }
+      function createAbortError(){
+        if(typeof DOMException==='function'){
+          try{ return new DOMException('上传已取消','AbortError'); }
+          catch(_){ }
+        }
+        const err=new Error('上传已取消');
+        err.name='AbortError';
+        return err;
+      }
+      class AttachmentUploadManager{
+        constructor(options={}){
+          this.concurrency=Math.max(1, options.concurrency||2);
+          this.queue=[];
+          this.active=new Map();
+          this.tasks=new Map();
+          this.counter=0;
+          this.subscribers=new Set();
+          this.cleanupTimers=new Map();
+        }
+        subscribe(fn){
+          if(typeof fn!=='function') return ()=>{};
+          this.subscribers.add(fn);
+          try{ fn(this.snapshot()); }
+          catch(err){ console.error(err); }
+          return ()=>{ this.subscribers.delete(fn); };
+        }
+        snapshot(){
+          const list=Array.from(this.tasks.values()).map(task=>({
+            id:task.id,
+            nodeId:task.nodeId,
+            fileName:task.fileName,
+            fileSize:task.fileSize,
+            status:task.status,
+            progress:task.progress,
+            loaded:task.loaded,
+            total:task.total,
+            errorMessage:task.errorMessage,
+            createdAt:task.createdAt,
+            completedAt:task.completedAt,
+          }));
+          list.sort((a,b)=>a.createdAt-b.createdAt);
+          return { tasks:list };
+        }
+        notify(){
+          const snapshot=this.snapshot();
+          this.subscribers.forEach(fn=>{
+            try{ fn(snapshot); }
+            catch(err){ console.error(err); }
+          });
+        }
+        enqueue({file,nodeId}){
+          if(!file || !nodeId){ throw new Error('无效的上传任务'); }
+          const id=`upload-${Date.now()}-${++this.counter}`;
+          const task={
+            id,
+            nodeId,
+            file,
+            fileName:typeof file.name==='string'?file.name:'未命名文件',
+            fileSize:Number(file.size)||0,
+            status:'queued',
+            progress:0,
+            loaded:0,
+            total:Number(file.size)||0,
+            createdAt:Date.now(),
+            completedAt:null,
+            errorMessage:'',
+            request:null,
+          };
+          task.promise=new Promise((resolve,reject)=>{ task._resolve=resolve; task._reject=reject; });
+          this.tasks.set(id, task);
+          this.queue.push(task);
+          this.notify();
+          this.pump();
+          return { id, promise:task.promise };
+        }
+        getPendingCount(){
+          let count=0;
+          this.tasks.forEach(task=>{ if(task.status==='queued'||task.status==='uploading'){ count++; } });
+          return count;
+        }
+        pump(){
+          while(this.active.size<this.concurrency && this.queue.length){
+            const task=this.queue.shift();
+            if(task){ this.start(task); }
+          }
+        }
+        start(task){
+          task.status='uploading';
+          this.updateProgress(task, task.loaded, task.total);
+          const request=uploadMindmapFile({
+            file:task.file,
+            nodeId:task.nodeId,
+            onProgress:(loaded,total)=>{ this.updateProgress(task, loaded, total); }
+          });
+          task.request=request;
+          this.active.set(task.id, task);
+          this.notify();
+          request.promise.then(result=>{ this.handleSuccess(task, result); }).catch(error=>{ this.handleFailure(task, error); });
+        }
+        updateProgress(task, loaded, total){
+          if(Number.isFinite(loaded) && loaded>=0){ task.loaded=loaded; }
+          if(Number.isFinite(total) && total>0){ task.total=total; }
+          const baseTotal=Number.isFinite(task.total) && task.total>0 ? task.total : (task.fileSize || 0);
+          if(baseTotal>0){ task.progress=Math.min(100, Math.round((task.loaded/baseTotal)*100)); }
+          else if(task.loaded>0){ task.progress=Math.min(100, Math.round((task.loaded/Math.max(task.fileSize || task.loaded,1))*100)); }
+          else{ task.progress=0; }
+          this.notify();
+        }
+        handleSuccess(task, result){
+          this.active.delete(task.id);
+          task.status='success';
+          task.result=result;
+          task.progress=100;
+          task.loaded=task.total>0?task.total:(task.fileSize||task.loaded);
+          task.completedAt=Date.now();
+          task.file=null;
+          task.request=null;
+          this.notify();
+          if(typeof task._resolve==='function'){ task._resolve(result); }
+          this.scheduleCleanup(task.id);
+          this.pump();
+        }
+        handleFailure(task, error){
+          this.active.delete(task.id);
+          if(error && error.name==='AbortError'){
+            task.status='cancelled';
+            task.errorMessage='上传已取消';
+          }else{
+            task.status='error';
+            task.errorMessage=error && error.message ? error.message : '上传失败';
+          }
+          task.completedAt=Date.now();
+          task.request=null;
+          this.notify();
+          if(typeof task._reject==='function'){ task._reject(error); }
+          this.scheduleCleanup(task.id);
+          this.pump();
+        }
+        cancel(id){
+          const task=this.tasks.get(id);
+          if(!task) return;
+          if(task.status==='queued'){
+            this.queue=this.queue.filter(entry=>entry.id!==id);
+            task.status='cancelled';
+            task.completedAt=Date.now();
+            this.notify();
+            if(typeof task._reject==='function'){ task._reject(createAbortError()); }
+            this.scheduleCleanup(task.id);
+            return;
+          }
+          if(task.status==='uploading' && task.request && typeof task.request.abort==='function'){
+            task.request.abort();
+          }
+        }
+        cancelAll(){
+          this.tasks.forEach(task=>{
+            if(task.status==='queued' || task.status==='uploading'){
+              this.cancel(task.id);
+            }
+          });
+        }
+        dismiss(id){
+          const task=this.tasks.get(id);
+          if(!task) return;
+          if(task.status==='uploading' || task.status==='queued') return;
+          const timer=this.cleanupTimers.get(id);
+          if(timer){ window.clearTimeout(timer); this.cleanupTimers.delete(id); }
+          this.tasks.delete(id);
+          this.notify();
+        }
+        scheduleCleanup(id){
+          if(this.cleanupTimers.has(id)) return;
+          const timer=window.setTimeout(()=>{
+            this.cleanupTimers.delete(id);
+            this.dismiss(id);
+          },6000);
+          this.cleanupTimers.set(id,timer);
+        }
+      }
+    const attachmentUploadManager=new AttachmentUploadManager({ concurrency:2 });
+    let attachmentManager=null;
     if(!window.jsMind){
       if(jmContainer){
         jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
@@ -7035,17 +7424,73 @@ if ($view === 'map_edit') {
         label=String(label || '附件');
         return label.length>16 ? label.slice(0,15)+'…' : label;
       }
-      async function uploadMindmapFile(file, nodeId){
-        const fd=new FormData();
-        fd.append('action','upload_mindmap_asset');
-        fd.append('map_id', String(currentMapId||0));
-        fd.append('node_id', nodeId);
-        fd.append('file', file);
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        if(!res.ok) throw new Error('网络异常');
-        const json=await res.json();
-        if(!json.ok) throw new Error(json.error||'上传失败');
-        return json;
+      function uploadMindmapFile({ file, nodeId, onProgress }){
+        let xhr=null;
+        const promise=new Promise((resolve,reject)=>{
+          if(!file || !nodeId){ reject(new Error('上传参数缺失')); return; }
+          const fd=new FormData();
+          fd.append('action','upload_mindmap_asset');
+          fd.append('map_id', String(currentMapId||0));
+          fd.append('node_id', nodeId);
+          fd.append('file', file);
+          xhr=new XMLHttpRequest();
+          xhr.open('POST', location.href, true);
+          xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
+          const cleanup=()=>{
+            if(!xhr) return;
+            xhr.upload.onprogress=null;
+            xhr.onload=null;
+            xhr.onerror=null;
+            xhr.onabort=null;
+          };
+          xhr.upload.onprogress=evt=>{
+            if(typeof onProgress==='function'){
+              const total=evt.lengthComputable ? evt.total : (file.size||0);
+              onProgress(evt.loaded, total);
+            }
+          };
+          xhr.onerror=()=>{
+            cleanup();
+            reject(new Error('网络异常'));
+          };
+          xhr.onabort=()=>{
+            cleanup();
+            reject(createAbortError());
+          };
+          xhr.onload=()=>{
+            cleanup();
+            if(xhr.status<200 || xhr.status>=300){
+              reject(new Error('网络异常'));
+              return;
+            }
+            let json=xhr.response;
+            if(!json || typeof json!=='object'){
+              try{ json=JSON.parse(xhr.responseText); }
+              catch(_){ json=null; }
+            }
+            if(!json || json.ok!==1){
+              const message=json && json.error ? json.error : '上传失败';
+              reject(new Error(message));
+              return;
+            }
+            resolve(json);
+          };
+          try{
+            xhr.send(fd);
+          }catch(err){
+            cleanup();
+            reject(err);
+          }
+        });
+        return {
+          promise,
+          abort:()=>{
+            if(xhr && xhr.readyState!==XMLHttpRequest.DONE){
+              try{ xhr.abort(); }
+              catch(_){ }
+            }
+          }
+        };
       }
       let inlineEditState=null;
       function finishInlineEditing(commit){
@@ -7159,6 +7604,7 @@ if ($view === 'map_edit') {
       function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
       jm.options.onInlineEdit=startInlineEditing;
       jm.show(initialData);
+      rebuildAttachmentIndex();
       jmContainer.appendChild(overlay);
       syncOverlaySize();
       if(!jm.get_selected_node() && initialData && initialData.data){
@@ -7545,6 +7991,7 @@ if ($view === 'map_edit') {
         undoManager.isRestoring=true;
         try{
           jm.show(deepClone(snapshot.tree));
+          rebuildAttachmentIndex();
           if(snapshot.view){ applyViewState(snapshot.view); }
           if(snapshot.selectedId && typeof jm.select_node==='function'){
             try{ jm.select_node(snapshot.selectedId); }
@@ -8442,7 +8889,7 @@ if ($view === 'map_edit') {
           const parent=jm.get_node(input.parentId);
           if(!parent) return null;
           const nodeId=input.id || randomId();
-          const payloadData=deepClone(input.data)||{};
+          const payloadData=normalizeNodeData(deepClone(input.data)||{});
           const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
           const style=deepClone(input.style);
           if(style && (style.background || style.foreground)){
@@ -8452,6 +8899,8 @@ if ($view === 'map_edit') {
             newNode.data = newNode.data || {};
             newNode.data.position = {x:input.position.x, y:input.position.y};
           }
+          const attachments=gatherAttachments(newNode.data||{});
+          if(attachments.length){ setAttachmentIndexForNode(newNode.id, attachments); }
           jm.select_node(newNode.id);
           markDirty();
           scheduleHandleRefresh();
@@ -8540,6 +8989,9 @@ if ($view === 'map_edit') {
         if(childTemplates.length){
           childTemplates.forEach(childTpl=>{ buildNodeFromTemplate(childTpl, node); });
         }
+        const attachments=gatherAttachments(node.data||{});
+        if(attachments.length){ setAttachmentIndexForNode(node.id, attachments); }
+        else{ removeAttachmentIndexForNodes([node.id]); }
         return node;
       }
       function copySelectedNode(){
@@ -8749,10 +9201,15 @@ if ($view === 'map_edit') {
         if(!accepted.length) return;
         const data=ensureNodeDataObject(targetNode);
         data.attachments=data.attachments || [];
+        const uploads=accepted.map(file=>({ file, task:attachmentUploadManager.enqueue({ file, nodeId:targetNode.id }) }));
+        const results=await Promise.allSettled(uploads.map(entry=>entry.task.promise));
         const uploadedEntries=[];
-        for(const file of accepted){
-          try{
-            const uploaded=await uploadMindmapFile(file, targetNode.id);
+        const errors=[];
+        let didChange=false;
+        results.forEach((result,index)=>{
+          const file=uploads[index].file;
+          if(result.status==='fulfilled'){
+            const uploaded=result.value;
             const createdTs=Number(uploaded.created_at)||Math.floor(Date.now()/1000);
             const normalized={
               assetId:uploaded.id,
@@ -8774,6 +9231,7 @@ if ($view === 'map_edit') {
               session_key:null,
               url:uploaded.url
             });
+            registerUnsavedMindmapAsset(uploaded.id);
             uploadedEntries.push({
               id:uploaded.id,
               name:normalized.name,
@@ -8783,19 +9241,27 @@ if ($view === 'map_edit') {
               url:uploaded.url,
               nodeId:targetNode.id,
             });
-          }catch(err){
-            console.error(err);
-            alert((file.name||'文件')+' 上传失败：'+(err && err.message ? err.message : err));
+            didChange=true;
+          }else{
+            const reason=result.reason;
+            if(reason && reason.name==='AbortError'){ return; }
+            const message=reason && reason.message ? reason.message : '上传失败';
+            errors.push(`${file.name||'文件'}：${message}`);
+            console.error(reason);
           }
+        });
+        if(didChange){
+          setAttachmentIndexForNode(targetNode.id, data.attachments);
+          targetNode.model.data=data;
+          targetNode.data=data;
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(targetNode.id);
+          markDirty();
+          scheduleHandleRefresh();
+          refreshInspector(jm.get_node(targetNode.id));
         }
-        targetNode.model.data=data;
-        targetNode.data=data;
-        jm.computeLayout();
-        jm.render();
-        jm.select_node(targetNode.id);
-        markDirty();
-        scheduleHandleRefresh();
-        refreshInspector(jm.get_node(targetNode.id));
+        if(errors.length){ alert(errors.join('\n')); }
         if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
       }
       function handleDroppedText(text, parent, event){
@@ -8861,7 +9327,9 @@ if ($view === 'map_edit') {
         const node=ensureNode(); if(!node || node.isroot) return;
         performUndoable('delete-node',()=>{
           commitInlineEditing();
+          const removedIds=collectNodeIds(node);
           jm.remove_node(node.id);
+          removeAttachmentIndexForNodes(removedIds);
           markDirty();
           scheduleHandleRefresh();
           requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
@@ -8995,6 +9463,9 @@ if ($view === 'map_edit') {
           sort:document.getElementById('mind-attachment-sort'),
           filters:document.getElementById('mind-attachment-filters'),
           deleteBtn:document.getElementById('mind-attachment-delete'),
+          uploads:document.getElementById('mind-attachment-uploads'),
+          uploadsList:document.getElementById('mind-attachment-uploads-list'),
+          uploadsCancel:document.getElementById('mind-attachment-cancel-all'),
           closeBtn:document.querySelector('[data-attachment-close]'),
         };
         const state={
@@ -9008,6 +9479,7 @@ if ($view === 'map_edit') {
           lastIndex:null,
           initialized:false,
         };
+        let unsubscribeUploads=null;
         let loadObserver=null;
         let loadSentinel=null;
         let lastFocused=null;
@@ -9017,6 +9489,7 @@ if ($view === 'map_edit') {
           if(elements.filters){ elements.filters.addEventListener('click',handleFilterClick); }
           if(elements.sort){ elements.sort.addEventListener('change',()=>{ state.sort=elements.sort.value; refresh(); }); }
           if(elements.closeBtn){ elements.closeBtn.addEventListener('click',()=>close()); }
+          if(elements.uploadsCancel){ elements.uploadsCancel.addEventListener('click',()=>attachmentUploadManager.cancelAll()); }
           if(elements.backdrop){ elements.backdrop.addEventListener('click',evt=>{ if(evt.target===elements.backdrop) close(); }); }
           if(elements.list){
             elements.list.addEventListener('click',handleListClick);
@@ -9164,30 +9637,143 @@ if ($view === 'map_edit') {
             }
           });
         }
+        function buildUploadMeta(task){
+          if(!task) return '';
+          const parts=[];
+          const status=task.status || 'queued';
+          const progressValue=Number.isFinite(task.progress)?Math.max(0,Math.min(100,Math.round(task.progress))):null;
+          if(status==='queued'){ parts.push('等待上传'); }
+          else if(status==='uploading'){
+            const loaded=Number(task.loaded)||0;
+            const total=Number(task.total)||Number(task.fileSize)||0;
+            const loadedText=formatBytesLocal(loaded);
+            const totalText=total>0?formatBytesLocal(total):'';
+            if(progressValue!==null){ parts.push(`上传中 ${progressValue}%`); }
+            else{ parts.push('上传中'); }
+            if(totalText){ parts.push(`${loadedText} / ${totalText}`); }
+            else if(loadedText){ parts.push(loadedText); }
+          }else if(status==='success'){
+            parts.push('上传完成');
+            const total=Number(task.fileSize)||Number(task.total)||0;
+            if(total>0){ parts.push(formatBytesLocal(total)); }
+          }else if(status==='cancelled'){
+            parts.push('已取消');
+          }else if(status==='error'){
+            parts.push(`失败：${task.errorMessage || '上传失败'}`);
+          }else{
+            parts.push('等待上传');
+          }
+          if(task.nodeId){
+            let nodeTopic='';
+            if(jm && typeof jm.get_node==='function'){
+              const node=jm.get_node(task.nodeId);
+              if(node && node.topic){ nodeTopic=node.topic; }
+            }
+            if(nodeTopic){ parts.push(`节点：${nodeTopic}`); }
+          }
+          return parts.filter(Boolean).join(' · ');
+        }
+        function renderUploads(tasks){
+          if(!elements.uploads || !elements.uploadsList) return;
+          const list=Array.isArray(tasks)?tasks:[];
+          if(!list.length){
+            elements.uploads.hidden=true;
+            elements.uploadsList.innerHTML='';
+            if(elements.uploadsCancel){ elements.uploadsCancel.disabled=true; }
+            return;
+          }
+          elements.uploads.hidden=false;
+          elements.uploadsList.innerHTML='';
+          list.forEach(task=>{
+            const row=document.createElement('div');
+            row.className='mind-attachment-upload';
+            row.dataset.status=task.status || 'queued';
+            const info=document.createElement('div');
+            info.className='mind-attachment-upload-info';
+            const name=document.createElement('div');
+            name.className='mind-attachment-upload-name';
+            name.textContent=task.fileName || '未命名文件';
+            const meta=document.createElement('div');
+            meta.className='mind-attachment-upload-meta';
+            meta.textContent=buildUploadMeta(task);
+            info.appendChild(name);
+            info.appendChild(meta);
+            row.appendChild(info);
+            const actions=document.createElement('div');
+            actions.className='mind-attachment-upload-actions';
+            const actionBtn=document.createElement('button');
+            actionBtn.type='button';
+            const status=task.status || 'queued';
+            const pending=status==='queued' || status==='uploading';
+            if(status==='success'){
+              actionBtn.textContent='完成';
+              actionBtn.disabled=true;
+            }else if(pending){
+              actionBtn.textContent='取消';
+              actionBtn.addEventListener('click',()=>attachmentUploadManager.cancel(task.id));
+            }else{
+              actionBtn.textContent='清除';
+              actionBtn.addEventListener('click',()=>attachmentUploadManager.dismiss(task.id));
+            }
+            actions.appendChild(actionBtn);
+            row.appendChild(actions);
+            const progress=document.createElement('div');
+            progress.className='mind-attachment-progress';
+            const bar=document.createElement('div');
+            bar.className='mind-attachment-progress-bar';
+            const pct=Number.isFinite(task.progress)?Math.max(0,Math.min(100,task.progress)): (pending?5:0);
+            bar.style.width=`${pct}%`;
+            progress.appendChild(bar);
+            row.appendChild(progress);
+            elements.uploadsList.appendChild(row);
+          });
+          if(elements.uploadsCancel){
+            const hasPending=list.some(task=>task.status==='queued' || task.status==='uploading');
+            elements.uploadsCancel.disabled=!hasPending;
+          }
+        }
+        function handleUploadsSnapshot(snapshot){
+          const tasks=snapshot && Array.isArray(snapshot.tasks) ? snapshot.tasks : [];
+          renderUploads(tasks);
+          updateSummary();
+        }
         function collectAttachments(){
+          ensureAttachmentIndex();
           const items=[];
           if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return items;
-          jm.nodes.forEach(node=>{
-            if(!node) return;
-            const attachments=gatherAttachments(node.data||{});
+          mindAttachmentIndex.forEach((attachments,nodeKey)=>{
             if(!attachments || !attachments.length) return;
+            let nodeTopic='';
+            let nodeId=nodeKey;
+            let node=null;
+            if(jm && jm.nodes && typeof jm.nodes.get==='function'){
+              node=jm.nodes.get(nodeKey);
+            }
+            if(!node && typeof jm.get_node==='function'){
+              try{ node=jm.get_node(nodeKey); }
+              catch(_){ node=null; }
+            }
+            if(node){
+              nodeTopic=node.topic || '';
+              nodeId=node.id || nodeKey;
+            }
             attachments.forEach(att=>{
               if(!att || typeof att!=='object') return;
               const assetId=Number(att.assetId || att.id);
               if(!Number.isFinite(assetId) || assetId<=0) return;
               const meta=assetMeta.get(assetId) || {};
               const name=att.name || meta.name || attachmentLabel(att) || `附件 #${assetId}`;
-              const size=Number(att.size || meta.size || 0);
+              const size=Number(att.size ?? meta.size ?? 0) || 0;
               const mime=att.mime || meta.mime || 'application/octet-stream';
               const url=att.url || meta.url || `?mindmap_asset=${assetId}`;
-              const createdRaw=Number(att.createdAt || att.created_at || meta.created_at || 0);
+              const createdRaw=Number(att.createdAt ?? meta.created_at ?? 0);
               assetMeta.set(assetId,{
                 id:assetId,
                 name,
                 size,
                 mime,
                 created_at:createdRaw,
-                node_uid:node.id,
+                node_uid:nodeId || nodeKey,
                 mindmap_id:meta.mindmap_id ?? (Number.isFinite(currentMapId)?currentMapId:null),
                 session_key:meta.session_key || null,
                 url,
@@ -9198,8 +9784,8 @@ if ($view === 'map_edit') {
                 size,
                 mime,
                 url,
-                nodeId:node.id,
-                nodeTopic:node.topic || '',
+                nodeId:nodeId || nodeKey,
+                nodeTopic:nodeTopic,
                 createdAt:createdRaw,
                 type:categorizeAttachment({name,mime})
               });
@@ -9502,6 +10088,7 @@ if ($view === 'map_edit') {
           requestDelete(unique).then(()=>{
             state.selection.clear();
             refresh(true);
+            unregisterUnsavedMindmapAssets(unique);
           }).catch(err=>{
             alert(err && err.message ? err.message : '删除附件失败');
             restoreAssetMeta(metaBackup);
@@ -9527,6 +10114,8 @@ if ($view === 'map_edit') {
                 else { delete data.attachments; delete data.attachment; }
                 node.model.data=data;
                 node.data=data;
+                if(data.attachments && data.attachments.length){ setAttachmentIndexForNode(node.id, data.attachments); }
+                else{ removeAttachmentIndexForNodes([node.id]); }
               }
             });
             if(!changed) return false;
@@ -9553,11 +10142,15 @@ if ($view === 'map_edit') {
           if(!elements.summary) return;
           const total=state.items.length;
           const totalSize=state.items.reduce((sum,item)=>sum+(Number(item.size)||0),0);
-          if(total===0){ elements.summary.textContent='暂无附件'; }
-          else{
-            const sizeText=totalSize>0?formatBytesLocal(totalSize):'';
-            elements.summary.textContent=sizeText?`共 ${total} 个附件 · 总计 ${sizeText}`:`共 ${total} 个附件`;
+          const pending=attachmentUploadManager.getPendingCount();
+          if(total===0){
+            elements.summary.textContent=pending>0?`上传中 ${pending} 项`:'暂无附件';
+            return;
           }
+          const sizeText=totalSize>0?formatBytesLocal(totalSize):'';
+          let summary=sizeText?`共 ${total} 个附件 · 总计 ${sizeText}`:`共 ${total} 个附件`;
+          if(pending>0){ summary+=` · 上传中 ${pending} 项`; }
+          elements.summary.textContent=summary;
         }
         function refresh(forceReset=false){
           ensureInit();
@@ -9587,7 +10180,7 @@ if ($view === 'map_edit') {
           if(lastFocused && typeof lastFocused.focus==='function'){ setTimeout(()=>lastFocused.focus(),0); }
         }
         function toggle(){ state.open ? close() : open(); }
-        function onFilesUploaded(entries){
+        function onFilesUploaded(entries, targetNode){
           if(entries && entries.length){
             entries.forEach(entry=>{
               const existing=assetMeta.get(entry.id) || {};
@@ -9602,7 +10195,13 @@ if ($view === 'map_edit') {
                 session_key:existing.session_key || null,
                 url:entry.url || existing.url || `?mindmap_asset=${entry.id}`,
               });
+              registerUnsavedMindmapAsset(entry.id);
             });
+          }
+          if(targetNode && targetNode.id){
+            const attachments=gatherAttachments(targetNode.data||{});
+            if(attachments.length){ setAttachmentIndexForNode(targetNode.id, attachments); }
+            else{ removeAttachmentIndexForNodes([targetNode.id]); }
           }
           if(state.open){ refresh(true); }
           else{ refreshWhenClosed(); }
@@ -9610,6 +10209,9 @@ if ($view === 'map_edit') {
         function onMindUpdate(){
           if(state.open){ refresh(); }
           else{ refreshWhenClosed(); }
+        }
+        if(!unsubscribeUploads){
+          unsubscribeUploads=attachmentUploadManager.subscribe(handleUploadsSnapshot);
         }
         return { open, close, toggle, refresh, onFilesUploaded, onMindUpdate };
       }
@@ -10237,6 +10839,7 @@ if ($view === 'map_edit') {
           switch(mode){
             case 'replace':
               jm.show(payload);
+              rebuildAttachmentIndex();
               initialData=JSON.parse(JSON.stringify(payload));
               if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
               markDirty();
@@ -10302,6 +10905,7 @@ if ($view === 'map_edit') {
         parentModel.expanded=true;
         enforceRightOrientation(current.data);
         jm.show(current);
+        rebuildAttachmentIndex();
         requestAnimationFrame(()=>{ jm.select_node(newNode.id); scheduleHandleRefresh(); });
         markDirty();
       }
@@ -10309,6 +10913,7 @@ if ($view === 'map_edit') {
         const cloned=JSON.parse(JSON.stringify(json));
         if(cloned && cloned.data){ enforceRightOrientation(cloned.data); }
         jm.show(cloned);
+        rebuildAttachmentIndex();
         initialData=JSON.parse(JSON.stringify(cloned));
         if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
         currentMapId=0;
@@ -10386,6 +10991,7 @@ if ($view === 'map_edit') {
           initialData=JSON.parse(payload);
           if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
           markSaved();
+          clearUnsavedMindmapAssets();
         }catch(err){
           alert(err.message||'保存失败');
           markDirty();
@@ -10397,7 +11003,16 @@ if ($view === 'map_edit') {
           blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
           blobUrlRegistry.clear();
         }
-        if(dirty){ e.preventDefault(); e.returnValue=''; }
+        if(!dirty){
+          purgeUnsavedMindmapAssetsViaBeacon();
+          return;
+        }
+        e.preventDefault();
+        e.returnValue='';
+      });
+      window.addEventListener('pagehide',evt=>{
+        if(evt && evt.persisted) return;
+        purgeUnsavedMindmapAssetsViaBeacon();
       });
       })();
     </script>
