@@ -6351,7 +6351,12 @@ if ($view === 'map_edit') {
           };
         }
         updateLinkPath(node){
-          if(!node || !node.parent || !node.linkPath) return;
+          if(!node){ return; }
+          if(!node.parent || !node.linkPath){
+            node.traceRoute=null;
+            node.traceSegments=null;
+            return;
+          }
           if(!node.anchors) this.updateAnchors(node);
           if(!node.parent.anchors) this.updateAnchors(node.parent);
           const parent=node.parent;
@@ -6378,6 +6383,22 @@ if ($view === 'map_edit') {
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
           const routePoints=(Array.isArray(route) && route.length>=2)?route:[start,end];
+          const clonedPoints=routePoints.map(pt=>({x:pt.x,y:pt.y}));
+          const segments=[];
+          for(let i=1;i<clonedPoints.length;i++){
+            const prev=clonedPoints[i-1];
+            const curr=clonedPoints[i];
+            if(!prev || !curr) continue;
+            if(!Number.isFinite(prev.x) || !Number.isFinite(prev.y) || !Number.isFinite(curr.x) || !Number.isFinite(curr.y)){
+              continue;
+            }
+            segments.push({
+              a:{x:prev.x,y:prev.y},
+              b:{x:curr.x,y:curr.y},
+            });
+          }
+          node.traceRoute=clonedPoints;
+          node.traceSegments=segments;
           this.positionEdgeInsertButton(node, routePoints);
         }
         ensureEdgeInsertButton(node){
@@ -6634,6 +6655,28 @@ if ($view === 'map_edit') {
           }
           return rects;
         }
+        collectTraceAvoidSegments(node, owner){
+          const segments=[];
+          if(!node || !Array.isArray(node.traceSegments) || !node.traceSegments.length){
+            return segments;
+          }
+          for(const segment of node.traceSegments){
+            if(!segment || !segment.a || !segment.b) continue;
+            const a=segment.a;
+            const b=segment.b;
+            if(!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)){
+              continue;
+            }
+            segments.push({
+              type:'trace',
+              owner,
+              a:{x:a.x,y:a.y},
+              b:{x:b.x,y:b.y},
+              margin:12,
+            });
+          }
+          return segments;
+        }
         simplifyRelationRoute(points){
           if(!Array.isArray(points) || !points.length) return [];
           const cleaned=[];
@@ -6727,6 +6770,26 @@ if ($view === 'map_edit') {
           const cy=(rect.top+rect.bottom)/2;
           return Math.hypot(a.x-cx,a.y-cy);
         }
+        segmentSegmentDistance(a1,a2,b1,b2){
+          if(!a1 || !a2 || !b1 || !b2) return Infinity;
+          if(!Number.isFinite(a1.x) || !Number.isFinite(a1.y) || !Number.isFinite(a2.x) || !Number.isFinite(a2.y)) return Infinity;
+          if(!Number.isFinite(b1.x) || !Number.isFinite(b1.y) || !Number.isFinite(b2.x) || !Number.isFinite(b2.y)) return Infinity;
+          const minAx=Math.min(a1.x,a2.x);
+          const maxAx=Math.max(a1.x,a2.x);
+          const minAy=Math.min(a1.y,a2.y);
+          const maxAy=Math.max(a1.y,a2.y);
+          const minBx=Math.min(b1.x,b2.x);
+          const maxBx=Math.max(b1.x,b2.x);
+          const minBy=Math.min(b1.y,b2.y);
+          const maxBy=Math.max(b1.y,b2.y);
+          let dx=0;
+          if(maxAx<minBx){ dx=minBx - maxAx; }
+          else if(maxBx<minAx){ dx=minAx - maxBx; }
+          let dy=0;
+          if(maxAy<minBy){ dy=minBy - maxAy; }
+          else if(maxBy<minAy){ dy=minAy - maxBy; }
+          return Math.hypot(dx, dy);
+        }
         buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance){
           const points=[];
           const safeClearance=Math.max(18, Math.min(72, clearance));
@@ -6765,6 +6828,20 @@ if ($view === 'map_edit') {
             for(const rect of avoidRects){
               if(!rect) continue;
               const margin=typeof rect.margin==='number'?rect.margin:8;
+              if(rect.type==='trace'){
+                if(rect.owner==='from' && segment.index===0) continue;
+                if(rect.owner==='to' && segment.index===segments.length-1) continue;
+                const distance=this.segmentSegmentDistance(segment.a, segment.b, rect.a, rect.b);
+                if(!Number.isFinite(distance)) continue;
+                if(distance<=0.5){
+                  penalty+=900 + margin*35;
+                  continue;
+                }
+                if(distance<margin){
+                  penalty+=(margin-distance)*16;
+                }
+                continue;
+              }
               if(rect.type==='node'){
                 if(rect.owner==='from' && segment.index===0) continue;
                 if(rect.owner==='to' && segment.index===segments.length-1) continue;
@@ -6851,8 +6928,24 @@ if ($view === 'map_edit') {
           if(!startCenter || !endCenter) return;
           const avoidRects=[
             ...this.collectRelationAvoidRects(fromNode,'from'),
-            ...this.collectRelationAvoidRects(toNode,'to')
+            ...this.collectRelationAvoidRects(toNode,'to'),
+            ...this.collectTraceAvoidSegments(fromNode,'from'),
+            ...this.collectTraceAvoidSegments(toNode,'to'),
           ];
+          if(this.nodes && this.nodes.size){
+            for(const node of this.nodes.values()){
+              if(!node || node===fromNode || node===toNode) continue;
+              if(node.el){
+                if(!node.el.isConnected) continue;
+                const hasRect=typeof node.el.getClientRects==='function' ? node.el.getClientRects() : null;
+                if((node.el.offsetWidth===0 && node.el.offsetHeight===0) && (!hasRect || hasRect.length===0)){
+                  continue;
+                }
+              }
+              avoidRects.push(...this.collectRelationAvoidRects(node,'other'));
+              avoidRects.push(...this.collectTraceAvoidSegments(node,'other'));
+            }
+          }
           const sides=['left','right','top','bottom'];
           let bestRoute=null;
           for(const startSide of sides){
