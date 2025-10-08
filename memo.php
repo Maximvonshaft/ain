@@ -244,6 +244,10 @@ function db(): PDO {
     $stmt=$pdo->prepare('INSERT INTO categories(name,created_at) VALUES(?,?)');
     foreach(['备忘录','流程','其他'] as $n){ $stmt->execute([$n, now()]); }
   }
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
   $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -11168,6 +11172,16 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
     background-attachment:fixed;
   }
   .scanlines{position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(to bottom,rgba(75,195,209,.14) 0,transparent 4px);background-size:100% 6px;opacity:.18}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{
+      animation-duration:.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;
+      scroll-behavior:auto !important;
+    }
+    .scanlines{display:none;}
+    body::after{background:none;}
+  }
   a{color:inherit;text-decoration:none}
   .app{display:flex;min-height:100vh;position:relative;z-index:0}
   .sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar-width);overflow:auto;background:linear-gradient(165deg,rgba(12,14,18,.94) 0%,rgba(15,19,22,.9) 55%,rgba(21,26,30,.9) 100%);border-right:1px solid var(--border);box-shadow:inset 0 0 0 1px rgba(201,168,106,.08),0 18px 45px rgba(0,0,0,.45);padding:20px;backdrop-filter:blur(18px) saturate(170%);
@@ -11229,6 +11243,9 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .density-toggle .btn.active{background:rgba(230,192,137,.16);color:var(--gold-400);box-shadow:inset 0 0 0 1px rgba(230,192,137,.25)}
   .items{display:grid;gap:var(--item-grid-gap);position:relative;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
   .item{position:relative;padding:var(--item-padding);border-radius:var(--item-radius);background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:var(--item-gap);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),opacity var(--transition)}
+  @supports (content-visibility:auto){
+    .item{content-visibility:auto;contain: layout paint style;}
+  }
   .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
   .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 12px rgba(207,166,107,.5),0 0 22px rgba(142,107,61,.45)}
   .item:hover{transform:translateY(-4px);box-shadow:0 0 28px rgba(201,168,106,.28),0 26px 50px rgba(0,0,0,.6);border-color:rgba(201,168,106,.52)}
@@ -11909,6 +11926,66 @@ window.addEventListener('keydown',e=>{
   }
 })();
 <?php endif; ?>
+function createCatFetcher(){
+  let inflight=null;
+  let cache=null;
+  let cachedAt=0;
+  const TTL=4000;
+  const setCache=data=>{
+    if(data && typeof data==='object'){
+      cache=data;
+      cachedAt=Date.now();
+    }
+  };
+  const loader=async(force=false)=>{
+    const now=Date.now();
+    if(!force && cache && (now-cachedAt)<TTL){
+      return cache;
+    }
+    if(force){
+      cache=null;
+      cachedAt=0;
+      inflight=null;
+    }
+    if(!inflight){
+      let wrapped;
+      const requestPromise=(async()=>{
+        const fd=new FormData();
+        fd.append('action','ping_cats');
+        const response=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(!response.ok){
+          throw new Error('网络异常');
+        }
+        const json=await response.json();
+        if(!json || !json.ok){
+          throw new Error('加载分类失败');
+        }
+        setCache(json);
+        return json;
+      })().catch(err=>{
+        cache=null;
+        cachedAt=0;
+        throw err;
+      });
+      wrapped=requestPromise.finally(()=>{
+        if(inflight===wrapped){
+          inflight=null;
+        }
+      });
+      inflight=wrapped;
+    }
+    return inflight;
+  };
+  loader.invalidate=()=>{
+    cache=null;
+    cachedAt=0;
+    inflight=null;
+  };
+  loader.set=data=>{
+    setCache(data);
+  };
+  return loader;
+}
 const itemsContainer=document.getElementById('items');
 const currentCategoryFilter=<?php echo json_encode((string)$cat); ?>;
 const memoImportButton=document.getElementById('btn-import-items');
@@ -11916,6 +11993,7 @@ const memoImportInput=document.getElementById('memo-import-input');
 const toastContainer=document.getElementById('toast-container');
 const densityButtons=$$('.density-option');
 const deleteForms=$$('.form-delete-item');
+const fetchCats=createCatFetcher();
 const DENSITY_KEY='memo-density';
 function safeStorageGet(key){ try{ return window.localStorage.getItem(key); }catch(_){ return null; }}
 function safeStorageSet(key,value){ try{ window.localStorage.setItem(key,value); }catch(_){ }}
@@ -11984,7 +12062,7 @@ async function handleDeleteForm(form){
     }
     showToast(`已删除 · ${title}`, data.undo_token ? [{label:'撤销', onClick:()=>undoDelete(data.undo_token)}] : []);
     try{
-      const {cats,counts,total,mindmap_total}=await fetchCats();
+      const {cats,counts,total,mindmap_total}=await fetchCats(true);
       refreshSidebarCats(cats,counts,total,mindmap_total);
     }catch(_){ }
   }catch(err){
@@ -12119,19 +12197,26 @@ function renderCatRows(cats, counts){
     box.appendChild(row);
   });
 }
-function renderCatRowsFromDOM(){ fetchCats().then(({cats,counts,total,mindmap_total})=>{renderCatRows(cats,counts); refreshSidebarCats(cats,counts,total,mindmap_total);}); }
-function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
-async function fetchCats(){
-  const fd=new FormData(); fd.append('action','ping_cats');
-  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(!j.ok) throw new Error('加载分类失败'); return j;
+function renderCatRowsFromDOM(){
+  fetchCats().then(({cats,counts,total,mindmap_total})=>{
+    renderCatRows(cats,counts);
+    refreshSidebarCats(cats,counts,total,mindmap_total);
+  }).catch(err=>{
+    console.error('加载分类失败', err);
+  });
 }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
 async function addCat(ev){
   ev.preventDefault();
   const name=document.getElementById('new-cat-name').value.trim(); if(!name) return false;
   const fd=new FormData(); fd.append('action','add_category'); fd.append('name', name);
   const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(j.ok){ document.getElementById('new-cat-name').value=''; renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total); }
+  if(j.ok){
+    fetchCats.set(j);
+    document.getElementById('new-cat-name').value='';
+    renderCatRows(j.cats,j.counts);
+    refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total);
+  }
   return false;
 }
 async function saveCat(ev, id){
@@ -12139,14 +12224,22 @@ async function saveCat(ev, id){
   const name=new FormData(ev.target).get('name');
   const fd=new FormData(); fd.append('action','edit_category'); fd.append('id', id); fd.append('name', name);
   const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total); }
+  if(j.ok){
+    fetchCats.set(j);
+    renderCatRows(j.cats,j.counts);
+    refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total);
+  }
   return false;
 }
 async function delCat(id, name){
   if(!confirm(`确认删除分类【${name}】？该分类下条目将移入“其他”。`)) return false;
   const fd=new FormData(); fd.append('action','delete_category'); fd.append('id', id);
   const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
-  if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total); }
+  if(j.ok){
+    fetchCats.set(j);
+    renderCatRows(j.cats,j.counts);
+    refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total);
+  }
   return false;
 }
 function refreshSidebarCats(cats, counts, total, mindmapTotal){
@@ -12200,7 +12293,7 @@ if(itemsContainer){
             ensureItemsEmptyState();
           }
           try{
-            const {cats,counts,total,mindmap_total}=await fetchCats();
+            const {cats,counts,total,mindmap_total}=await fetchCats(true);
             refreshSidebarCats(cats,counts,total,mindmap_total);
           }catch(_){ }
         }
