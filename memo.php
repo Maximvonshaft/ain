@@ -442,6 +442,42 @@ function cleanup_stale_mindmap_assets(int $ttlSeconds = 604800): int {
   return $deleted;
 }
 
+function purge_mindmap_session_assets(?array $ids = null, ?string $session_key = null): int {
+  $session_key=$session_key ?? session_id();
+  if($session_key===''){ return 0; }
+  $normalized=[];
+  if(is_array($ids)){
+    foreach($ids as $val){
+      if(is_int($val) || ctype_digit((string)$val)){
+        $intVal=(int)$val;
+        if($intVal>0){ $normalized[]=$intVal; }
+      }
+    }
+  }
+  $ids=array_values(array_unique($normalized));
+  $pdo=db();
+  if($ids){
+    $placeholders=implode(',',array_fill(0,count($ids),'?'));
+    $sql="SELECT id FROM mindmap_assets WHERE session_key=? AND mindmap_id IS NULL AND id IN ($placeholders)";
+    $params=array_merge([$session_key],$ids);
+  }else{
+    $sql='SELECT id FROM mindmap_assets WHERE session_key=? AND mindmap_id IS NULL';
+    $params=[$session_key];
+  }
+  $st=$pdo->prepare($sql);
+  $st->execute($params);
+  $rows=$st->fetchAll();
+  if(!$rows){ return 0; }
+  $deleted=0;
+  foreach($rows as $row){
+    $assetId=(int)($row['id'] ?? 0);
+    if($assetId<=0){ continue; }
+    delete_mindmap_asset($assetId);
+    $deleted++;
+  }
+  return $deleted;
+}
+
 function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name, string $stored_name, string $mime, int $size, string $session_key): array {
   $pdo=db();
   $pdo->prepare('INSERT INTO mindmap_assets(mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)')
@@ -1260,6 +1296,36 @@ if (is_post()) {
           exit;
         }
         break;
+      }
+      case 'purge_mindmap_session_assets': {
+        $raw=$_POST['ids'] ?? [];
+        $ids=[];
+        if(is_string($raw)){
+          $decoded=json_decode($raw,true);
+          if(is_array($decoded)){
+            $raw=$decoded;
+          }else{
+            $trimmed=trim($raw);
+            if($trimmed!==''){
+              $raw=array_map('trim',explode(',', $trimmed));
+            }else{
+              $raw=[];
+            }
+          }
+        }
+        if(is_array($raw)){
+          foreach($raw as $val){
+            if(is_int($val) || ctype_digit((string)$val)){
+              $intVal=(int)$val;
+              if($intVal>0){ $ids[]=$intVal; }
+            }
+          }
+        }
+        $ids=array_values(array_unique($ids));
+        $deleted=purge_mindmap_session_assets($ids, session_id());
+        header('Content-Type: application/json');
+        echo json_encode(['ok'=>1,'deleted'=>$deleted]);
+        exit;
       }
       case 'save_mindmap': {
         $title=trim((string)($_POST['title'] ?? ''));
@@ -6914,8 +6980,16 @@ if ($view === 'map_edit') {
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
       if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
       if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+      const jmContainer=document.getElementById('jsmind-container');
+      let currentMapId=0;
+      if(jmContainer){
+        const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
+        currentMapId=Number.isFinite(parsed)?parsed:0;
+      }
       const initialAssetMeta = <?php echo json_encode($mindmapAssetsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       const assetMeta=new Map();
+      const unsavedSessionAttachmentIds=new Set();
+      let unsavedCleanupRequested=false;
       if(Array.isArray(initialAssetMeta)){
         initialAssetMeta.forEach(entry=>{
           if(!entry || typeof entry!=='object') return;
@@ -6932,7 +7006,52 @@ if ($view === 'map_edit') {
             session_key:typeof entry.session_key==='string'?entry.session_key:null,
             url:typeof entry.url==='string' && entry.url?entry.url:`?mindmap_asset=${id}`,
           });
+          const entryMapId=Number(entry.mindmap_id);
+          const hasSessionKey=typeof entry.session_key==='string' && entry.session_key.trim()!=='';
+          if((!Number.isFinite(entryMapId) || entryMapId<=0) && hasSessionKey){
+            unsavedSessionAttachmentIds.add(id);
+          }
         });
+      }
+      function trackUnsavedAttachment(id){
+        const numeric=Number(id);
+        if(!Number.isFinite(numeric) || numeric<=0) return;
+        unsavedSessionAttachmentIds.add(numeric);
+        unsavedCleanupRequested=false;
+      }
+      function untrackUnsavedAttachment(id){
+        const numeric=Number(id);
+        if(!Number.isFinite(numeric) || numeric<=0) return;
+        unsavedSessionAttachmentIds.delete(numeric);
+      }
+      function resetUnsavedAttachmentTracking(){
+        unsavedSessionAttachmentIds.clear();
+        unsavedCleanupRequested=false;
+      }
+      function dispatchUnsavedAttachmentCleanup(){
+        if(unsavedSessionAttachmentIds.size===0) return;
+        if(unsavedCleanupRequested) return;
+        unsavedCleanupRequested=true;
+        const ids=Array.from(unsavedSessionAttachmentIds);
+        const payload=JSON.stringify(ids);
+        let sent=false;
+        if(typeof navigator!=='undefined' && typeof navigator.sendBeacon==='function'){
+          try{
+            const form=new FormData();
+            form.append('action','purge_mindmap_session_assets');
+            form.append('ids', payload);
+            sent=navigator.sendBeacon(location.href, form);
+          }catch(_){ sent=false; }
+        }
+        if(!sent){
+          try{
+            const fd=new FormData();
+            fd.append('action','purge_mindmap_session_assets');
+            fd.append('ids', payload);
+            fetch(location.href,{ method:'POST', body:fd, headers:{'X-Requested-With':'fetch'}, keepalive:true }).catch(()=>{});
+          }catch(_){ }
+        }
+        unsavedSessionAttachmentIds.clear();
       }
       const mindAttachmentIndex=new Map();
       let attachmentIndexInitialized=false;
@@ -7174,12 +7293,6 @@ if ($view === 'map_edit') {
       }
       const attachmentUploadManager=new AttachmentUploadManager({ concurrency:2 });
       let attachmentManager=null;
-    const jmContainer=document.getElementById('jsmind-container');
-    let currentMapId=0;
-    if(jmContainer){
-      const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
-      currentMapId=Number.isFinite(parsed)?parsed:0;
-    }
     if(!window.jsMind){
       if(jmContainer){
         jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
@@ -9138,6 +9251,11 @@ if ($view === 'map_edit') {
               session_key:null,
               url:uploaded.url
             });
+            if(!currentMapId){
+              trackUnsavedAttachment(uploaded.id);
+            }else{
+              untrackUnsavedAttachment(uploaded.id);
+            }
             uploadedEntries.push({
               id:uploaded.id,
               name:normalized.name,
@@ -9529,6 +9647,7 @@ if ($view === 'map_edit') {
               const meta=assetMeta.get(numeric);
               stash.set(numeric, meta && typeof meta==='object'?{...meta}:meta);
               assetMeta.delete(numeric);
+              untrackUnsavedAttachment(numeric);
             }
           });
           return stash;
@@ -9540,6 +9659,13 @@ if ($view === 'map_edit') {
               assetMeta.set(id,{...meta});
             }else if(meta!=null){
               assetMeta.set(id,meta);
+            }
+            const metaObj=assetMeta.get(id);
+            const mapIdValue=metaObj && typeof metaObj==='object'?Number(metaObj.mindmap_id ?? metaObj.map_id ?? 0):0;
+            if(!Number.isFinite(mapIdValue) || mapIdValue<=0){
+              trackUnsavedAttachment(id);
+            }else{
+              untrackUnsavedAttachment(id);
             }
           });
         }
@@ -10100,6 +10226,13 @@ if ($view === 'map_edit') {
                 session_key:existing.session_key || null,
                 url:entry.url || existing.url || `?mindmap_asset=${entry.id}`,
               });
+              const meta=assetMeta.get(entry.id);
+              const mapIdValue=meta && typeof meta==='object'?Number(meta.mindmap_id ?? 0):0;
+              if(!Number.isFinite(mapIdValue) || mapIdValue<=0){
+                trackUnsavedAttachment(entry.id);
+              }else{
+                untrackUnsavedAttachment(entry.id);
+              }
             });
           }
           if(targetNode && targetNode.id){
@@ -10814,6 +10947,8 @@ if ($view === 'map_edit') {
         markDirty();
       }
       function importJsonAsNewMap(json){
+        dispatchUnsavedAttachmentCleanup();
+        resetUnsavedAttachmentTracking();
         const cloned=JSON.parse(JSON.stringify(json));
         if(cloned && cloned.data){ enforceRightOrientation(cloned.data); }
         jm.show(cloned);
@@ -10887,6 +11022,19 @@ if ($view === 'map_edit') {
           currentMapId=parseInt(json.id,10)||0;
           document.getElementById('jsmind-container').dataset.mapId=currentMapId;
           if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+          resetUnsavedAttachmentTracking();
+          if(currentMapId){
+            assetMeta.forEach((meta,id)=>{
+              if(meta && typeof meta==='object'){
+                assetMeta.set(id,{
+                  ...meta,
+                  mindmap_id:currentMapId,
+                  session_key:null
+                });
+              }
+              untrackUnsavedAttachment(id);
+            });
+          }
           if(deleteMapForm){
             const idInput=deleteMapForm.querySelector('input[name="id"]');
             if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
@@ -10906,7 +11054,11 @@ if ($view === 'map_edit') {
           blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
           blobUrlRegistry.clear();
         }
+        dispatchUnsavedAttachmentCleanup();
         if(dirty){ e.preventDefault(); e.returnValue=''; }
+      });
+      window.addEventListener('pagehide',()=>{
+        dispatchUnsavedAttachmentCleanup();
       });
       })();
     </script>
