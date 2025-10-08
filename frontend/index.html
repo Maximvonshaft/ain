@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Memo SPA</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <script>
+      window.MEMO_API_BASE = window.MEMO_API_BASE || '/api';
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="logo">✦</span>
+          <div>
+            <h1>Memo</h1>
+            <p>个人事务中心</p>
+          </div>
+        </div>
+        <button class="new-category" id="new-category-btn">＋ 新建分类</button>
+        <ul id="category-list" class="category-list"></ul>
+        <div class="stats" id="stats"></div>
+      </aside>
+      <main class="content">
+        <header class="toolbar">
+          <div>
+            <h2 id="current-category">全部备忘录</h2>
+            <p class="subtitle" id="item-count"></p>
+          </div>
+          <div class="filters">
+            <label>
+              分类筛选
+              <select id="category-filter"></select>
+            </label>
+            <label>
+              状态
+              <select id="status-filter">
+                <option value="active">进行中</option>
+                <option value="all">全部</option>
+                <option value="completed">已完成</option>
+              </select>
+            </label>
+            <label>
+              搜索
+              <input type="search" id="search-input" placeholder="关键词" />
+            </label>
+            <button id="refresh-btn" class="ghost">刷新</button>
+          </div>
+        </header>
+        <section class="composer">
+          <h3>快速新建</h3>
+          <form id="new-item-form">
+            <div class="row">
+              <input type="text" id="new-title" placeholder="标题" required />
+              <select id="new-category"></select>
+            </div>
+            <textarea id="new-description" placeholder="补充描述"></textarea>
+            <div class="actions">
+              <button type="submit">保存备忘录</button>
+              <button type="reset" class="ghost">清空</button>
+            </div>
+          </form>
+        </section>
+        <section class="items">
+          <div id="items-empty" class="empty" hidden>暂无内容，创建第一条备忘录吧。</div>
+          <div id="items-loading" class="loading" hidden>加载中…</div>
+          <div id="items-error" class="error" hidden></div>
+          <div id="item-list" class="item-list"></div>
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

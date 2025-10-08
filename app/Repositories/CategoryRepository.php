@@ -21,6 +21,19 @@ class CategoryRepository extends BaseRepository
         return $counts;
     }
 
+    public function stats(): array
+    {
+        $stmt = $this->pdo()->query('SELECT
+            (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
+            (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized
+        ');
+        $row = $stmt->fetch();
+        return [
+            'active_total' => (int)($row['active_total'] ?? 0),
+            'active_uncategorized' => (int)($row['active_uncategorized'] ?? 0),
+        ];
+    }
+
     public function ensureOther(): int
     {
         $stmt = $this->pdo()->query("SELECT id FROM categories WHERE name='其他' LIMIT 1");
@@ -37,6 +50,27 @@ class CategoryRepository extends BaseRepository
     {
         $stmt = $this->pdo()->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
         $stmt->execute([$name, now()]);
+        return (int)$this->pdo()->lastInsertId();
+    }
+
+    public function find(int $id): ?array
+    {
+        $stmt = $this->pdo()->prepare('SELECT * FROM categories WHERE id=? LIMIT 1');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function ensureDone(): int
+    {
+        $stmt = $this->pdo()->query("SELECT id FROM categories WHERE name='已完成' LIMIT 1");
+        $row = $stmt->fetch();
+        if ($row) {
+            return (int)$row['id'];
+        }
+
+        $insert = $this->pdo()->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
+        $insert->execute(['已完成', now()]);
         return (int)$this->pdo()->lastInsertId();
     }
 

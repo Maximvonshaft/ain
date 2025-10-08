@@ -16,6 +16,9 @@ class Request
         $this->basePath = $this->normalizeBasePath($basePath ?: $this->detectBasePath($server));
     }
 
+    private ?array $jsonBody = null;
+    private ?string $rawBody = null;
+
     public static function fromGlobals(string $basePath = ''): self
     {
         return new self($_GET, $_POST, $_SERVER, $_FILES, $_COOKIE, $_SESSION, $basePath);
@@ -63,6 +66,44 @@ class Request
     public function ajax(): bool
     {
         return !empty($this->server['HTTP_X_REQUESTED_WITH']);
+    }
+
+    public function body(): string
+    {
+        if ($this->rawBody !== null) {
+            return $this->rawBody;
+        }
+
+        $this->rawBody = file_get_contents('php://input') ?: '';
+        return $this->rawBody;
+    }
+
+    public function json(): array
+    {
+        if ($this->jsonBody !== null) {
+            return $this->jsonBody;
+        }
+
+        $contentType = strtolower((string)$this->server('CONTENT_TYPE', ''));
+        if (!str_contains($contentType, 'application/json')) {
+            $this->jsonBody = [];
+            return $this->jsonBody;
+        }
+
+        $raw = $this->body();
+        if ($raw === '') {
+            $this->jsonBody = [];
+            return $this->jsonBody;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            $this->jsonBody = [];
+            return $this->jsonBody;
+        }
+
+        $this->jsonBody = $decoded;
+        return $this->jsonBody;
     }
 
     public function session(): array
