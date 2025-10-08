@@ -84,6 +84,8 @@ class DB
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done ON items(done)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_order ON items(order_index ASC, updated_at DESC, id DESC)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index ASC, updated_at DESC, id DESC)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_cat_done_order ON items(category_id, done, order_index ASC, updated_at DESC, id DESC)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index ASC, id ASC)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at ASC, id ASC)');
         $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');

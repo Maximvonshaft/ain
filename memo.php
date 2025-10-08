@@ -36,6 +36,8 @@ const ALLOWED_UPLOAD_MIME_MAP = [
   'audio/mpeg'=>'mp3','audio/mp3'=>'mp3','audio/ogg'=>'ogg','audio/opus'=>'opus','audio/wav'=>'wav','audio/x-wav'=>'wav','audio/webm'=>'weba','audio/mp4'=>'m4a','audio/aac'=>'aac','audio/flac'=>'flac',
   'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg','video/ogg'=>'ogv',
 ];
+const ITEMS_PER_PAGE = 24;
+const CATEGORY_CACHE_FILE = __DIR__ . '/storage/cache/categories-summary.json';
 date_default_timezone_set('Asia/Shanghai');
 
 // —— 思维导图默认内容 ——
@@ -183,6 +185,10 @@ function highlight_text(string $text, string $term): string {
   return $out;
 }
 
+function memo_build_url(array $params): string {
+  return '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+}
+
 
 // —— 数据库 ——
 function db(): PDO {
@@ -296,7 +302,56 @@ function db(): PDO {
 }
 
 // —— 获取分类及计数 ——
+function ensure_cache_directory(): void {
+  $dir = dirname(CATEGORY_CACHE_FILE);
+  if(!is_dir($dir)){
+    @mkdir($dir, 0775, true);
+  }
+}
+
+function categories_cache_read(): ?array {
+  if(!is_file(CATEGORY_CACHE_FILE)){
+    return null;
+  }
+  $raw=file_get_contents(CATEGORY_CACHE_FILE);
+  if($raw===false){
+    return null;
+  }
+  $decoded=json_decode($raw,true);
+  if(!is_array($decoded)){
+    return null;
+  }
+  if(!isset($decoded['cats'], $decoded['counts'], $decoded['stats']) || !is_array($decoded['cats']) || !is_array($decoded['counts']) || !is_array($decoded['stats'])){
+    return null;
+  }
+  return [$decoded['cats'], $decoded['counts'], $decoded['stats']];
+}
+
+function categories_cache_write(array $cats, array $counts, array $stats): void {
+  ensure_cache_directory();
+  $payload=json_encode([
+    'cats'=>$cats,
+    'counts'=>$counts,
+    'stats'=>$stats,
+    'generated_at'=>now(),
+  ], JSON_UNESCAPED_UNICODE);
+  if($payload===false){
+    return;
+  }
+  file_put_contents(CATEGORY_CACHE_FILE, $payload, LOCK_EX);
+}
+
+function invalidate_categories_cache(): void {
+  if(is_file(CATEGORY_CACHE_FILE)){
+    @unlink(CATEGORY_CACHE_FILE);
+  }
+}
+
 function get_categories(): array {
+  $cached=categories_cache_read();
+  if($cached!==null){
+    return $cached;
+  }
   $pdo=db();
   ensure_done_category();
   $rows=$pdo->query('SELECT c.id, c.name, COUNT(i.id) AS item_count
@@ -321,6 +376,7 @@ function get_categories(): array {
     'active_uncategorized'=>(int)($statsRow['active_uncategorized'] ?? 0),
     'mindmap_total'=>(int)($statsRow['mindmap_total'] ?? 0),
   ];
+  categories_cache_write($cats,$map,$stats);
   return [$cats,$map,$stats];
 }
 
@@ -512,6 +568,7 @@ function create_mindmap(string $title, string $content): array {
   $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
       ->execute([$title,$content,$nowTs,$nowTs]);
   $id=(int)$pdo->lastInsertId();
+  invalidate_categories_cache();
   return ['id'=>$id,'updated_at'=>$nowTs];
 }
 
@@ -520,6 +577,7 @@ function update_mindmap(int $id, string $title, string $content): array {
   $nowTs=now();
   $pdo->prepare('UPDATE mindmaps SET title=?, content=?, updated_at=? WHERE id=?')
       ->execute([$title,$content,$nowTs,$id]);
+  invalidate_categories_cache();
   return ['id'=>$id,'updated_at'=>$nowTs];
 }
 
@@ -528,6 +586,7 @@ function delete_mindmap(int $id): void {
   $assets=mindmap_assets_for_map($id);
   foreach($assets as $asset){ delete_mindmap_asset((int)$asset['id']); }
   $pdo->prepare('DELETE FROM mindmaps WHERE id=?')->execute([$id]);
+  invalidate_categories_cache();
 }
 
 function mindmap_outline_preview(string $json, int $limit = 8): string {
@@ -748,6 +807,33 @@ function json_cats(): void {
   exit;
 }
 
+if (($_GET['action'] ?? '') === 'fetch_mindmap') {
+  if (!isset($_GET['id']) || !ctype_digit((string)$_GET['id'])) {
+    header('Content-Type: application/json', true, 400);
+    echo json_encode(['ok'=>0,'error'=>'缺少导图编号']);
+    exit;
+  }
+  $mapId=(int)$_GET['id'];
+  $map=$mapId>0 ? get_mindmap($mapId) : null;
+  if(!$map){
+    header('Content-Type: application/json', true, 404);
+    echo json_encode(['ok'=>0,'error'=>'导图不存在']);
+    exit;
+  }
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode([
+    'ok'=>1,
+    'map'=>[
+      'id'=>(int)$map['id'],
+      'title'=>$map['title'],
+      'content'=>$map['content'],
+      'created_at'=>(int)$map['created_at'],
+      'updated_at'=>(int)$map['updated_at'],
+    ],
+  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  exit;
+}
+
 // —— 下载附件 ——
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
@@ -849,11 +935,50 @@ if (is_post()) {
         foreach($existingCats as $row){
           $catMap[$row['name']]=(int)$row['id'];
         }
+        $potentialCats=[];
+        foreach($itemsPayload as $entry){
+          if(!is_array($entry)) continue;
+          foreach(['cat_name','category_name','category'] as $key){
+            if(isset($entry[$key]) && is_string($entry[$key])){
+              $candidate=trim($entry[$key]);
+              if($candidate!==''){ $potentialCats[$candidate]=true; }
+            }
+          }
+        }
+        $newCatNames=[];
+        foreach(array_keys($potentialCats) as $candidate){
+          if(!isset($catMap[$candidate])){
+            $newCatNames[]=$candidate;
+          }
+        }
+        if($newCatNames){
+          $nowCat=now();
+          foreach(array_chunk($newCatNames, 40) as $chunk){
+            $values=implode(',', array_fill(0,count($chunk),'(?, ?)'));
+            $params=[];
+            foreach($chunk as $name){
+              $params[]=$name;
+              $params[]=$nowCat;
+            }
+            $pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES '.$values)->execute($params);
+          }
+          $placeholders=implode(',', array_fill(0,count($newCatNames),'?'));
+          $fetchNew=$pdo->prepare('SELECT id,name FROM categories WHERE name IN ('.$placeholders.')');
+          $fetchNew->execute($newCatNames);
+          $resolved=[];
+          foreach($fetchNew->fetchAll() as $row){
+            $resolved[$row['name']]=(int)$row['id'];
+          }
+          foreach($newCatNames as $name){
+            if(isset($resolved[$name])){
+              $catMap[$name]=$resolved[$name];
+              $createdCategoryNames[$name]=true;
+            }
+          }
+        }
         $maxOrder=(int)$pdo->query('SELECT COALESCE(MAX(order_index), -1) FROM items')->fetchColumn();
         $insertItem=$pdo->prepare('INSERT INTO items(title,description,done,category_id,order_index,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
         $insertStep=$pdo->prepare('INSERT INTO steps(item_id,title,notes,done,order_index,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
-        $insertCat=$pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)');
-        $fetchCatId=$pdo->prepare('SELECT id FROM categories WHERE name=? LIMIT 1');
         $imported=0; $skipped=0;
         try {
           foreach($itemsPayload as $item){
@@ -873,16 +998,6 @@ if (is_post()) {
             if($catName!==''){
               if(isset($catMap[$catName])){
                 $catId=$catMap[$catName];
-              } else {
-                $createdAt=now();
-                $insertCat->execute([$catName, $createdAt]);
-                $fetchCatId->execute([$catName]);
-                $newId=(int)($fetchCatId->fetchColumn() ?: 0);
-                if($newId>0){
-                  $catMap[$catName]=$newId;
-                  $createdCategoryNames[$catName]=true;
-                  $catId=$newId;
-                }
               }
             }
             $nowTs=now();
@@ -913,6 +1028,7 @@ if (is_post()) {
           $pdo->rollBack();
           throw $inner;
         }
+        invalidate_categories_cache();
         $createdList=array_keys($createdCategoryNames);
         $result=['ok'=>1,'imported'=>$imported,'skipped'=>$skipped,'created_categories'=>$createdList];
         if(is_ajax()){
@@ -930,13 +1046,16 @@ if (is_post()) {
         $pdo->prepare('INSERT INTO items(title,description,done,category_id,order_index,created_at,updated_at) VALUES(?,?,?,?,0,?,?)')
             ->execute([$title,'',0,null,$nowt,$nowt]);
         $id=(int)$pdo->lastInsertId();
+        invalidate_categories_cache();
         header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$id]); exit;
       }
       case 'add_item': {
         $title=trim((string)($_POST['title']??'')); if($title==='') throw new RuntimeException('标题必填');
         $desc=(string)($_POST['description']??''); $catId=(isset($_POST['category_id'])&&ctype_digit((string)$_POST['category_id']))?(int)$_POST['category_id']:null;
         $nowt=now(); $pdo->prepare('INSERT INTO items(title,description,done,category_id,order_index,created_at,updated_at) VALUES(?,?,?,?,0,?,?)')->execute([$title,$desc,0,$catId,$nowt,$nowt]);
-        $newId=(int)$pdo->lastInsertId(); if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$newId]); exit; }
+        $newId=(int)$pdo->lastInsertId();
+        invalidate_categories_cache();
+        if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$newId]); exit; }
         redirect('?view=item&id='.$newId); break;
       }
       case 'toggle_done': {
@@ -977,6 +1096,7 @@ if (is_post()) {
           $pdo->rollBack();
           throw $err;
         }
+        invalidate_categories_cache();
         if(is_ajax()){
           header('Content-Type: application/json');
           echo json_encode([
@@ -995,6 +1115,7 @@ if (is_post()) {
         $id=(int)$_POST['id']; $title=trim((string)($_POST['title']??'')); if($title==='') throw new RuntimeException('标题必填');
         $desc=(string)($_POST['description']??''); $catId=(isset($_POST['category_id'])&&ctype_digit((string)$_POST['category_id']))?(int)$_POST['category_id']:null;
         $pdo->prepare('UPDATE items SET title=?, description=?, category_id=?, updated_at=? WHERE id=?')->execute([$title,$desc,$catId,now(),$id]);
+        invalidate_categories_cache();
         if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1]); exit; } break;
       }
       case 'delete_item': {
@@ -1014,6 +1135,7 @@ if (is_post()) {
           $pdo->rollBack();
           throw $err;
         }
+        invalidate_categories_cache();
         $token=bin2hex(random_bytes(10));
         $expires=now()+180;
         if(!isset($_SESSION['undo_deleted']) || !is_array($_SESSION['undo_deleted'])){
@@ -1109,6 +1231,7 @@ if (is_post()) {
           $pdo->rollBack();
           throw $err;
         }
+        invalidate_categories_cache();
         if(is_ajax()){
           header('Content-Type: application/json');
           echo json_encode(['ok'=>1], JSON_UNESCAPED_UNICODE);
@@ -1120,11 +1243,13 @@ if (is_post()) {
       case 'add_category': {
         $name=trim((string)($_POST['name']??'')); if($name==='') throw new RuntimeException('分类名必填');
         $pdo->prepare('INSERT OR IGNORE INTO categories(name, created_at) VALUES(?,?)')->execute([$name,now()]);
+        invalidate_categories_cache();
         if(is_ajax()) json_cats(); break;
       }
       case 'edit_category': {
         $id=(int)$_POST['id']; $name=trim((string)($_POST['name']??'')); if($name==='') throw new RuntimeException('分类名必填');
         $pdo->prepare('UPDATE categories SET name=? WHERE id=?')->execute([$name,$id]);
+        invalidate_categories_cache();
         if(is_ajax()) json_cats(); break;
       }
       case 'delete_category': {
@@ -1136,6 +1261,7 @@ if (is_post()) {
         $pdo->prepare('DELETE FROM categories WHERE id=?')->execute([$id]);
         $pdo->commit();
         if($fallback===null){ ensure_other_category(); }
+        invalidate_categories_cache();
         if(is_ajax()) json_cats();
         break;
       }
@@ -1295,6 +1421,7 @@ if (is_post()) {
         $res = $id>0 ? update_mindmap($id,$title,$normalized) : create_mindmap($title,$normalized);
         $finalId=(int)$res['id'];
         sync_mindmap_assets($finalId,$assetRefs,session_id());
+        invalidate_categories_cache();
         if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$res['id'],'updated_at'=>$res['updated_at']]); exit; }
         redirect('?view=map_edit&id='.$res['id']);
         break;
@@ -11091,16 +11218,29 @@ if ($view === 'maps') {
 $pdo=db(); [$cats,$counts,$stats]=get_categories();
 $cat=$_GET['cat'] ?? 'all';
 $q=trim((string)($_GET['q'] ?? ''));
+$pageParam=$_GET['page'] ?? '1';
+$page=(is_string($pageParam) && ctype_digit($pageParam) && (int)$pageParam>0) ? (int)$pageParam : 1;
+$perPage=ITEMS_PER_PAGE;
 $mindmap_total = (int)($stats['mindmap_total'] ?? 0);
 $isMindmapCategory = $cat === 'mindmaps';
 $items=[];
 $mindmapsAll=[];
+$totalRows=0;
+$totalPages=1;
+$itemsStart=0;
+$itemsEnd=0;
+$pagination=['page'=>$page,'total_pages'=>$totalPages,'total'=>$totalRows,'per_page'=>$perPage,'start'=>$itemsStart,'end'=>$itemsEnd];
 if($isMindmapCategory){
+  $page=1;
   $mindmapsAll=get_mindmaps();
   foreach($mindmapsAll as &$map){
     $map['outline']=mindmap_outline_preview($map['content']);
+    $map['created_at']=(int)$map['created_at'];
+    $map['updated_at']=(int)$map['updated_at'];
+    unset($map['content']);
   }
   unset($map);
+  $pagination=['page'=>1,'total_pages'=>1,'total'=>count($mindmapsAll),'per_page'=>$perPage,'start'=>0,'end'=>0];
 } else {
   $params=[]; $where=[];
   if($cat==='all'){
@@ -11108,10 +11248,40 @@ if($isMindmapCategory){
   }
   if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
   if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
-  $sql='SELECT * FROM items';
-  if($where) $sql.=' WHERE '.implode(' AND ',$where);
-  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
-  $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
+  $whereSql=$where ? ' WHERE '.implode(' AND ',$where) : '';
+  $countSt=$pdo->prepare('SELECT COUNT(*) FROM items'.$whereSql);
+  foreach($params as $key=>$value){
+    $countSt->bindValue($key,$value,is_int($value)?\PDO::PARAM_INT:\PDO::PARAM_STR);
+  }
+  $countSt->execute();
+  $totalRows=(int)$countSt->fetchColumn();
+  $totalPages=$totalRows>0 ? (int)ceil($totalRows / $perPage) : 1;
+  if($totalPages<1){ $totalPages=1; }
+  if($totalRows===0){
+    $page=1;
+  } elseif($page>$totalPages){
+    $page=$totalPages;
+  }
+  $offset=max(0, ($page-1) * $perPage);
+  $itemsStart=$totalRows ? $offset+1 : 0;
+  $itemsEnd=$totalRows ? min($offset+$perPage, $totalRows) : 0;
+  $sql='SELECT * FROM items'.$whereSql.' ORDER BY order_index ASC, updated_at DESC, id DESC LIMIT :limit OFFSET :offset';
+  $st=$pdo->prepare($sql);
+  foreach($params as $key=>$value){
+    $st->bindValue($key,$value,is_int($value)?\PDO::PARAM_INT:\PDO::PARAM_STR);
+  }
+  $st->bindValue(':limit',$perPage,\PDO::PARAM_INT);
+  $st->bindValue(':offset',$offset,\PDO::PARAM_INT);
+  $st->execute();
+  $items=$st->fetchAll();
+  $pagination=[
+    'page'=>$page,
+    'total_pages'=>$totalPages,
+    'total'=>$totalRows,
+    'per_page'=>$perPage,
+    'start'=>$itemsStart,
+    'end'=>$itemsEnd,
+  ];
 }
 $all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];
@@ -11379,6 +11549,11 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .attachment-preview-footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
   .attachment-preview-download{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(15,19,22,.85);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:transform var(--transition),box-shadow var(--transition)}
   .attachment-preview-download:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(227,198,139,.25)}
+  .pagination{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;color:var(--text-dim)}
+  .pagination .page-link{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.28);color:var(--gold-400);text-decoration:none;transition:background var(--transition),border-color var(--transition)}
+  .pagination .page-link:hover{background:rgba(230,192,137,.12);border-color:rgba(230,192,137,.45)}
+  .pagination .page-link.disabled{pointer-events:none;opacity:.45}
+  .pagination .page-status{min-width:180px;text-align:center}
   body[data-density='compact'] .item-title{font-size:15px}
   body[data-density='compact'] .item-desc{font-size:12px;opacity:.78}
   body[data-density='compact'] .item-meta{margin-top:4px}
@@ -11436,16 +11611,16 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
     </div>
     <div class="section-title">分类 · Categories</div>
     <div class="cat-list" id="cat-list">
-      <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
+      <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="<?php echo memo_build_url(['cat'=>'all','q'=>$q,'page'=>1]); ?>">
         <span class="name">全部 · All</span><span class="count"><?php echo $all_total; ?></span>
       </a>
       <?php foreach ($cats as $c): ?>
-      <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>">
+      <a class="cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="<?php echo memo_build_url(['cat'=>(string)$c['id'],'q'=>$q,'page'=>1]); ?>">
         <span class="name"><?php echo h($c['name']); ?></span>
         <span class="count"><?php echo (int)($counts[$c['id']] ?? 0); ?></span>
       </a>
       <?php endforeach; ?>
-      <a class="cat <?php echo ($cat==='mindmaps'?'active':''); ?>" data-id="mindmaps" href="?cat=mindmaps&q=<?php echo urlencode($q); ?>">
+      <a class="cat <?php echo ($cat==='mindmaps'?'active':''); ?>" data-id="mindmaps" href="<?php echo memo_build_url(['cat'=>'mindmaps','q'=>$q,'page'=>1]); ?>">
         <span class="name">思维导图</span>
         <span class="count"><?php echo $mindmap_total; ?></span>
       </a>
@@ -11538,14 +11713,15 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
       <script type="application/json" id="mind-maps-data"><?php echo json_encode(array_map(fn($m)=>[
         'id'=>$m['id'],
         'title'=>$m['title'],
-        'content'=>$m['content'],
         'created_at'=>$m['created_at'],
         'updated_at'=>$m['updated_at'],
+        'outline'=>$m['outline'] ?? '',
       ], $mindmapsAll), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
     <?php else: ?>
       <div class="toolbar">
         <form class="search" method="get" style="flex:1">
           <input type="hidden" name="cat" value="<?php echo h((string)$cat); ?>">
+          <input type="hidden" name="page" value="1">
           <input name="q" value="<?php echo h($q); ?>" placeholder="搜索标题/内容 · Search"/>
           <button>搜索</button>
         </form>
@@ -11645,6 +11821,21 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
           </article>
         <?php endforeach; ?>
       </div>
+      <?php if ($pagination['total_pages'] > 1): ?>
+        <nav class="pagination" aria-label="分页导航">
+          <?php if ($pagination['page'] > 1): ?>
+            <a class="page-link prev" href="<?php echo memo_build_url(['cat'=>(string)$cat,'q'=>$q,'page'=>$pagination['page']-1]); ?>">&larr; 上一页</a>
+          <?php else: ?>
+            <span class="page-link prev disabled">&larr; 上一页</span>
+          <?php endif; ?>
+          <span class="page-status">第 <?php echo $pagination['page']; ?> / <?php echo $pagination['total_pages']; ?> 页 · 共 <?php echo $pagination['total']; ?> 条</span>
+          <?php if ($pagination['page'] < $pagination['total_pages']): ?>
+            <a class="page-link next" href="<?php echo memo_build_url(['cat'=>(string)$cat,'q'=>$q,'page'=>$pagination['page']+1]); ?>">下一页 &rarr;</a>
+          <?php else: ?>
+            <span class="page-link next disabled">下一页 &rarr;</span>
+          <?php endif; ?>
+        </nav>
+      <?php endif; ?>
       <div class="shortcuts">
         快捷键：<span class="kbd">/</span> 聚焦搜索。
       </div>
@@ -11694,6 +11885,8 @@ window.addEventListener('keydown',e=>{
   const mindImportInput=document.getElementById('mind-import-file');
   const mindImportButton=document.getElementById('btn-import-map');
   const mindExportButton=document.getElementById('btn-export-maps');
+  const mindmapContentCache=new Map();
+  const exportButtonLabel=mindExportButton ? mindExportButton.textContent : '';
   const mindImportModal=document.getElementById('map-import-modal');
   const mindImportFileName=document.getElementById('import-file-name');
   const mindImportTargetSelect=document.getElementById('import-target-select');
@@ -11759,6 +11952,20 @@ window.addEventListener('keydown',e=>{
     }
     return cloned;
   }
+  async function fetchMindmapDetail(id){
+    const key=String(id);
+    if(mindmapContentCache.has(key)){
+      return mindmapContentCache.get(key);
+    }
+    const res=await fetch(`?action=fetch_mindmap&id=${encodeURIComponent(key)}`,{headers:{'X-Requested-With':'fetch'}});
+    if(!res.ok) throw new Error('导图加载失败');
+    const json=await res.json();
+    if(!json.ok || !json.map) throw new Error(json.error||'导图加载失败');
+    mindmapContentCache.set(key,json.map);
+    const existing=mapsById.get(key) || {};
+    mapsById.set(key,{...existing,...json.map});
+    return json.map;
+  }
   async function saveMindmapRequest(id,title,data){
     const fd=new FormData();
     fd.append('action','save_mindmap');
@@ -11789,17 +11996,16 @@ window.addEventListener('keydown',e=>{
         const title=resolveImportTitle(payload,'');
         await saveMindmapRequest(0,title,payload);
       }else if(mode==='replace'){
-        const target=mapsById.get(String(targetId));
-        if(!target) throw new Error('目标导图不存在');
+        const detail=await fetchMindmapDetail(targetId);
         const payload=JSON.parse(JSON.stringify(pendingImport));
         if(payload && payload.data) enforceRightOrientationFromRoot(payload.data);
-        const title=resolveImportTitle(payload,target.title||'');
-        await saveMindmapRequest(target.id,title,payload);
+        const title=resolveImportTitle(payload,detail.title||'');
+        await saveMindmapRequest(detail.id,title,payload);
+        mindmapContentCache.delete(String(targetId));
       }else if(mode==='append'){
-        const target=mapsById.get(String(targetId));
-        if(!target) throw new Error('目标导图不存在');
+        const detail=await fetchMindmapDetail(targetId);
         let base;
-        try{ base=JSON.parse(target.content); }
+        try{ base=JSON.parse(detail.content); }
         catch(_){ throw new Error('目标导图内容无法解析'); }
         if(!base || typeof base!=='object' || !base.data){ throw new Error('目标导图缺少数据'); }
         const subtree=cloneImportSubtree(pendingImport.data || pendingImport);
@@ -11807,8 +12013,9 @@ window.addEventListener('keydown',e=>{
         if(!Array.isArray(base.data.children)){ base.data.children=[]; }
         base.data.children.push(subtree);
         enforceRightOrientationFromRoot(base.data);
-        const title=target.title || resolveImportTitle(pendingImport,'');
-        await saveMindmapRequest(target.id,title,base);
+        const title=detail.title || resolveImportTitle(pendingImport,'');
+        await saveMindmapRequest(detail.id,title,base);
+        mindmapContentCache.delete(String(targetId));
       }else{
         return;
       }
@@ -11855,30 +12062,45 @@ window.addEventListener('keydown',e=>{
     const pad=n=>String(n).padStart(2,'0');
     return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   }
-  function exportAllMaps(){
+  async function exportAllMaps(){
     if(!mapsData.length){
       alert('暂无导图可导出');
       return;
     }
-    const payload=mapsData.map(map=>{
-      let content;
-      try{ content=JSON.parse(map.content); }
-      catch(_){ content=map.content; }
-      return {
-        id: map.id,
-        title: map.title,
-        created_at: map.created_at,
-        updated_at: map.updated_at,
-        content,
-      };
-    });
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=`mindmaps-${buildTimestamp()}.json`;
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    try{
+      if(mindExportButton){
+        mindExportButton.disabled=true;
+        mindExportButton.textContent='导出中…';
+      }
+      const payload=[];
+      for(const meta of mapsData){
+        const detail=await fetchMindmapDetail(meta.id);
+        let content;
+        try{ content=JSON.parse(detail.content); }
+        catch(_){ content=detail.content; }
+        payload.push({
+          id: detail.id,
+          title: detail.title,
+          created_at: detail.created_at,
+          updated_at: detail.updated_at,
+          content,
+        });
+      }
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=`mindmaps-${buildTimestamp()}.json`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(err){
+      alert(err instanceof Error ? err.message : '导出失败');
+    }finally{
+      if(mindExportButton){
+        mindExportButton.disabled=false;
+        mindExportButton.textContent=exportButtonLabel || '导出全部';
+      }
+    }
   }
   if(mindImportButton && mindImportInput){
     mindImportButton.addEventListener('click',()=>{
