@@ -3966,6 +3966,7 @@ if ($view === 'map_edit') {
       .mind-relations{position:absolute;top:0;left:0;overflow:visible}
       .mind-relations .relation-group{pointer-events:auto;transition:filter var(--transition)}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+      .mind-relations .relation-hit{stroke:transparent;stroke-width:18;pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition)}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
@@ -4007,8 +4008,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:min(100%,max-content);max-width:100%;box-sizing:border-box;touch-action:pan-x;flex:0 1 auto;margin:0 auto;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 112px;min-width:72px;max-width:156px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4027,11 +4029,10 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:1 1 104px;min-width:68px;max-width:140px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start}.dock-btn{height:58px;flex:1 1 94px;min-width:62px;max-width:128px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:1 1 86px;min-width:56px;max-width:118px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4191,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -4338,7 +4339,6 @@ if ($view === 'map_edit') {
           <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
         </header>
         <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
-        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
         <div class="settings-actions">
           <button type="button" data-settings-close>关闭</button>
         </div>
@@ -4905,6 +4905,10 @@ if ($view === 'map_edit') {
       let lastTapInfo={id:null,time:0};
       const TRACE_GRID=8;
       const TRACE_CHAMFER=3;
+      const RELATION_CORNER_RADIUS=26;
+      const RELATION_OUTER_MARGIN=56;
+      const RELATION_MIN_BEND=48;
+      const RELATION_SIMPLIFY_EPSILON=0.5;
       const nearlyEqual=(a,b)=>Math.abs(a-b)<0.5;
       function alignToTraceGrid(value){
         return Math.round(value/TRACE_GRID)*TRACE_GRID;
@@ -4975,6 +4979,72 @@ if ($view === 'map_edit') {
             };
             d+=` L${entry.x} ${entry.y}`;
             d+=` L${exit.x} ${exit.y}`;
+          }else{
+            d+=` L${current.x} ${current.y}`;
+          }
+        }
+        return d;
+      }
+      function simplifyPolyline(points, epsilon=RELATION_SIMPLIFY_EPSILON){
+        if(!Array.isArray(points) || points.length<2) return Array.isArray(points)?points.slice():[];
+        const filtered=[points[0]];
+        for(let i=1;i<points.length;i++){
+          const current=points[i];
+          const last=filtered[filtered.length-1];
+          if(last && Math.abs((current.x||0)-(last.x||0))<=epsilon && Math.abs((current.y||0)-(last.y||0))<=epsilon){
+            continue;
+          }
+          filtered.push(current);
+        }
+        if(filtered.length<3) return filtered.slice();
+        const cleaned=[filtered[0]];
+        for(let i=1;i<filtered.length-1;i++){
+          const prev=cleaned[cleaned.length-1];
+          const current=filtered[i];
+          const next=filtered[i+1];
+          if(!prev || !current || !next){ cleaned.push(current); continue; }
+          const vx1=(current.x||0)-(prev.x||0);
+          const vy1=(current.y||0)-(prev.y||0);
+          const vx2=(next.x||0)-(current.x||0);
+          const vy2=(next.y||0)-(current.y||0);
+          const cross=vx1*vy2 - vy1*vx2;
+          if(Math.abs(cross)<=epsilon*epsilon && (Math.abs(vx1)+Math.abs(vy1))>epsilon && (Math.abs(vx2)+Math.abs(vy2))>epsilon){
+            continue;
+          }
+          cleaned.push(current);
+        }
+        cleaned.push(filtered[filtered.length-1]);
+        return cleaned;
+      }
+      function buildRoundedPath(points, radius){
+        if(!Array.isArray(points) || points.length<2) return '';
+        const pts=simplifyPolyline(points);
+        if(pts.length<2) return '';
+        let d=`M${pts[0].x} ${pts[0].y}`;
+        for(let i=1;i<pts.length;i++){
+          const current=pts[i];
+          const prev=pts[i-1];
+          const next=i+1<pts.length ? pts[i+1] : null;
+          if(next){
+            const prevVec={x:(current.x||0)-(prev.x||0),y:(current.y||0)-(prev.y||0)};
+            const nextVec={x:(next.x||0)-(current.x||0),y:(next.y||0)-(current.y||0)};
+            const prevLen=Math.hypot(prevVec.x,prevVec.y);
+            const nextLen=Math.hypot(nextVec.x,nextVec.y);
+            if(prevLen<0.001 || nextLen<0.001){
+              d+=` L${current.x} ${current.y}`;
+              continue;
+            }
+            const cut=Math.min(radius, prevLen/2, nextLen/2);
+            const entry={
+              x:current.x - (prevVec.x/prevLen)*cut,
+              y:current.y - (prevVec.y/prevLen)*cut
+            };
+            const exit={
+              x:current.x + (nextVec.x/nextLen)*cut,
+              y:current.y + (nextVec.y/nextLen)*cut
+            };
+            d+=` L${entry.x} ${entry.y}`;
+            d+=` Q ${current.x} ${current.y} ${exit.x} ${exit.y}`;
           }else{
             d+=` L${current.x} ${current.y}`;
           }
@@ -6230,6 +6300,8 @@ if ($view === 'map_edit') {
             group.dataset.id=relation.id;
             group.dataset.from=relation.from;
             group.dataset.to=relation.to;
+            const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+            hit.classList.add('relation-hit');
             const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
             shadow.classList.add('relation-shadow');
             const core=document.createElementNS('http://www.w3.org/2000/svg','path');
@@ -6243,13 +6315,15 @@ if ($view === 'map_edit') {
             if(this.selectedRelationId && this.selectedRelationId===relation.id){
               group.dataset.selected='true';
             }
+            group.appendChild(hit);
             group.appendChild(shadow);
             group.appendChild(core);
             group.appendChild(highlight);
             this.relationLayer.appendChild(group);
-            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            this.relationRegistry.set(relation.id,{group,hit,shadow,core,highlight,relation});
             const handleSelect=evt=>{
               if(evt){ evt.stopPropagation(); }
+              cancelRelationLongPress();
               const isMouse=evt && evt.pointerType==='mouse';
               if(evt && evt.type==='pointerdown' && isMouse && evt.button!==0) return;
               const selected=this.select_relation(relation.id) || relation;
@@ -6258,14 +6332,32 @@ if ($view === 'map_edit') {
               }
             };
             const handleContext=evt=>{
+              cancelRelationLongPress();
               if(evt){ evt.preventDefault(); evt.stopPropagation(); }
               const selected=this.select_relation(relation.id) || relation;
               if(this.options && typeof this.options.onRelationContext==='function'){
                 this.options.onRelationContext(selected, this, evt||null);
               }
             };
-            core.addEventListener('pointerdown',handleSelect);
-            core.addEventListener('contextmenu',handleContext);
+            const handlePointerDown=evt=>{
+              handleSelect(evt);
+              beginRelationLongPress(relation, evt);
+            };
+            const handlePointerMove=evt=>{
+              updateRelationLongPress(evt);
+            };
+            const handlePointerEnd=evt=>{
+              finishRelationLongPress(evt);
+            };
+            [core, hit].forEach(target=>{
+              if(!target) return;
+              target.addEventListener('pointerdown',handlePointerDown);
+              target.addEventListener('pointermove',handlePointerMove);
+              target.addEventListener('pointerup',handlePointerEnd);
+              target.addEventListener('pointercancel',handlePointerEnd);
+              target.addEventListener('pointerleave',handlePointerEnd);
+              target.addEventListener('contextmenu',handleContext);
+            });
             this.updateRelationPath(relation);
           }
         }
@@ -6318,6 +6410,66 @@ if ($view === 'map_edit') {
             top:{x:node.absX,y:node.absY - height/2},
             bottom:{x:node.absX,y:node.absY + height/2},
           };
+        }
+        estimateNodeSize(node){
+          if(!node) return {width:0,height:0};
+          const width=Math.max(0, node.width || (node.el?node.el.offsetWidth:0) || 0);
+          const height=Math.max(0, node.height || (node.el?node.el.offsetHeight:0) || 0);
+          return {width,height};
+        }
+        getNodeDirectionSign(node){
+          if(!node) return 1;
+          if(node.dir===-1 || node.direction==='left') return -1;
+          if(node.dir===1 || node.direction==='right') return 1;
+          const rootX=this.root && typeof this.root.absX==='number' ? this.root.absX : null;
+          const nodeX=typeof node.absX==='number' ? node.absX : null;
+          if(rootX!==null && nodeX!==null){
+            if(nodeX < rootX - 0.5) return -1;
+            if(nodeX > rootX + 0.5) return 1;
+          }
+          if(node.parent && typeof node.parent.absX==='number' && nodeX!==null){
+            return nodeX >= node.parent.absX ? 1 : -1;
+          }
+          return nodeX!==null && nodeX<0 ? -1 : 1;
+        }
+        getRelationEscapeDistance(node){
+          const {width}=this.estimateNodeSize(node);
+          return Math.max(RELATION_OUTER_MARGIN, width*0.5 + 28);
+        }
+        buildRelationRoute(startPoint,endPoint,fromNode,toNode){
+          const route=[startPoint];
+          const startDir=this.getNodeDirectionSign(fromNode);
+          const endDir=this.getNodeDirectionSign(toNode);
+          const startEscape=this.getRelationEscapeDistance(fromNode);
+          const endEscape=this.getRelationEscapeDistance(toNode);
+          const exitPoint={x:startPoint.x + startDir*startEscape,y:startPoint.y};
+          const entryPoint={x:endPoint.x + endDir*endEscape,y:endPoint.y};
+          route.push(exitPoint);
+          if(startDir===endDir){
+            const outward=startDir||1;
+            const span=Math.abs(entryPoint.x-exitPoint.x);
+            const clearanceBase=Math.max(startEscape,endEscape,RELATION_OUTER_MARGIN);
+            const clearance=Math.max(clearanceBase, span*0.35);
+            const extremeX=outward>0 ? Math.max(exitPoint.x, entryPoint.x) + clearance : Math.min(exitPoint.x, entryPoint.x) - clearance;
+            const midY=exitPoint.y + (entryPoint.y - exitPoint.y)/2;
+            route.push({x:extremeX,y:exitPoint.y});
+            if(Math.abs(midY-exitPoint.y)>RELATION_MIN_BEND*0.5){
+              route.push({x:extremeX,y:midY});
+            }
+            route.push({x:extremeX,y:entryPoint.y});
+          }else{
+            const dy=entryPoint.y-exitPoint.y;
+            const verticalDir=dy>=0?1:-1;
+            const {height:fromHeight}=this.estimateNodeSize(fromNode);
+            const {height:toHeight}=this.estimateNodeSize(toNode);
+            const clearanceY=Math.max(Math.abs(dy)*0.35, fromHeight/2 + toHeight/2 + RELATION_MIN_BEND);
+            const bendY=exitPoint.y + verticalDir*clearanceY;
+            route.push({x:exitPoint.x,y:bendY});
+            route.push({x:entryPoint.x,y:bendY});
+          }
+          route.push(entryPoint);
+          route.push(endPoint);
+          return simplifyPolyline(route);
         }
         updateLinkPath(node){
           if(!node || !node.parent || !node.linkPath) return;
@@ -6561,20 +6713,13 @@ if ($view === 'map_edit') {
           const startClearance=relation.bidirectional ? effectiveClearance : 0;
           const startPoint={x:startInner.x - norm.x*startClearance,y:startInner.y - norm.y*startClearance};
           const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
-          const dx=endPoint.x-startPoint.x;
-          const dy=endPoint.y-startPoint.y;
-          const distance=Math.hypot(dx,dy) || 1;
-          const normalX=distance?-dy/distance:0;
-          const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=startPoint.x + dx*0.25 + normalX*offset;
-          const ctrl1y=startPoint.y + dy*0.25 + normalY*offset;
-          const ctrl2x=startPoint.x + dx*0.75 - normalX*offset;
-          const ctrl2y=startPoint.y + dy*0.75 - normalY*offset;
-          const pathData=`M${startPoint.x} ${startPoint.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${endPoint.x} ${endPoint.y}`;
+          const route=this.buildRelationRoute(startPoint,endPoint,fromNode,toNode);
+          let pathData=buildRoundedPath(route, RELATION_CORNER_RADIUS);
+          if(!pathData){ pathData=`M${startPoint.x} ${startPoint.y} L${endPoint.x} ${endPoint.y}`; }
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
+          if(entry.hit){ entry.hit.setAttribute('d', pathData); }
           entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
           if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
           else{ entry.core.removeAttribute('marker-start'); }
@@ -7426,7 +7571,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
       const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
@@ -7454,12 +7598,8 @@ if ($view === 'map_edit') {
       const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
-      const fisheyeToggle=document.getElementById('setting-fisheye');
-      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7520,24 +7660,6 @@ if ($view === 'map_edit') {
           exportOverlay.setAttribute('aria-hidden','true');
           exportOverlayHideTimer=null;
         },360);
-      }
-      function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
-      }
-      function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
-      }
-      function handlePointerPrecisionChange(event){
-        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
-        syncFisheyeState();
-      }
-      syncFisheyeState();
-      if(pointerMedia){
-        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
-        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -7833,6 +7955,7 @@ if ($view === 'map_edit') {
       let relationToastTimer=null;
       let selectedRelationId=null;
       let relationBlankClickTs=0;
+      let relationLongPressState=null;
       let nodeClipboardTemplate=null;
       let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
@@ -7884,6 +8007,55 @@ if ($view === 'map_edit') {
           }
         },1500);
       }
+      function cancelRelationLongPress(){
+        if(relationLongPressState && relationLongPressState.timer){
+          clearTimeout(relationLongPressState.timer);
+        }
+        relationLongPressState=null;
+      }
+      function beginRelationLongPress(relation, evt){
+        if(!relation || !relation.id || !evt) return;
+        const pointerType=(evt.pointerType||'').toLowerCase();
+        if(pointerType && !['touch','pen'].includes(pointerType)) return;
+        if(pointerType==='mouse' && evt.button!==0) return;
+        cancelRelationLongPress();
+        const pointerId=evt.pointerId;
+        relationLongPressState={
+          relationId:relation.id,
+          pointerId,
+          startX:evt.clientX,
+          startY:evt.clientY,
+          triggered:false,
+          timer:window.setTimeout(()=>{
+            if(!relationLongPressState || relationLongPressState.pointerId!==pointerId) return;
+            relationLongPressState.triggered=true;
+            relationLongPressState.timer=null;
+            const targetId=relationLongPressState.relationId;
+            relationLongPressState.relationId=null;
+            if(!targetId) return;
+            if(typeof jm?.select_relation==='function'){ jm.select_relation(targetId); }
+            selectedRelationId=targetId;
+            deleteSelectedRelation();
+          }, LONG_PRESS_DELAY)
+        };
+      }
+      function updateRelationLongPress(evt){
+        if(!relationLongPressState || !evt) return;
+        if(relationLongPressState.pointerId!==evt.pointerId) return;
+        if(relationLongPressState.triggered) return;
+        const dx=Math.abs(evt.clientX - relationLongPressState.startX);
+        const dy=Math.abs(evt.clientY - relationLongPressState.startY);
+        if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){
+          cancelRelationLongPress();
+        }
+      }
+      function finishRelationLongPress(evt){
+        if(!relationLongPressState) return;
+        if(evt && relationLongPressState.pointerId!==evt.pointerId) return;
+        const triggered=relationLongPressState.triggered;
+        cancelRelationLongPress();
+        if(triggered && evt){ evt.preventDefault(); evt.stopPropagation(); }
+      }
       function clearRelationHighlights(){
         document.querySelectorAll('.jsmind-node.relation-source,.jsmind-node.relation-target').forEach(el=>{
           el.classList.remove('relation-source','relation-target');
@@ -7930,6 +8102,7 @@ if ($view === 'map_edit') {
       }
       function resetRelationSource(message){
         if(!relationMode) return;
+        cancelRelationLongPress();
         relationMode.sourceId=null;
         clearRelationHighlights();
         updateRelationModeState();
@@ -7938,6 +8111,7 @@ if ($view === 'map_edit') {
       }
       function cancelRelationMode(notify=false){
         if(!relationMode) return;
+        cancelRelationLongPress();
         relationMode=null;
         updateRelationModeState();
         clearRelationHighlights();
@@ -8426,7 +8600,7 @@ if ($view === 'map_edit') {
               longPressState.triggered=true;
               longPressState.timer=null;
               const node=jm.get_node(longPressState.nodeId);
-              if(node){ openNodeContextMenu(node,{x:longPressState.startX,y:longPressState.startY}); }
+              if(node){ openInspectorPopover(node); }
             }, LONG_PRESS_DELAY)
           };
         });
@@ -9826,27 +10000,6 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
-        if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
-        }
-        if(fisheyeToggle){
-          fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
-          });
-        }
       }
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
