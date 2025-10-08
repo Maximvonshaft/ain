@@ -587,7 +587,7 @@ function sanitize_mindmap_payload(array &$payload, array &$asset_refs, ?int $map
       }
       if(isset($node['data']['attachments'])){
         foreach($node['data']['attachments'] as &$att){
-          unset($att['content'],$att['id'],$att['type']);
+          unset($att['content'],$att['id'],$att['type'],$att['clientId'],$att['pending'],$att['localId'],$att['tempId'],$att['nodeId']);
           if(!isset($att['mime'])){
             $att['mime']='application/octet-stream';
           }
@@ -1249,7 +1249,16 @@ if (is_post()) {
         $res = $id>0 ? update_mindmap($id,$title,$normalized) : create_mindmap($title,$normalized);
         $finalId=(int)$res['id'];
         sync_mindmap_assets($finalId,$assetRefs,session_id());
-        if(is_ajax()){ header('Content-Type: application/json'); echo json_encode(['ok'=>1,'id'=>$res['id'],'updated_at'=>$res['updated_at']]); exit; }
+        if(is_ajax()){
+          header('Content-Type: application/json');
+          echo json_encode([
+            'ok'=>1,
+            'id'=>$res['id'],
+            'updated_at'=>$res['updated_at'],
+            'content'=>$normalized,
+          ]);
+          exit;
+        }
         redirect('?view=map_edit&id='.$res['id']);
         break;
       }
@@ -4007,8 +4016,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4017,8 +4027,8 @@ if ($view === 'map_edit') {
         .dock-btn[data-tip]:hover::after,.dock-btn[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,-4px)}
         .dock-btn[data-tip]:hover::before,.dock-btn[data-tip]:focus-visible::before{opacity:1;transform:translate(-50%,-4px)}
       }
-      .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
-      .dock-btn:active{transform:translateY(-1px)}
+      .dock-btn:hover{border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
+      .dock-btn:active{box-shadow:0 0 20px rgba(227,198,139,.16);background:rgba(201,168,106,.22)}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .dock-btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
       .dock-btn.danger{color:#F6D6D6;border-color:rgba(209,75,75,.52);background:rgba(209,75,75,.12)}
@@ -4027,11 +4037,10 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
       @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4199,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -4338,7 +4347,6 @@ if ($view === 'map_edit') {
           <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
         </header>
         <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
-        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
         <div class="settings-actions">
           <button type="button" data-settings-close>关闭</button>
         </div>
@@ -6877,6 +6885,83 @@ if ($view === 'map_edit') {
           });
         });
       }
+      function mergeAssetMetaIntoMindData(mindData){
+        if(!mindData || !mindData.data || !assetMeta.size) return;
+        const assetInfo=new Map();
+        assetMeta.forEach((meta,id)=>{
+          if(!meta || typeof meta!=='object') return;
+          assetInfo.set(id,{
+            id,
+            name:meta.name || `附件 #${id}`,
+            size:Number(meta.size)||0,
+            mime:typeof meta.mime==='string'?meta.mime:'application/octet-stream',
+            url:typeof meta.url==='string' && meta.url?meta.url:`?mindmap_asset=${id}`,
+            createdAt:Number(meta.created_at)||0,
+            nodeUid:typeof meta.node_uid==='string'?meta.node_uid:null,
+          });
+        });
+        if(!assetInfo.size) return;
+        const nodeIndex=new Map();
+        const visit=node=>{
+          if(!node || typeof node!=='object') return;
+          if(typeof node.id==='string' && node.id){ nodeIndex.set(node.id,node); }
+          if(Array.isArray(node.children)){
+            node.children.forEach(child=>visit(child));
+          }
+        };
+        visit(mindData.data);
+        nodeIndex.forEach((node,nodeId)=>{
+          if(!node || typeof node!=='object') return;
+          const data=(node.data && typeof node.data==='object' && !Array.isArray(node.data))?node.data:{};
+          const rawList=Array.isArray(data.attachments)?data.attachments.filter(item=>item && typeof item==='object'):[];
+          const normalized=[];
+          const seen=new Set();
+          rawList.forEach(att=>{
+            const assetId=Number(att.assetId ?? att.id);
+            if(Number.isFinite(assetId) && assetId>0){
+              const meta=assetInfo.get(assetId);
+              if(!meta || (meta.nodeUid && meta.nodeUid!==nodeId)){
+                return;
+              }
+              seen.add(assetId);
+              normalized.push({
+                assetId,
+                name:att.name || meta.name,
+                size:Number(att.size)||meta.size||0,
+                mime:att.mime || meta.mime,
+                url:att.url || meta.url,
+                createdAt:Number(att.createdAt || att.created_at || meta.createdAt || 0),
+              });
+            }else{
+              normalized.push(att);
+            }
+          });
+          assetInfo.forEach(meta=>{
+            if(!meta || meta.nodeUid!==nodeId) return;
+            if(seen.has(meta.id)) return;
+            seen.add(meta.id);
+            normalized.push({
+              assetId:meta.id,
+              name:meta.name,
+              size:meta.size,
+              mime:meta.mime,
+              url:meta.url,
+              createdAt:meta.createdAt,
+            });
+          });
+          if(normalized.length){
+            data.attachments=normalized;
+            data.attachment=normalized[0];
+            node.data=data;
+          }else{
+            if(data.attachments) delete data.attachments;
+            if(data.attachment) delete data.attachment;
+            if(Object.keys(data).length===0){ delete node.data; }
+            else{ node.data=data; }
+          }
+        });
+      }
+      mergeAssetMetaIntoMindData(initialData);
       let attachmentManager=null;
     const jmContainer=document.getElementById('jsmind-container');
     let currentMapId=0;
@@ -7036,16 +7121,34 @@ if ($view === 'map_edit') {
         return label.length>16 ? label.slice(0,15)+'…' : label;
       }
       async function uploadMindmapFile(file, nodeId){
-        const fd=new FormData();
-        fd.append('action','upload_mindmap_asset');
-        fd.append('map_id', String(currentMapId||0));
-        fd.append('node_id', nodeId);
-        fd.append('file', file);
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-        if(!res.ok) throw new Error('网络异常');
-        const json=await res.json();
-        if(!json.ok) throw new Error(json.error||'上传失败');
-        return json;
+        if(!file) throw new Error('文件不存在');
+        const dataUrl=await new Promise((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=()=>{
+            const result=typeof reader.result==='string'?reader.result:null;
+            if(result){ resolve(result); }
+            else{ reject(new Error('读取文件失败')); }
+          };
+          reader.onerror=()=>reject(new Error('读取文件失败'));
+          try{
+            reader.readAsDataURL(file);
+          }catch(err){
+            reject(err instanceof Error?err:new Error('读取文件失败'));
+          }
+        });
+        const tempId='tmp-'+Math.random().toString(36).slice(2,10)+'-'+Date.now().toString(36);
+        return {
+          id:null,
+          assetId:null,
+          clientId:tempId,
+          pending:true,
+          nodeId,
+          name:file.name || '附件',
+          size:Number.isFinite(file.size)?file.size:0,
+          mime:file.type || 'application/octet-stream',
+          content:dataUrl,
+          created_at:Math.floor(Date.now()/1000)
+        };
       }
       let inlineEditState=null;
       function finishInlineEditing(commit){
@@ -7325,7 +7428,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
       const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
@@ -7353,12 +7455,8 @@ if ($view === 'map_edit') {
       const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
-      const fisheyeToggle=document.getElementById('setting-fisheye');
-      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7419,24 +7517,6 @@ if ($view === 'map_edit') {
           exportOverlay.setAttribute('aria-hidden','true');
           exportOverlayHideTimer=null;
         },360);
-      }
-      function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
-      }
-      function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
-      }
-      function handlePointerPrecisionChange(event){
-        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
-        syncFisheyeState();
-      }
-      syncFisheyeState();
-      if(pointerMedia){
-        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
-        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -8749,44 +8829,29 @@ if ($view === 'map_edit') {
         if(!accepted.length) return;
         const data=ensureNodeDataObject(targetNode);
         data.attachments=data.attachments || [];
-        const uploadedEntries=[];
         for(const file of accepted){
           try{
             const uploaded=await uploadMindmapFile(file, targetNode.id);
             const createdTs=Number(uploaded.created_at)||Math.floor(Date.now()/1000);
             const normalized={
-              assetId:uploaded.id,
+              clientId:uploaded.clientId,
+              pending:true,
               name:uploaded.name || file.name,
               size:uploaded.size ?? file.size,
               mime:uploaded.mime || file.type || 'application/octet-stream',
-              url:uploaded.url,
+              content:uploaded.content,
               createdAt:createdTs
             };
             data.attachments.push(normalized);
-            assetMeta.set(uploaded.id,{
-              id:uploaded.id,
-              name:normalized.name,
-              size:normalized.size,
-              mime:normalized.mime,
-              created_at:createdTs,
-              node_uid:targetNode.id,
-              mindmap_id:Number.isFinite(currentMapId)?currentMapId:null,
-              session_key:null,
-              url:uploaded.url
-            });
-            uploadedEntries.push({
-              id:uploaded.id,
-              name:normalized.name,
-              size:normalized.size,
-              mime:normalized.mime,
-              created_at:createdTs,
-              url:uploaded.url,
-              nodeId:targetNode.id,
-            });
           }catch(err){
             console.error(err);
             alert((file.name||'文件')+' 上传失败：'+(err && err.message ? err.message : err));
           }
+        }
+        if(Array.isArray(data.attachments) && data.attachments.length){
+          data.attachment=data.attachments[0];
+        }else if(data.attachment){
+          delete data.attachment;
         }
         targetNode.model.data=data;
         targetNode.data=data;
@@ -8796,7 +8861,7 @@ if ($view === 'map_edit') {
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
-        if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
+        if(attachmentManager){ attachmentManager.onMindUpdate(); }
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -9008,6 +9073,34 @@ if ($view === 'map_edit') {
           lastIndex:null,
           initialized:false,
         };
+        let clientIdCounter=0;
+        function nextClientKey(){
+          clientIdCounter=(clientIdCounter+1)%1e9;
+          return 'client-'+Date.now().toString(36)+'-'+clientIdCounter.toString(36);
+        }
+        function ensureAttachmentClientId(att){
+          if(!att || typeof att!=='object') return nextClientKey();
+          if(typeof att.clientId==='string' && att.clientId){ return att.clientId; }
+          const generated=nextClientKey();
+          att.clientId=generated;
+          return generated;
+        }
+        function attachmentKeyFromData(att){
+          if(!att || typeof att!=='object') return '';
+          const rawId=att.assetId ?? att.id;
+          const numeric=Number(rawId);
+          if(Number.isFinite(numeric) && numeric>0){
+            return 'asset-'+numeric;
+          }
+          const clientId=ensureAttachmentClientId(att);
+          return 'client-'+clientId;
+        }
+        function numericIdFromKey(key){
+          if(typeof key!=='string') return null;
+          if(!key.startsWith('asset-')) return null;
+          const numeric=Number(key.slice(6));
+          return Number.isFinite(numeric) && numeric>0 ? numeric : null;
+        }
         let loadObserver=null;
         let loadSentinel=null;
         let lastFocused=null;
@@ -9049,13 +9142,13 @@ if ($view === 'map_edit') {
           const actionBtn=evt.target.closest('[data-action]');
           const row=evt.target.closest('.mind-attachment-row');
           if(actionBtn && row){
-            const id=Number(row.dataset.assetId);
-            const item=state.filtered.find(entry=>entry.assetId===id);
+            const key=row.dataset.assetId || '';
+            const item=state.filtered.find(entry=>entry.key===key);
             if(!item) return;
             const action=actionBtn.dataset.action;
             if(action==='preview'){ openMindmapAttachment(item); return; }
             if(action==='download'){ triggerDirectDownload(item); return; }
-            if(action==='delete'){ handleDelete([item.assetId]); return; }
+            if(action==='delete'){ handleDelete([item.key]); return; }
           }
           if(evt.target.closest('.mind-attachment-select')) return;
           if(!row) return;
@@ -9064,8 +9157,8 @@ if ($view === 'map_edit') {
         function handleListDblClick(evt){
           const row=evt.target.closest('.mind-attachment-row');
           if(!row) return;
-          const id=Number(row.dataset.assetId);
-          const item=state.filtered.find(entry=>entry.assetId===id);
+          const key=row.dataset.assetId || '';
+          const item=state.filtered.find(entry=>entry.key===key);
           if(item){ openMindmapAttachment(item); }
         }
         function handleManagerKey(evt){
@@ -9074,15 +9167,37 @@ if ($view === 'map_edit') {
           else if((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase()==='a'){ evt.preventDefault(); selectAll(); }
         }
         function selectAll(){
-          state.selection=new Set(state.filtered.map(item=>item.assetId));
+          state.selection=new Set(state.filtered.map(item=>item.key));
           state.lastIndex=null;
           syncSelectionState();
         }
         function triggerDirectDownload(item){
-          if(!item || !item.url) return;
+          if(!item) return;
+          if(item.pending){
+            if(!item.content){
+              alert('附件尚未保存，当前无法下载。');
+              return;
+            }
+            const blob=dataUrlToBlob(item.content);
+            if(!blob){
+              alert('附件数据无效，无法下载。');
+              return;
+            }
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');
+            a.href=url;
+            a.download=sanitizeFilename(item.name || 'attachment');
+            a.rel='noopener';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(()=>URL.revokeObjectURL(url),0);
+            return;
+          }
+          if(!item.url) return;
           const a=document.createElement('a');
           a.href=item.url;
-          a.download=sanitizeFilename(item.name || `attachment-${item.assetId}`);
+          a.download=sanitizeFilename(item.name || `attachment-${item.assetId || ''}`);
           a.rel='noopener';
           document.body.appendChild(a);
           a.click();
@@ -9140,30 +9255,6 @@ if ($view === 'map_edit') {
           if(mime.includes('zip') || mime.includes('rar') || archiveExts.includes(ext)) return 'archive';
           return 'other';
         }
-        function backupAndRemoveAssetMeta(ids){
-          const stash=new Map();
-          if(!Array.isArray(ids)) return stash;
-          ids.forEach(id=>{
-            const numeric=Number(id);
-            if(!Number.isFinite(numeric)) return;
-            if(assetMeta.has(numeric)){
-              const meta=assetMeta.get(numeric);
-              stash.set(numeric, meta && typeof meta==='object'?{...meta}:meta);
-              assetMeta.delete(numeric);
-            }
-          });
-          return stash;
-        }
-        function restoreAssetMeta(stash){
-          if(!(stash instanceof Map)) return;
-          stash.forEach((meta,id)=>{
-            if(meta && typeof meta==='object'){
-              assetMeta.set(id,{...meta});
-            }else if(meta!=null){
-              assetMeta.set(id,meta);
-            }
-          });
-        }
         function collectAttachments(){
           const items=[];
           if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return items;
@@ -9173,35 +9264,41 @@ if ($view === 'map_edit') {
             if(!attachments || !attachments.length) return;
             attachments.forEach(att=>{
               if(!att || typeof att!=='object') return;
-              const assetId=Number(att.assetId || att.id);
-              if(!Number.isFinite(assetId) || assetId<=0) return;
-              const meta=assetMeta.get(assetId) || {};
-              const name=att.name || meta.name || attachmentLabel(att) || `附件 #${assetId}`;
+              const key=attachmentKeyFromData(att);
+              if(!key) return;
+              const numericId=numericIdFromKey(key);
+              const meta=numericId ? (assetMeta.get(numericId) || {}) : {};
+              const name=att.name || meta.name || attachmentLabel(att) || (numericId?`附件 #${numericId}`:'附件');
               const size=Number(att.size || meta.size || 0);
               const mime=att.mime || meta.mime || 'application/octet-stream';
-              const url=att.url || meta.url || `?mindmap_asset=${assetId}`;
-              const createdRaw=Number(att.createdAt || att.created_at || meta.created_at || 0);
-              assetMeta.set(assetId,{
-                id:assetId,
-                name,
-                size,
-                mime,
-                created_at:createdRaw,
-                node_uid:node.id,
-                mindmap_id:meta.mindmap_id ?? (Number.isFinite(currentMapId)?currentMapId:null),
-                session_key:meta.session_key || null,
-                url,
-              });
+              const url=att.url || meta.url || (numericId?`?mindmap_asset=${numericId}`:'');
+              const createdRaw=Number(att.createdAt || att.created_at || meta.created_at || Math.floor(Date.now()/1000));
+              if(numericId){
+                assetMeta.set(numericId,{
+                  id:numericId,
+                  name,
+                  size,
+                  mime,
+                  created_at:createdRaw,
+                  node_uid:node.id,
+                  mindmap_id:meta.mindmap_id ?? (Number.isFinite(currentMapId)?currentMapId:null),
+                  session_key:meta.session_key || null,
+                  url:url || `?mindmap_asset=${numericId}`,
+                });
+              }
               items.push({
-                assetId,
+                key,
+                assetId:numericId,
+                pending:!numericId,
                 name,
                 size,
                 mime,
-                url,
+                url:url || '',
                 nodeId:node.id,
                 nodeTopic:node.topic || '',
                 createdAt:createdRaw,
-                type:categorizeAttachment({name,mime})
+                type:categorizeAttachment({name,mime}),
+                content:typeof att.content==='string'?att.content:'',
               });
             });
           });
@@ -9271,20 +9368,23 @@ if ($view === 'map_edit') {
         function buildRow(item,index){
           const row=document.createElement('div');
           row.className='mind-attachment-row';
-          row.dataset.assetId=String(item.assetId);
+          row.dataset.assetId=item.key;
           row.dataset.index=String(index);
+          if(item.pending){ row.dataset.pending='true'; }
+          else{ row.removeAttribute('data-pending'); }
           row.setAttribute('role','option');
-          const selected=state.selection.has(item.assetId);
+          const labelText=item.pending ? `${item.name}（未保存）` : item.name;
+          const selected=state.selection.has(item.key);
           if(selected) row.dataset.selected='true';
           row.setAttribute('aria-selected',selected?'true':'false');
           const selectBox=document.createElement('label');
           selectBox.className='mind-attachment-select';
-          selectBox.setAttribute('aria-label',`选择附件：${item.name}`);
+          selectBox.setAttribute('aria-label',`选择附件：${labelText}`);
           selectBox.addEventListener('click',evt=>evt.stopPropagation());
           const checkbox=document.createElement('input');
           checkbox.type='checkbox';
           checkbox.className='mind-attachment-checkbox';
-          checkbox.setAttribute('aria-label',`选择附件：${item.name}`);
+          checkbox.setAttribute('aria-label',`选择附件：${labelText}`);
           checkbox.checked=selected;
           checkbox.addEventListener('pointerdown',evt=>{ checkbox.dataset.shift=evt.shiftKey?'true':'false'; });
           checkbox.addEventListener('change',evt=>handleCheckboxChange(row, checkbox, evt));
@@ -9298,7 +9398,7 @@ if ($view === 'map_edit') {
           if(item.type==='image'){
             const img=document.createElement('img');
             img.loading='lazy';
-            img.src=item.url;
+            img.src=item.pending && item.content ? item.content : item.url;
             img.alt=item.name;
             thumb.appendChild(img);
           }else{
@@ -9308,8 +9408,9 @@ if ($view === 'map_edit') {
           info.className='mind-attachment-info';
           const nameEl=document.createElement('div');
           nameEl.className='mind-attachment-name';
-          nameEl.textContent=item.name;
-          nameEl.title=item.name;
+          const displayName=labelText;
+          nameEl.textContent=displayName;
+          nameEl.title=displayName;
           const metaRow=document.createElement('div');
           metaRow.className='mind-attachment-meta';
           const tag=document.createElement('span');
@@ -9394,8 +9495,8 @@ if ($view === 'map_edit') {
           if(!elements.list) return;
           const rows=Array.from(elements.list.querySelectorAll('.mind-attachment-row'));
           rows.forEach(row=>{
-            const id=Number(row.dataset.assetId);
-            const selected=state.selection.has(id);
+            const key=row.dataset.assetId || '';
+            const selected=state.selection.has(key);
             if(selected) row.dataset.selected='true';
             else row.removeAttribute('data-selected');
             row.setAttribute('aria-selected',selected?'true':'false');
@@ -9413,7 +9514,7 @@ if ($view === 'map_edit') {
             return;
           }
           let total=0;
-          state.items.forEach(item=>{ if(state.selection.has(item.assetId)) total+=Number(item.size)||0; });
+          state.items.forEach(item=>{ if(state.selection.has(item.key)) total+=Number(item.size)||0; });
           const sizeText=total>0?formatBytesLocal(total):'';
           elements.selectionInfo.textContent=sizeText?`已选择 ${count} 个附件 · ${sizeText}`:`已选择 ${count} 个附件`;
         }
@@ -9421,8 +9522,8 @@ if ($view === 'map_edit') {
           if(!row || !checkbox) return;
           if(evt){ evt.stopPropagation(); }
           const index=Number(row.dataset.index);
-          const id=Number(row.dataset.assetId);
-          if(!Number.isFinite(index) || !Number.isFinite(id)) return;
+          const key=row.dataset.assetId || '';
+          if(!Number.isFinite(index) || !key) return;
           const selection=new Set(state.selection);
           const shiftKey=(evt && evt.shiftKey) || checkbox.dataset.shift==='true';
           if(checkbox.checked){
@@ -9432,15 +9533,14 @@ if ($view === 'map_edit') {
               for(let i=start;i<=end;i++){
                 const item=state.filtered[i];
                 if(!item) continue;
-                const asset=Number(item.assetId);
-                if(Number.isFinite(asset)){ selection.add(asset); }
+                selection.add(item.key);
               }
             }else{
-              selection.add(id);
+              selection.add(key);
             }
             state.lastIndex=index;
           }else{
-            selection.delete(id);
+            selection.delete(key);
             if(state.lastIndex===index){ state.lastIndex=null; }
           }
           state.selection=selection;
@@ -9449,8 +9549,8 @@ if ($view === 'map_edit') {
         }
         function handleRowSelection(row,evt){
           const index=Number(row.dataset.index);
-          const id=Number(row.dataset.assetId);
-          if(!Number.isFinite(index) || !Number.isFinite(id)) return;
+          const key=row.dataset.assetId || '';
+          if(!Number.isFinite(index) || !key) return;
           const selection=new Set(state.selection);
           if(evt.shiftKey && state.lastIndex!==null){
             const start=Math.min(state.lastIndex,index);
@@ -9458,19 +9558,19 @@ if ($view === 'map_edit') {
             if(!(evt.ctrlKey || evt.metaKey)) selection.clear();
             for(let i=start;i<=end;i++){
               const item=state.filtered[i];
-              if(item) selection.add(item.assetId);
+              if(item) selection.add(item.key);
             }
           }else if(evt.ctrlKey || evt.metaKey){
-            if(selection.has(id)) selection.delete(id);
-            else selection.add(id);
+            if(selection.has(key)) selection.delete(key);
+            else selection.add(key);
             state.lastIndex=index;
           }else{
-            if(selection.size===1 && selection.has(id)){
+            if(selection.size===1 && selection.has(key)){
               selection.clear();
               state.lastIndex=null;
             }else{
               selection.clear();
-              selection.add(id);
+              selection.add(key);
               state.lastIndex=index;
             }
           }
@@ -9490,24 +9590,24 @@ if ($view === 'map_edit') {
           }
         }
         function handleDelete(ids){
-          const unique=Array.from(new Set(ids.map(id=>Number(id)).filter(id=>Number.isFinite(id) && id>0)));
+          const unique=Array.from(new Set((ids||[]).filter(id=>typeof id==='string' && id!=='')));
           if(!unique.length) return;
           let total=0;
-          state.items.forEach(item=>{ if(unique.includes(item.assetId)) total+=Number(item.size)||0; });
+          state.items.forEach(item=>{ if(unique.includes(item.key)) total+=Number(item.size)||0; });
           const sizeText=total>0?`（总计 ${formatBytesLocal(total)}）`:'';
-          if(!confirm(`确定要删除 ${unique.length} 个附件${sizeText}吗？`)) return;
+          if(!confirm(`确定要删除 ${unique.length} 个附件${sizeText}吗？删除将在保存后生效。`)) return;
           const changed=removeAttachmentsFromMind(unique);
-          const metaBackup=backupAndRemoveAssetMeta(unique);
+          const numericIds=unique.map(numericIdFromKey).filter(id=>id!==null);
+          if(numericIds.length){
+            numericIds.forEach(id=>assetMeta.delete(id));
+          }
+          state.selection.clear();
           refresh(true);
-          requestDelete(unique).then(()=>{
-            state.selection.clear();
-            refresh(true);
-          }).catch(err=>{
-            alert(err && err.message ? err.message : '删除附件失败');
-            restoreAssetMeta(metaBackup);
-            if(changed){ undoMindChange(); }
-            refresh(true);
-          });
+          if(changed){
+            showRelationToast('附件已移除，保存后生效');
+          } else {
+            showRelationToast('未找到可移除的附件');
+          }
         }
         function removeAttachmentsFromMind(ids){
           if(!ids || !ids.length) return false;
@@ -9520,7 +9620,10 @@ if ($view === 'map_edit') {
               const data=ensureNodeDataObject(node);
               if(!Array.isArray(data.attachments) || !data.attachments.length) return;
               const before=data.attachments.length;
-              data.attachments=data.attachments.filter(att=>!idSet.has(Number(att.assetId||att.id)));
+              data.attachments=data.attachments.filter(att=>{
+                const key=attachmentKeyFromData(att);
+                return !idSet.has(key);
+              });
               if(data.attachments.length!==before){
                 changed=true;
                 if(data.attachments.length){ data.attachment=data.attachments[0]; }
@@ -9539,16 +9642,6 @@ if ($view === 'map_edit') {
           },{mergeKey:'delete:attachments'});
           return changed;
         }
-        async function requestDelete(ids){
-          const fd=new FormData();
-          fd.append('action','delete_mindmap_assets');
-          fd.append('ids',JSON.stringify(ids));
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('网络异常，删除失败');
-          const json=await res.json();
-          if(!json.ok) throw new Error(json.error||'删除失败');
-          return json;
-        }
         function updateSummary(){
           if(!elements.summary) return;
           const total=state.items.length;
@@ -9562,8 +9655,8 @@ if ($view === 'map_edit') {
         function refresh(forceReset=false){
           ensureInit();
           state.items=collectAttachments();
-          const availableIds=new Set(state.items.map(item=>item.assetId));
-          state.selection.forEach(id=>{ if(!availableIds.has(id)) state.selection.delete(id); });
+          const availableKeys=new Set(state.items.map(item=>item.key));
+          state.selection.forEach(key=>{ if(!availableKeys.has(key)) state.selection.delete(key); });
           updateSummary();
           applyFilterAndSort();
           renderList(forceReset);
@@ -9587,31 +9680,11 @@ if ($view === 'map_edit') {
           if(lastFocused && typeof lastFocused.focus==='function'){ setTimeout(()=>lastFocused.focus(),0); }
         }
         function toggle(){ state.open ? close() : open(); }
-        function onFilesUploaded(entries){
-          if(entries && entries.length){
-            entries.forEach(entry=>{
-              const existing=assetMeta.get(entry.id) || {};
-              assetMeta.set(entry.id,{
-                id:entry.id,
-                name:entry.name || existing.name || `附件 #${entry.id}`,
-                size:entry.size ?? existing.size ?? 0,
-                mime:entry.mime || existing.mime || 'application/octet-stream',
-                created_at:entry.created_at || existing.created_at || 0,
-                node_uid:entry.nodeId || existing.node_uid || '',
-                mindmap_id:existing.mindmap_id ?? (Number.isFinite(currentMapId)?currentMapId:null),
-                session_key:existing.session_key || null,
-                url:entry.url || existing.url || `?mindmap_asset=${entry.id}`,
-              });
-            });
-          }
-          if(state.open){ refresh(true); }
-          else{ refreshWhenClosed(); }
-        }
         function onMindUpdate(){
           if(state.open){ refresh(); }
           else{ refreshWhenClosed(); }
         }
-        return { open, close, toggle, refresh, onFilesUploaded, onMindUpdate };
+        return { open, close, toggle, refresh, onMindUpdate };
       }
       attachmentManager=createAttachmentManager();
       if(attachmentManager && typeof attachmentManager.onMindUpdate==='function'){
@@ -9725,27 +9798,6 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
-        if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
-        }
-        if(fisheyeToggle){
-          fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
-          });
-        }
       }
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
@@ -10369,6 +10421,13 @@ if ($view === 'map_edit') {
         fd.append('id', String(currentMapId||0));
         fd.append('title', title);
         fd.append('content', payload);
+        const selectedNode=jm.get_selected_node();
+        const selectedId=selectedNode && selectedNode.id ? selectedNode.id : null;
+        const viewState={
+          offsetX:Number.isFinite(jm.offsetX)?jm.offsetX:null,
+          offsetY:Number.isFinite(jm.offsetY)?jm.offsetY:null,
+          scale:Number.isFinite(jm.scale)?jm.scale:null,
+        };
         try{
           showSaving();
           const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
@@ -10376,15 +10435,37 @@ if ($view === 'map_edit') {
           const json=await res.json();
           if(!json.ok) throw new Error(json.error||'保存失败');
           currentMapId=parseInt(json.id,10)||0;
-          document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+          const containerEl=document.getElementById('jsmind-container');
+          if(containerEl){ containerEl.dataset.mapId=currentMapId; }
           if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
           if(deleteMapForm){
             const idInput=deleteMapForm.querySelector('input[name="id"]');
             if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
           }
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
-          initialData=JSON.parse(payload);
-          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+          let normalizedString=typeof json.content==='string' && json.content!=='' ? json.content : payload;
+          let normalizedData;
+          try{
+            normalizedData=JSON.parse(normalizedString);
+          }catch(_){
+            normalizedString=payload;
+            normalizedData=JSON.parse(payload);
+          }
+          if(normalizedData && normalizedData.data){ enforceRightOrientation(normalizedData.data); }
+          const renderedData=JSON.parse(JSON.stringify(normalizedData));
+          if(typeof undoManager?.clear==='function'){ undoManager.clear(); }
+          jm.show(renderedData);
+          if(selectedId){
+            try{ jm.select_node(selectedId); }
+            catch(_){ /* ignore */ }
+          }
+          applyViewState(viewState);
+          afterMindStateChange();
+          assetMeta.clear();
+          initialData=JSON.parse(JSON.stringify(normalizedData));
+          if(attachmentManager && typeof attachmentManager.onMindUpdate==='function'){
+            attachmentManager.onMindUpdate();
+          }
           markSaved();
         }catch(err){
           alert(err.message||'保存失败');
