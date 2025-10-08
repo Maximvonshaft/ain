@@ -27,6 +27,7 @@ header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 's
 const DB_FILE = __DIR__ . '/memo.sqlite';
 const UPLOAD_DIR = __DIR__ . '/storage/uploads';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
+const ITEMS_PER_PAGE = 20;
 const ALLOWED_UPLOAD_MIME_MAP = [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
   'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
@@ -248,6 +249,7 @@ function db(): PDO {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
+    outline TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );');
@@ -265,6 +267,11 @@ function db(): PDO {
   );');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
+  $mindmapCols=$pdo->query('PRAGMA table_info(mindmaps)')->fetchAll();
+  $mindmapColNames=array_map(fn($col)=>$col['name']??'', $mindmapCols);
+  if(!in_array('outline',$mindmapColNames,true)){
+    $pdo->exec('ALTER TABLE mindmaps ADD COLUMN outline TEXT');
+  }
   $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
   if ($hasMap === 0) {
     $nowTs = now();
@@ -274,8 +281,9 @@ function db(): PDO {
       $decoded['data']['topic'] = '默认导图';
       $defaultPayload = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
-    $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
-        ->execute(['默认导图', $defaultPayload, $nowTs, $nowTs]);
+    $defaultOutline=mindmap_outline_preview($defaultPayload);
+    $pdo->prepare('INSERT INTO mindmaps(title, content, outline, created_at, updated_at) VALUES(?,?,?,?,?)')
+        ->execute(['默认导图', $defaultPayload, $defaultOutline, $nowTs, $nowTs]);
   }
   // 创建上传目录
   if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
@@ -364,6 +372,22 @@ function get_steps_grouped(array $item_ids): array {
   return $group;
 }
 
+function get_steps_grouped_by_time(array $item_ids): array {
+  $ids=array_values(array_unique(array_map('intval',$item_ids)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM steps WHERE item_id IN ($placeholders) ORDER BY item_id ASC, created_at ASC, id ASC");
+  $st->execute($ids);
+  $group=[];
+  foreach($st->fetchAll() as $row){
+    $iid=(int)$row['item_id'];
+    if(!isset($group[$iid])) $group[$iid]=[];
+    $group[$iid][]=$row;
+  }
+  return $group;
+}
+
 function get_step_counts(array $item_ids): array {
   $ids=array_values(array_unique(array_map('intval',$item_ids)));
   if(!$ids){ return []; }
@@ -382,6 +406,22 @@ function get_attachment(int $id): ?array {
 
 function attachments_for_item(int $item_id): array {
   $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
+}
+
+function attachments_for_items(array $item_ids): array {
+  $ids=array_values(array_unique(array_map('intval',$item_ids)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE item_id IN ($placeholders) ORDER BY item_id ASC, id DESC");
+  $st->execute($ids);
+  $group=[];
+  foreach($st->fetchAll() as $row){
+    $iid=(int)$row['item_id'];
+    if(!isset($group[$iid])) $group[$iid]=[];
+    $group[$iid][]=$row;
+  }
+  return $group;
 }
 
 function get_mindmap_asset(int $id): ?array {
@@ -463,8 +503,9 @@ function get_mindmap(int $id): ?array {
 function create_mindmap(string $title, string $content): array {
   $pdo=db();
   $nowTs=now();
-  $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
-      ->execute([$title,$content,$nowTs,$nowTs]);
+  $outline=mindmap_outline_preview($content);
+  $pdo->prepare('INSERT INTO mindmaps(title, content, outline, created_at, updated_at) VALUES(?,?,?,?,?)')
+      ->execute([$title,$content,$outline,$nowTs,$nowTs]);
   $id=(int)$pdo->lastInsertId();
   return ['id'=>$id,'updated_at'=>$nowTs];
 }
@@ -472,9 +513,19 @@ function create_mindmap(string $title, string $content): array {
 function update_mindmap(int $id, string $title, string $content): array {
   $pdo=db();
   $nowTs=now();
-  $pdo->prepare('UPDATE mindmaps SET title=?, content=?, updated_at=? WHERE id=?')
-      ->execute([$title,$content,$nowTs,$id]);
+  $outline=mindmap_outline_preview($content);
+  $pdo->prepare('UPDATE mindmaps SET title=?, content=?, outline=?, updated_at=? WHERE id=?')
+      ->execute([$title,$content,$outline,$nowTs,$id]);
   return ['id'=>$id,'updated_at'=>$nowTs];
+}
+
+function set_mindmap_outline(int $id, string $outline): void {
+  $pdo=db();
+  static $stmt=null;
+  if($stmt===null){
+    $stmt=$pdo->prepare('UPDATE mindmaps SET outline=? WHERE id=?');
+  }
+  $stmt->execute([$outline,$id]);
 }
 
 function delete_mindmap(int $id): void {
@@ -3865,6 +3916,10 @@ if ($view === 'map_edit') {
       .mind-info-handle:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .mind-info-bar[data-collapsed="true"] .mind-info-handle{margin-bottom:0}
       .mind-info-row{display:flex;align-items:center;gap:12px}
+      .export-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:4px 0}
+      .export-settings label{display:flex;flex-direction:column;gap:6px;font:600 11px/1.2 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(227,198,139,.75)}
+      .export-settings select{appearance:none;padding:8px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.35);background:rgba(15,19,22,.88);color:var(--text-strong);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;box-shadow:inset 0 0 16px rgba(201,168,106,.12);cursor:pointer}
+      .export-settings select:focus-visible{outline:none;border-color:rgba(75,195,209,.6);box-shadow:0 0 0 3px rgba(75,195,209,.25)}
       .map-io{position:relative;flex:0 0 auto}
       .map-io-button{padding:10px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.36);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .map-io-button:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5)}
@@ -4207,6 +4262,40 @@ if ($view === 'map_edit') {
                 </div>
               </div>
               <div class="save-state" id="save-state">保存成功</div>
+            </div>
+            <div class="export-settings" id="export-settings" aria-label="导出质量设置">
+              <label for="export-resolution">分辨率
+                <select id="export-resolution">
+                  <option value="1">标准 · 1x</option>
+                  <option value="1.5">增强 · 1.5x</option>
+                  <option value="2" selected>高清 · 2x</option>
+                  <option value="3">超清 · 3x</option>
+                  <option value="4">极清 · 4x</option>
+                  <option value="5">打印级 · 5x</option>
+                </select>
+              </label>
+              <label for="export-jpg-quality">JPG 质量
+                <select id="export-jpg-quality">
+                  <option value="0.85">均衡 · 85%</option>
+                  <option value="0.92" selected>高清 · 92%</option>
+                  <option value="0.97">极致 · 97%</option>
+                </select>
+              </label>
+              <label for="export-pdf-dpi">PDF DPI
+                <select id="export-pdf-dpi">
+                  <option value="150">精简 · 150</option>
+                  <option value="220">高清 · 220</option>
+                  <option value="300" selected>打印 · 300</option>
+                </select>
+              </label>
+              <label for="export-pdf-compression">PDF 压缩
+                <select id="export-pdf-compression">
+                  <option value="FAST">快速</option>
+                  <option value="MEDIUM" selected>标准</option>
+                  <option value="SLOW">高质量</option>
+                  <option value="NONE">无压缩</option>
+                </select>
+              </label>
             </div>
             <div class="map-meta">
               <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
@@ -7950,6 +8039,10 @@ if ($view === 'map_edit') {
       const mapIoButton=document.getElementById('map-io-button');
       const mapIoMenu=document.getElementById('map-io-menu');
       const mapDeleteButton=document.getElementById('map-delete-btn');
+      const exportResolutionSelect=document.getElementById('export-resolution');
+      const exportJpgQualitySelect=document.getElementById('export-jpg-quality');
+      const exportPdfDpiSelect=document.getElementById('export-pdf-dpi');
+      const exportPdfCompressionSelect=document.getElementById('export-pdf-compression');
       const importModal=document.getElementById('mind-import-modal');
       const importModalName=importModal ? importModal.querySelector('[data-import-name]') : null;
       const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
@@ -7966,6 +8059,35 @@ if ($view === 'map_edit') {
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
       let exportOverlayHideTimer=null;
+      const exportSettingsState={
+        pixelRatio:2,
+        jpgQuality:0.92,
+        pdfDpi:300,
+        pdfCompression:'MEDIUM'
+      };
+      const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+      function refreshExportSettings(){
+        if(exportResolutionSelect){
+          const parsed=parseFloat(exportResolutionSelect.value);
+          if(Number.isFinite(parsed)){ exportSettingsState.pixelRatio=Math.max(1,parsed); }
+        }
+        if(exportJpgQualitySelect){
+          const parsed=parseFloat(exportJpgQualitySelect.value);
+          if(Number.isFinite(parsed)){ exportSettingsState.jpgQuality=clamp(parsed,0.5,0.99); }
+        }
+        if(exportPdfDpiSelect){
+          const parsed=parseInt(exportPdfDpiSelect.value,10);
+          if(Number.isFinite(parsed)){ exportSettingsState.pdfDpi=clamp(parsed,72,600); }
+        }
+        if(exportPdfCompressionSelect){
+          const value=(exportPdfCompressionSelect.value || '').toString().toUpperCase();
+          if(value){ exportSettingsState.pdfCompression=value; }
+        }
+      }
+      refreshExportSettings();
+      [exportResolutionSelect,exportJpgQualitySelect,exportPdfDpiSelect,exportPdfCompressionSelect].forEach(select=>{
+        if(select){ select.addEventListener('change',refreshExportSettings); }
+      });
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
@@ -10745,11 +10867,10 @@ if ($view === 'map_edit') {
           const viewportWidth=Math.max(1, Math.ceil(bounds.width));
           const viewportHeight=Math.max(1, Math.ceil(bounds.height));
           const SAFE_CANVAS_BOUND=16384;
-          const basePixelRatio=window.devicePixelRatio || 1;
-          const minPixelRatio=2;
-          const maxPixelRatio=4;
-          const sizeLimitedRatio=Math.max(1, Math.floor(SAFE_CANVAS_BOUND / Math.max(viewportWidth, viewportHeight)));
-          const pixelRatio=Math.min(maxPixelRatio, Math.max(minPixelRatio, basePixelRatio), sizeLimitedRatio);
+          const requestedRatio=Math.max(1, Number.isFinite(exportSettingsState.pixelRatio)?exportSettingsState.pixelRatio:2);
+          const maxDimension=Math.max(viewportWidth, viewportHeight);
+          const boundLimitedRatio=maxDimension>0?SAFE_CANVAS_BOUND / maxDimension:1;
+          const pixelRatio=Math.max(1, Math.min(requestedRatio, Math.max(1, boundLimitedRatio), 8));
           exportHost=document.createElement('div');
           exportHost.style.position='fixed';
           exportHost.style.left='-120vw';
@@ -10808,7 +10929,8 @@ if ($view === 'map_edit') {
           });
           if(!canvas){ throw new Error('无法生成导出图像'); }
           if(format==='jpg'){
-            const blob=await canvasToBlob(canvas,'image/jpeg',0.95);
+            const jpgQuality=Math.min(0.99, Math.max(0.5, Number.isFinite(exportSettingsState.jpgQuality)?exportSettingsState.jpgQuality:0.95));
+            const blob=await canvasToBlob(canvas,'image/jpeg',jpgQuality);
             const url=URL.createObjectURL(blob);
             const a=document.createElement('a');
             a.href=url;
@@ -10819,13 +10941,19 @@ if ($view === 'map_edit') {
             setTimeout(()=>URL.revokeObjectURL(url), 1500);
           }else if(format==='pdf'){
             const jsPDF=await ensureJsPDF();
-            const isLandscape=canvas.width>=canvas.height;
-            const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
-            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
+            const targetDpi=Math.max(72, Math.min(600, Number.isFinite(exportSettingsState.pdfDpi)?exportSettingsState.pdfDpi:300));
+            const mmWidth=(canvas.width/targetDpi)*25.4;
+            const mmHeight=(canvas.height/targetDpi)*25.4;
+            const isLandscape=mmWidth>=mmHeight;
+            const pageSize=isLandscape?[mmHeight, mmWidth]:[mmWidth, mmHeight];
+            const compressionCandidate=(exportSettingsState.pdfCompression || 'MEDIUM').toString().toUpperCase();
+            const validCompression=new Set(['FAST','MEDIUM','SLOW','NONE']);
+            const compressionMode=validCompression.has(compressionCandidate)?compressionCandidate:'MEDIUM';
+            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'mm', format:pageSize});
             const dataUrl=canvas.toDataURL('image/png');
             const pageWidth=pdf.internal.pageSize.getWidth();
             const pageHeight=pdf.internal.pageSize.getHeight();
-            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'FAST');
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,compressionMode);
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
@@ -11043,12 +11171,34 @@ $mindmap_total = (int)($stats['mindmap_total'] ?? 0);
 $isMindmapCategory = $cat === 'mindmaps';
 $items=[];
 $mindmapsAll=[];
+$stepsGroupedByTime=[];
+$attachmentsByItem=[];
+$totalItems=0;
+$totalPages=1;
+$page=max(1,(int)($_GET['page'] ?? 1));
+$paginationBaseParams=['cat'=>$cat];
+if($q!==''){
+  $paginationBaseParams['q']=$q;
+}
 if($isMindmapCategory){
   $mindmapsAll=get_mindmaps();
+  $outlineUpdates=[];
   foreach($mindmapsAll as &$map){
-    $map['outline']=mindmap_outline_preview($map['content']);
+    $cachedOutline=trim((string)($map['outline'] ?? ''));
+    if($cachedOutline===''){
+      $cachedOutline=mindmap_outline_preview($map['content']);
+      if(!empty($map['id'])){
+        $outlineUpdates[(int)$map['id']]=$cachedOutline;
+      }
+    }
+    $map['outline']=$cachedOutline;
   }
   unset($map);
+  if($outlineUpdates){
+    foreach($outlineUpdates as $mapId=>$outline){
+      set_mindmap_outline($mapId,$outline);
+    }
+  }
 } else {
   $params=[]; $where=[];
   if($cat==='all'){
@@ -11056,10 +11206,31 @@ if($isMindmapCategory){
   }
   if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
   if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
-  $sql='SELECT * FROM items';
+  $countSql='SELECT COUNT(*) FROM items';
+  if($where){ $countSql.=' WHERE '.implode(' AND ',$where); }
+  $countSt=$pdo->prepare($countSql);
+  $countSt->execute($params);
+  $totalItems=(int)$countSt->fetchColumn();
+  $totalPages=max(1,(int)ceil($totalItems/ITEMS_PER_PAGE));
+  if($page>$totalPages){ $page=$totalPages; }
+  $offset=($page-1)*ITEMS_PER_PAGE;
+  $sql='SELECT id,title,description,done,category_id,order_index,created_at,updated_at FROM items';
   if($where) $sql.=' WHERE '.implode(' AND ',$where);
-  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
-  $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
+  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC LIMIT :limit OFFSET :offset';
+  $st=$pdo->prepare($sql);
+  foreach($params as $name=>$value){
+    $paramType=is_int($value)?PDO::PARAM_INT:PDO::PARAM_STR;
+    $st->bindValue($name,$value,$paramType);
+  }
+  $st->bindValue(':limit',ITEMS_PER_PAGE,PDO::PARAM_INT);
+  $st->bindValue(':offset',$offset,PDO::PARAM_INT);
+  $st->execute();
+  $items=$st->fetchAll();
+  $itemIds=array_map(fn($it)=>(int)$it['id'],$items);
+  if($itemIds){
+    $stepsGroupedByTime=get_steps_grouped_by_time($itemIds);
+    $attachmentsByItem=attachments_for_items($itemIds);
+  }
 }
 $all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];
@@ -11188,6 +11359,9 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .density-toggle .btn:hover{background:rgba(230,192,137,.08);color:var(--gold-400)}
   .density-toggle .btn.active{background:rgba(230,192,137,.16);color:var(--gold-400);box-shadow:inset 0 0 0 1px rgba(230,192,137,.25)}
   .items{display:grid;gap:var(--item-grid-gap);position:relative;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .pagination-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin:24px 0 12px;font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
+  .pagination-nav .page-info{color:var(--text-dim)}
+  .pagination-nav .btn.disabled{opacity:.4;pointer-events:none}
   .item{position:relative;padding:var(--item-padding);border-radius:var(--item-radius);background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:var(--item-gap);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),opacity var(--transition)}
   .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
   .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 12px rgba(207,166,107,.5),0 0 22px rgba(142,107,61,.45)}
@@ -11510,8 +11684,9 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
         <?php endif; ?>
         <?php foreach ($items as $it): ?>
           <?php
-            $steps_time=get_steps_by_time((int)$it['id']);
-            $attachments=attachments_for_item((int)$it['id']);
+            $itemId=(int)$it['id'];
+            $steps_time=$stepsGroupedByTime[$itemId] ?? [];
+            $attachments=$attachmentsByItem[$itemId] ?? [];
             $titlePlain=(string)$it['title'];
             $titleHtml = $q!=='' ? highlight_text($titlePlain, $q) : h($titlePlain);
             $descRaw = (string)$it['description'];
@@ -11583,6 +11758,17 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
           </article>
         <?php endforeach; ?>
       </div>
+      <?php if(!$isMindmapCategory && $totalPages>1): ?>
+        <?php
+          $prevQuery=http_build_query(array_merge($paginationBaseParams,['page'=>max(1,$page-1)]));
+          $nextQuery=http_build_query(array_merge($paginationBaseParams,['page'=>min($totalPages,$page+1)]));
+        ?>
+        <nav class="pagination-nav" aria-label="分页导航">
+          <a class="btn btn-outline btn-small<?php echo $page<=1?' disabled':''; ?>" href="<?php echo $page<=1?'#':'?'.h($prevQuery); ?>"<?php echo $page<=1?' aria-disabled="true"':''; ?>>上一页</a>
+          <span class="page-info">第 <?php echo $page; ?> / <?php echo $totalPages; ?> 页 · 共 <?php echo $totalItems; ?> 条</span>
+          <a class="btn btn-outline btn-small<?php echo $page>=$totalPages?' disabled':''; ?>" href="<?php echo $page>=$totalPages?'#':'?'.h($nextQuery); ?>"<?php echo $page>=$totalPages?' aria-disabled="true"':''; ?>>下一页</a>
+        </nav>
+      <?php endif; ?>
       <div class="shortcuts">
         快捷键：<span class="kbd">/</span> 聚焦搜索。
       </div>
