@@ -4014,11 +4014,9 @@ if ($view === 'map_edit') {
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
       .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:pan-x pan-y;flex:0 1 auto;margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
       .mind-dock::-webkit-scrollbar{display:none}
-      .dock-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px}
+      .dock-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px;text-align:center}
       .dock-btn .icon{font-size:20px;line-height:1}
-      .dock-btn .label-group{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;line-height:1}
-      .dock-btn .label{font-size:12px}
-      .dock-btn .shortcut{font:600 9px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:rgba(227,198,139,.7)}
+      .dock-btn .label{font-size:12px;line-height:1}
       .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
       .dock-btn:active{transform:translateY(-1px)}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
@@ -4231,79 +4229,49 @@ if ($view === 'map_edit') {
       <?php endif; ?>
       <div class="mind-dock-wrap">
         <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
-          <button class="dock-btn" data-action="save" data-default-label="保存" aria-label="保存（Ctrl+S）">
+          <button class="dock-btn" data-action="save" data-default-label="保存" aria-label="保存">
             <span class="icon">💾</span>
-            <span class="label-group">
-              <span class="label">保存</span>
-              <span class="shortcut">Ctrl+S</span>
-            </span>
+            <span class="label">保存</span>
           </button>
-          <button class="dock-btn" data-action="undo" aria-label="撤销操作（Ctrl/⌘+Z）">
+          <button class="dock-btn" data-action="undo" aria-label="撤销操作">
             <span class="icon">↺</span>
-            <span class="label-group">
-              <span class="label">撤销</span>
-              <span class="shortcut">Ctrl/⌘+Z</span>
-            </span>
+            <span class="label">撤销</span>
           </button>
-          <button class="dock-btn" data-action="redo" aria-label="重做操作（Ctrl+Shift+Z）">
+          <button class="dock-btn" data-action="redo" aria-label="重做操作">
             <span class="icon">↻</span>
-            <span class="label-group">
-              <span class="label">重做</span>
-              <span class="shortcut">Ctrl+Shift+Z</span>
-            </span>
+            <span class="label">重做</span>
           </button>
-          <button class="dock-btn" data-action="sibling" aria-label="新增同级节点（Enter）">
+          <button class="dock-btn" data-action="sibling" aria-label="新增同级节点">
             <span class="icon">⧉</span>
-            <span class="label-group">
-              <span class="label">同级</span>
-              <span class="shortcut">Enter</span>
-            </span>
+            <span class="label">同级</span>
           </button>
-          <button class="dock-btn" data-action="child" aria-label="新增子级节点（Tab）">
+          <button class="dock-btn" data-action="child" aria-label="新增子级节点">
             <span class="icon">↳</span>
-            <span class="label-group">
-              <span class="label">子级</span>
-              <span class="shortcut">Tab</span>
-            </span>
+            <span class="label">子级</span>
           </button>
           <button class="dock-btn" data-action="fold" aria-label="折叠或展开节点">
             <span class="icon" data-fold-icon>⇅</span>
-            <span class="label-group">
-              <span class="label" data-fold-label>折叠</span>
-              <span class="shortcut" data-fold-shortcut>Space / ←→</span>
-            </span>
+            <span class="label" data-fold-label>折叠</span>
           </button>
           <button class="dock-btn" data-action="attach" aria-label="上传附件">
             <span class="icon">📎</span>
-            <span class="label-group">
-              <span class="label">附件</span>
-            </span>
+            <span class="label">附件</span>
           </button>
-          <button class="dock-btn" data-action="manage-attachments" aria-label="附件管理（Ctrl+Shift+A）">
+          <button class="dock-btn" data-action="manage-attachments" aria-label="附件管理">
             <span class="icon">🗂</span>
-            <span class="label-group">
-              <span class="label">管理</span>
-              <span class="shortcut">Ctrl+Shift+A</span>
-            </span>
+            <span class="label">管理</span>
           </button>
           <button class="dock-btn" data-action="relation" aria-label="关联节点">
             <span class="icon">🪢</span>
-            <span class="label-group">
-              <span class="label">关联</span>
-            </span>
+            <span class="label">关联</span>
           </button>
           <button class="dock-btn" data-action="link" aria-label="新增链接">
             <span class="icon">🔗</span>
-            <span class="label-group">
-              <span class="label">链接</span>
-            </span>
+            <span class="label">链接</span>
           </button>
-          <button class="dock-btn danger" data-action="delete" aria-label="删除节点（Backspace/Del）">
+          <button class="dock-btn danger" data-action="delete" aria-label="删除节点">
             <span class="icon">🗑</span>
-            <span class="label-group">
-              <span class="label">删除</span>
-              <span class="shortcut">Backspace / Del</span>
-            </span>
+            <span class="label">删除</span>
           </button>
         </nav>
       </div>
@@ -6591,30 +6559,161 @@ if ($view === 'map_edit') {
             btn.style.top=`${screenY}px`;
           }
         }
-        chooseVerticalAnchor(node, counterpart){
-          if(!node) return {point:null, position:'center'};
+        getNodeCenterPoint(node){
+          if(!node) return {x:0,y:0};
+          if(node.anchors && node.anchors.center && Number.isFinite(node.anchors.center.x) && Number.isFinite(node.anchors.center.y)){
+            return {x:node.anchors.center.x,y:node.anchors.center.y};
+          }
+          const x=Number.isFinite(node.absX)?node.absX:0;
+          const y=Number.isFinite(node.absY)?node.absY:0;
+          return {x,y};
+        }
+        getNodeBounds(node){
+          if(!node) return null;
           if(!node.anchors) this.updateAnchors(node);
           const anchors=node.anchors||{};
-          const center=anchors.center ? {x:anchors.center.x,y:anchors.center.y} : {x:node.absX||0,y:node.absY||0};
-          const top=anchors.top ? {x:anchors.top.x,y:anchors.top.y} : {...center};
-          const bottom=anchors.bottom ? {x:anchors.bottom.x,y:anchors.bottom.y} : {...center};
-          let targetY;
-          if(counterpart){
-            if(counterpart.anchors && counterpart.anchors.center && Number.isFinite(counterpart.anchors.center.y)){
-              targetY=counterpart.anchors.center.y;
-            }else if(Number.isFinite(counterpart.absY)){
-              targetY=counterpart.absY;
+          const center=this.getNodeCenterPoint(node);
+          const left=anchors.left && Number.isFinite(anchors.left.x)?anchors.left.x:center.x;
+          const right=anchors.right && Number.isFinite(anchors.right.x)?anchors.right.x:center.x;
+          const top=anchors.top && Number.isFinite(anchors.top.y)?anchors.top.y:center.y;
+          const bottom=anchors.bottom && Number.isFinite(anchors.bottom.y)?anchors.bottom.y:center.y;
+          return {
+            minX:Math.min(left,right),
+            maxX:Math.max(left,right),
+            minY:Math.min(top,bottom),
+            maxY:Math.max(top,bottom)
+          };
+        }
+        getEdgeButtonPosition(node){
+          if(!node || !node.edgeButton) return null;
+          const btn=node.edgeButton;
+          let logical=btn._logicalPosition||null;
+          if((!logical || !Number.isFinite(logical.x) || !Number.isFinite(logical.y)) && btn.dataset){
+            const lx=parseFloat(btn.dataset.logicalX||'');
+            const ly=parseFloat(btn.dataset.logicalY||'');
+            if(Number.isFinite(lx) && Number.isFinite(ly)){
+              logical={x:lx,y:ly};
+              btn._logicalPosition=logical;
             }
           }
-          if(!Number.isFinite(targetY)){ targetY=center.y; }
-          const delta=targetY - center.y;
-          if(Math.abs(delta)>2){
-            return delta<0 ? {point:top, position:'top'} : {point:bottom, position:'bottom'};
+          if(logical && Number.isFinite(logical.x) && Number.isFinite(logical.y)){
+            return {x:logical.x,y:logical.y};
           }
-          const topDist=Math.abs(top.y - targetY);
-          const bottomDist=Math.abs(bottom.y - targetY);
-          if(topDist<=bottomDist){ return {point:top, position:'top'}; }
-          return {point:bottom, position:'bottom'};
+          return null;
+        }
+        buildRelationAnchorCandidates(node, counterpart){
+          if(!node) return [];
+          if(!node.anchors) this.updateAnchors(node);
+          const anchors=node.anchors||{};
+          const center=this.getNodeCenterPoint(node);
+          const counterpartCenter=counterpart?this.getNodeCenterPoint(counterpart):null;
+          const buttonPos=this.getEdgeButtonPosition(node);
+          const createCandidate=(position, anchorPoint, normal)=>{
+            const point=anchorPoint && Number.isFinite(anchorPoint.x) && Number.isFinite(anchorPoint.y)
+              ? {x:anchorPoint.x,y:anchorPoint.y}
+              : {x:center.x,y:center.y};
+            const normalized=(()=>{
+              const len=Math.hypot(normal.x||0, normal.y||0);
+              if(len<1e-6) return {x:0,y:0};
+              return {x:normal.x/len,y:normal.y/len};
+            })();
+            let penalty=0;
+            let distanceToCounterpart=counterpartCenter?Math.hypot(counterpartCenter.x-point.x,counterpartCenter.y-point.y):Infinity;
+            if(counterpartCenter){
+              const vec={x:counterpartCenter.x-point.x,y:counterpartCenter.y-point.y};
+              const dot=normalized.x*vec.x + normalized.y*vec.y;
+              if(dot<0){ penalty+=Math.abs(dot)*0.6; }
+            }
+            if(buttonPos){
+              const dx=point.x-buttonPos.x;
+              const dy=point.y-buttonPos.y;
+              const dist=Math.hypot(dx,dy);
+              if(Number.isFinite(dist) && dist<40){ penalty+=(40-dist)*35; }
+            }
+            return {
+              position,
+              axis:(position==='left'||position==='right')?'horizontal':'vertical',
+              point,
+              normal:normalized,
+              penalty,
+              distanceToCounterpart:Number.isFinite(distanceToCounterpart)?distanceToCounterpart:Infinity
+            };
+          };
+          const candidates=[
+            createCandidate('left', anchors.left, {x:-1,y:0}),
+            createCandidate('right', anchors.right, {x:1,y:0}),
+            createCandidate('top', anchors.top, {x:0,y:-1}),
+            createCandidate('bottom', anchors.bottom, {x:0,y:1})
+          ];
+          return candidates.filter(Boolean);
+        }
+        chooseRelationAnchors(fromNode, toNode){
+          const startCandidates=this.buildRelationAnchorCandidates(fromNode, toNode);
+          const endCandidates=this.buildRelationAnchorCandidates(toNode, fromNode);
+          const startCenter=this.getNodeCenterPoint(fromNode);
+          const endCenter=this.getNodeCenterPoint(toNode);
+          const startButton=this.getEdgeButtonPosition(fromNode);
+          const endButton=this.getEdgeButtonPosition(toNode);
+          if(!startCandidates.length){
+            startCandidates.push({position:'center',axis:'both',point:{x:startCenter.x,y:startCenter.y},normal:{x:0,y:0},penalty:0,distanceToCounterpart:Math.hypot(endCenter.x-startCenter.x,endCenter.y-startCenter.y)});
+          }
+          if(!endCandidates.length){
+            endCandidates.push({position:'center',axis:'both',point:{x:endCenter.x,y:endCenter.y},normal:{x:0,y:0},penalty:0,distanceToCounterpart:Math.hypot(endCenter.x-startCenter.x,endCenter.y-startCenter.y)});
+          }
+          const pointToSegmentDistance=(pt,a,b)=>{
+            if(!pt || !a || !b) return Infinity;
+            const dx=b.x-a.x;
+            const dy=b.y-a.y;
+            const denom=dx*dx + dy*dy;
+            if(denom<=1e-6){ return Math.hypot(pt.x-a.x, pt.y-a.y); }
+            const t=((pt.x-a.x)*dx + (pt.y-a.y)*dy)/denom;
+            const clamped=Math.max(0, Math.min(1, t));
+            const projX=a.x + clamped*dx;
+            const projY=a.y + clamped*dy;
+            return Math.hypot(pt.x-projX, pt.y-projY);
+          };
+          let best=null;
+          for(const start of startCandidates){
+            if(!start || !start.point) continue;
+            for(const end of endCandidates){
+              if(!end || !end.point) continue;
+              const dx=end.point.x-start.point.x;
+              const dy=end.point.y-start.point.y;
+              const distance=Math.hypot(dx,dy);
+              let score=distance;
+              if(distance<1e-3){ score+=start.penalty + end.penalty; }
+              const startDot=start.normal.x*dx + start.normal.y*dy;
+              const endDot=end.normal.x*(-dx) + end.normal.y*(-dy);
+              if(startDot<=4){ score+=(4-startDot)*260; }
+              else{ score-=Math.min(startDot,220)*0.05; }
+              if(endDot<=4){ score+=(4-endDot)*260; }
+              else{ score-=Math.min(endDot,220)*0.05; }
+              if(start.position===end.position && start.axis===end.axis){ score+=distance*0.25; }
+              const horizontalBias=Math.abs(dx) - Math.abs(dy);
+              if(horizontalBias>18){
+                if(start.axis!=='horizontal'){ score+=horizontalBias*0.35; }
+                if(end.axis!=='horizontal'){ score+=horizontalBias*0.35; }
+              }else if(horizontalBias<-18){
+                const bias=Math.abs(horizontalBias);
+                if(start.axis!=='vertical'){ score+=bias*0.35; }
+                if(end.axis!=='vertical'){ score+=bias*0.35; }
+              }
+              score+=(start.penalty||0) + (end.penalty||0);
+              if(Number.isFinite(start.distanceToCounterpart)){ score+=start.distanceToCounterpart*0.02; }
+              if(Number.isFinite(end.distanceToCounterpart)){ score+=end.distanceToCounterpart*0.02; }
+              if(startButton){
+                const dist=pointToSegmentDistance(startButton, start.point, end.point);
+                if(dist<28){ score+=(28-dist)*70; }
+              }
+              if(endButton){
+                const dist=pointToSegmentDistance(endButton, start.point, end.point);
+                if(dist<28){ score+=(28-dist)*70; }
+              }
+              if(!best || score<best.score){ best={start,end,score}; }
+            }
+          }
+          if(best){ return {start:best.start,end:best.end}; }
+          return {start:startCandidates[0],end:endCandidates[0]};
         }
         updateRelationPath(relation){
           if(!relation) return;
@@ -6628,124 +6727,85 @@ if ($view === 'map_edit') {
           const startCenter=fromNode.anchors ? fromNode.anchors.center : null;
           const endCenter=toNode.anchors ? toNode.anchors.center : null;
           if(!startCenter || !endCenter) return;
-          const rootCenter=(()=>{
-            if(this.root){
-              if(this.root.anchors && this.root.anchors.center && Number.isFinite(this.root.anchors.center.x)){
-                return this.root.anchors.center.x;
-              }
-              if(Number.isFinite(this.root.absX)) return this.root.absX;
-            }
-            return (startCenter.x + endCenter.x)/2;
-          })();
-          const determineSide=node=>{
-            if(!node) return 0;
-            if(node.direction==='left' || node.dir===-1) return -1;
-            if(node.direction==='right' || node.dir===1) return 1;
-            if(Number.isFinite(node.absX)){
-              if(node.absX < rootCenter - 1) return -1;
-              if(node.absX > rootCenter + 1) return 1;
-            }
-            return 0;
-          };
-          const startSide=determineSide(fromNode);
-          const endSide=determineSide(toNode);
-          const startAnchor=this.chooseVerticalAnchor(fromNode, toNode);
-          const endAnchor=this.chooseVerticalAnchor(toNode, fromNode);
-          const anchorPadding=4;
-          const applyAnchorPadding=(point, position)=>{
-            if(!point) return;
-            if(position==='top'){ point.y-=anchorPadding; }
-            else if(position==='bottom'){ point.y+=anchorPadding; }
-          };
-          let startInner=startAnchor && startAnchor.point ? {x:startAnchor.point.x,y:startAnchor.point.y} : {x:startCenter.x,y:startCenter.y};
-          let endInner=endAnchor && endAnchor.point ? {x:endAnchor.point.x,y:endAnchor.point.y} : {x:endCenter.x,y:endCenter.y};
-          applyAnchorPadding(startInner, startAnchor ? startAnchor.position : null);
-          applyAnchorPadding(endInner, endAnchor ? endAnchor.position : null);
-          let vector={x:endInner.x-startInner.x,y:endInner.y-startInner.y};
-          let segmentLength=Math.hypot(vector.x, vector.y);
-          if(segmentLength<0.001){
+          const anchorSelection=this.chooseRelationAnchors(fromNode, toNode);
+          const startAnchor=anchorSelection && anchorSelection.start ? anchorSelection.start : null;
+          const endAnchor=anchorSelection && anchorSelection.end ? anchorSelection.end : null;
+          const startPoint=startAnchor && startAnchor.point ? {x:startAnchor.point.x,y:startAnchor.point.y} : {x:startCenter.x,y:startCenter.y};
+          const endPoint=endAnchor && endAnchor.point ? {x:endAnchor.point.x,y:endAnchor.point.y} : {x:endCenter.x,y:endCenter.y};
+          let vector={x:endPoint.x-startPoint.x,y:endPoint.y-startPoint.y};
+          let distance=Math.hypot(vector.x, vector.y);
+          if(distance<0.001){
             vector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
-            segmentLength=Math.hypot(vector.x, vector.y);
-            if(segmentLength<0.001) return;
-            startInner={x:startCenter.x,y:startCenter.y};
-            endInner={x:endCenter.x,y:endCenter.y};
+            distance=Math.hypot(vector.x, vector.y);
+            if(distance<0.001) return;
           }
-          const norm={x:vector.x/segmentLength,y:vector.y/segmentLength};
-          const clearanceBase=Math.min(24, Math.max(10, segmentLength*0.2));
-          const maxClearance=Math.max(0, segmentLength/2 - 6);
-          const approach=Math.min(clearanceBase, maxClearance);
-          let startClearance=approach;
-          if(!relation.bidirectional){ startClearance=-Math.min(approach*0.6, maxClearance); }
-          const endClearance=approach;
-          const startPoint={x:startInner.x - norm.x*startClearance,y:startInner.y - norm.y*startClearance};
-          const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
-          const dx=endPoint.x-startPoint.x;
-          const dy=endPoint.y-startPoint.y;
-          const distance=Math.hypot(dx,dy) || 1;
-          const baseNormal={x:distance?-dy/distance:0,y:distance?dx/distance:0};
-          const tangentLength=Math.min(96, Math.max(24, distance*0.28));
-          const curvature=Math.min(160, Math.max(26, distance*0.42));
-          const verticalHint=Math.abs(dy)>4 ? Math.sign(dy) : 0;
-          const fallbackHorizontal=(()=>{ const direct=Math.sign(dx); if(direct) return direct; return (startSide||endSide||1); })();
-          const buildTangent=(side, fallback, normalBias)=>{
-            let horizontal=side;
-            if(horizontal===0){ horizontal=fallback; }
-            if(horizontal===0){ horizontal=fallback>=0?1:-1; }
-            let vertical=verticalHint ? verticalHint*0.6 : normalBias*0.6;
-            const len=Math.hypot(horizontal, vertical);
-            if(len===0){ return {x:horizontal||0,y:vertical||0}; }
-            return {x:horizontal/len,y:vertical/len};
+          const norm={x:vector.x/distance,y:vector.y/distance};
+          const normalizeVec=input=>{
+            if(!input) return {x:0,y:0};
+            const len=Math.hypot(input.x||0, input.y||0);
+            if(len<1e-6){ return {x:0,y:0}; }
+            return {x:input.x/len,y:input.y/len};
           };
-          const bezierPoint=(t,p0,p1,p2,p3)=>{
-            const mt=1-t;
-            const mt2=mt*mt;
-            const t2=t*t;
-            return {
-              x:mt2*mt*p0.x + 3*mt2*t*p1.x + 3*mt*t2*p2.x + t2*t*p3.x,
-              y:mt2*mt*p0.y + 3*mt2*t*p1.y + 3*mt*t2*p2.y + t2*t*p3.y
-            };
+          let startNormal=startAnchor && startAnchor.normal ? {...startAnchor.normal} : null;
+          let endNormal=endAnchor && endAnchor.normal ? {...endAnchor.normal} : null;
+          startNormal=normalizeVec(startNormal||norm);
+          if(Math.abs(startNormal.x)<1e-6 && Math.abs(startNormal.y)<1e-6){ startNormal={x:norm.x,y:norm.y}; }
+          endNormal=normalizeVec(endNormal||{x:-norm.x,y:-norm.y});
+          if(Math.abs(endNormal.x)<1e-6 && Math.abs(endNormal.y)<1e-6){ endNormal={x:-norm.x,y:-norm.y}; }
+          const startBounds=this.getNodeBounds(fromNode);
+          const endBounds=this.getNodeBounds(toNode);
+          const startButtonPos=this.getEdgeButtonPosition(fromNode);
+          const endButtonPos=this.getEdgeButtonPosition(toNode);
+          let escapeDistance=Math.min(60, Math.max(24, distance*0.2));
+          let travelDistance=Math.min(140, Math.max(32, distance*0.35));
+          let lateralDistance=Math.min(52, Math.max(10, distance*0.12));
+          escapeDistance=Math.min(escapeDistance, distance*0.45);
+          travelDistance=Math.min(travelDistance, distance*0.75);
+          travelDistance=Math.max(travelDistance, distance*0.25);
+          lateralDistance=Math.min(lateralDistance, distance*0.5);
+          if(distance<80){
+            escapeDistance=Math.max(18, distance*0.24);
+            travelDistance=Math.max(travelDistance, distance*0.42);
+            lateralDistance=Math.max(lateralDistance, distance*0.08);
+          }
+          const perp={x:-norm.y,y:norm.x};
+          const startPerpWeight=startNormal.x*perp.x + startNormal.y*perp.y;
+          const endPerpWeight=endNormal.x*perp.x + endNormal.y*perp.y;
+          const bendInfluence=(startPerpWeight - endPerpWeight)/2;
+          const startCtrl={
+            x:startPoint.x + startNormal.x*escapeDistance + norm.x*travelDistance + perp.x*lateralDistance*bendInfluence,
+            y:startPoint.y + startNormal.y*escapeDistance + norm.y*travelDistance + perp.y*lateralDistance*bendInfluence
           };
-          const avgY=(startCenter.y + endCenter.y)/2;
-          const evaluatePath=normalSign=>{
-            const normalX=baseNormal.x*normalSign;
-            const normalY=baseNormal.y*normalSign;
-            const startTangent=buildTangent(startSide, fallbackHorizontal, normalSign||1);
-            const endTangent=buildTangent(endSide, fallbackHorizontal, normalSign||1);
-            const startCtrlBase={
-              x:startPoint.x + startTangent.x*tangentLength,
-              y:startPoint.y + startTangent.y*tangentLength
-            };
-            const endCtrlBase={
-              x:endPoint.x + endTangent.x*tangentLength,
-              y:endPoint.y + endTangent.y*tangentLength
-            };
-            const ctrl1={x:startCtrlBase.x + normalX*curvature,y:startCtrlBase.y + normalY*curvature};
-            const ctrl2={x:endCtrlBase.x + normalX*curvature,y:endCtrlBase.y + normalY*curvature};
-            const q1=bezierPoint(0.25,startPoint,ctrl1,ctrl2,endPoint);
-            const q2=bezierPoint(0.5,startPoint,ctrl1,ctrl2,endPoint);
-            const q3=bezierPoint(0.75,startPoint,ctrl1,ctrl2,endPoint);
-            const points=[q1,q2,q3];
-            let score=0;
-            for(const pt of points){ score+=Math.abs(pt.x - rootCenter); }
-            if(startSide && startSide===endSide){
-              const extremes=[startPoint.x,endPoint.x,ctrl1.x,ctrl2.x,q1.x,q2.x,q3.x];
-              const outward=startSide>0?Math.max(...extremes):Math.min(...extremes);
-              const baseline=startSide>0?Math.max(startCenter.x,endCenter.x):Math.min(startCenter.x,endCenter.x);
-              score+=Math.abs(outward-baseline);
-            }else{
-              const verticalSpread=Math.max(Math.abs(q1.y-avgY),Math.abs(q2.y-avgY),Math.abs(q3.y-avgY));
-              score+=verticalSpread*0.25;
+          const endCtrl={
+            x:endPoint.x - endNormal.x*escapeDistance - norm.x*travelDistance - perp.x*lateralDistance*bendInfluence,
+            y:endPoint.y - endNormal.y*escapeDistance - norm.y*travelDistance - perp.y*lateralDistance*bendInfluence
+          };
+          const pushOutside=(point,bounds,dir)=>{
+            if(!point || !bounds || !dir) return;
+            const margin=12;
+            if(point.x>bounds.minX-margin && point.x<bounds.maxX+margin && point.y>bounds.minY-margin && point.y<bounds.maxY+margin){
+              point.x+=dir.x*(margin*2);
+              point.y+=dir.y*(margin*2);
             }
-            return {
-              pathData:`M${startPoint.x} ${startPoint.y} C ${ctrl1.x} ${ctrl1.y}, ${ctrl2.x} ${ctrl2.y}, ${endPoint.x} ${endPoint.y}`,
-              score
-            };
           };
-          const candidateA=evaluatePath(1);
-          const candidateB=evaluatePath(-1);
-          let chosen=candidateA;
-          if(!Number.isFinite(candidateA.score) || candidateB.score>candidateA.score){ chosen=candidateB; }
-          const pathData=chosen.pathData;
+          pushOutside(startCtrl,startBounds,startNormal);
+          pushOutside(endCtrl,endBounds,endNormal);
+          const repelFromPoint=(point,avoid,radius=28)=>{
+            if(!point || !avoid) return;
+            const dx=point.x-avoid.x;
+            const dy=point.y-avoid.y;
+            const dist=Math.hypot(dx,dy);
+            if(dist>0 && dist<radius){
+              const scale=(radius-dist)/dist;
+              point.x+=dx*scale;
+              point.y+=dy*scale;
+            }
+          };
+          repelFromPoint(startCtrl,startButtonPos);
+          repelFromPoint(endCtrl,startButtonPos);
+          repelFromPoint(startCtrl,endButtonPos);
+          repelFromPoint(endCtrl,endButtonPos);
+          const pathData=`M${startPoint.x} ${startPoint.y} C ${startCtrl.x} ${startCtrl.y}, ${endCtrl.x} ${endCtrl.y}, ${endPoint.x} ${endPoint.y}`;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
@@ -7652,7 +7712,6 @@ if ($view === 'map_edit') {
       const dockFoldButton=dock ? dock.querySelector('.dock-btn[data-action="fold"]') : null;
       const dockFoldLabel=dockFoldButton ? dockFoldButton.querySelector('[data-fold-label]') : null;
       const dockFoldIcon=dockFoldButton ? dockFoldButton.querySelector('[data-fold-icon]') : null;
-      const dockFoldShortcut=dockFoldButton ? dockFoldButton.querySelector('[data-fold-shortcut]') : null;
       const exportOverlay=document.getElementById('mind-export-overlay');
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
@@ -7824,18 +7883,15 @@ if ($view === 'map_edit') {
         const hasChildren=!!(node && node.children && node.children.length);
         let label='折叠';
         let icon='⇅';
-        let shortcut='Space / ←→';
         if(hasChildren){
           const collapsed=node.expanded===false;
           label=collapsed?'展开':'折叠';
           icon=collapsed?'⤴':'⤵';
-          shortcut=collapsed?'Space 或 →':'Space 或 ←';
         }
         if(dockFoldLabel){ dockFoldLabel.textContent=label; }
         if(dockFoldIcon){ dockFoldIcon.textContent=icon; }
-        if(dockFoldShortcut){ dockFoldShortcut.textContent=shortcut; }
         dockFoldButton.disabled=!hasChildren;
-        dockFoldButton.setAttribute('aria-label', hasChildren ? `${label}节点（${shortcut}）` : '折叠或展开节点');
+        dockFoldButton.setAttribute('aria-label', hasChildren ? `${label}节点` : '折叠或展开节点');
       }
       function restoreMindSnapshot(snapshot){
         if(!snapshot || !snapshot.tree) return false;
