@@ -16,6 +16,26 @@ class Router
         $this->addRoute('POST', $path, $handler);
     }
 
+    public function put(string $path, callable $handler): void
+    {
+        $this->addRoute('PUT', $path, $handler);
+    }
+
+    public function patch(string $path, callable $handler): void
+    {
+        $this->addRoute('PATCH', $path, $handler);
+    }
+
+    public function delete(string $path, callable $handler): void
+    {
+        $this->addRoute('DELETE', $path, $handler);
+    }
+
+    public function options(string $path, callable $handler): void
+    {
+        $this->addRoute('OPTIONS', $path, $handler);
+    }
+
     private function addRoute(string $method, string $path, callable $handler): void
     {
         $this->routes[$method][$this->normalize($path)] = $handler;
