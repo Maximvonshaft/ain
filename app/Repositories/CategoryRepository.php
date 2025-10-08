@@ -21,6 +21,18 @@ class CategoryRepository extends BaseRepository
         return $counts;
     }
 
+    public function ensureDone(): int
+    {
+        $stmt = $this->pdo()->query("SELECT id FROM categories WHERE name='已完成' LIMIT 1");
+        $row = $stmt->fetch();
+        if ($row) {
+            return (int)$row['id'];
+        }
+        $insert = $this->pdo()->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
+        $insert->execute(['已完成', now()]);
+        return (int)$this->pdo()->lastInsertId();
+    }
+
     public function ensureOther(): int
     {
         $stmt = $this->pdo()->query("SELECT id FROM categories WHERE name='其他' LIMIT 1");
