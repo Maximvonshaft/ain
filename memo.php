@@ -6857,6 +6857,106 @@ if ($view === 'map_edit') {
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
       if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
       if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+      function hydrateMindmapAttachments(initialMindmapData, assetEntries, assetMetaMap){
+        if(!initialMindmapData || !initialMindmapData.data) return;
+        const root=initialMindmapData.data;
+        const nodesById=new Map();
+        (function walk(node){
+          if(!node || typeof node!=='object') return;
+          if(typeof node.id==='string' && node.id){ nodesById.set(node.id, node); }
+          if(Array.isArray(node.children)){
+            node.children=node.children.filter(child=>child && typeof child==='object');
+            node.children.forEach(child=>walk(child));
+          }
+        })(root);
+        if(!nodesById.size) return;
+        const ensureNodeAttachments=node=>{
+          if(!node || typeof node!=='object') return [];
+          if(!node.data || typeof node.data!=='object'){ node.data={}; }
+          const data=node.data;
+          if(data.attachment && !Array.isArray(data.attachments)){
+            data.attachments=Array.isArray(data.attachment)?data.attachment.slice():[data.attachment];
+          }
+          if(!Array.isArray(data.attachments)){ data.attachments=[]; }
+          else{ data.attachments=data.attachments.filter(att=>att && typeof att==='object'); }
+          return data.attachments;
+        };
+        const ensureAssetMeta=(assetId, nodeUid, seed)=>{
+          if(!(assetMetaMap instanceof Map)) return;
+          const base=assetMetaMap.get(assetId) || {};
+          const name=typeof seed?.name==='string' && seed.name ? seed.name : (base.name || `附件 #${assetId}`);
+          const sizeCandidate=Number(seed?.size);
+          const size=Number.isFinite(sizeCandidate) && sizeCandidate>=0 ? sizeCandidate : (Number(base.size)||0);
+          const mime=typeof seed?.mime==='string' && seed.mime ? seed.mime : (base.mime || 'application/octet-stream');
+          const url=typeof seed?.url==='string' && seed.url ? seed.url : (base.url || `?mindmap_asset=${assetId}`);
+          const createdRaw=Number(seed?.created_at ?? seed?.createdAt ?? base.created_at ?? 0) || 0;
+          const mindmapIdCandidate=Number(seed?.mindmap_id);
+          const mindmap_id=Number.isFinite(mindmapIdCandidate) && mindmapIdCandidate>0 ? mindmapIdCandidate : (base.mindmap_id ?? null);
+          const session_key=typeof seed?.session_key==='string' && seed.session_key ? seed.session_key : (base.session_key || null);
+          assetMetaMap.set(assetId,{id:assetId,name,size,mime,url,created_at:createdRaw,node_uid:nodeUid,mindmap_id,session_key});
+        };
+        if(Array.isArray(assetEntries)){
+          assetEntries.forEach(entry=>{
+            if(!entry || typeof entry!=='object') return;
+            const nodeUid=typeof entry.node_uid==='string' ? entry.node_uid.trim() : '';
+            if(!nodeUid) return;
+            const node=nodesById.get(nodeUid);
+            if(!node) return;
+            const attachments=ensureNodeAttachments(node);
+            const assetId=Number(entry.id);
+            if(!Number.isFinite(assetId) || assetId<=0) return;
+            let existing=null;
+            for(const att of attachments){
+              const id=Number(att && (att.assetId || att.id));
+              if(Number.isFinite(id) && id===assetId){ existing=att; break; }
+            }
+            const descriptor={
+              assetId,
+              name:typeof entry.name==='string' && entry.name ? entry.name : (existing?.name || `附件 #${assetId}`),
+              size:Number(entry.size)|| (existing ? Number(existing.size)||0 : 0),
+              mime:typeof entry.mime==='string' && entry.mime ? entry.mime : (existing?.mime || 'application/octet-stream'),
+              url:typeof entry.url==='string' && entry.url ? entry.url : (existing?.url || `?mindmap_asset=${assetId}`),
+            };
+            const created=Number(entry.created_at);
+            if(created>0){ descriptor.createdAt=created; }
+            if(existing){ Object.assign(existing, descriptor); }
+            else{ attachments.push(descriptor); }
+            ensureAssetMeta(assetId, nodeUid, entry);
+          });
+        }
+        nodesById.forEach((node,nodeUid)=>{
+          if(!node.data || typeof node.data!=='object'){ return; }
+          const data=node.data;
+          if(data.attachment && !Array.isArray(data.attachments)){
+            data.attachments=Array.isArray(data.attachment)?data.attachment.slice():[data.attachment];
+          }
+          if(!Array.isArray(data.attachments)) return;
+          const filtered=[];
+          const seen=new Set();
+          data.attachments.forEach(att=>{
+            if(!att || typeof att!=='object') return;
+            const assetId=Number(att.assetId || att.id);
+            if(!Number.isFinite(assetId) || assetId<=0) return;
+            if(seen.has(assetId)) return;
+            seen.add(assetId);
+            if(typeof att.name!=='string' || !att.name){ att.name=`附件 #${assetId}`; }
+            if(typeof att.url!=='string' || !att.url){ att.url=`?mindmap_asset=${assetId}`; }
+            if(typeof att.mime!=='string' || !att.mime){ att.mime='application/octet-stream'; }
+            const sizeNum=Number(att.size);
+            att.size=Number.isFinite(sizeNum) && sizeNum>=0 ? sizeNum : 0;
+            if(att.created_at && !att.createdAt){ att.createdAt=att.created_at; }
+            filtered.push(att);
+            ensureAssetMeta(assetId, nodeUid, att);
+          });
+          if(filtered.length){
+            data.attachments=filtered;
+            data.attachment=filtered[0];
+          }else{
+            delete data.attachments;
+            delete data.attachment;
+          }
+        });
+      }
       const initialAssetMeta = <?php echo json_encode($mindmapAssetsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       const assetMeta=new Map();
       if(Array.isArray(initialAssetMeta)){
@@ -6878,18 +6978,19 @@ if ($view === 'map_edit') {
         });
       }
       let attachmentManager=null;
-    const jmContainer=document.getElementById('jsmind-container');
-    let currentMapId=0;
-    if(jmContainer){
-      const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
-      currentMapId=Number.isFinite(parsed)?parsed:0;
-    }
-    if(!window.jsMind){
+      const jmContainer=document.getElementById('jsmind-container');
+      let currentMapId=0;
       if(jmContainer){
-        jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
+        const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
+        currentMapId=Number.isFinite(parsed)?parsed:0;
       }
-      return;
-    }
+      hydrateMindmapAttachments(initialData, initialAssetMeta, assetMeta);
+      if(!window.jsMind){
+        if(jmContainer){
+          jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
+        }
+        return;
+      }
     const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
     overlay.id='drag-overlay';
     overlay.dataset.exportIgnore='true';
