@@ -3966,6 +3966,7 @@ if ($view === 'map_edit') {
       .mind-relations{position:absolute;top:0;left:0;overflow:visible}
       .mind-relations .relation-group{pointer-events:auto;transition:filter var(--transition)}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+      .mind-relations .relation-hit{stroke:transparent;stroke-width:18;pointer-events:stroke;cursor:pointer;vector-effect:non-scaling-stroke}
       .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition)}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
@@ -4007,8 +4008,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:pan-x pan-y;flex:0 1 auto;margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4027,11 +4029,10 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
-      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:1 1 clamp(82px,11vw,124px);min-width:70px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start}.dock-btn{height:58px;flex:0 1 clamp(72px,24vw,112px);min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 1 clamp(66px,28vw,98px);min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4191,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -4338,7 +4339,6 @@ if ($view === 'map_edit') {
           <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
         </header>
         <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
-        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
         <div class="settings-actions">
           <button type="button" data-settings-close>关闭</button>
         </div>
@@ -6240,14 +6240,19 @@ if ($view === 'map_edit') {
             else{ core.removeAttribute('marker-start'); }
             const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
             highlight.classList.add('relation-highlight');
+            const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+            hit.classList.add('relation-hit');
+            hit.setAttribute('fill','none');
+            hit.setAttribute('stroke','transparent');
             if(this.selectedRelationId && this.selectedRelationId===relation.id){
               group.dataset.selected='true';
             }
             group.appendChild(shadow);
             group.appendChild(core);
             group.appendChild(highlight);
+            group.appendChild(hit);
             this.relationLayer.appendChild(group);
-            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
             const handleSelect=evt=>{
               if(evt){ evt.stopPropagation(); }
               const isMouse=evt && evt.pointerType==='mouse';
@@ -6264,8 +6269,21 @@ if ($view === 'map_edit') {
                 this.options.onRelationContext(selected, this, evt||null);
               }
             };
-            core.addEventListener('pointerdown',handleSelect);
-            core.addEventListener('contextmenu',handleContext);
+            const interactionTargets=[core, hit];
+            interactionTargets.forEach(target=>{
+              if(!target) return;
+              target.addEventListener('pointerdown',evt=>{
+                handleSelect(evt);
+                if(evt && typeof beginRelationLongPress==='function'){
+                  if(evt.pointerType && ['touch','pen'].includes(evt.pointerType)){ beginRelationLongPress(evt, relation.id); }
+                  else{ cancelRelationLongPressState(); }
+                }
+              });
+              target.addEventListener('contextmenu',evt=>{
+                cancelRelationLongPressState();
+                handleContext(evt);
+              });
+            });
             this.updateRelationPath(relation);
           }
         }
@@ -6540,8 +6558,38 @@ if ($view === 'map_edit') {
           const startCenter=fromNode.anchors ? fromNode.anchors.center : null;
           const endCenter=toNode.anchors ? toNode.anchors.center : null;
           if(!startCenter || !endCenter) return;
-          const startInner=this.computeNodeBoundaryPoint(fromNode, {x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y}, 6);
-          const endInner=this.computeNodeBoundaryPoint(toNode, {x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y}, 6);
+          const rootCenter=(()=>{
+            if(this.root){
+              if(this.root.anchors && this.root.anchors.center && Number.isFinite(this.root.anchors.center.x)){
+                return this.root.anchors.center.x;
+              }
+              if(Number.isFinite(this.root.absX)) return this.root.absX;
+            }
+            return (startCenter.x + endCenter.x)/2;
+          })();
+          const determineSide=node=>{
+            if(!node) return 0;
+            if(node.direction==='left' || node.dir===-1) return -1;
+            if(node.direction==='right' || node.dir===1) return 1;
+            if(Number.isFinite(node.absX)){
+              if(node.absX < rootCenter - 1) return -1;
+              if(node.absX > rootCenter + 1) return 1;
+            }
+            return 0;
+          };
+          const startSide=determineSide(fromNode);
+          const endSide=determineSide(toNode);
+          const adjustVector=(vector, side)=>{
+            if(!vector) return vector;
+            if(!side) return {x:vector.x,y:vector.y};
+            const biasBase=Math.hypot(vector.x, vector.y) || 1;
+            const bias=Math.min(Math.max(biasBase*0.35, 18), 72);
+            return {x:vector.x + side*bias, y:vector.y};
+          };
+          const startVector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
+          const endVector={x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y};
+          const startInner=this.computeNodeBoundaryPoint(fromNode, adjustVector(startVector, startSide), 8);
+          const endInner=this.computeNodeBoundaryPoint(toNode, adjustVector(endVector, endSide), 8);
           if(!startInner || !endInner) return;
           let vector={x:endInner.x-startInner.x,y:endInner.y-startInner.y};
           let segmentLength=Math.hypot(vector.x, vector.y);
@@ -6564,17 +6612,74 @@ if ($view === 'map_edit') {
           const dx=endPoint.x-startPoint.x;
           const dy=endPoint.y-startPoint.y;
           const distance=Math.hypot(dx,dy) || 1;
-          const normalX=distance?-dy/distance:0;
-          const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=startPoint.x + dx*0.25 + normalX*offset;
-          const ctrl1y=startPoint.y + dy*0.25 + normalY*offset;
-          const ctrl2x=startPoint.x + dx*0.75 - normalX*offset;
-          const ctrl2y=startPoint.y + dy*0.75 - normalY*offset;
-          const pathData=`M${startPoint.x} ${startPoint.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${endPoint.x} ${endPoint.y}`;
+          const baseNormal={x:distance?-dy/distance:0,y:distance?dx/distance:0};
+          const tangentLength=Math.min(96, Math.max(24, distance*0.28));
+          const curvature=Math.min(160, Math.max(26, distance*0.42));
+          const verticalHint=Math.abs(dy)>4 ? Math.sign(dy) : 0;
+          const fallbackHorizontal=(()=>{ const direct=Math.sign(dx); if(direct) return direct; return (startSide||endSide||1); })();
+          const buildTangent=(side, fallback, normalBias)=>{
+            let horizontal=side;
+            if(horizontal===0){ horizontal=fallback; }
+            if(horizontal===0){ horizontal=fallback>=0?1:-1; }
+            let vertical=verticalHint ? verticalHint*0.6 : normalBias*0.6;
+            const len=Math.hypot(horizontal, vertical);
+            if(len===0){ return {x:horizontal||0,y:vertical||0}; }
+            return {x:horizontal/len,y:vertical/len};
+          };
+          const bezierPoint=(t,p0,p1,p2,p3)=>{
+            const mt=1-t;
+            const mt2=mt*mt;
+            const t2=t*t;
+            return {
+              x:mt2*mt*p0.x + 3*mt2*t*p1.x + 3*mt*t2*p2.x + t2*t*p3.x,
+              y:mt2*mt*p0.y + 3*mt2*t*p1.y + 3*mt*t2*p2.y + t2*t*p3.y
+            };
+          };
+          const avgY=(startCenter.y + endCenter.y)/2;
+          const evaluatePath=normalSign=>{
+            const normalX=baseNormal.x*normalSign;
+            const normalY=baseNormal.y*normalSign;
+            const startTangent=buildTangent(startSide, fallbackHorizontal, normalSign||1);
+            const endTangent=buildTangent(endSide, fallbackHorizontal, normalSign||1);
+            const startCtrlBase={
+              x:startPoint.x + startTangent.x*tangentLength,
+              y:startPoint.y + startTangent.y*tangentLength
+            };
+            const endCtrlBase={
+              x:endPoint.x + endTangent.x*tangentLength,
+              y:endPoint.y + endTangent.y*tangentLength
+            };
+            const ctrl1={x:startCtrlBase.x + normalX*curvature,y:startCtrlBase.y + normalY*curvature};
+            const ctrl2={x:endCtrlBase.x + normalX*curvature,y:endCtrlBase.y + normalY*curvature};
+            const q1=bezierPoint(0.25,startPoint,ctrl1,ctrl2,endPoint);
+            const q2=bezierPoint(0.5,startPoint,ctrl1,ctrl2,endPoint);
+            const q3=bezierPoint(0.75,startPoint,ctrl1,ctrl2,endPoint);
+            const points=[q1,q2,q3];
+            let score=0;
+            for(const pt of points){ score+=Math.abs(pt.x - rootCenter); }
+            if(startSide && startSide===endSide){
+              const extremes=[startPoint.x,endPoint.x,ctrl1.x,ctrl2.x,q1.x,q2.x,q3.x];
+              const outward=startSide>0?Math.max(...extremes):Math.min(...extremes);
+              const baseline=startSide>0?Math.max(startCenter.x,endCenter.x):Math.min(startCenter.x,endCenter.x);
+              score+=Math.abs(outward-baseline);
+            }else{
+              const verticalSpread=Math.max(Math.abs(q1.y-avgY),Math.abs(q2.y-avgY),Math.abs(q3.y-avgY));
+              score+=verticalSpread*0.25;
+            }
+            return {
+              pathData:`M${startPoint.x} ${startPoint.y} C ${ctrl1.x} ${ctrl1.y}, ${ctrl2.x} ${ctrl2.y}, ${endPoint.x} ${endPoint.y}`,
+              score
+            };
+          };
+          const candidateA=evaluatePath(1);
+          const candidateB=evaluatePath(-1);
+          let chosen=candidateA;
+          if(!Number.isFinite(candidateA.score) || candidateB.score>candidateA.score){ chosen=candidateB; }
+          const pathData=chosen.pathData;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
+          if(entry.hit){ entry.hit.setAttribute('d', pathData); }
           entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
           if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
           else{ entry.core.removeAttribute('marker-start'); }
@@ -7426,7 +7531,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
       const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
@@ -7454,12 +7558,8 @@ if ($view === 'map_edit') {
       const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
-      const fisheyeToggle=document.getElementById('setting-fisheye');
-      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7520,24 +7620,6 @@ if ($view === 'map_edit') {
           exportOverlay.setAttribute('aria-hidden','true');
           exportOverlayHideTimer=null;
         },360);
-      }
-      function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
-      }
-      function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
-      }
-      function handlePointerPrecisionChange(event){
-        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
-        syncFisheyeState();
-      }
-      syncFisheyeState();
-      if(pointerMedia){
-        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
-        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -8019,6 +8101,7 @@ if ($view === 'map_edit') {
         else{ startRelationMode(); }
       }
       function handleRelationSelect(relation, evt){
+        cancelRelationLongPressState();
         if(relation && relation.id){ selectedRelationId=relation.id; }
         else{ selectedRelationId=null; }
         closeNodeContextMenu();
@@ -8026,12 +8109,14 @@ if ($view === 'map_edit') {
         if(evt && evt.type==='contextmenu'){ evt.preventDefault(); }
       }
       function handleRelationContext(relation, evt){
+        cancelRelationLongPressState();
         if(relation && relation.id){ selectedRelationId=relation.id; }
         else{ selectedRelationId=null; }
         closeNodeContextMenu();
         openRelationContextMenu(relation, evt || null);
       }
       function deleteSelectedRelation(){
+        cancelRelationLongPressState();
         if(!selectedRelationId || typeof jm?.remove_relation!=='function') return false;
         const targetId=selectedRelationId;
         const result=performUndoable('remove-relation',()=>{
@@ -8188,6 +8273,54 @@ if ($view === 'map_edit') {
       let popoverOpen=false;
       let sheetDragState=null;
       let longPressState=null;
+      let relationLongPressState=null;
+      function cancelRelationLongPressState(){
+        if(relationLongPressState && relationLongPressState.timer){
+          clearTimeout(relationLongPressState.timer);
+        }
+        relationLongPressState=null;
+      }
+      function beginRelationLongPress(evt, relationId){
+        if(!evt || !relationId) return;
+        if(evt.pointerType && !['touch','pen'].includes(evt.pointerType)){
+          cancelRelationLongPressState();
+          return;
+        }
+        cancelRelationLongPressState();
+        relationLongPressState={
+          pointerId:evt.pointerId,
+          relationId,
+          startX:evt.clientX,
+          startY:evt.clientY,
+          triggered:false,
+          timer:window.setTimeout(()=>{
+            if(!relationLongPressState || relationLongPressState.pointerId!==evt.pointerId) return;
+            relationLongPressState.triggered=true;
+            relationLongPressState.timer=null;
+            if(typeof jm?.select_relation==='function'){ jm.select_relation(relationId); }
+            selectedRelationId=relationId;
+            deleteSelectedRelation();
+          }, LONG_PRESS_DELAY)
+        };
+      }
+      function handleRelationLongPressMove(e){
+        if(!relationLongPressState || e.pointerId!==relationLongPressState.pointerId) return;
+        if(relationLongPressState.triggered) return;
+        const dx=Math.abs(e.clientX - relationLongPressState.startX);
+        const dy=Math.abs(e.clientY - relationLongPressState.startY);
+        if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){
+          cancelRelationLongPressState();
+        }
+      }
+      function finishRelationLongPress(e){
+        if(!relationLongPressState || e.pointerId!==relationLongPressState.pointerId) return;
+        const triggered=relationLongPressState.triggered;
+        cancelRelationLongPressState();
+        if(triggered){ e.preventDefault(); }
+      }
+      document.addEventListener('pointermove',handleRelationLongPressMove,{passive:true});
+      document.addEventListener('pointerup',finishRelationLongPress);
+      document.addEventListener('pointercancel',finishRelationLongPress);
       const popoverMedia=window.matchMedia('(max-width: 768px)');
       function updatePopoverMode(){
         if(!nodePopover) return;
@@ -8350,6 +8483,7 @@ if ($view === 'map_edit') {
         nodePopover.addEventListener('pointercancel',e=>endSheetDrag(e,true));
       }
       document.addEventListener('pointerdown',e=>{
+        cancelRelationLongPressState();
         if(!popoverOpen || !nodePopover) return;
         if(nodePopover.contains(e.target)) return;
         if(e.target.closest && e.target.closest('.jsmind-node')) return;
@@ -8376,6 +8510,7 @@ if ($view === 'map_edit') {
         }
       });
       document.addEventListener('pointerdown',e=>{
+        cancelRelationLongPressState();
         const target=e.target;
         if(nodeContextMenu && !nodeContextMenu.hidden && !nodeContextMenu.contains(target)){ closeNodeContextMenu(); }
         if(relationContextMenu && !relationContextMenu.hidden && !relationContextMenu.contains(target)){ closeRelationContextMenu(); }
@@ -8409,6 +8544,7 @@ if ($view === 'map_edit') {
       };
       if(jmContainer){
         jmContainer.addEventListener('pointerdown',e=>{
+          cancelRelationLongPressState();
           const nodeEl=e.target.closest('.jsmind-node');
           if(!nodeEl){ cancelLongPressState(); return; }
           if(e.pointerType && !['touch','pen'].includes(e.pointerType)){ cancelLongPressState(); return; }
@@ -8426,7 +8562,10 @@ if ($view === 'map_edit') {
               longPressState.triggered=true;
               longPressState.timer=null;
               const node=jm.get_node(longPressState.nodeId);
-              if(node){ openNodeContextMenu(node,{x:longPressState.startX,y:longPressState.startY}); }
+              if(node){
+                try{ jm.select_node(node.id); }catch(_){ }
+                openInspectorPopover(node);
+              }
             }, LONG_PRESS_DELAY)
           };
         });
@@ -9826,27 +9965,6 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
-        if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
-        }
-        if(fisheyeToggle){
-          fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
-          });
-        }
       }
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
@@ -10112,9 +10230,10 @@ if ($view === 'map_edit') {
             const shadow=group.querySelector('.relation-shadow');
             const core=group.querySelector('.relation-core');
             const highlight=group.querySelector('.relation-highlight');
+            const hit=group.querySelector('.relation-hit');
             if(core){ core.dataset.bidirectional=relation.bidirectional?'true':'false'; }
             if(mindInstance.relationRegistry){
-              mindInstance.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+              mindInstance.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
             }
           }
         };
