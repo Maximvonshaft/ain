@@ -12,6 +12,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 mb_internal_encoding('UTF-8');
+require __DIR__ . '/resources/views/memo/_cdn.php';
 
 // 移除默认 X-Powered-By 头
 header_remove('X-Powered-By');
@@ -21,7 +22,14 @@ header_remove('X-Powered-By');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+$cspHeader = sprintf(
+    "Content-Security-Policy: default-src 'self' %s; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' %s; font-src %s; script-src 'self' 'unsafe-inline' %s; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+    MEMO_CDN_HOST,
+    MEMO_CDN_HOST,
+    MEMO_CDN_HOST,
+    MEMO_CDN_HOST
+);
+header($cspHeader);
 
 // —— 配置 ——
 const DB_FILE = __DIR__ . '/memo.sqlite';

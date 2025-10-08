@@ -1,3 +1,4 @@
+  <?php require __DIR__ . '/_cdn.php'; ?>
   <!doctype html>
   <html lang="zh-Hans">
   <head>
@@ -5,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>思维导图编辑器 · <?php echo h($mind['title']); ?></title>
     <meta name="color-scheme" content="dark"/>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="dns-prefetch" href="<?= MEMO_CDN_HOST ?>">
+    <link rel="preconnect" href="<?= MEMO_CDN_HOST ?>" crossorigin>
+    <link href="<?= MEMO_CDN_COMBINE ?>/npm/@fontsource/cinzel/index.css,npm/@fontsource/inter/index.css,npm/@fontsource/noto-sans-sc/index.css,npm/@fontsource/noto-serif-sc/index.css" rel="stylesheet" crossorigin>
     <style>
       :root{
         --bg-void:#0A0C0E;
@@ -930,7 +931,7 @@
           const attempt=async password=>{
             setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
-            await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
+            await ensureScript('<?= MEMO_CDN_NPM ?>/@zip.js/zip.js@2.7.32/dist/zip.min.js');
             const zipLib=window.zip;
             if(!zipLib || !zipLib.ZipReader || !zipLib.Uint8ArrayReader) throw new Error('解析库未加载');
             const reader=new zipLib.ZipReader(new zipLib.Uint8ArrayReader(new Uint8Array(buffer)), password?{password}:{});
@@ -976,7 +977,7 @@
           const attempt=async password=>{
             setLoadingMessage(password?'验证密码…':'解析压缩包…');
             const buffer=await loadBuffer(source);
-            await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
+            await ensureScript('<?= MEMO_CDN_NPM ?>/unrar-js@0.2.19/dist/unrar.js');
             const api=window.UNRAR || window.unrar;
             if(!api || typeof api.createExtractorFromData!=='function') throw new Error('解析库未加载');
             const extractor=await api.createExtractorFromData({data:buffer,password:password||undefined});
@@ -1026,7 +1027,7 @@
         const loadDocxPreview=async source=>{
           showLoading('解析文档…');
           const buffer=await loadBuffer(source);
-          await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
+          await ensureScript('<?= MEMO_CDN_NPM ?>/mammoth@1.6.0/mammoth.browser.min.js');
           if(!window.mammoth || typeof window.mammoth.convertToHtml!=='function') throw new Error('转换库未加载');
           const result=await window.mammoth.convertToHtml({arrayBuffer:buffer}).catch(err=>{ throw err; });
           const html=result && typeof result.value==='string' ? result.value : '';
@@ -1039,7 +1040,7 @@
         const loadExcelPreview=async source=>{
           showLoading('解析表格…');
           const buffer=await loadBuffer(source);
-          await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+          await ensureScript('<?= MEMO_CDN_NPM ?>/xlsx@0.18.5/dist/xlsx.full.min.js');
           if(!window.XLSX || typeof window.XLSX.read!=='function') throw new Error('解析库未加载');
           const workbook=window.XLSX.read(buffer,{type:'array'});
           const sheetNames=Array.isArray(workbook.SheetNames)?workbook.SheetNames:[];
@@ -3783,14 +3784,14 @@
       }
       async function ensureHtmlToImage(){
         if(window.htmlToImage){ return window.htmlToImage; }
-        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js',()=>window.htmlToImage);
+        const lib=await loadExternalScript('<?= MEMO_CDN_NPM ?>/html-to-image@1.11.11/dist/html-to-image.min.js',()=>window.htmlToImage);
         if(lib){ return lib; }
         if(window.htmlToImage){ return window.htmlToImage; }
         throw new Error('图像导出依赖加载失败');
       }
       async function ensureJsPDF(){
         if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
-        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>window.jspdf);
+        const lib=await loadExternalScript('<?= MEMO_CDN_NPM ?>/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>window.jspdf);
         if(lib && lib.jsPDF){ return lib.jsPDF; }
         if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
         throw new Error('PDF 导出依赖加载失败');
