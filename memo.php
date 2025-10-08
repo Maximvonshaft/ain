@@ -6857,6 +6857,160 @@ if ($view === 'map_edit') {
       if(!initialData || !initialData.data){ initialData = JSON.parse(JSON.stringify(defaultData)); }
       if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
       if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+      const mindmapSessionKey = <?php echo json_encode($sessionKey ?? '', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+      function hydrateMindmapAttachments(sourceData, assetMetaList, assetMetaMap){
+        if(!sourceData || typeof sourceData!=='object' || !sourceData.data){ return; }
+        const nodeIndex=new Map();
+        const stack=[sourceData.data];
+        while(stack.length){
+          const node=stack.pop();
+          if(!node || typeof node!=='object'){ continue; }
+          if(typeof node.id==='string' && node.id){ nodeIndex.set(node.id, node); }
+          if(Array.isArray(node.children)){
+            for(let i=node.children.length-1;i>=0;i--){
+              const child=node.children[i];
+              if(child && typeof child==='object'){ stack.push(child); }
+            }
+          }
+        }
+        if(nodeIndex.size===0 || !Array.isArray(assetMetaList)){ return; }
+        assetMetaList.forEach(entry=>{
+          if(!entry || typeof entry!=='object'){ return; }
+          const assetId=Number(entry.id);
+          if(!Number.isFinite(assetId) || assetId<=0){ return; }
+          const nodeUid=typeof entry.node_uid==='string' ? entry.node_uid.trim() : '';
+          if(nodeUid==='' || !nodeIndex.has(nodeUid)){ return; }
+          const node=nodeIndex.get(nodeUid);
+          if(!node){ return; }
+          const name=typeof entry.name==='string' && entry.name!=='' ? entry.name : (typeof node.topic==='string' && node.topic ? node.topic : `附件 #${assetId}`);
+          const size=Number(entry.size)||0;
+          const mime=typeof entry.mime==='string' && entry.mime!=='' ? entry.mime : 'application/octet-stream';
+          const url=typeof entry.url==='string' && entry.url!=='' ? entry.url : `?mindmap_asset=${assetId}`;
+          const createdRaw=Number(entry.created_at ?? entry.createdAt ?? 0);
+          const normalized={ assetId, name, size, mime, url };
+          if(Number.isFinite(createdRaw) && createdRaw>0){ normalized.createdAt=createdRaw; }
+          if(!node.data || typeof node.data!=='object'){ node.data={}; }
+          const existingRaw=Array.isArray(node.data.attachments)
+            ? node.data.attachments
+            : (node.data.attachments && typeof node.data.attachments==='object' ? [node.data.attachments] : []);
+          const orderedIds=[];
+          const existingMap=new Map();
+          existingRaw.forEach(att=>{
+            if(!att || typeof att!=='object'){ return; }
+            const existingId=Number(att.assetId ?? att.id ?? 0);
+            if(!Number.isFinite(existingId) || existingId<=0){ return; }
+            if(!orderedIds.includes(existingId)){ orderedIds.push(existingId); }
+            const attName=typeof att.name==='string' && att.name!=='' ? att.name : (typeof node.topic==='string' && node.topic ? node.topic : `附件 #${existingId}`);
+            const attSize=Number(att.size)||0;
+            const attMime=typeof att.mime==='string' && att.mime!=='' ? att.mime : 'application/octet-stream';
+            const attUrl=typeof att.url==='string' && att.url!=='' ? att.url : `?mindmap_asset=${existingId}`;
+            const attCreated=Number(att.createdAt ?? att.created_at ?? att.uploadedAt ?? 0);
+            const normalizedExisting={ assetId:existingId, name:attName, size:attSize, mime:attMime, url:attUrl };
+            if(Number.isFinite(attCreated) && attCreated>0){ normalizedExisting.createdAt=attCreated; }
+            existingMap.set(existingId, normalizedExisting);
+          });
+          if(existingMap.has(assetId)){
+            const existing=existingMap.get(assetId);
+            if(existing){
+              if((!existing.name || existing.name===`附件 #${assetId}`) && name){ existing.name=name; }
+              if((!existing.mime || existing.mime==='application/octet-stream') && mime){ existing.mime=mime; }
+              if((!existing.url || existing.url===`?mindmap_asset=${assetId}`) && url){ existing.url=url; }
+              if(existing.size===0 && size>0){ existing.size=size; }
+              if(Number.isFinite(createdRaw) && createdRaw>0){ existing.createdAt=createdRaw; }
+            }
+          }else{
+            existingMap.set(assetId, normalized);
+            orderedIds.push(assetId);
+          }
+          const normalizedAttachments=[];
+          orderedIds.forEach(id=>{
+            const item=existingMap.get(id);
+            if(item){ normalizedAttachments.push(item); }
+          });
+          existingMap.forEach((value,id)=>{
+            if(!orderedIds.includes(id)){ normalizedAttachments.push(value); }
+          });
+          if(normalizedAttachments.length>0){
+            node.data.attachments=normalizedAttachments;
+            node.data.attachment=normalizedAttachments[0];
+          }else{
+            delete node.data.attachments;
+            delete node.data.attachment;
+          }
+          if(assetMetaMap instanceof Map && assetMetaMap.has(assetId)){
+            const metaEntry=assetMetaMap.get(assetId);
+            if(metaEntry && typeof metaEntry==='object'){
+              metaEntry.node_uid=nodeUid;
+              assetMetaMap.set(assetId, metaEntry);
+            }
+          }
+        });
+        nodeIndex.forEach(node=>{
+          if(!node || typeof node!=='object' || !node.data || typeof node.data!=='object'){ return; }
+          if(Array.isArray(node.data.attachments) && node.data.attachments.length>0){
+            const firstAttachment=node.data.attachments.find(att=>att && typeof att==='object');
+            if(firstAttachment){ node.data.attachment=firstAttachment; }
+            else{ delete node.data.attachment; }
+          }else{
+            delete node.data.attachments;
+            delete node.data.attachment;
+          }
+        });
+      }
+      function storageAvailable(){
+        try{
+          const testKey='mindmap.draft.probe';
+          window.localStorage.setItem(testKey,'1');
+          window.localStorage.removeItem(testKey);
+          return true;
+        }catch(_){
+          return false;
+        }
+      }
+      const canUseDraftStorage=storageAvailable();
+      function computeDraftStorageKey(mapId, sessionKey){
+        const segments=['mindmap.draft'];
+        if(Number.isFinite(mapId) && mapId>0){ segments.push(`map-${mapId}`); }
+        if(typeof sessionKey==='string' && sessionKey!==''){ segments.push(`session-${sessionKey}`); }
+        if(segments.length===1){ segments.push('anonymous'); }
+        return segments.join(':');
+      }
+      function readDraftFromStorage(key){
+        if(!canUseDraftStorage || !key){ return null; }
+        try{
+          const raw=window.localStorage.getItem(key);
+          if(!raw){ return null; }
+          const parsed=JSON.parse(raw);
+          if(!parsed || typeof parsed!=='object' || !parsed.data){ return null; }
+          return parsed;
+        }catch(err){
+          console.warn('无法读取思维导图草稿：', err);
+          return null;
+        }
+      }
+      function writeDraftToStorage(key, payload){
+        if(!canUseDraftStorage || !key){ return false; }
+        try{
+          window.localStorage.setItem(key, JSON.stringify(payload));
+          return true;
+        }catch(err){
+          console.warn('无法保存思维导图草稿：', err);
+          return false;
+        }
+      }
+      function removeDraftFromStorage(key){
+        if(!canUseDraftStorage || !key){ return; }
+        try{
+          window.localStorage.removeItem(key);
+        }catch(err){
+          console.warn('无法清理思维导图草稿：', err);
+        }
+      }
+      let draftSaveTimer=null;
+      let activeDraftKey='';
+      let pendingDraftTitle='';
+      let restoredFromDraft=false;
+      let titleInput=null;
       const initialAssetMeta = <?php echo json_encode($mindmapAssetsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       const assetMeta=new Map();
       if(Array.isArray(initialAssetMeta)){
@@ -6884,6 +7038,29 @@ if ($view === 'map_edit') {
       const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
       currentMapId=Number.isFinite(parsed)?parsed:0;
     }
+    activeDraftKey=computeDraftStorageKey(currentMapId, mindmapSessionKey);
+    if(canUseDraftStorage){
+      const storedDraft=readDraftFromStorage(activeDraftKey);
+      if(storedDraft && storedDraft.data){
+        let shouldRestore=false;
+        try{
+          shouldRestore=window.confirm('检测到未保存的草稿，是否恢复？');
+        }catch(_){ shouldRestore=false; }
+        if(shouldRestore){
+          try{
+            initialData=JSON.parse(JSON.stringify(storedDraft.data));
+          }catch(_){
+            initialData=storedDraft.data;
+          }
+          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+          pendingDraftTitle=typeof storedDraft.title==='string'?storedDraft.title:'';
+          restoredFromDraft=true;
+        }else{
+          clearDraft(activeDraftKey);
+        }
+      }
+    }
+    hydrateMindmapAttachments(initialData, initialAssetMeta, assetMeta);
     if(!window.jsMind){
       if(jmContainer){
         jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
@@ -7308,7 +7485,11 @@ if ($view === 'map_edit') {
       window.addEventListener('resize',scheduleHandleRefresh);
       document.addEventListener('scroll',scheduleHandleRefresh, true);
       scheduleHandleRefresh();
-      const titleInput=document.getElementById('map-title');
+      titleInput=document.getElementById('map-title');
+      if(restoredFromDraft && titleInput){
+        const draftTitle=typeof pendingDraftTitle==='string' ? pendingDraftTitle : '';
+        titleInput.value=draftTitle;
+      }
       const saveState=document.getElementById('save-state');
       const importInput=document.getElementById('import-input');
       const attachInput=document.getElementById('attach-file-input');
@@ -7752,6 +7933,45 @@ if ($view === 'map_edit') {
           else{ dockSaveButton.removeAttribute('data-state'); }
         }
       }
+      function persistDraftSnapshot(){
+        if(!canUseDraftStorage){ return; }
+        const key=activeDraftKey || computeDraftStorageKey(currentMapId, mindmapSessionKey);
+        if(!activeDraftKey && key){ activeDraftKey=key; }
+        if(!key || !jm || typeof jm.get_data!=='function'){ return; }
+        try{
+          const snapshot=jm.get_data('node_tree');
+          if(!snapshot || typeof snapshot!=='object'){ return; }
+          if(snapshot.data){ enforceRightOrientation(snapshot.data); }
+          const payload={
+            mapId:currentMapId||0,
+            sessionKey:mindmapSessionKey || '',
+            savedAt:Date.now(),
+            title:titleInput ? titleInput.value.trim() : '',
+            data:snapshot,
+          };
+          writeDraftToStorage(key, payload);
+        }catch(err){
+          console.warn('无法保存思维导图草稿：', err);
+        }
+      }
+      function scheduleDraftSave(immediate=false){
+        if(!canUseDraftStorage){ return; }
+        if(immediate){
+          if(draftSaveTimer){ clearTimeout(draftSaveTimer); draftSaveTimer=null; }
+          persistDraftSnapshot();
+          return;
+        }
+        if(draftSaveTimer){ clearTimeout(draftSaveTimer); }
+        draftSaveTimer=window.setTimeout(()=>{
+          draftSaveTimer=null;
+          persistDraftSnapshot();
+        },1200);
+      }
+      function clearDraft(key){
+        if(draftSaveTimer){ clearTimeout(draftSaveTimer); draftSaveTimer=null; }
+        const targetKey=key || (activeDraftKey || computeDraftStorageKey(currentMapId, mindmapSessionKey));
+        removeDraftFromStorage(targetKey);
+      }
       function markDirty(){
         dirty=true;
         if(saveState){
@@ -7759,6 +7979,11 @@ if ($view === 'map_edit') {
           saveState.classList.add('show','dirty');
         }
         setSaveButtonState('未保存',false,'dirty');
+        scheduleDraftSave();
+      }
+      if(restoredFromDraft){
+        markDirty();
+        restoredFromDraft=false;
       }
       function showSaving(){
         if(saveState){
@@ -10312,6 +10537,7 @@ if ($view === 'map_edit') {
         initialData=JSON.parse(JSON.stringify(cloned));
         if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
         currentMapId=0;
+        activeDraftKey=computeDraftStorageKey(currentMapId, mindmapSessionKey);
         if(jmContainer){ jmContainer.dataset.mapId='0'; }
         if(deleteMapForm){
           const idInput=deleteMapForm.querySelector('input[name="id"]');
@@ -10375,6 +10601,7 @@ if ($view === 'map_edit') {
           if(!res.ok) throw new Error('网络异常');
           const json=await res.json();
           if(!json.ok) throw new Error(json.error||'保存失败');
+          const previousDraftKey=activeDraftKey;
           currentMapId=parseInt(json.id,10)||0;
           document.getElementById('jsmind-container').dataset.mapId=currentMapId;
           if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
@@ -10385,6 +10612,8 @@ if ($view === 'map_edit') {
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
           if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+          if(previousDraftKey){ clearDraft(previousDraftKey); }
+          activeDraftKey=computeDraftStorageKey(currentMapId, mindmapSessionKey);
           markSaved();
         }catch(err){
           alert(err.message||'保存失败');
@@ -10397,6 +10626,7 @@ if ($view === 'map_edit') {
           blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
           blobUrlRegistry.clear();
         }
+        if(canUseDraftStorage){ persistDraftSnapshot(); }
         if(dirty){ e.preventDefault(); e.returnValue=''; }
       });
       })();
