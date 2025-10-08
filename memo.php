@@ -364,6 +364,22 @@ function get_steps_grouped(array $item_ids): array {
   return $group;
 }
 
+function get_steps_by_time_grouped(array $item_ids): array {
+  $ids=array_values(array_unique(array_map('intval',$item_ids)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM steps WHERE item_id IN ($placeholders) ORDER BY item_id ASC, created_at ASC, id ASC");
+  $st->execute($ids);
+  $group=[];
+  foreach($st->fetchAll() as $row){
+    $iid=(int)$row['item_id'];
+    if(!isset($group[$iid])) $group[$iid]=[];
+    $group[$iid][]=$row;
+  }
+  return $group;
+}
+
 function get_step_counts(array $item_ids): array {
   $ids=array_values(array_unique(array_map('intval',$item_ids)));
   if(!$ids){ return []; }
@@ -382,6 +398,22 @@ function get_attachment(int $id): ?array {
 
 function attachments_for_item(int $item_id): array {
   $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
+}
+
+function attachments_for_items(array $item_ids): array {
+  $ids=array_values(array_unique(array_map('intval',$item_ids)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',', array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE item_id IN ($placeholders) ORDER BY item_id ASC, id DESC");
+  $st->execute($ids);
+  $group=[];
+  foreach($st->fetchAll() as $row){
+    $iid=(int)$row['item_id'];
+    if(!isset($group[$iid])) $group[$iid]=[];
+    $group[$iid][]=$row;
+  }
+  return $group;
 }
 
 function get_mindmap_asset(int $id): ?array {
@@ -7784,8 +7816,11 @@ if ($view === 'map_edit') {
         overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
       }
       syncOverlaySize();
-      window.addEventListener('resize',()=>requestAnimationFrame(syncOverlaySize));
-      document.addEventListener('scroll',()=>requestAnimationFrame(syncOverlaySize), true);
+      const scheduleOverlaySync=()=>requestAnimationFrame(syncOverlaySize);
+      window.addEventListener('resize',scheduleOverlaySync);
+      if(jmContainer){
+        jmContainer.addEventListener('scroll',scheduleOverlaySync,{passive:true});
+      }
       const dragHandle=document.createElement('div');
       dragHandle.id='node-handle';
       dragHandle.textContent='+';
@@ -7919,7 +7954,10 @@ if ($view === 'map_edit') {
       window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
       window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
       window.addEventListener('resize',scheduleHandleRefresh);
-      document.addEventListener('scroll',scheduleHandleRefresh, true);
+      if(jmContainer){
+        const refreshOnScroll=()=>scheduleHandleRefresh();
+        jmContainer.addEventListener('scroll',refreshOnScroll,{passive:true});
+      }
       scheduleHandleRefresh();
       const titleInput=document.getElementById('map-title');
       const saveState=document.getElementById('save-state');
@@ -10746,10 +10784,10 @@ if ($view === 'map_edit') {
           const viewportHeight=Math.max(1, Math.ceil(bounds.height));
           const SAFE_CANVAS_BOUND=16384;
           const basePixelRatio=window.devicePixelRatio || 1;
-          const minPixelRatio=2;
-          const maxPixelRatio=4;
+          const targetPixelRatio=Math.max(2, basePixelRatio * 2);
+          const maxPixelRatio=6;
           const sizeLimitedRatio=Math.max(1, Math.floor(SAFE_CANVAS_BOUND / Math.max(viewportWidth, viewportHeight)));
-          const pixelRatio=Math.min(maxPixelRatio, Math.max(minPixelRatio, basePixelRatio), sizeLimitedRatio);
+          const pixelRatio=Math.min(maxPixelRatio, targetPixelRatio, sizeLimitedRatio);
           exportHost=document.createElement('div');
           exportHost.style.position='fixed';
           exportHost.style.left='-120vw';
@@ -10808,7 +10846,7 @@ if ($view === 'map_edit') {
           });
           if(!canvas){ throw new Error('无法生成导出图像'); }
           if(format==='jpg'){
-            const blob=await canvasToBlob(canvas,'image/jpeg',0.95);
+            const blob=await canvasToBlob(canvas,'image/jpeg',0.98);
             const url=URL.createObjectURL(blob);
             const a=document.createElement('a');
             a.href=url;
@@ -10822,10 +10860,10 @@ if ($view === 'map_edit') {
             const isLandscape=canvas.width>=canvas.height;
             const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
             const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
-            const dataUrl=canvas.toDataURL('image/png');
+            const dataUrl=canvas.toDataURL('image/png',1.0);
             const pageWidth=pdf.internal.pageSize.getWidth();
             const pageHeight=pdf.internal.pageSize.getHeight();
-            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'FAST');
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'MEDIUM');
             pdf.save(buildExportFilename('pdf', titleValue));
           }else{
             throw new Error('不支持的导出格式');
@@ -11157,7 +11195,7 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .btn-ghost:hover{background:rgba(230,192,137,.08);color:var(--gold-400)}
   .btn-danger,.btn.danger{border:1px solid rgba(239,68,68,.35);color:#fca5a5;background:transparent;box-shadow:none}
   .btn-danger:hover,.btn.danger:hover{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.5)}
-  .btn-small,.btn.small{padding:8px 12px;border-radius:12px;font-size:11px;letter-spacing:.18em}
+  .btn-small,.btn.small{padding:8px 12px;border-radius:12px;font-size:11px;letter-spacing:.1em}
   .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(230,192,137,.5)}
   .btn-icon{font-size:14px;line-height:1}
   .btn-label{display:inline-flex}
@@ -11179,11 +11217,13 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .search{flex:1 1 260px;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(15,19,22,.9),rgba(10,12,14,.88));border:1px solid rgba(201,168,106,.32);border-radius:16px;padding:10px 14px;box-shadow:inset 0 0 28px rgba(201,168,106,.08)}
   .search input{all:unset;flex:1;color:var(--text-strong);font-size:15px;letter-spacing:.06em}
   .search input::placeholder{color:var(--text-dim)}
-  .search button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.42);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.18em;cursor:pointer;transition:background var(--transition),box-shadow var(--transition),border-color var(--transition)}
+  .search button{padding:8px 14px;border-radius:12px;border:1px solid rgba(201,168,106,.42);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:none;letter-spacing:.08em;cursor:pointer;transition:background var(--transition),box-shadow var(--transition),border-color var(--transition)}
+  .search button:lang(en){text-transform:uppercase;letter-spacing:.18em}
   .search button:hover{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.6);box-shadow:0 0 18px rgba(227,198,139,.22)}
   .actions-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .density-toggle{display:inline-flex;border-radius:12px;border:1px solid rgba(230,192,137,.28);overflow:hidden;background:rgba(15,19,22,.6);box-shadow:0 10px 24px rgba(0,0,0,.35)}
-  .density-toggle .btn{border:0;border-radius:0;box-shadow:none;font-size:11px;letter-spacing:.16em;padding:8px 14px;color:var(--text-dim)}
+  .density-toggle .btn{border:0;border-radius:0;box-shadow:none;font-size:11px;letter-spacing:.08em;padding:8px 14px;color:var(--text-dim)}
+  .density-toggle .btn:lang(en){letter-spacing:.16em;text-transform:uppercase}
   .density-toggle .btn::before{display:none}
   .density-toggle .btn:hover{background:rgba(230,192,137,.08);color:var(--gold-400)}
   .density-toggle .btn.active{background:rgba(230,192,137,.16);color:var(--gold-400);box-shadow:inset 0 0 0 1px rgba(230,192,137,.25)}
@@ -11201,7 +11241,8 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .item-title{font-weight:600;font-size:16px;line-height:var(--item-line);letter-spacing:.2px;color:var(--text-strong);text-shadow:0 0 14px rgba(227,198,139,.16);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
   .item.done .item-title,.item.done .item-desc,.item.done .tinyline{text-decoration:line-through;color:rgba(227,198,139,.75)}
   .item-desc{color:var(--text-muted);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:var(--item-desc-lines);-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;font-size:13px;line-height:1.6;opacity:.88}
-  .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.22em;padding:4px 10px;border-radius:999px;border:1px solid rgba(230,192,137,.32);background:rgba(230,192,137,.08);color:var(--text-muted);box-shadow:inset 0 0 12px rgba(230,192,137,.05)}
+  .badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;padding:4px 10px;border-radius:999px;border:1px solid rgba(230,192,137,.32);background:rgba(230,192,137,.08);color:var(--text-muted);box-shadow:inset 0 0 12px rgba(230,192,137,.05)}
+  .badge:lang(en){text-transform:uppercase;letter-spacing:.22em}
   .attachment-badge{background:rgba(75,195,209,.14);border-color:rgba(75,195,209,.38);color:#9fe8f1}
   .item-meta{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:6px;font-size:12px;opacity:.75}
   .item-meta .meta-left{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -11226,7 +11267,8 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .ts{color:var(--text-dim);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;margin-left:6px;letter-spacing:.12em;text-transform:uppercase}
   .item-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
   .item-actions form{margin:0}
-  .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.2em;text-transform:uppercase}
+  .item-actions .tip{margin-right:auto;color:var(--text-dim);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.1em;text-transform:none}
+  .item-actions .tip:lang(en){letter-spacing:.2em;text-transform:uppercase}
   .item-actions .status-tip{color:var(--gold-400)}
   .item-actions .note-tip{margin-right:0}
   .move-controls{display:flex;gap:6px}
@@ -11508,10 +11550,16 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
         <?php if (!$items): ?>
           <div class="item item-empty">没有条目 · No items</div>
         <?php endif; ?>
+        <?php
+          $itemIds=array_map(fn($it)=>(int)$it['id'],$items);
+          $stepsTimeMap=$itemIds ? get_steps_by_time_grouped($itemIds) : [];
+          $attachmentsMap=$itemIds ? attachments_for_items($itemIds) : [];
+        ?>
         <?php foreach ($items as $it): ?>
           <?php
-            $steps_time=get_steps_by_time((int)$it['id']);
-            $attachments=attachments_for_item((int)$it['id']);
+            $itemId=(int)$it['id'];
+            $steps_time=$stepsTimeMap[$itemId] ?? [];
+            $attachments=$attachmentsMap[$itemId] ?? [];
             $titlePlain=(string)$it['title'];
             $titleHtml = $q!=='' ? highlight_text($titlePlain, $q) : h($titlePlain);
             $descRaw = (string)$it['description'];
