@@ -3972,6 +3972,10 @@ if ($view === 'map_edit') {
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-highlight{pointer-events:none}
+      .mind-relations .relation-direction{font:600 10px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.32em;text-transform:uppercase;fill:rgba(227,198,139,.75);pointer-events:none;mix-blend-mode:screen}
+      .mind-relations .relation-direction.reverse{fill:rgba(191,242,255,.65)}
+      .mind-relations .relation-direction textPath{dominant-baseline:middle}
+      .mind-relations .relation-direction.reverse textPath{dominant-baseline:hanging}
       .mind-relations .relation-group[data-selected="true"]{filter:drop-shadow(0 0 6px rgba(191,242,255,.45)) drop-shadow(0 0 18px rgba(191,242,255,.3))}
       .mind-relations .relation-group[data-selected="true"] .relation-shadow{stroke:rgba(75,195,209,.85);opacity:.9}
       .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2.6;stroke:rgba(191,242,255,.92);filter:url(#mindSoftGlow)}
@@ -4010,15 +4014,9 @@ if ($view === 'map_edit') {
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
       .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:pan-x pan-y;flex:0 1 auto;margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
       .mind-dock::-webkit-scrollbar{display:none}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px}
-      .dock-btn .icon{font-size:20px}
-      .dock-btn .label{font-size:12px}
-      @media (hover:hover) and (pointer:fine){
-        .dock-btn[data-tip]::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);padding:6px 10px;border-radius:12px;border:1px solid rgba(201,168,106,.38);background:rgba(12,16,18,.92);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);box-shadow:0 12px 28px rgba(0,0,0,.45)}
-        .dock-btn[data-tip]::before{content:"";position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);border-width:6px;border-style:solid;border-color:rgba(12,16,18,.92) transparent transparent transparent;opacity:0;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
-        .dock-btn[data-tip]:hover::after,.dock-btn[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,-4px)}
-        .dock-btn[data-tip]:hover::before,.dock-btn[data-tip]:focus-visible::before{opacity:1;transform:translate(-50%,-4px)}
-      }
+      .dock-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px;text-align:center}
+      .dock-btn .icon{font-size:20px;line-height:1}
+      .dock-btn .label{font-size:12px;line-height:1}
       .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
       .dock-btn:active{transform:translateY(-1px)}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
@@ -4186,9 +4184,6 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
-          <path d="M0 0 L12 6 L0 12 Z" fill="#E3C68B" />
-        </marker>
       </defs>
     </svg>
     <div class="mind-shell">
@@ -4234,47 +4229,47 @@ if ($view === 'map_edit') {
       <?php endif; ?>
       <div class="mind-dock-wrap">
         <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
-          <button class="dock-btn" data-action="save" data-default-label="保存" data-tip="保存（Ctrl+S）" aria-label="保存">
+          <button class="dock-btn" data-action="save" data-default-label="保存" aria-label="保存">
             <span class="icon">💾</span>
             <span class="label">保存</span>
           </button>
-          <button class="dock-btn" data-action="undo" data-tip="撤销（Ctrl/⌘+Z）" aria-label="撤销操作">
+          <button class="dock-btn" data-action="undo" aria-label="撤销操作">
             <span class="icon">↺</span>
             <span class="label">撤销</span>
           </button>
-          <button class="dock-btn" data-action="redo" data-tip="重做（Ctrl+Shift+Z）" aria-label="重做操作">
+          <button class="dock-btn" data-action="redo" aria-label="重做操作">
             <span class="icon">↻</span>
             <span class="label">重做</span>
           </button>
-          <button class="dock-btn" data-action="sibling" data-tip="同级节点（Enter）" aria-label="新增同级节点">
+          <button class="dock-btn" data-action="sibling" aria-label="新增同级节点">
             <span class="icon">⧉</span>
             <span class="label">同级</span>
           </button>
-          <button class="dock-btn" data-action="child" data-tip="子级节点（Tab）" aria-label="新增子级节点">
+          <button class="dock-btn" data-action="child" aria-label="新增子级节点">
             <span class="icon">↳</span>
             <span class="label">子级</span>
           </button>
-          <button class="dock-btn" data-action="fold" data-tip="折叠/展开（Space 或 ←/→）" aria-label="折叠或展开节点">
+          <button class="dock-btn" data-action="fold" aria-label="折叠或展开节点">
             <span class="icon" data-fold-icon>⇅</span>
             <span class="label" data-fold-label>折叠</span>
           </button>
-          <button class="dock-btn" data-action="attach" data-tip="上传附件" aria-label="上传附件">
+          <button class="dock-btn" data-action="attach" aria-label="上传附件">
             <span class="icon">📎</span>
             <span class="label">附件</span>
           </button>
-          <button class="dock-btn" data-action="manage-attachments" data-tip="附件管理（Ctrl+Shift+A）" aria-label="附件管理">
+          <button class="dock-btn" data-action="manage-attachments" aria-label="附件管理">
             <span class="icon">🗂</span>
             <span class="label">管理</span>
           </button>
-          <button class="dock-btn" data-action="relation" data-tip="建立关联" aria-label="关联节点">
+          <button class="dock-btn" data-action="relation" aria-label="关联节点">
             <span class="icon">🪢</span>
             <span class="label">关联</span>
           </button>
-          <button class="dock-btn" data-action="link" data-tip="新增链接" aria-label="新增链接">
+          <button class="dock-btn" data-action="link" aria-label="新增链接">
             <span class="icon">🔗</span>
             <span class="label">链接</span>
           </button>
-          <button class="dock-btn danger" data-action="delete" data-tip="删除（Backspace/Del）" aria-label="删除节点">
+          <button class="dock-btn danger" data-action="delete" aria-label="删除节点">
             <span class="icon">🗑</span>
             <span class="label">删除</span>
           </button>
@@ -6235,24 +6230,42 @@ if ($view === 'map_edit') {
             const core=document.createElementNS('http://www.w3.org/2000/svg','path');
             core.classList.add('relation-core');
             core.dataset.bidirectional=relation.bidirectional?'true':'false';
-            core.setAttribute('marker-end','url(#mindRelationArrow)');
-            if(relation.bidirectional){ core.setAttribute('marker-start','url(#mindRelationArrow)'); }
-            else{ core.removeAttribute('marker-start'); }
+            const coreId=`relation-path-${relation.id}`;
+            core.setAttribute('id', coreId);
             const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
             highlight.classList.add('relation-highlight');
             const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
             hit.classList.add('relation-hit');
             hit.setAttribute('fill','none');
             hit.setAttribute('stroke','transparent');
+            const direction=document.createElementNS('http://www.w3.org/2000/svg','text');
+            direction.classList.add('relation-direction');
+            direction.setAttribute('aria-hidden','true');
+            const directionPath=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+            directionPath.setAttribute('href', `#${coreId}`);
+            directionPath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            directionPath.setAttribute('startOffset','2%');
+            direction.appendChild(directionPath);
+            const directionReverse=document.createElementNS('http://www.w3.org/2000/svg','text');
+            directionReverse.classList.add('relation-direction','reverse');
+            directionReverse.setAttribute('aria-hidden','true');
+            directionReverse.setAttribute('hidden','true');
+            const directionReversePath=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+            directionReversePath.setAttribute('href', `#${coreId}`);
+            directionReversePath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            directionReversePath.setAttribute('startOffset','6%');
+            directionReverse.appendChild(directionReversePath);
             if(this.selectedRelationId && this.selectedRelationId===relation.id){
               group.dataset.selected='true';
             }
             group.appendChild(shadow);
             group.appendChild(core);
             group.appendChild(highlight);
+            group.appendChild(direction);
+            group.appendChild(directionReverse);
             group.appendChild(hit);
             this.relationLayer.appendChild(group);
-            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
+            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation,direction,directionReverse,directionPath,directionReversePath});
             const handleSelect=evt=>{
               if(evt){ evt.stopPropagation(); }
               const isMouse=evt && evt.pointerType==='mouse';
@@ -6546,6 +6559,162 @@ if ($view === 'map_edit') {
             btn.style.top=`${screenY}px`;
           }
         }
+        getNodeCenterPoint(node){
+          if(!node) return {x:0,y:0};
+          if(node.anchors && node.anchors.center && Number.isFinite(node.anchors.center.x) && Number.isFinite(node.anchors.center.y)){
+            return {x:node.anchors.center.x,y:node.anchors.center.y};
+          }
+          const x=Number.isFinite(node.absX)?node.absX:0;
+          const y=Number.isFinite(node.absY)?node.absY:0;
+          return {x,y};
+        }
+        getNodeBounds(node){
+          if(!node) return null;
+          if(!node.anchors) this.updateAnchors(node);
+          const anchors=node.anchors||{};
+          const center=this.getNodeCenterPoint(node);
+          const left=anchors.left && Number.isFinite(anchors.left.x)?anchors.left.x:center.x;
+          const right=anchors.right && Number.isFinite(anchors.right.x)?anchors.right.x:center.x;
+          const top=anchors.top && Number.isFinite(anchors.top.y)?anchors.top.y:center.y;
+          const bottom=anchors.bottom && Number.isFinite(anchors.bottom.y)?anchors.bottom.y:center.y;
+          return {
+            minX:Math.min(left,right),
+            maxX:Math.max(left,right),
+            minY:Math.min(top,bottom),
+            maxY:Math.max(top,bottom)
+          };
+        }
+        getEdgeButtonPosition(node){
+          if(!node || !node.edgeButton) return null;
+          const btn=node.edgeButton;
+          let logical=btn._logicalPosition||null;
+          if((!logical || !Number.isFinite(logical.x) || !Number.isFinite(logical.y)) && btn.dataset){
+            const lx=parseFloat(btn.dataset.logicalX||'');
+            const ly=parseFloat(btn.dataset.logicalY||'');
+            if(Number.isFinite(lx) && Number.isFinite(ly)){
+              logical={x:lx,y:ly};
+              btn._logicalPosition=logical;
+            }
+          }
+          if(logical && Number.isFinite(logical.x) && Number.isFinite(logical.y)){
+            return {x:logical.x,y:logical.y};
+          }
+          return null;
+        }
+        buildRelationAnchorCandidates(node, counterpart){
+          if(!node) return [];
+          if(!node.anchors) this.updateAnchors(node);
+          const anchors=node.anchors||{};
+          const center=this.getNodeCenterPoint(node);
+          const counterpartCenter=counterpart?this.getNodeCenterPoint(counterpart):null;
+          const buttonPos=this.getEdgeButtonPosition(node);
+          const createCandidate=(position, anchorPoint, normal)=>{
+            const point=anchorPoint && Number.isFinite(anchorPoint.x) && Number.isFinite(anchorPoint.y)
+              ? {x:anchorPoint.x,y:anchorPoint.y}
+              : {x:center.x,y:center.y};
+            const normalized=(()=>{
+              const len=Math.hypot(normal.x||0, normal.y||0);
+              if(len<1e-6) return {x:0,y:0};
+              return {x:normal.x/len,y:normal.y/len};
+            })();
+            let penalty=0;
+            let distanceToCounterpart=counterpartCenter?Math.hypot(counterpartCenter.x-point.x,counterpartCenter.y-point.y):Infinity;
+            if(counterpartCenter){
+              const vec={x:counterpartCenter.x-point.x,y:counterpartCenter.y-point.y};
+              const dot=normalized.x*vec.x + normalized.y*vec.y;
+              if(dot<0){ penalty+=Math.abs(dot)*0.6; }
+            }
+            if(buttonPos){
+              const dx=point.x-buttonPos.x;
+              const dy=point.y-buttonPos.y;
+              const dist=Math.hypot(dx,dy);
+              if(Number.isFinite(dist) && dist<40){ penalty+=(40-dist)*35; }
+            }
+            return {
+              position,
+              axis:(position==='left'||position==='right')?'horizontal':'vertical',
+              point,
+              normal:normalized,
+              penalty,
+              distanceToCounterpart:Number.isFinite(distanceToCounterpart)?distanceToCounterpart:Infinity
+            };
+          };
+          const candidates=[
+            createCandidate('left', anchors.left, {x:-1,y:0}),
+            createCandidate('right', anchors.right, {x:1,y:0}),
+            createCandidate('top', anchors.top, {x:0,y:-1}),
+            createCandidate('bottom', anchors.bottom, {x:0,y:1})
+          ];
+          return candidates.filter(Boolean);
+        }
+        chooseRelationAnchors(fromNode, toNode){
+          const startCandidates=this.buildRelationAnchorCandidates(fromNode, toNode);
+          const endCandidates=this.buildRelationAnchorCandidates(toNode, fromNode);
+          const startCenter=this.getNodeCenterPoint(fromNode);
+          const endCenter=this.getNodeCenterPoint(toNode);
+          const startButton=this.getEdgeButtonPosition(fromNode);
+          const endButton=this.getEdgeButtonPosition(toNode);
+          if(!startCandidates.length){
+            startCandidates.push({position:'center',axis:'both',point:{x:startCenter.x,y:startCenter.y},normal:{x:0,y:0},penalty:0,distanceToCounterpart:Math.hypot(endCenter.x-startCenter.x,endCenter.y-startCenter.y)});
+          }
+          if(!endCandidates.length){
+            endCandidates.push({position:'center',axis:'both',point:{x:endCenter.x,y:endCenter.y},normal:{x:0,y:0},penalty:0,distanceToCounterpart:Math.hypot(endCenter.x-startCenter.x,endCenter.y-startCenter.y)});
+          }
+          const pointToSegmentDistance=(pt,a,b)=>{
+            if(!pt || !a || !b) return Infinity;
+            const dx=b.x-a.x;
+            const dy=b.y-a.y;
+            const denom=dx*dx + dy*dy;
+            if(denom<=1e-6){ return Math.hypot(pt.x-a.x, pt.y-a.y); }
+            const t=((pt.x-a.x)*dx + (pt.y-a.y)*dy)/denom;
+            const clamped=Math.max(0, Math.min(1, t));
+            const projX=a.x + clamped*dx;
+            const projY=a.y + clamped*dy;
+            return Math.hypot(pt.x-projX, pt.y-projY);
+          };
+          let best=null;
+          for(const start of startCandidates){
+            if(!start || !start.point) continue;
+            for(const end of endCandidates){
+              if(!end || !end.point) continue;
+              const dx=end.point.x-start.point.x;
+              const dy=end.point.y-start.point.y;
+              const distance=Math.hypot(dx,dy);
+              let score=distance;
+              if(distance<1e-3){ score+=start.penalty + end.penalty; }
+              const startDot=start.normal.x*dx + start.normal.y*dy;
+              const endDot=end.normal.x*(-dx) + end.normal.y*(-dy);
+              if(startDot<=4){ score+=(4-startDot)*260; }
+              else{ score-=Math.min(startDot,220)*0.05; }
+              if(endDot<=4){ score+=(4-endDot)*260; }
+              else{ score-=Math.min(endDot,220)*0.05; }
+              if(start.position===end.position && start.axis===end.axis){ score+=distance*0.25; }
+              const horizontalBias=Math.abs(dx) - Math.abs(dy);
+              if(horizontalBias>18){
+                if(start.axis!=='horizontal'){ score+=horizontalBias*0.35; }
+                if(end.axis!=='horizontal'){ score+=horizontalBias*0.35; }
+              }else if(horizontalBias<-18){
+                const bias=Math.abs(horizontalBias);
+                if(start.axis!=='vertical'){ score+=bias*0.35; }
+                if(end.axis!=='vertical'){ score+=bias*0.35; }
+              }
+              score+=(start.penalty||0) + (end.penalty||0);
+              if(Number.isFinite(start.distanceToCounterpart)){ score+=start.distanceToCounterpart*0.02; }
+              if(Number.isFinite(end.distanceToCounterpart)){ score+=end.distanceToCounterpart*0.02; }
+              if(startButton){
+                const dist=pointToSegmentDistance(startButton, start.point, end.point);
+                if(dist<28){ score+=(28-dist)*70; }
+              }
+              if(endButton){
+                const dist=pointToSegmentDistance(endButton, start.point, end.point);
+                if(dist<28){ score+=(28-dist)*70; }
+              }
+              if(!best || score<best.score){ best={start,end,score}; }
+            }
+          }
+          if(best){ return {start:best.start,end:best.end}; }
+          return {start:startCandidates[0],end:endCandidates[0]};
+        }
         updateRelationPath(relation){
           if(!relation) return;
           const entry=this.relationRegistry ? this.relationRegistry.get(relation.id) : null;
@@ -6558,131 +6727,136 @@ if ($view === 'map_edit') {
           const startCenter=fromNode.anchors ? fromNode.anchors.center : null;
           const endCenter=toNode.anchors ? toNode.anchors.center : null;
           if(!startCenter || !endCenter) return;
-          const rootCenter=(()=>{
-            if(this.root){
-              if(this.root.anchors && this.root.anchors.center && Number.isFinite(this.root.anchors.center.x)){
-                return this.root.anchors.center.x;
-              }
-              if(Number.isFinite(this.root.absX)) return this.root.absX;
-            }
-            return (startCenter.x + endCenter.x)/2;
-          })();
-          const determineSide=node=>{
-            if(!node) return 0;
-            if(node.direction==='left' || node.dir===-1) return -1;
-            if(node.direction==='right' || node.dir===1) return 1;
-            if(Number.isFinite(node.absX)){
-              if(node.absX < rootCenter - 1) return -1;
-              if(node.absX > rootCenter + 1) return 1;
-            }
-            return 0;
-          };
-          const startSide=determineSide(fromNode);
-          const endSide=determineSide(toNode);
-          const adjustVector=(vector, side)=>{
-            if(!vector) return vector;
-            if(!side) return {x:vector.x,y:vector.y};
-            const biasBase=Math.hypot(vector.x, vector.y) || 1;
-            const bias=Math.min(Math.max(biasBase*0.35, 18), 72);
-            return {x:vector.x + side*bias, y:vector.y};
-          };
-          const startVector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
-          const endVector={x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y};
-          const startInner=this.computeNodeBoundaryPoint(fromNode, adjustVector(startVector, startSide), 8);
-          const endInner=this.computeNodeBoundaryPoint(toNode, adjustVector(endVector, endSide), 8);
-          if(!startInner || !endInner) return;
-          let vector={x:endInner.x-startInner.x,y:endInner.y-startInner.y};
-          let segmentLength=Math.hypot(vector.x, vector.y);
-          if(segmentLength<0.001){
+          const anchorSelection=this.chooseRelationAnchors(fromNode, toNode);
+          const startAnchor=anchorSelection && anchorSelection.start ? anchorSelection.start : null;
+          const endAnchor=anchorSelection && anchorSelection.end ? anchorSelection.end : null;
+          const startPoint=startAnchor && startAnchor.point ? {x:startAnchor.point.x,y:startAnchor.point.y} : {x:startCenter.x,y:startCenter.y};
+          const endPoint=endAnchor && endAnchor.point ? {x:endAnchor.point.x,y:endAnchor.point.y} : {x:endCenter.x,y:endCenter.y};
+          let vector={x:endPoint.x-startPoint.x,y:endPoint.y-startPoint.y};
+          let distance=Math.hypot(vector.x, vector.y);
+          if(distance<0.001){
             vector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
-            segmentLength=Math.hypot(vector.x, vector.y);
-            if(segmentLength<0.001) return;
-            startInner={x:startCenter.x,y:startCenter.y};
-            endInner={x:endCenter.x,y:endCenter.y};
+            distance=Math.hypot(vector.x, vector.y);
+            if(distance<0.001) return;
           }
-          const norm={x:vector.x/segmentLength,y:vector.y/segmentLength};
-          const arrowBase=Math.min(22, Math.max(10, segmentLength*0.18));
-          const halfDistance=segmentLength/2;
-          const clearanceLimit=Math.max(0, halfDistance - 6);
-          const effectiveClearance=Math.max(0, Math.min(arrowBase, clearanceLimit, segmentLength - 8));
-          const endClearance=effectiveClearance;
-          const startClearance=relation.bidirectional ? effectiveClearance : 0;
-          const startPoint={x:startInner.x - norm.x*startClearance,y:startInner.y - norm.y*startClearance};
-          const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
-          const dx=endPoint.x-startPoint.x;
-          const dy=endPoint.y-startPoint.y;
-          const distance=Math.hypot(dx,dy) || 1;
-          const baseNormal={x:distance?-dy/distance:0,y:distance?dx/distance:0};
-          const tangentLength=Math.min(96, Math.max(24, distance*0.28));
-          const curvature=Math.min(160, Math.max(26, distance*0.42));
-          const verticalHint=Math.abs(dy)>4 ? Math.sign(dy) : 0;
-          const fallbackHorizontal=(()=>{ const direct=Math.sign(dx); if(direct) return direct; return (startSide||endSide||1); })();
-          const buildTangent=(side, fallback, normalBias)=>{
-            let horizontal=side;
-            if(horizontal===0){ horizontal=fallback; }
-            if(horizontal===0){ horizontal=fallback>=0?1:-1; }
-            let vertical=verticalHint ? verticalHint*0.6 : normalBias*0.6;
-            const len=Math.hypot(horizontal, vertical);
-            if(len===0){ return {x:horizontal||0,y:vertical||0}; }
-            return {x:horizontal/len,y:vertical/len};
+          const norm={x:vector.x/distance,y:vector.y/distance};
+          const normalizeVec=input=>{
+            if(!input) return {x:0,y:0};
+            const len=Math.hypot(input.x||0, input.y||0);
+            if(len<1e-6){ return {x:0,y:0}; }
+            return {x:input.x/len,y:input.y/len};
           };
-          const bezierPoint=(t,p0,p1,p2,p3)=>{
-            const mt=1-t;
-            const mt2=mt*mt;
-            const t2=t*t;
-            return {
-              x:mt2*mt*p0.x + 3*mt2*t*p1.x + 3*mt*t2*p2.x + t2*t*p3.x,
-              y:mt2*mt*p0.y + 3*mt2*t*p1.y + 3*mt*t2*p2.y + t2*t*p3.y
-            };
+          let startNormal=startAnchor && startAnchor.normal ? {...startAnchor.normal} : null;
+          let endNormal=endAnchor && endAnchor.normal ? {...endAnchor.normal} : null;
+          startNormal=normalizeVec(startNormal||norm);
+          if(Math.abs(startNormal.x)<1e-6 && Math.abs(startNormal.y)<1e-6){ startNormal={x:norm.x,y:norm.y}; }
+          endNormal=normalizeVec(endNormal||{x:-norm.x,y:-norm.y});
+          if(Math.abs(endNormal.x)<1e-6 && Math.abs(endNormal.y)<1e-6){ endNormal={x:-norm.x,y:-norm.y}; }
+          const startBounds=this.getNodeBounds(fromNode);
+          const endBounds=this.getNodeBounds(toNode);
+          const startButtonPos=this.getEdgeButtonPosition(fromNode);
+          const endButtonPos=this.getEdgeButtonPosition(toNode);
+          let escapeDistance=Math.min(60, Math.max(24, distance*0.2));
+          let travelDistance=Math.min(140, Math.max(32, distance*0.35));
+          let lateralDistance=Math.min(52, Math.max(10, distance*0.12));
+          escapeDistance=Math.min(escapeDistance, distance*0.45);
+          travelDistance=Math.min(travelDistance, distance*0.75);
+          travelDistance=Math.max(travelDistance, distance*0.25);
+          lateralDistance=Math.min(lateralDistance, distance*0.5);
+          if(distance<80){
+            escapeDistance=Math.max(18, distance*0.24);
+            travelDistance=Math.max(travelDistance, distance*0.42);
+            lateralDistance=Math.max(lateralDistance, distance*0.08);
+          }
+          const perp={x:-norm.y,y:norm.x};
+          const startPerpWeight=startNormal.x*perp.x + startNormal.y*perp.y;
+          const endPerpWeight=endNormal.x*perp.x + endNormal.y*perp.y;
+          const bendInfluence=(startPerpWeight - endPerpWeight)/2;
+          const startCtrl={
+            x:startPoint.x + startNormal.x*escapeDistance + norm.x*travelDistance + perp.x*lateralDistance*bendInfluence,
+            y:startPoint.y + startNormal.y*escapeDistance + norm.y*travelDistance + perp.y*lateralDistance*bendInfluence
           };
-          const avgY=(startCenter.y + endCenter.y)/2;
-          const evaluatePath=normalSign=>{
-            const normalX=baseNormal.x*normalSign;
-            const normalY=baseNormal.y*normalSign;
-            const startTangent=buildTangent(startSide, fallbackHorizontal, normalSign||1);
-            const endTangent=buildTangent(endSide, fallbackHorizontal, normalSign||1);
-            const startCtrlBase={
-              x:startPoint.x + startTangent.x*tangentLength,
-              y:startPoint.y + startTangent.y*tangentLength
-            };
-            const endCtrlBase={
-              x:endPoint.x + endTangent.x*tangentLength,
-              y:endPoint.y + endTangent.y*tangentLength
-            };
-            const ctrl1={x:startCtrlBase.x + normalX*curvature,y:startCtrlBase.y + normalY*curvature};
-            const ctrl2={x:endCtrlBase.x + normalX*curvature,y:endCtrlBase.y + normalY*curvature};
-            const q1=bezierPoint(0.25,startPoint,ctrl1,ctrl2,endPoint);
-            const q2=bezierPoint(0.5,startPoint,ctrl1,ctrl2,endPoint);
-            const q3=bezierPoint(0.75,startPoint,ctrl1,ctrl2,endPoint);
-            const points=[q1,q2,q3];
-            let score=0;
-            for(const pt of points){ score+=Math.abs(pt.x - rootCenter); }
-            if(startSide && startSide===endSide){
-              const extremes=[startPoint.x,endPoint.x,ctrl1.x,ctrl2.x,q1.x,q2.x,q3.x];
-              const outward=startSide>0?Math.max(...extremes):Math.min(...extremes);
-              const baseline=startSide>0?Math.max(startCenter.x,endCenter.x):Math.min(startCenter.x,endCenter.x);
-              score+=Math.abs(outward-baseline);
-            }else{
-              const verticalSpread=Math.max(Math.abs(q1.y-avgY),Math.abs(q2.y-avgY),Math.abs(q3.y-avgY));
-              score+=verticalSpread*0.25;
+          const endCtrl={
+            x:endPoint.x - endNormal.x*escapeDistance - norm.x*travelDistance - perp.x*lateralDistance*bendInfluence,
+            y:endPoint.y - endNormal.y*escapeDistance - norm.y*travelDistance - perp.y*lateralDistance*bendInfluence
+          };
+          const pushOutside=(point,bounds,dir)=>{
+            if(!point || !bounds || !dir) return;
+            const margin=12;
+            if(point.x>bounds.minX-margin && point.x<bounds.maxX+margin && point.y>bounds.minY-margin && point.y<bounds.maxY+margin){
+              point.x+=dir.x*(margin*2);
+              point.y+=dir.y*(margin*2);
             }
-            return {
-              pathData:`M${startPoint.x} ${startPoint.y} C ${ctrl1.x} ${ctrl1.y}, ${ctrl2.x} ${ctrl2.y}, ${endPoint.x} ${endPoint.y}`,
-              score
-            };
           };
-          const candidateA=evaluatePath(1);
-          const candidateB=evaluatePath(-1);
-          let chosen=candidateA;
-          if(!Number.isFinite(candidateA.score) || candidateB.score>candidateA.score){ chosen=candidateB; }
-          const pathData=chosen.pathData;
+          pushOutside(startCtrl,startBounds,startNormal);
+          pushOutside(endCtrl,endBounds,endNormal);
+          const repelFromPoint=(point,avoid,radius=28)=>{
+            if(!point || !avoid) return;
+            const dx=point.x-avoid.x;
+            const dy=point.y-avoid.y;
+            const dist=Math.hypot(dx,dy);
+            if(dist>0 && dist<radius){
+              const scale=(radius-dist)/dist;
+              point.x+=dx*scale;
+              point.y+=dy*scale;
+            }
+          };
+          repelFromPoint(startCtrl,startButtonPos);
+          repelFromPoint(endCtrl,startButtonPos);
+          repelFromPoint(startCtrl,endButtonPos);
+          repelFromPoint(endCtrl,endButtonPos);
+          const pathData=`M${startPoint.x} ${startPoint.y} C ${startCtrl.x} ${startCtrl.y}, ${endCtrl.x} ${endCtrl.y}, ${endPoint.x} ${endPoint.y}`;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
           if(entry.hit){ entry.hit.setAttribute('d', pathData); }
+          const coreId=entry.core && entry.core.getAttribute ? entry.core.getAttribute('id') : null;
+          if(coreId){
+            if(entry.directionPath){
+              entry.directionPath.setAttribute('href', `#${coreId}`);
+              entry.directionPath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            }
+            if(entry.directionReversePath){
+              entry.directionReversePath.setAttribute('href', `#${coreId}`);
+              entry.directionReversePath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            }
+          }
           entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
-          if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
-          else{ entry.core.removeAttribute('marker-start'); }
+          const totalLength=(()=>{
+            if(!entry.core || typeof entry.core.getTotalLength!=='function') return 0;
+            try{ return entry.core.getTotalLength(); }
+            catch(_){ return 0; }
+          })();
+          const margin=Math.min(48, Math.max(12, totalLength*0.18));
+          const usableLength=Math.max(0, totalLength - margin);
+          const arrowStep=14;
+          const forwardCount=Math.max(2, Math.floor(usableLength/arrowStep));
+          const startOffset=Math.max(0, Math.min(totalLength*0.25, margin*0.45));
+          if(entry.directionPath){
+            entry.directionPath.setAttribute('lengthAdjust','spacingAndGlyphs');
+            entry.directionPath.setAttribute('startOffset', `${startOffset}`);
+            entry.directionPath.textContent=forwardCount>0 ? '›'.repeat(forwardCount) : '››';
+            if(usableLength>1){ entry.directionPath.setAttribute('textLength', usableLength); }
+            else{ entry.directionPath.removeAttribute('textLength'); }
+          }
+          if(entry.directionReverse && entry.directionReversePath){
+            entry.directionReversePath.setAttribute('lengthAdjust','spacingAndGlyphs');
+            if(relation.bidirectional){
+              entry.directionReverse.removeAttribute('hidden');
+              const reverseCount=Math.max(2, Math.floor(usableLength/arrowStep));
+              const reverseOffsetBase=startOffset + Math.min(24, arrowStep);
+              const reverseOffset=Math.max(0, Math.min(totalLength*0.75, reverseOffsetBase));
+              entry.directionReversePath.setAttribute('startOffset', `${reverseOffset}`);
+              entry.directionReversePath.textContent=reverseCount>0 ? '‹'.repeat(reverseCount) : '‹‹';
+              if(usableLength>1){ entry.directionReversePath.setAttribute('textLength', usableLength); }
+              else{ entry.directionReversePath.removeAttribute('textLength'); }
+            }else{
+              entry.directionReverse.setAttribute('hidden','true');
+              entry.directionReversePath.textContent='';
+              entry.directionReversePath.removeAttribute('textLength');
+              entry.directionReversePath.removeAttribute('startOffset');
+            }
+          }
           entry.relation=relation;
         }
         computeNodeBoundaryPoint(node, directionVector, padding){
@@ -7709,16 +7883,13 @@ if ($view === 'map_edit') {
         const hasChildren=!!(node && node.children && node.children.length);
         let label='折叠';
         let icon='⇅';
-        let tip='折叠/展开（Space 或 ←/→）';
         if(hasChildren){
           const collapsed=node.expanded===false;
           label=collapsed?'展开':'折叠';
           icon=collapsed?'⤴':'⤵';
-          tip=collapsed?'展开（Space 或 →）':'折叠（Space 或 ←）';
         }
         if(dockFoldLabel){ dockFoldLabel.textContent=label; }
         if(dockFoldIcon){ dockFoldIcon.textContent=icon; }
-        dockFoldButton.dataset.tip=tip;
         dockFoldButton.disabled=!hasChildren;
         dockFoldButton.setAttribute('aria-label', hasChildren ? `${label}节点` : '折叠或展开节点');
       }
