@@ -3966,11 +3966,10 @@ if ($view === 'map_edit') {
       .mind-relations{position:absolute;top:0;left:0;overflow:visible}
       .mind-relations .relation-group{pointer-events:auto;transition:filter var(--transition)}
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition)}
-      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition)}
-      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
-      .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
-      .mind-relations .relation-highlight{pointer-events:none}
+      .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition);pointer-events:none}
+      .mind-relations .relation-hit{stroke:transparent;stroke-width:20;pointer-events:stroke;cursor:pointer}
+      .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition);pointer-events:none}
+      .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition);pointer-events:none}
       .mind-relations .relation-group[data-selected="true"]{filter:drop-shadow(0 0 6px rgba(191,242,255,.45)) drop-shadow(0 0 18px rgba(191,242,255,.3))}
       .mind-relations .relation-group[data-selected="true"] .relation-shadow{stroke:rgba(75,195,209,.85);opacity:.9}
       .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2.6;stroke:rgba(191,242,255,.92);filter:url(#mindSoftGlow)}
@@ -4007,8 +4006,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 clamp(78px,8vw,116px);min-width:clamp(72px,7vw,108px)}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4027,11 +4027,11 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 clamp(74px,9vw,104px);min-width:clamp(68px,8vw,96px)}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px}.dock-btn{height:58px;flex:0 0 clamp(70px,12vw,96px);min-width:clamp(64px,11vw,90px)}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px}.dock-btn{height:56px;flex:0 0 clamp(66px,16vw,88px);min-width:clamp(60px,15vw,82px)}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4190,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -4338,7 +4338,6 @@ if ($view === 'map_edit') {
           <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
         </header>
         <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
-        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
         <div class="settings-actions">
           <button type="button" data-settings-close>关闭</button>
         </div>
@@ -6232,6 +6231,8 @@ if ($view === 'map_edit') {
             group.dataset.to=relation.to;
             const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
             shadow.classList.add('relation-shadow');
+            const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+            hit.classList.add('relation-hit');
             const core=document.createElementNS('http://www.w3.org/2000/svg','path');
             core.classList.add('relation-core');
             core.dataset.bidirectional=relation.bidirectional?'true':'false';
@@ -6244,10 +6245,11 @@ if ($view === 'map_edit') {
               group.dataset.selected='true';
             }
             group.appendChild(shadow);
+            group.appendChild(hit);
             group.appendChild(core);
             group.appendChild(highlight);
             this.relationLayer.appendChild(group);
-            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            this.relationRegistry.set(relation.id,{group,shadow,hit,core,highlight,relation});
             const handleSelect=evt=>{
               if(evt){ evt.stopPropagation(); }
               const isMouse=evt && evt.pointerType==='mouse';
@@ -6264,8 +6266,25 @@ if ($view === 'map_edit') {
                 this.options.onRelationContext(selected, this, evt||null);
               }
             };
-            core.addEventListener('pointerdown',handleSelect);
-            core.addEventListener('contextmenu',handleContext);
+            const handlePointerDown=evt=>{
+              handleSelect(evt);
+              startRelationLongPress(evt, relation.id);
+            };
+            const handlePointerEnd=()=>{ cancelRelationLongPressState(); };
+            const handlePointerLeave=evt=>{
+              if(!relationLongPressState) return;
+              if(evt.pointerId!=null && evt.pointerId!==relationLongPressState.pointerId) return;
+              cancelRelationLongPressState();
+            };
+            const handleContextWrapped=evt=>{
+              cancelRelationLongPressState();
+              handleContext(evt);
+            };
+            hit.addEventListener('pointerdown',handlePointerDown);
+            hit.addEventListener('pointerup',handlePointerEnd);
+            hit.addEventListener('pointercancel',handlePointerEnd);
+            hit.addEventListener('pointerleave',handlePointerLeave);
+            hit.addEventListener('contextmenu',handleContextWrapped);
             this.updateRelationPath(relation);
           }
         }
@@ -6540,8 +6559,8 @@ if ($view === 'map_edit') {
           const startCenter=fromNode.anchors ? fromNode.anchors.center : null;
           const endCenter=toNode.anchors ? toNode.anchors.center : null;
           if(!startCenter || !endCenter) return;
-          const startInner=this.computeNodeBoundaryPoint(fromNode, {x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y}, 6);
-          const endInner=this.computeNodeBoundaryPoint(toNode, {x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y}, 6);
+          let startInner=this.computeNodeBoundaryPoint(fromNode, {x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y}, 6);
+          let endInner=this.computeNodeBoundaryPoint(toNode, {x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y}, 6);
           if(!startInner || !endInner) return;
           let vector={x:endInner.x-startInner.x,y:endInner.y-startInner.y};
           let segmentLength=Math.hypot(vector.x, vector.y);
@@ -6561,24 +6580,93 @@ if ($view === 'map_edit') {
           const startClearance=relation.bidirectional ? effectiveClearance : 0;
           const startPoint={x:startInner.x - norm.x*startClearance,y:startInner.y - norm.y*startClearance};
           const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
-          const dx=endPoint.x-startPoint.x;
-          const dy=endPoint.y-startPoint.y;
-          const distance=Math.hypot(dx,dy) || 1;
-          const normalX=distance?-dy/distance:0;
-          const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=startPoint.x + dx*0.25 + normalX*offset;
-          const ctrl1y=startPoint.y + dy*0.25 + normalY*offset;
-          const ctrl2x=startPoint.x + dx*0.75 - normalX*offset;
-          const ctrl2y=startPoint.y + dy*0.75 - normalY*offset;
-          const pathData=`M${startPoint.x} ${startPoint.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${endPoint.x} ${endPoint.y}`;
+          const resolveDirection=(node,fallback)=>{
+            if(!node) return fallback;
+            if(node.direction==='left' || node.dir===-1) return -1;
+            if(node.direction==='right' || node.dir===1) return 1;
+            if(node.parent){
+              if(node.absX < node.parent.absX) return -1;
+              if(node.absX > node.parent.absX) return 1;
+            }
+            if(this.root){
+              if(node.absX < this.root.absX) return -1;
+              if(node.absX > this.root.absX) return 1;
+            }
+            return fallback || 1;
+          };
+          const primaryDir=Math.sign(endPoint.x-startPoint.x) || 1;
+          const fromDir=resolveDirection(fromNode, primaryDir);
+          const toDir=resolveDirection(toNode, -primaryDir);
+          const fromWidth=Math.max(60, fromNode.width || (fromNode.el?fromNode.el.offsetWidth:0) || 0);
+          const toWidth=Math.max(60, toNode.width || (toNode.el?toNode.el.offsetWidth:0) || 0);
+          const startOffset=Math.max(36, Math.min(200, fromWidth*0.65));
+          const endOffset=Math.max(36, Math.min(200, toWidth*0.65));
+          const startBend={x:startPoint.x + fromDir*startOffset,y:startPoint.y};
+          const endBend={x:endPoint.x + toDir*endOffset,y:endPoint.y};
+          const deltaY=endPoint.y-startPoint.y;
+          let verticalDir=Math.sign(deltaY);
+          const rootY=this.root && typeof this.root.absY==='number' ? this.root.absY : (this.bounds ? this.bounds.height/2 : startPoint.y);
+          if(verticalDir===0){
+            verticalDir=startPoint.y < rootY ? -1 : 1;
+          }
+          const heightHint=Math.max(Math.abs(deltaY), Math.max(fromNode.height || (fromNode.el?fromNode.el.offsetHeight:0) || 0, toNode.height || (toNode.el?toNode.el.offsetHeight:0) || 0));
+          const verticalOffset=Math.max(32, Math.min(220, heightHint*0.75));
+          const midY1=startPoint.y + verticalDir*verticalOffset;
+          const midY2=endPoint.y - verticalDir*verticalOffset;
+          const outward=Math.max(startOffset,endOffset,Math.abs(endPoint.x-startPoint.x)*0.45);
+          const bridgeShift=fromDir===toDir ? fromDir*outward*0.6 : 0;
+          const bridgeX=(startBend.x + endBend.x)/2 + bridgeShift;
+          const bridgeY=(midY1 + midY2)/2;
+          const points=[];
+          const pushPoint=pt=>{
+            if(!pt) return;
+            const x=Number.isFinite(pt.x)?pt.x:0;
+            const y=Number.isFinite(pt.y)?pt.y:0;
+            if(!points.length){ points.push({x,y}); return; }
+            const last=points[points.length-1];
+            if(Math.hypot(last.x-x,last.y-y)<0.5) return;
+            points.push({x,y});
+          };
+          pushPoint(startPoint);
+          pushPoint(startBend);
+          pushPoint({x:startBend.x,y:midY1});
+          pushPoint({x:bridgeX,y:bridgeY});
+          pushPoint({x:endBend.x,y:midY2});
+          pushPoint(endBend);
+          pushPoint(endPoint);
+          if(points.length<2) return;
+          const pathData=this.buildSmoothPath(points);
+          if(!pathData) return;
           entry.shadow.setAttribute('d', pathData);
+          if(entry.hit){ entry.hit.setAttribute('d', pathData); }
           entry.core.setAttribute('d', pathData);
           entry.highlight.setAttribute('d', pathData);
           entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
           if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
           else{ entry.core.removeAttribute('marker-start'); }
           entry.relation=relation;
+        }
+        buildSmoothPath(points){
+          if(!Array.isArray(points) || points.length<2) return '';
+          const pts=points.map(pt=>({x:Number(pt.x)||0,y:Number(pt.y)||0}));
+          let d=`M${pts[0].x} ${pts[0].y}`;
+          if(pts.length===2){
+            d+=` L ${pts[1].x} ${pts[1].y}`;
+            return d;
+          }
+          const tension=0.3;
+          for(let i=0;i<pts.length-1;i++){
+            const p0=pts[i-1] || pts[i];
+            const p1=pts[i];
+            const p2=pts[i+1];
+            const p3=pts[i+2] || p2;
+            const cp1x=p1.x + (p2.x - p0.x)*tension;
+            const cp1y=p1.y + (p2.y - p0.y)*tension;
+            const cp2x=p2.x - (p3.x - p1.x)*tension;
+            const cp2y=p2.y - (p3.y - p1.y)*tension;
+            d+=` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+          }
+          return d;
         }
         computeNodeBoundaryPoint(node, directionVector, padding){
           if(!node || !directionVector) return null;
@@ -7454,12 +7542,8 @@ if ($view === 'map_edit') {
       const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
-      const fisheyeToggle=document.getElementById('setting-fisheye');
-      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7520,24 +7604,6 @@ if ($view === 'map_edit') {
           exportOverlay.setAttribute('aria-hidden','true');
           exportOverlayHideTimer=null;
         },360);
-      }
-      function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
-      }
-      function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
-      }
-      function handlePointerPrecisionChange(event){
-        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
-        syncFisheyeState();
-      }
-      syncFisheyeState();
-      if(pointerMedia){
-        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
-        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -7944,6 +8010,7 @@ if ($view === 'map_edit') {
         closeRelationContextMenu();
         clearRelationSelection();
         relationBlankClickTs=0;
+        cancelRelationLongPressState();
         if(notify){ showRelationToast('已退出关联模式'); }
         else{ hideRelationToast(); }
         scheduleHandleRefresh();
@@ -8019,6 +8086,7 @@ if ($view === 'map_edit') {
         else{ startRelationMode(); }
       }
       function handleRelationSelect(relation, evt){
+        cancelRelationLongPressState();
         if(relation && relation.id){ selectedRelationId=relation.id; }
         else{ selectedRelationId=null; }
         closeNodeContextMenu();
@@ -8026,6 +8094,7 @@ if ($view === 'map_edit') {
         if(evt && evt.type==='contextmenu'){ evt.preventDefault(); }
       }
       function handleRelationContext(relation, evt){
+        cancelRelationLongPressState();
         if(relation && relation.id){ selectedRelationId=relation.id; }
         else{ selectedRelationId=null; }
         closeNodeContextMenu();
@@ -8187,7 +8256,8 @@ if ($view === 'map_edit') {
       }
       let popoverOpen=false;
       let sheetDragState=null;
-      let longPressState=null;
+      let nodeLongPressState=null;
+      let relationLongPressState=null;
       const popoverMedia=window.matchMedia('(max-width: 768px)');
       function updatePopoverMode(){
         if(!nodePopover) return;
@@ -8403,50 +8473,89 @@ if ($view === 'map_edit') {
       }
       window.addEventListener('resize',closeNodeContextMenu);
       window.addEventListener('resize',closeRelationContextMenu);
-      const cancelLongPressState=()=>{
-        if(longPressState && longPressState.timer){ clearTimeout(longPressState.timer); }
-        longPressState=null;
+      const cancelNodeLongPressState=()=>{
+        if(nodeLongPressState && nodeLongPressState.timer){ clearTimeout(nodeLongPressState.timer); }
+        nodeLongPressState=null;
+      };
+      const cancelRelationLongPressState=()=>{
+        if(relationLongPressState && relationLongPressState.timer){ clearTimeout(relationLongPressState.timer); }
+        relationLongPressState=null;
+      };
+      const startRelationLongPress=(evt, relationId)=>{
+        cancelRelationLongPressState();
+        if(!evt || !relationId) return;
+        if(evt.pointerType && !['touch','pen'].includes(evt.pointerType)) return;
+        relationLongPressState={
+          pointerId:evt.pointerId,
+          relationId,
+          startX:evt.clientX,
+          startY:evt.clientY,
+          triggered:false,
+          timer:window.setTimeout(()=>{
+            if(!relationLongPressState || relationLongPressState.pointerId!==evt.pointerId) return;
+            relationLongPressState.triggered=true;
+            relationLongPressState.timer=null;
+            if(typeof jm?.select_relation==='function'){ jm.select_relation(relationId); }
+            selectedRelationId=relationId;
+            deleteSelectedRelation();
+          }, LONG_PRESS_DELAY)
+        };
+      };
+      const handleRelationLongPressMove=e=>{
+        if(!relationLongPressState || e.pointerId!==relationLongPressState.pointerId) return;
+        if(relationLongPressState.triggered) return;
+        const dx=Math.abs(e.clientX-relationLongPressState.startX);
+        const dy=Math.abs(e.clientY-relationLongPressState.startY);
+        if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){ cancelRelationLongPressState(); }
+      };
+      const finishRelationLongPress=e=>{
+        if(!relationLongPressState || e.pointerId!==relationLongPressState.pointerId) return;
+        const triggered=!!relationLongPressState.triggered;
+        cancelRelationLongPressState();
+        if(triggered){ e.preventDefault(); e.stopPropagation(); }
       };
       if(jmContainer){
         jmContainer.addEventListener('pointerdown',e=>{
           const nodeEl=e.target.closest('.jsmind-node');
-          if(!nodeEl){ cancelLongPressState(); return; }
-          if(e.pointerType && !['touch','pen'].includes(e.pointerType)){ cancelLongPressState(); return; }
+          cancelRelationLongPressState();
+          if(!nodeEl){ cancelNodeLongPressState(); return; }
+          if(e.pointerType && !['touch','pen'].includes(e.pointerType)){ cancelNodeLongPressState(); return; }
           const nodeId=nodeEl.getAttribute('nodeid');
-          if(!nodeId){ cancelLongPressState(); return; }
-          cancelLongPressState();
-          longPressState={
+          if(!nodeId){ cancelNodeLongPressState(); return; }
+          cancelNodeLongPressState();
+          nodeLongPressState={
             pointerId:e.pointerId,
             nodeId,
             startX:e.clientX,
             startY:e.clientY,
             triggered:false,
             timer:window.setTimeout(()=>{
-              if(!longPressState || longPressState.pointerId!==e.pointerId) return;
-              longPressState.triggered=true;
-              longPressState.timer=null;
-              const node=jm.get_node(longPressState.nodeId);
-              if(node){ openNodeContextMenu(node,{x:longPressState.startX,y:longPressState.startY}); }
+              if(!nodeLongPressState || nodeLongPressState.pointerId!==e.pointerId) return;
+              nodeLongPressState.triggered=true;
+              nodeLongPressState.timer=null;
+              const node=jm.get_node(nodeLongPressState.nodeId);
+              if(node){ openInspectorPopover(node); }
             }, LONG_PRESS_DELAY)
           };
         });
         jmContainer.addEventListener('pointermove',e=>{
+          if(!relationMode){ cancelRelationLongPressState(); }
           if(relationMode){
             const nodeEl=e.target.closest('.jsmind-node');
             const nodeId=nodeEl ? nodeEl.getAttribute('nodeid') : null;
             updateRelationHover(nodeId);
           }
-          if(!longPressState || e.pointerId!==longPressState.pointerId) return;
-          if(longPressState.triggered) return;
-          const dx=Math.abs(e.clientX-longPressState.startX);
-          const dy=Math.abs(e.clientY-longPressState.startY);
-          if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){ cancelLongPressState(); }
+          if(!nodeLongPressState || e.pointerId!==nodeLongPressState.pointerId) return;
+          if(nodeLongPressState.triggered) return;
+          const dx=Math.abs(e.clientX-nodeLongPressState.startX);
+          const dy=Math.abs(e.clientY-nodeLongPressState.startY);
+          if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){ cancelNodeLongPressState(); }
         });
         jmContainer.addEventListener('pointerleave',()=>{ if(relationMode){ updateRelationHover(null); } });
         const finishLongPress=(e)=>{
-          if(!longPressState || e.pointerId!==longPressState.pointerId) return;
-          const triggered=!!longPressState.triggered;
-          cancelLongPressState();
+          if(!nodeLongPressState || e.pointerId!==nodeLongPressState.pointerId) return;
+          const triggered=!!nodeLongPressState.triggered;
+          cancelNodeLongPressState();
           if(triggered){ e.preventDefault(); e.stopPropagation(); }
         };
         jmContainer.addEventListener('pointerup',finishLongPress);
@@ -8464,11 +8573,14 @@ if ($view === 'map_edit') {
           const nodeEl=e.target.closest('.jsmind-node');
           if(!nodeEl) return;
           e.preventDefault();
-          cancelLongPressState();
+          cancelNodeLongPressState();
           const node=jm.get_node(nodeEl.getAttribute('nodeid'));
           if(node){ openNodeContextMenu(node,{x:e.clientX,y:e.clientY}); }
         });
       }
+      document.addEventListener('pointermove',handleRelationLongPressMove,{passive:true});
+      document.addEventListener('pointerup',finishRelationLongPress,true);
+      document.addEventListener('pointercancel',finishRelationLongPress,true);
       function refreshInspector(node){
         inspectorSyncing=true;
         if(!node){
@@ -9826,27 +9938,6 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
-        if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
-        }
-        if(fisheyeToggle){
-          fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
-          });
-        }
       }
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
