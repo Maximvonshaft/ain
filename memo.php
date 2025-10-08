@@ -286,27 +286,63 @@ function db(): PDO {
     $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
   }
 
+  ensure_schema_indexes($pdo);
+
   return $pdo;
+}
+
+function ensure_schema_indexes(PDO $pdo): void {
+  static $ensured = false;
+  if ($ensured) {
+    return;
+  }
+  $ensured = true;
+
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, order_index, updated_at, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_prev_category ON items(previous_category_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmaps_updated ON mindmaps(updated_at, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
 }
 
 // —— 获取分类及计数 ——
 function get_categories(): array {
   $pdo=db();
   ensure_done_category();
-  $cats=$pdo->query('SELECT id,name FROM categories ORDER BY name COLLATE NOCASE')->fetchAll();
-  $map=[]; foreach($cats as $c) $map[$c['id']] = 0;
-  $rows=$pdo->query('SELECT category_id, COUNT(*) AS c FROM items GROUP BY category_id')->fetchAll();
-  foreach($rows as $r){ $cid=$r['category_id']; if($cid!==null&&isset($map[$cid])) $map[$cid]=(int)$r['c']; }
+
+  $stmt=$pdo->query('SELECT c.id, c.name, COALESCE(cnt.total, 0) AS total
+    FROM categories c
+    LEFT JOIN (
+      SELECT category_id, COUNT(*) AS total
+      FROM items
+      GROUP BY category_id
+    ) AS cnt ON cnt.category_id = c.id
+    ORDER BY c.name COLLATE NOCASE');
+  $cats=[];
+  $map=[];
+  foreach($stmt->fetchAll() as $row){
+    $id=(int)$row['id'];
+    $cats[]=['id'=>$id,'name'=>$row['name']];
+    $map[$id]=(int)$row['total'];
+  }
+
   $statsRow=$pdo->query('SELECT
-    (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
-    (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized,
-    (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
-  ')->fetch() ?: [];
+      COALESCE(SUM(CASE WHEN done = 0 THEN 1 ELSE 0 END), 0) AS active_total,
+      COALESCE(SUM(CASE WHEN done = 0 AND category_id IS NULL THEN 1 ELSE 0 END), 0) AS active_uncategorized,
+      (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
+    FROM items')->fetch() ?: [];
+
   $stats=[
     'active_total'=>(int)($statsRow['active_total'] ?? 0),
     'active_uncategorized'=>(int)($statsRow['active_uncategorized'] ?? 0),
     'mindmap_total'=>(int)($statsRow['mindmap_total'] ?? 0),
   ];
+
   return [$cats,$map,$stats];
 }
 
