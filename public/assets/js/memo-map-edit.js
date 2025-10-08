@@ -1,0 +1,6660 @@
+      (function(){
+        if(window.AttachmentPreview) return;
+        const readyQueue=window.__attachmentPreviewReadyCallbacks = window.__attachmentPreviewReadyCallbacks || [];
+        const scriptCache=new Map();
+        let elements=null;
+        let objectUrl=null;
+        let abortController=null;
+        let lastActive=null;
+
+        const formatBytes=value=>{
+          if(!Number.isFinite(value) || value<=0) return '';
+          const units=['B','KB','MB','GB','TB'];
+          let idx=0; let num=value;
+          while(num>=1024 && idx<units.length-1){ num/=1024; idx++; }
+          const decimals=num>=100 || idx===0 ? 0 : 1;
+          return num.toFixed(decimals)+' '+units[idx];
+        };
+        const ensureElements=()=>{
+          if(elements) return elements;
+          const backdrop=document.createElement('div');
+          backdrop.className='attachment-preview-backdrop';
+          const panel=document.createElement('div');
+          panel.className='attachment-preview-panel';
+          panel.setAttribute('role','dialog');
+          panel.setAttribute('aria-modal','true');
+          panel.setAttribute('aria-labelledby','attachment-preview-title');
+          panel.tabIndex=-1;
+          const header=document.createElement('div');
+          header.className='attachment-preview-header';
+          const titleWrap=document.createElement('div');
+          const titleEl=document.createElement('div');
+          titleEl.className='attachment-preview-title';
+          titleEl.id='attachment-preview-title';
+          const metaEl=document.createElement('div');
+          metaEl.className='attachment-preview-meta';
+          titleWrap.appendChild(titleEl);
+          titleWrap.appendChild(metaEl);
+          const closeBtn=document.createElement('button');
+          closeBtn.className='attachment-preview-close';
+          closeBtn.type='button';
+          closeBtn.setAttribute('aria-label','关闭预览');
+          closeBtn.textContent='×';
+          header.appendChild(titleWrap);
+          header.appendChild(closeBtn);
+          const bodyEl=document.createElement('div');
+          bodyEl.className='attachment-preview-body';
+          const loadingEl=document.createElement('div');
+          loadingEl.className='attachment-preview-loading';
+          const spinner=document.createElement('span');
+          spinner.className='attachment-preview-spinner';
+          const loadingText=document.createElement('span');
+          loadingText.className='attachment-preview-loading-text';
+          loadingText.textContent='载入中…';
+          loadingEl.appendChild(spinner);
+          loadingEl.appendChild(loadingText);
+          bodyEl.appendChild(loadingEl);
+          const footer=document.createElement('div');
+          footer.className='attachment-preview-footer';
+          const downloadBtn=document.createElement('a');
+          downloadBtn.className='attachment-preview-download';
+          downloadBtn.href='';
+          downloadBtn.target='_blank';
+          downloadBtn.rel='noopener';
+          downloadBtn.textContent='下载附件';
+          footer.appendChild(downloadBtn);
+          panel.appendChild(header);
+          panel.appendChild(bodyEl);
+          panel.appendChild(footer);
+          backdrop.appendChild(panel);
+          document.body.appendChild(backdrop);
+          const closePreview=()=>{
+            backdrop.dataset.open='false';
+            if(lastActive && typeof lastActive.focus==='function'){
+              try{ lastActive.focus(); }catch(_){ /* ignore */ }
+            }
+            lastActive=null;
+            if(abortController){ abortController.abort(); abortController=null; }
+            if(objectUrl){ URL.revokeObjectURL(objectUrl); objectUrl=null; }
+          };
+          closeBtn.addEventListener('click',closePreview);
+          backdrop.addEventListener('click',evt=>{ if(evt.target===backdrop) closePreview(); });
+          document.addEventListener('keydown',evt=>{ if(evt.key==='Escape' && backdrop.dataset.open==='true'){ closePreview(); } });
+          elements={backdrop,panel,titleEl,metaEl,closeBtn,bodyEl,loadingEl,loadingTextEl:loadingText,downloadBtn,closePreview};
+          return elements;
+        };
+        const cleanupObjectUrl=()=>{ if(objectUrl){ URL.revokeObjectURL(objectUrl); objectUrl=null; } };
+        const setLoadingMessage=message=>{
+          const {loadingTextEl}=ensureElements();
+          if(loadingTextEl) loadingTextEl.textContent=message || '载入中…';
+        };
+        const showLoading=message=>{
+          const {bodyEl,loadingEl}=ensureElements();
+          bodyEl.classList.add('is-loading');
+          bodyEl.innerHTML='';
+          bodyEl.appendChild(loadingEl);
+          setLoadingMessage(message);
+        };
+        const showContent=content=>{
+          const {bodyEl}=ensureElements();
+          bodyEl.classList.remove('is-loading');
+          bodyEl.innerHTML='';
+          if(content) bodyEl.appendChild(content);
+        };
+        const showError=message=>{
+          const div=document.createElement('div');
+          div.className='attachment-preview-error';
+          div.textContent=message||'预览失败';
+          showContent(div);
+        };
+        const showList=entries=>{
+          const list=document.createElement('ul');
+          list.className='attachment-preview-list';
+          entries.forEach(entry=>{
+            const li=document.createElement('li');
+            const label=document.createElement('span');
+            label.textContent=entry.label;
+            li.appendChild(label);
+            if(entry.size){
+              const sizeSpan=document.createElement('span');
+              sizeSpan.className='entry-size';
+              sizeSpan.textContent=entry.size;
+              li.appendChild(sizeSpan);
+            }
+            list.appendChild(li);
+          });
+          showContent(list);
+        };
+        const renderMedia=(type,url,mime)=>{
+          let el;
+          if(type==='video'){
+            el=document.createElement('video');
+            el.controls=true;
+            el.preload='metadata';
+            el.playsInline=true;
+            el.classList.add('attachment-preview-video');
+          }else if(type==='audio'){
+            el=document.createElement('audio');
+            el.controls=true;
+            el.preload='metadata';
+            el.style.width='100%';
+          }else if(type==='pdf'){
+            el=document.createElement('iframe');
+            el.type=mime||'application/pdf';
+            el.setAttribute('title','PDF 预览');
+          }else{
+            el=document.createElement('img');
+          }
+          el.src=url;
+          showContent(el);
+        };
+        const detectType=source=>{
+          const mime=(source.mime||'').toLowerCase();
+          const name=(source.name||'').toLowerCase();
+          const ext=name.includes('.') ? name.split('.').pop() : '';
+          if(mime.startsWith('image/') || ['png','jpg','jpeg','gif','webp','bmp','svg','avif','heic','heif'].includes(ext)) return 'image';
+          if(mime.startsWith('video/') || ['mp4','mov','m4v','webm','ogv','mkv','avi'].includes(ext)) return 'video';
+          if(mime.startsWith('audio/') || ['mp3','wav','ogg','oga','m4a','aac','flac','opus','weba'].includes(ext)) return 'audio';
+          if(mime==='application/pdf' || ext==='pdf') return 'pdf';
+          if(mime.includes('zip') || ext==='zip') return 'zip';
+          if(mime.includes('rar') || ext==='rar') return 'rar';
+          if(mime.includes('spreadsheet') || ['xlsx','xls','xlsm','xlsb','csv','xltx','xltm','tsv'].includes(ext)) return 'excel';
+          if(mime.includes('word') || ['docx','docm','doc','dotx','dotm'].includes(ext)) return 'word';
+          return 'other';
+        };
+        const normalizeSource=input=>{
+          if(!input) return {kind:'url',url:'',name:'附件',mime:'',size:null,downloadName:null};
+          if(typeof input==='string') return {kind:'url',url:input,name:'附件',mime:'',size:null,downloadName:null};
+          const kind=input.kind ? String(input.kind) : (input.blob ? 'blob' : 'url');
+          const sizeRaw = typeof input.size==='number' ? input.size : parseInt(input.size,10);
+          const size=Number.isFinite(sizeRaw) && sizeRaw>0 ? sizeRaw : null;
+          const name=typeof input.name==='string' && input.name.trim() ? input.name.trim() : '附件';
+          return {
+            kind,
+            url:typeof input.url==='string'?input.url:'',
+            blob:input.blob instanceof Blob ? input.blob : null,
+            name,
+            mime:typeof input.mime==='string'?input.mime:'',
+            size,
+            downloadName:typeof input.downloadName==='string' && input.downloadName.trim()?input.downloadName.trim():name
+          };
+        };
+        const setDownloadLink=(btn,source)=>{
+          let href='';
+          if(source.kind==='blob' && source.blob){
+            cleanupObjectUrl();
+            objectUrl=URL.createObjectURL(source.blob);
+            href=objectUrl;
+          }else if(source.url){
+            href=source.url;
+          }
+          if(btn){
+            if(href){
+              btn.href=href;
+              btn.download=source.downloadName || source.name || 'attachment';
+              btn.hidden=false;
+            }else{
+              btn.removeAttribute('href');
+              btn.hidden=true;
+            }
+          }
+          return href;
+        };
+        const loadBuffer=async source=>{
+          if(source.kind==='blob' && source.blob){
+            return await source.blob.arrayBuffer();
+          }
+          if(!source.url) throw new Error('缺少文件地址');
+          abortController=new AbortController();
+          try{
+            const res=await fetch(source.url,{signal:abortController.signal});
+            if(!res.ok) throw new Error('网络错误');
+            return await res.arrayBuffer();
+          }finally{
+            abortController=null;
+          }
+        };
+        const ensureScript=url=>{
+          if(scriptCache.has(url)) return scriptCache.get(url);
+          const promise=new Promise((resolve,reject)=>{
+            const el=document.createElement('script');
+            el.src=url;
+            el.async=true;
+            el.onload=()=>resolve();
+            el.onerror=()=>reject(new Error('脚本加载失败'));
+            document.head.appendChild(el);
+          });
+          scriptCache.set(url,promise);
+          return promise;
+        };
+        const buildArchiveTree=entries=>{
+          const root={name:'',type:'dir',children:new Map()};
+          entries.forEach(entry=>{
+            const rawPath=String(entry.path||'').replace(/\\/g,'/');
+            const normalized=rawPath.replace(/^\/+/, '').trim();
+            if(!normalized) return;
+            const parts=normalized.split('/').filter(Boolean);
+            let node=root;
+            parts.forEach((part,index)=>{
+              const isLast=index===parts.length-1;
+              if(isLast && !entry.dir){
+                node.children.set(part,{type:'file',name:part,size:entry.size||''});
+              }else{
+                let next=node.children.get(part);
+                if(!next || next.type!=='dir'){
+                  next={type:'dir',name:part,children:new Map()};
+                  node.children.set(part,next);
+                }
+                node=next;
+              }
+            });
+            if(entry.dir && parts.length){
+              let dirNode=root;
+              parts.forEach(part=>{
+                let next=dirNode.children.get(part);
+                if(!next || next.type!=='dir'){
+                  next={type:'dir',name:part,children:new Map()};
+                  dirNode.children.set(part,next);
+                }
+                dirNode=next;
+              });
+            }
+          });
+          return root;
+        };
+        const createTreeElement=(node,depth=0)=>{
+          const ul=document.createElement('ul');
+          ul.className='attachment-preview-tree';
+          const items=Array.from(node.children.values());
+          items.sort((a,b)=>{
+            if(a.type!==b.type) return a.type==='dir'?-1:1;
+            return a.name.localeCompare(b.name,'zh-Hans');
+          });
+          items.forEach(child=>{
+            const li=document.createElement('li');
+            if(child.type==='dir'){
+              const details=document.createElement('details');
+              if(depth<1) details.open=true;
+              const summary=document.createElement('summary');
+              const label=document.createElement('span');
+              label.className='entry-label';
+              label.textContent='📁 '+child.name;
+              summary.appendChild(label);
+              if(child.size){
+                const sizeSpan=document.createElement('span');
+                sizeSpan.className='entry-size';
+                sizeSpan.textContent=child.size;
+                summary.appendChild(sizeSpan);
+              }
+              details.appendChild(summary);
+              details.appendChild(createTreeElement(child, depth+1));
+              li.appendChild(details);
+            }else{
+              const row=document.createElement('div');
+              row.className='tree-entry';
+              const label=document.createElement('span');
+              label.className='entry-label';
+              label.textContent='📄 '+child.name;
+              row.appendChild(label);
+              if(child.size){
+                const sizeSpan=document.createElement('span');
+                sizeSpan.className='entry-size';
+                sizeSpan.textContent=child.size;
+                row.appendChild(sizeSpan);
+              }
+              li.appendChild(row);
+            }
+            ul.appendChild(li);
+          });
+          return ul;
+        };
+        const showArchiveTree=(entries,kind)=>{
+          if(!entries || !entries.length){
+            showError((kind||'压缩包')+'为空。');
+            return;
+          }
+          const tree=buildArchiveTree(entries);
+          const view=createTreeElement(tree);
+          showContent(view);
+        };
+        const isPasswordError=err=>{
+          const msg=(err && err.message ? String(err.message) : '').toLowerCase();
+          return msg.includes('password') || msg.includes('decrypt') || msg.includes('encrypted');
+        };
+        const loadZipPreview=async source=>{
+          const attempt=async password=>{
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js');
+            const zipLib=window.zip;
+            if(!zipLib || !zipLib.ZipReader || !zipLib.Uint8ArrayReader) throw new Error('解析库未加载');
+            const reader=new zipLib.ZipReader(new zipLib.Uint8ArrayReader(new Uint8Array(buffer)), password?{password}:{});
+            try{
+              const entries=await reader.getEntries();
+              const mapped=(entries||[]).map(entry=>({
+                path:entry.filename,
+                dir:!!entry.directory,
+                size:entry.uncompressedSize?formatBytes(entry.uncompressedSize):''
+              }));
+              if(!mapped.length){
+                showError('压缩包为空。');
+                return;
+              }
+              showArchiveTree(mapped,'ZIP 压缩包');
+            }finally{
+              if(reader && typeof reader.close==='function'){
+                try{ await reader.close(); }catch(_){ /* ignore */ }
+              }
+            }
+          };
+          try{
+            await attempt('');
+          }catch(err){
+            if(isPasswordError(err)){
+              let retry=false;
+              while(true){
+                const input=window.prompt(retry?'密码不正确，请重新输入 ZIP 密码：':'该 ZIP 文件已加密，请输入密码以预览：','');
+                if(input===null){ showError('已取消预览。'); return; }
+                try{
+                  await attempt(input);
+                  return;
+                }catch(inner){
+                  if(!isPasswordError(inner)) throw inner;
+                  retry=true;
+                }
+              }
+            }
+            throw err;
+          }
+        };
+        const loadRarPreview=async source=>{
+          const attempt=async password=>{
+            setLoadingMessage(password?'验证密码…':'解析压缩包…');
+            const buffer=await loadBuffer(source);
+            await ensureScript('https://cdn.jsdelivr.net/npm/unrar-js@0.2.19/dist/unrar.js');
+            const api=window.UNRAR || window.unrar;
+            if(!api || typeof api.createExtractorFromData!=='function') throw new Error('解析库未加载');
+            const extractor=await api.createExtractorFromData({data:buffer,password:password||undefined});
+            try{
+              const list=extractor && typeof extractor.getFileList==='function' ? extractor.getFileList() : null;
+              const headers=list && Array.isArray(list.fileHeaders) ? list.fileHeaders : [];
+              const entries=headers.map(header=>{
+                const name=header && typeof header.name==='string' && header.name ? header.name : (header && typeof header.fileName==='string' ? header.fileName : '未知文件');
+                const dirFlag=header && header.flags ? (header.flags.directory || header.flags.DIRECTORY || header.flags.folder) : false;
+                const isDir=!!dirFlag || /[\\/]$/.test(name);
+                const sizeValue=header && typeof header.uncompressedSize==='number'?header.uncompressedSize:(header && typeof header.size==='number'?header.size:null);
+                return {path:name,dir:isDir,size:sizeValue?formatBytes(sizeValue):''};
+              });
+              if(!entries.length){
+                showError('压缩包为空。');
+                return;
+              }
+              showArchiveTree(entries,'RAR 压缩包');
+            }finally{
+              if(extractor){
+                if(typeof extractor.free==='function') extractor.free();
+                else if(typeof extractor.close==='function') extractor.close();
+                else if(typeof extractor.delete==='function') extractor.delete();
+              }
+            }
+          };
+          try{
+            await attempt('');
+          }catch(err){
+            if(isPasswordError(err)){
+              let retry=false;
+              while(true){
+                const input=window.prompt(retry?'密码不正确，请重新输入 RAR 密码：':'该 RAR 文件已加密，请输入密码以预览：','');
+                if(input===null){ showError('已取消预览。'); return; }
+                try{
+                  await attempt(input);
+                  return;
+                }catch(inner){
+                  if(!isPasswordError(inner)) throw inner;
+                  retry=true;
+                }
+              }
+            }
+            throw err;
+          }
+        };
+        const loadDocxPreview=async source=>{
+          showLoading('解析文档…');
+          const buffer=await loadBuffer(source);
+          await ensureScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
+          if(!window.mammoth || typeof window.mammoth.convertToHtml!=='function') throw new Error('转换库未加载');
+          const result=await window.mammoth.convertToHtml({arrayBuffer:buffer}).catch(err=>{ throw err; });
+          const html=result && typeof result.value==='string' ? result.value : '';
+          const wrapper=document.createElement('div');
+          wrapper.className='attachment-docx';
+          const content=html && html.trim() ? html : '<p>（文档为空）</p>';
+          wrapper.innerHTML=window.DOMPurify ? window.DOMPurify.sanitize(content) : content;
+          showContent(wrapper);
+        };
+        const loadExcelPreview=async source=>{
+          showLoading('解析表格…');
+          const buffer=await loadBuffer(source);
+          await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+          if(!window.XLSX || typeof window.XLSX.read!=='function') throw new Error('解析库未加载');
+          const workbook=window.XLSX.read(buffer,{type:'array'});
+          const sheetNames=Array.isArray(workbook.SheetNames)?workbook.SheetNames:[];
+          if(!sheetNames.length){ showError('工作簿为空。'); return; }
+          const container=document.createElement('div');
+          container.className='attachment-excel';
+          sheetNames.forEach(name=>{
+            const sheet=workbook.Sheets[name];
+            if(!sheet) return;
+            const section=document.createElement('section');
+            section.className='excel-sheet';
+            const heading=document.createElement('h3');
+            heading.textContent='工作表：'+name;
+            section.appendChild(heading);
+            const tableHtml=window.XLSX.utils && typeof window.XLSX.utils.sheet_to_html==='function'
+              ? window.XLSX.utils.sheet_to_html(sheet,{header:'',footer:''})
+              : '';
+            const sanitized=window.DOMPurify ? window.DOMPurify.sanitize(tableHtml||'<table><tbody><tr><td>（无法预览该表格）</td></tr></tbody></table>') : (tableHtml||'<table><tbody><tr><td>（无法预览该表格）</td></tr></tbody></table>');
+            const tableWrap=document.createElement('div');
+            tableWrap.className='excel-table';
+            tableWrap.innerHTML=sanitized;
+            section.appendChild(tableWrap);
+            container.appendChild(section);
+          });
+          showContent(container);
+        };
+        const openPreview=input=>{
+          const source=normalizeSource(input);
+          const {backdrop,panel,titleEl,metaEl,downloadBtn}=ensureElements();
+          if(abortController){ abortController.abort(); abortController=null; }
+          cleanupObjectUrl();
+          lastActive=document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          backdrop.dataset.open='true';
+          try{ panel.focus({preventScroll:true}); }catch(_){ /* ignore */ }
+          titleEl.textContent=source.name || '附件预览';
+          const metaParts=[];
+          if(source.mime) metaParts.push(source.mime);
+          if(Number.isFinite(source.size) && source.size>0) metaParts.push(formatBytes(source.size));
+          metaEl.textContent=metaParts.join(' · ');
+          const downloadHref=setDownloadLink(downloadBtn, source);
+          showLoading('载入中…');
+          const type=detectType(source);
+          if(type==='image' || type==='video' || type==='pdf' || type==='audio'){
+            const url=(type==='image' && source.kind==='url') ? source.url : (source.kind==='blob' ? downloadHref : source.url || downloadHref);
+            if(!url){ showError('附件缺少可用地址'); return; }
+            renderMedia(type,url,source.mime);
+            return;
+          }
+          const labelMap={zip:'ZIP 压缩包',rar:'RAR 压缩包',word:'文档',excel:'表格'};
+          const handleError=err=>{
+            console.error(err);
+            if(labelMap[type]){
+              showError('无法解析'+labelMap[type]+'：'+(err && err.message?err.message:''));
+            }else{
+              showError('暂不支持该文件类型的在线预览，请使用下载按钮。');
+            }
+          };
+          if(type==='zip'){ loadZipPreview(source).then(()=>{}).catch(handleError); return; }
+          if(type==='rar'){ loadRarPreview(source).then(()=>{}).catch(handleError); return; }
+          if(type==='word'){ loadDocxPreview(source).then(()=>{}).catch(handleError); return; }
+          if(type==='excel'){ loadExcelPreview(source).then(()=>{}).catch(handleError); return; }
+          showError('暂不支持该文件类型的在线预览，请使用下载按钮。');
+        };
+        window.AttachmentPreview={
+          open:openPreview,
+          openFromUrl(url,meta){ openPreview(Object.assign({}, meta||{}, {url:url||''})); },
+          openFromBlob(blob,meta){ openPreview(Object.assign({}, meta||{}, {blob})); },
+          close(){ const els=ensureElements(); els.closePreview(); }
+        };
+        const callbacks=readyQueue.splice(0);
+        callbacks.forEach(fn=>{ try{ fn(); }catch(err){ console.error(err); } });
+      })();
+
+      (function(){
+      const DOUBLE_TAP_WINDOW=320;
+      const LONG_PRESS_DELAY=550;
+      const LONG_PRESS_TOLERANCE=14;
+      const DEFAULT_NODE_ICON='🧠';
+      const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
+      let lastTapInfo={id:null,time:0};
+      const TRACE_GRID=8;
+      const TRACE_CHAMFER=3;
+      const nearlyEqual=(a,b)=>Math.abs(a-b)<0.5;
+      function alignToTraceGrid(value){
+        return Math.round(value/TRACE_GRID)*TRACE_GRID;
+      }
+      function buildTraceRoute(start,end,directionHint=1){
+        if(!start || !end){ return []; }
+        const points=[{x:start.x,y:start.y}];
+        const rawDx=end.x-start.x;
+        const absDx=Math.abs(rawDx);
+        const direction=(absDx<TRACE_GRID*0.5)
+          ? (directionHint>=0?1:-1)
+          : (rawDx>=0?1:-1);
+        const MIN_LEAD=TRACE_GRID*3;
+        let midX;
+        if(absDx<TRACE_GRID*0.25){
+          midX=start.x + direction*MIN_LEAD;
+        }else if(absDx<=TRACE_GRID*3){
+          const halfSpan=absDx/2;
+          midX=start.x + direction*Math.max(MIN_LEAD, halfSpan);
+        }else{
+          const maxLead=Math.max(MIN_LEAD, absDx - TRACE_GRID*2);
+          let lead=absDx*0.45;
+          lead=Math.min(Math.max(MIN_LEAD, lead), maxLead);
+          midX=start.x + direction*lead;
+        }
+        midX=alignToTraceGrid(midX);
+        const viaY=alignToTraceGrid(end.y);
+        points.push({x:midX,y:start.y});
+        if(!nearlyEqual(viaY,start.y)){
+          points.push({x:midX,y:viaY});
+        }
+        points.push({x:end.x,y:end.y});
+        const cleaned=[];
+        for(const pt of points){
+          if(!cleaned.length){ cleaned.push(pt); continue; }
+          const prev=cleaned[cleaned.length-1];
+          if(nearlyEqual(prev.x, pt.x) && nearlyEqual(prev.y, pt.y)){
+            continue;
+          }
+          cleaned.push(pt);
+        }
+        return cleaned;
+      }
+      function buildChamferedPath(points,chamfer){
+        if(!Array.isArray(points) || points.length<2) return '';
+        let d=`M${points[0].x} ${points[0].y}`;
+        for(let i=1;i<points.length;i++){
+          const current=points[i];
+          const prev=points[i-1];
+          const next=i+1<points.length ? points[i+1] : null;
+          if(next){
+            const prevVec={x:current.x-prev.x,y:current.y-prev.y};
+            const nextVec={x:next.x-current.x,y:next.y-current.y};
+            const prevLen=Math.hypot(prevVec.x,prevVec.y);
+            const nextLen=Math.hypot(nextVec.x,nextVec.y);
+            if(prevLen<0.01 || nextLen<0.01){
+              d+=` L${current.x} ${current.y}`;
+              continue;
+            }
+            const cut=Math.min(chamfer, prevLen/2, nextLen/2);
+            const entry={
+              x:current.x - Math.sign(prevVec.x)*cut,
+              y:current.y - Math.sign(prevVec.y)*cut
+            };
+            const exit={
+              x:current.x + Math.sign(nextVec.x)*cut,
+              y:current.y + Math.sign(nextVec.y)*cut
+            };
+            d+=` L${entry.x} ${entry.y}`;
+            d+=` L${exit.x} ${exit.y}`;
+          }else{
+            d+=` L${current.x} ${current.y}`;
+          }
+        }
+        return d;
+      }
+      function normalizeNodeData(value){
+        if(!value || typeof value!=='object' || Array.isArray(value)) return {};
+        const data=value;
+        if(data.attachment && !data.attachments){
+          data.attachments=Array.isArray(data.attachment)?data.attachment.slice():[data.attachment];
+        }
+        if(!Array.isArray(data.attachments)){ data.attachments=[]; }
+        else{
+          data.attachments=data.attachments.filter(item=>item && typeof item==='object');
+        }
+        if(data.attachments.length){ data.attachment=data.attachments[0]; }
+        else if('attachment' in data){ delete data.attachment; }
+        if(typeof data.note!=='string'){ data.note=''; }
+        else{ data.note=data.note.replace(/\r\n?/g,'\n'); }
+        return data;
+      }
+      function enforceRightOrientation(node, depth=0){
+        if(!node || typeof node!=='object') return;
+        node.direction=depth===0?'center':'right';
+        if(Array.isArray(node.children)){
+          node.children=node.children.filter(child=>child && typeof child==='object');
+          node.children.forEach(child=>enforceRightOrientation(child, depth+1));
+        }else{
+          node.children=[];
+        }
+      }
+      function gatherAttachments(data){
+        if(!data) return [];
+        if(Array.isArray(data.attachments)){ return data.attachments.map(att=>att && typeof att==='object'?att:null).filter(Boolean); }
+        if(data.attachment && typeof data.attachment==='object') return [data.attachment];
+        return [];
+      }
+      class SimpleMind {
+        constructor(options){
+          this.options=options||{};
+          const containerOpt=this.options.container;
+          this.container=typeof containerOpt==='string'?document.getElementById(containerOpt):containerOpt;
+          if(!this.container) throw new Error('Mind container not found');
+          this.listeners=[];
+          this.scale=1;
+          this.defaultMinScale=0.3;
+          this.defaultMaxScale=2.5;
+          this.minReadableScale=0.05;
+          this.minScale=this.defaultMinScale;
+          this.maxScale=this.defaultMaxScale;
+          this.scalePadding=200;
+          this.offsetX=0;
+          this.offsetY=0;
+          this.mind=null;
+          this.nodes=new Map();
+          this.root=null;
+          this.selectedId=null;
+          this.container.innerHTML='';
+          this.container.classList.add('mind-container');
+          this.container.style.touchAction='none';
+          this.container.addEventListener('gesturestart',evt=>evt.preventDefault());
+          this.container.addEventListener('gesturechange',evt=>evt.preventDefault());
+          this.container.addEventListener('gestureend',evt=>evt.preventDefault());
+          this.container.addEventListener('pointerleave',()=>{ this.clearEdgeHover(); });
+          this.background=document.createElement('div');
+          this.background.className='mind-background';
+          this.container.appendChild(this.background);
+          this.viewport=document.createElement('div');
+          this.viewport.className='mind-viewport';
+          this.linkLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.linkLayer.classList.add('mind-links');
+          this.viewport.appendChild(this.linkLayer);
+          this.relationLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          this.relationLayer.classList.add('mind-relations');
+          this.viewport.appendChild(this.relationLayer);
+          this.guideLayer=document.createElement('div');
+          this.guideLayer.className='mind-guides';
+          this.guideLayer.style.position='absolute';
+          this.guideLayer.style.left='0';
+          this.guideLayer.style.top='0';
+          this.guideLayer.style.width='100%';
+          this.guideLayer.style.height='100%';
+          this.guideLayer.style.pointerEvents='none';
+          this.guideLayer.style.zIndex='1';
+          this.guideLayer.style.display='none';
+          this.viewport.appendChild(this.guideLayer);
+          this.nodeLayer=document.createElement('div');
+          this.nodeLayer.className='mind-nodes';
+          this.viewport.appendChild(this.nodeLayer);
+          this.container.appendChild(this.viewport);
+          this.linkControlLayer=document.createElement('div');
+          this.linkControlLayer.className='mind-link-controls';
+          this.linkControlLayer.style.width='100%';
+          this.linkControlLayer.style.height='100%';
+          this.container.appendChild(this.linkControlLayer);
+          this.sizeCache=new Map();
+          this.measureHost=document.querySelector('.mind-measure') || document.createElement('div');
+          if(!this.measureHost.classList.contains('mind-measure')){
+            this.measureHost.className='mind-measure';
+            document.body.appendChild(this.measureHost);
+          }else if(!this.measureHost.parentElement){
+            document.body.appendChild(this.measureHost);
+          }
+          this.dragState=null;
+          this.activePointers=new Map();
+          this.pinchState=null;
+          this.relations=[];
+          this.selectedRelationId=null;
+          this.linkRegistry=new Map();
+          this.relationRegistry=new Map();
+          this.edgeHoverState=null;
+          this.spacePanActive=false;
+          this.globalPanKeyHandlersAttached=false;
+          this.boundPanKeyDown=null;
+          this.boundPanKeyUp=null;
+          this.boundPanBlur=null;
+          this.isPointerPanning=false;
+          this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
+          this.setupPan();
+          this.setupTouchGuards();
+        }
+        ensurePanKeyHandlers(){
+          if(this.globalPanKeyHandlersAttached) return;
+          this.boundPanKeyDown=evt=>this.handleGlobalKeyDown(evt);
+          this.boundPanKeyUp=evt=>this.handleGlobalKeyUp(evt);
+          this.boundPanBlur=()=>this.cancelSpacePan();
+          document.addEventListener('keydown',this.boundPanKeyDown,true);
+          document.addEventListener('keyup',this.boundPanKeyUp,true);
+          window.addEventListener('blur',this.boundPanBlur);
+          this.globalPanKeyHandlersAttached=true;
+        }
+        isEditableTarget(target){
+          if(!target) return false;
+          const ElementCtor=typeof Element!=='undefined'?Element:null;
+          const el=ElementCtor && target instanceof ElementCtor ? target : (target.parentElement || null);
+          if(!el) return false;
+          if(el.closest('input,textarea,select,[contenteditable="true"]')) return true;
+          if(typeof el.isContentEditable==='boolean' && el.isContentEditable) return true;
+          return false;
+        }
+        isSpaceKey(evt){
+          if(!evt) return false;
+          if(evt.code==='Space') return true;
+          const key=evt.key;
+          return key===' ' || key==='Spacebar';
+        }
+        handleGlobalKeyDown(evt){
+          if(!this.isSpaceKey(evt)) return;
+          if(evt.repeat) return;
+          if(this.isEditableTarget(evt.target)) return;
+          this.spacePanActive=true;
+          this.applySpacePanState();
+          evt.preventDefault();
+        }
+        handleGlobalKeyUp(evt){
+          if(!this.isSpaceKey(evt)) return;
+          this.cancelSpacePan();
+        }
+        cancelSpacePan(){
+          if(!this.spacePanActive) return;
+          this.spacePanActive=false;
+          this.applySpacePanState();
+        }
+        applySpacePanState(){
+          if(!this.container) return;
+          if(this.spacePanActive){ this.container.classList.add('mind-pan-key'); }
+          else{ this.container.classList.remove('mind-pan-key'); }
+        }
+        updatePointerPanState(active){
+          this.isPointerPanning=!!active;
+          if(!this.container) return;
+          if(this.isPointerPanning){ this.container.classList.add('mind-pan-dragging'); }
+          else{ this.container.classList.remove('mind-pan-dragging'); }
+        }
+        setupPan(){
+          this.ensurePanKeyHandlers();
+          const updatePinchBaseline=()=>{
+            if(this.activePointers.size<2){ this.pinchState=null; return; }
+            const pointers=Array.from(this.activePointers.values());
+            if(pointers.length<2){ this.pinchState=null; return; }
+            const [a,b]=pointers;
+            const distance=Math.hypot(b.x-a.x, b.y-a.y) || 1;
+            const rect=this.container.getBoundingClientRect();
+            const centerX=((a.x+b.x)/2)-rect.left;
+            const centerY=((a.y+b.y)/2)-rect.top;
+            const originX=(centerX - this.offsetX)/this.scale;
+            const originY=(centerY - this.offsetY)/this.scale;
+            this.pinchState={
+              initialDistance:distance,
+              baseScale:this.scale,
+              originX,
+              originY,
+            };
+          };
+          const startPan=(evt)=>{
+            if(!evt) return;
+            this.clearEdgeHover();
+            const isTouch=evt.pointerType==='touch';
+            const onNode=!!(evt.target && evt.target.closest && evt.target.closest('.jsmind-node'));
+            if(isTouch){
+              this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+              if(this.activePointers.size>=2){
+                evt.preventDefault();
+                this.dragState=null;
+                this.updatePointerPanState(false);
+                for(const id of this.activePointers.keys()){
+                  try{ this.container.setPointerCapture(id); }catch(_){ }
+                }
+                updatePinchBaseline();
+                return;
+              }
+              if(onNode && !this.spacePanActive){
+                this.dragState=null;
+                return;
+              }
+              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+              this.updatePointerPanState(true);
+              evt.preventDefault();
+              return;
+            }
+            const button=typeof evt.button==='number'?evt.button:0;
+            const isPrimary=button===0;
+            const isMiddle=button===1;
+            if(!isPrimary && !isMiddle) return;
+            if(onNode && !(this.spacePanActive || isMiddle)) return;
+            this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+            try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+            this.updatePointerPanState(true);
+            evt.preventDefault();
+          };
+          const movePan=(evt)=>{
+            if(!this.activePointers.has(evt.pointerId)) return;
+            const isTouch=evt.pointerType==='touch';
+            if(isTouch){
+              this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
+              if(this.activePointers.size>=2){
+                evt.preventDefault();
+                this.updatePointerPanState(false);
+                if(!this.pinchState){ updatePinchBaseline(); }
+                const pinch=this.pinchState;
+                if(!pinch) return;
+                const pointers=Array.from(this.activePointers.values());
+                if(pointers.length<2) return;
+                const [a,b]=pointers;
+                const distance=Math.hypot(b.x-a.x, b.y-a.y) || 1;
+                const rect=this.container.getBoundingClientRect();
+                const centerX=((a.x+b.x)/2)-rect.left;
+                const centerY=((a.y+b.y)/2)-rect.top;
+                const nextScale=this.clampScale(pinch.baseScale * (distance / pinch.initialDistance), rect);
+                if(Math.abs(nextScale-this.scale)>0.0001){
+                  this.scale=nextScale;
+                  this.offsetX=centerX - pinch.originX*this.scale;
+                  this.offsetY=centerY - pinch.originY*this.scale;
+                  this.applyTransform();
+                }
+                return;
+              }
+              if(this.dragState && this.dragState.pointerId===evt.pointerId){
+                evt.preventDefault();
+              }
+            }
+            if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
+            const dx=evt.clientX-this.dragState.startX;
+            const dy=evt.clientY-this.dragState.startY;
+            this.offsetX=this.dragState.baseX+dx;
+            this.offsetY=this.dragState.baseY+dy;
+            this.applyTransform();
+          };
+          const endPan=(evt)=>{
+            if(this.activePointers.has(evt.pointerId)){
+              this.activePointers.delete(evt.pointerId);
+            }
+            if(this.dragState && evt.pointerId===this.dragState.pointerId){
+              this.dragState=null;
+              this.updatePointerPanState(false);
+            }
+            if(this.activePointers.size<2){
+              this.pinchState=null;
+            }else{
+              updatePinchBaseline();
+            }
+            try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
+          };
+          this.container.addEventListener('pointerdown',startPan);
+          this.container.addEventListener('pointermove',movePan);
+          this.container.addEventListener('pointerup',endPan);
+          this.container.addEventListener('pointercancel',endPan);
+          this.container.addEventListener('wheel',evt=>this.handleWheel(evt),{passive:false});
+        }
+        calculateScaleBounds(rect){
+          const defaultMin=(typeof this.defaultMinScale==='number' && this.defaultMinScale>0)?this.defaultMinScale:0.3;
+          const defaultMax=(typeof this.defaultMaxScale==='number' && this.defaultMaxScale>0)?this.defaultMaxScale:2.5;
+          const readableMin=(typeof this.minReadableScale==='number' && this.minReadableScale>0)?this.minReadableScale:0.05;
+          let min=defaultMin;
+          const containerRect=rect || this.container.getBoundingClientRect();
+          const hasRect=containerRect && containerRect.width>0 && containerRect.height>0;
+          if(this.bounds && hasRect){
+            const padding=(typeof this.scalePadding==='number' && this.scalePadding>=0)?this.scalePadding:0;
+            const widthDenom=(this.bounds.width||0)+padding;
+            const heightDenom=(this.bounds.height||0)+padding;
+            const widthScale=widthDenom>0?containerRect.width/widthDenom:Infinity;
+            const heightScale=heightDenom>0?containerRect.height/heightDenom:Infinity;
+            const fitScale=Math.min(widthScale,heightScale);
+            if(Number.isFinite(fitScale) && fitScale>0){
+              if(fitScale<defaultMin){
+                min=Math.max(readableMin, fitScale);
+              }
+            }
+          }
+          if(min>defaultMax){ min=defaultMax; }
+          return {min, max:defaultMax};
+        }
+        updateScaleBounds(rect){
+          const bounds=this.calculateScaleBounds(rect);
+          this.minScale=bounds.min;
+          this.maxScale=bounds.max;
+          return bounds;
+        }
+        clampScale(value, rect){
+          if(typeof value!=='number' || !isFinite(value)) return this.scale;
+          const bounds=this.updateScaleBounds(rect);
+          if(value<bounds.min) return bounds.min;
+          if(value>bounds.max) return bounds.max;
+          return value;
+        }
+        enforceScaleBounds(rect, options={}){
+          const prevScale=this.scale;
+          const bounds=this.updateScaleBounds(rect);
+          const clamped=Math.min(bounds.max, Math.max(bounds.min, prevScale));
+          if(Math.abs(clamped-prevScale)>0.0001){
+            const adjustOffset=options.adjustOffset!==false;
+            if(adjustOffset){
+              const containerRect=rect || this.container.getBoundingClientRect();
+              if(containerRect && containerRect.width>0 && containerRect.height>0 && prevScale>0){
+                const anchorX=(options.anchor && typeof options.anchor.x==='number')?options.anchor.x:containerRect.width/2;
+                const anchorY=(options.anchor && typeof options.anchor.y==='number')?options.anchor.y:containerRect.height/2;
+                const originX=(anchorX - this.offsetX)/prevScale;
+                const originY=(anchorY - this.offsetY)/prevScale;
+                this.offsetX=anchorX - originX*clamped;
+                this.offsetY=anchorY - originY*clamped;
+              }
+            }
+            this.scale=clamped;
+            return true;
+          }
+          return false;
+        }
+        handleWheel(evt){
+          if(!evt) return;
+          const rect=this.container.getBoundingClientRect();
+          if(!rect) return;
+          const trackpadThreshold=60;
+          const isTrackpadLike=evt.deltaMode===0 && Math.abs(evt.deltaY)<trackpadThreshold && Math.abs(evt.deltaX)<trackpadThreshold;
+          const wantsZoom=evt.ctrlKey || evt.metaKey || (!evt.shiftKey && !evt.altKey && !isTrackpadLike);
+          if(wantsZoom){
+            evt.preventDefault();
+            const baseScale=this.scale>0?this.scale:1;
+            const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
+            const delta=evt.deltaY||0;
+            const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
+            if(Math.abs(nextScale-baseScale)<0.0001) return;
+            const anchorX=evt.clientX-rect.left;
+            const anchorY=evt.clientY-rect.top;
+            const originX=(anchorX - this.offsetX)/baseScale;
+            const originY=(anchorY - this.offsetY)/baseScale;
+            this.scale=nextScale;
+            this.offsetX=anchorX - originX*this.scale;
+            this.offsetY=anchorY - originY*this.scale;
+            this.applyTransform();
+            return;
+          }
+          evt.preventDefault();
+          let deltaX=evt.deltaX||0;
+          let deltaY=evt.deltaY||0;
+          if(evt.shiftKey && !evt.altKey){
+            deltaX+=deltaY;
+            deltaY=0;
+          }
+          const multiplier=evt.deltaMode===1?20:(evt.deltaMode===2?Math.max(rect.width,rect.height)*0.8:(isTrackpadLike?1:1.8));
+          this.offsetX-=deltaX*multiplier;
+          this.offsetY-=deltaY*multiplier;
+          this.applyTransform();
+        }
+        add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
+        emit(type){ this.listeners.forEach(fn=>{ try{ fn(type); }catch(err){ console.warn(err); } }); }
+        show(mindData){
+          this.mind=(typeof structuredClone==='function')?structuredClone(mindData):JSON.parse(JSON.stringify(mindData));
+          this.nodes.clear();
+          this.root=null;
+          this.selectedId=null;
+          if(this.relationRegistry){ this.relationRegistry.clear(); }
+          const relationsSource=Array.isArray(this.mind && this.mind.relations ? this.mind.relations : null) ? this.mind.relations : [];
+          this.relations=[];
+          const relationIds=new Set();
+          relationsSource.forEach(rel=>{
+            if(!rel || typeof rel!=='object') return;
+            const from=typeof rel.from==='string'?rel.from.trim():'';
+            const to=typeof rel.to==='string'?rel.to.trim():'';
+            if(!from || !to || from===to) return;
+            let id=typeof rel.id==='string' && rel.id.trim()!=='' ? rel.id.trim() : null;
+            if(!id){
+              do { id='rel-'+Math.random().toString(36).slice(2,10); } while(relationIds.has(id));
+            }
+            if(relationIds.has(id)){
+              do { id='rel-'+Math.random().toString(36).slice(2,10); } while(relationIds.has(id));
+            }
+            relationIds.add(id);
+            const entry={id,from,to};
+            if(typeof rel.label==='string' && rel.label.trim()!==''){ entry.label=rel.label.trim(); }
+            if(rel.bidirectional){ entry.bidirectional=true; }
+            this.relations.push(entry);
+          });
+          const data=this.mind && this.mind.data ? this.mind.data : null;
+          if(!data) return;
+          const build=(item,parent)=>{
+            const normalizedData=normalizeNodeData(item && item.data ? item.data : {});
+            item.data=normalizedData;
+            const depth=parent ? (parent.depth||0)+1 : 0;
+            const node={
+              id:item.id || ('node-'+Math.random().toString(36).slice(2,9)),
+              topic:item.topic || '',
+              data:normalizedData,
+              parent:parent,
+              children:[],
+              direction:parent ? 'right' : 'center',
+              expanded:item.expanded!==false,
+              isroot:!parent,
+              style:item.style || null,
+              meta:item.meta || null,
+              model:item,
+              depth:depth,
+            };
+            node.model.data=normalizedData;
+            node.model.direction=node.direction;
+            this.nodes.set(node.id,node);
+            if(parent){ parent.children.push(node); node.model.parentId=parent.id; }
+            else this.root=node;
+            if(Array.isArray(item.children)){
+              item.children=item.children.filter(child=>child && typeof child==='object');
+              node.children=item.children.map(child=>build(child,node));
+            }else{
+              item.children=[];
+            }
+            return node;
+          };
+          build(data,null);
+          if(this.relations.length){
+            const filtered=[];
+            const seenIds=new Set();
+            for(const relation of this.relations){
+              if(!relation) continue;
+              if(!this.nodes.has(relation.from) || !this.nodes.has(relation.to) || relation.from===relation.to) continue;
+              if(seenIds.has(relation.id)){
+                let newId;
+                do { newId='rel-'+Math.random().toString(36).slice(2,10); } while(seenIds.has(newId));
+                relation.id=newId;
+              }
+              seenIds.add(relation.id);
+              filtered.push(relation);
+            }
+            this.relations.length=0;
+            this.relations.push(...filtered);
+          }
+          this.mind.relations=this.relations;
+          this.hasCentered=false;
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.show);
+          if(this.root){ this.select_node(this.root.id); }
+        }
+        get_root(){ return this.root; }
+        get_node(id){ return this.nodes.get(id) || null; }
+        get_selected_node(){
+          const node=this.nodes.get(this.selectedId);
+          if(node){ node.selected=true; }
+          return node || null;
+        }
+        select_node(id){
+          if(!id || !this.nodes.has(id)) return;
+          if(this.selectedId && this.selectedId!==id){
+            const prev=this.nodes.get(this.selectedId);
+            if(prev && prev.el){ prev.el.classList.remove('selected'); prev.selected=false; }
+          }
+          this.selectedId=id;
+          const node=this.nodes.get(id);
+          if(node && node.el){ node.el.classList.add('selected'); }
+          if(node){ node.selected=true; }
+          this.emit(SimpleMind.event_type.select);
+        }
+        ensureModelChildren(node){
+          if(!node.model.children) node.model.children=[];
+          return node.model.children;
+        }
+        add_node(parentNode,newId,topic,data){
+          const parent=typeof parentNode==='string'?this.get_node(parentNode):parentNode;
+          if(!parent) return null;
+          if(!newId) newId='node-'+Math.random().toString(36).slice(2,10);
+          const normalized=normalizeNodeData(data||{});
+          const model={id:newId,topic:topic||'新节点',data:normalized,children:[],direction:'right',expanded:true};
+          const children=this.ensureModelChildren(parent);
+          children.push(model);
+          const node={
+            id:newId,
+            topic:model.topic,
+            data:model.data,
+            parent:parent,
+            children:[],
+            direction:'right',
+            expanded:true,
+            isroot:false,
+            style:model.style || null,
+            meta:model.meta || null,
+            model:model,
+            depth:(parent.depth||0)+1,
+          };
+          node.model.direction='right';
+          parent.children.push(node);
+          this.nodes.set(newId,node);
+          this.computeLayout();
+          this.render();
+          this.select_node(newId);
+          this.emit(SimpleMind.event_type.update);
+          return node;
+        }
+        insert_node_between(parentId, childId, options){
+          const parent=typeof parentId==='string'?this.get_node(parentId):parentId;
+          const child=typeof childId==='string'?this.get_node(childId):childId;
+          if(!parent || !child || child.parent!==parent) return null;
+          const childIndex=parent.children?parent.children.indexOf(child):-1;
+          if(childIndex===-1) return null;
+          let newId=null;
+          if(options && typeof options.id==='string' && options.id.trim()!==''){ newId=options.id.trim(); }
+          if(!newId){
+            do { newId='node-'+Math.random().toString(36).slice(2,10); }
+            while(this.nodes.has(newId));
+          }
+          const topic=(options && typeof options.topic==='string' && options.topic.trim()!=='')?options.topic.trim():'新节点';
+          const normalized=normalizeNodeData(options && options.data ? options.data : {});
+          const style=options && options.style ? JSON.parse(JSON.stringify(options.style)) : null;
+          const meta=options && options.meta ? JSON.parse(JSON.stringify(options.meta)) : null;
+          const direction=child.direction || child.dir || parent.direction || 'right';
+          const newModel={
+            id:newId,
+            topic:topic,
+            data:normalized,
+            children:[],
+            direction:direction,
+            expanded:true,
+          };
+          if(style){ newModel.style=JSON.parse(JSON.stringify(style)); }
+          if(meta){ newModel.meta=JSON.parse(JSON.stringify(meta)); }
+          const newNode={
+            id:newId,
+            topic:topic,
+            data:normalized,
+            parent:parent,
+            children:[],
+            direction:direction,
+            expanded:true,
+            isroot:false,
+            style:style,
+            meta:meta,
+            model:newModel,
+            depth:(parent.depth||0)+1,
+          };
+          const parentModelChildren=this.ensureModelChildren(parent);
+          const modelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===child.id);
+          const insertIndex=modelIndex===-1?parentModelChildren.length:modelIndex;
+          parentModelChildren.splice(insertIndex,0,newModel);
+          if(!Array.isArray(parent.children)){ parent.children=[]; }
+          parent.children.splice(childIndex,0,newNode);
+          const removeIndex=parent.children.indexOf(child);
+          if(removeIndex!==-1){ parent.children.splice(removeIndex,1); }
+          const removeModelIndex=parentModelChildren.findIndex(entry=>entry && entry.id===child.id);
+          if(removeModelIndex!==-1){ parentModelChildren.splice(removeModelIndex,1); }
+          newModel.children=newModel.children||[];
+          if(child.model){ newModel.children.push(child.model); }
+          else{
+            newModel.children.push({id:child.id,topic:child.topic,data:child.data,children:[]});
+          }
+          newNode.children.push(child);
+          child.parent=newNode;
+          const updateDepths=(node, depth)=>{
+            if(!node) return;
+            node.depth=depth;
+            if(node.model){ node.model.depth=depth; }
+            if(node.children && node.children.length){
+              node.children.forEach(kid=>updateDepths(kid, depth+1));
+            }
+          };
+          updateDepths(newNode, (parent.depth||0)+1);
+          updateDepths(child, (newNode.depth||0)+1);
+          this.nodes.set(newId,newNode);
+          this.computeLayout();
+          this.render();
+          this.select_node(newId);
+          this.emit(SimpleMind.event_type.update);
+          return this.nodes.get(newId) || null;
+        }
+        remove_node(id){
+          const node=this.nodes.get(id);
+          if(!node || node.isroot) return;
+          const parent=node.parent;
+          parent.children=parent.children.filter(child=>child!==node);
+          if(parent.model && parent.model.children){
+            parent.model.children=parent.model.children.filter(child=>child.id!==id);
+          }
+          const stack=[node];
+          const removedIds=new Set();
+          while(stack.length){
+            const cur=stack.pop();
+            removedIds.add(cur.id);
+            this.nodes.delete(cur.id);
+            if(cur.children && cur.children.length){ stack.push(...cur.children); }
+          }
+          if(removedIds.size){
+            this.pruneRelations(rel=>removedIds.has(rel.from) || removedIds.has(rel.to),{silent:true});
+          }
+          this.computeLayout();
+          this.render();
+          this.select_node(parent.id);
+          this.emit(SimpleMind.event_type.update);
+        }
+        setupTouchGuards(){
+          let lastTapTime=0;
+          let lastTapX=0;
+          let lastTapY=0;
+          let tapTimer=null;
+          const DOUBLE_TAP_DELAY=320;
+          const DOUBLE_TAP_DISTANCE=26;
+          const reset=()=>{
+            if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; }
+            lastTapTime=0;
+          };
+          const isEditableTarget=(target)=>{
+            if(!target || !target.tagName) return false;
+            const tag=target.tagName.toLowerCase();
+            return tag==='input' || tag==='textarea' || tag==='select' || target.isContentEditable===true;
+          };
+          this.container.addEventListener('touchstart',(evt)=>{
+            if(evt.touches.length>1){ reset(); return; }
+            const target=evt.target;
+            if(isEditableTarget(target)){ reset(); return; }
+            const touch=evt.touches[0];
+            const now=performance.now();
+            if(lastTapTime){
+              const delta=now-lastTapTime;
+              const dx=touch.clientX-lastTapX;
+              const dy=touch.clientY-lastTapY;
+              if(delta>0 && delta<=DOUBLE_TAP_DELAY && (dx*dx + dy*dy) <= (DOUBLE_TAP_DISTANCE*DOUBLE_TAP_DISTANCE)){
+                evt.preventDefault();
+                const dblTarget=target || this.container;
+                const dblEvt=new MouseEvent('dblclick',{
+                  bubbles:true,
+                  cancelable:true,
+                  clientX:touch.clientX,
+                  clientY:touch.clientY,
+                });
+                dblTarget.dispatchEvent(dblEvt);
+                reset();
+                return;
+              }
+            }
+            lastTapTime=now;
+            lastTapX=touch.clientX;
+            lastTapY=touch.clientY;
+            if(tapTimer){ clearTimeout(tapTimer); }
+            tapTimer=setTimeout(reset, DOUBLE_TAP_DELAY+60);
+          },{passive:false});
+          this.container.addEventListener('touchend',(evt)=>{
+            if(evt.touches && evt.touches.length>0) return;
+            if(isEditableTarget(evt.target)){ reset(); return; }
+            if(tapTimer){ clearTimeout(tapTimer); }
+            tapTimer=setTimeout(reset, DOUBLE_TAP_DELAY);
+          });
+          this.container.addEventListener('touchcancel', reset);
+        }
+        toggle_node(id){
+          const node=this.nodes.get(id);
+          if(!node) return;
+          node.expanded=!node.expanded;
+          node.model.expanded=node.expanded;
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.refresh);
+        }
+        set_node_expanded(id, expanded){
+          const node=this.nodes.get(id);
+          if(!node) return false;
+          const desired=expanded!==false;
+          if(node.expanded===desired) return false;
+          node.expanded=desired;
+          if(node.model){ node.model.expanded=desired; }
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.refresh);
+          return true;
+        }
+        set_all_expanded(expanded){
+          const desired=expanded!==false;
+          let changed=false;
+          if(this.root){
+            if(this.root.expanded!==true){
+              this.root.expanded=true;
+              if(this.root.model){ this.root.model.expanded=true; }
+              changed=true;
+            }
+          }
+          for(const node of this.nodes.values()){
+            if(!node || node.isroot) continue;
+            if(!node.children || !node.children.length) continue;
+            if(node.expanded===desired) continue;
+            node.expanded=desired;
+            if(node.model){ node.model.expanded=desired; }
+            changed=true;
+          }
+          if(changed){
+            this.computeLayout();
+            this.render();
+            this.emit(SimpleMind.event_type.refresh);
+          }
+          return changed;
+        }
+        has_collapsed_nodes(){
+          for(const node of this.nodes.values()){
+            if(node && node.children && node.children.length && node.expanded===false){
+              return true;
+            }
+          }
+          return false;
+        }
+        set_node_color(id,bg,fg){
+          const node=this.nodes.get(id);
+          if(node && node.el){
+            node.style=node.style||{};
+            if(bg){ node.style.background=bg; node.el.style.background=bg; node.el.dataset.bg=bg; }
+            if(fg){ node.style.foreground=fg; node.el.style.color=fg; node.el.dataset.fg=fg; }
+          }
+        }
+        update_node(id,topic){
+          const node=this.nodes.get(id);
+          if(!node) return;
+          node.topic=topic;
+          node.model.topic=topic;
+          if(node.el){ node.el.querySelector('.node-topic').textContent=topic; }
+          this.computeLayout();
+          this.render();
+          this.emit(SimpleMind.event_type.edit);
+          this.emit(SimpleMind.event_type.after_edit);
+        }
+        get_data(format){
+          if(format && format!=='node_tree'){ return null; }
+          return this.mind ? ((typeof structuredClone==='function')?structuredClone(this.mind):JSON.parse(JSON.stringify(this.mind))) : null;
+        }
+        collectNodeSizes(){
+          if(!this.root || !this.measureHost) return;
+          const VISUAL_MARGIN_Y=24;
+          this.sizeCache.clear();
+          this.measureHost.innerHTML='';
+          const measureNode=(node)=>{
+            if(!node) return;
+            const el=this.buildNodeElement(node,{forMeasure:true});
+            this.measureHost.appendChild(el);
+            const rect=el.getBoundingClientRect();
+            this.sizeCache.set(node.id,{
+              width:rect.width,
+              height:rect.height+VISUAL_MARGIN_Y,
+            });
+            el.remove();
+            if(node.expanded!==false && node.children && node.children.length){ node.children.forEach(child=>measureNode(child)); }
+          };
+          measureNode(this.root);
+        }
+        computeLayout(){
+          if(!this.root) return;
+          this.collectNodeSizes();
+          const MIN_HEIGHT=88;
+          const clamp=(value,min,max)=>Math.min(max, Math.max(min,value));
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const layoutOptions=this.options && this.options.layout ? this.options.layout : {};
+          const verticalSpacingValue=typeof layoutOptions.verticalSpacing==='number'?layoutOptions.verticalSpacing:72;
+          const horizontalSpacingValue=typeof layoutOptions.horizontalSpacing==='number'?layoutOptions.horizontalSpacing:160;
+          const verticalSpacing=clamp(verticalSpacingValue,56,120);
+          const horizontalSpacing=clamp(horizontalSpacingValue,120,220);
+          const verticalGap=verticalSpacing/scale;
+          const horizontalGap=horizontalSpacing/scale;
+          const heightMap=new Map();
+          const layers=new Map();
+          const registerLayer=(depth,node)=>{
+            if(!layers.has(depth)) layers.set(depth,[]);
+            layers.get(depth).push(node);
+          };
+          const getNodeHeight=(node)=>{
+            if(!node) return MIN_HEIGHT;
+            const cached=this.sizeCache.get(node.id);
+            if(cached && cached.height){ return Math.max(MIN_HEIGHT, cached.height); }
+            return MIN_HEIGHT;
+          };
+          const getNodeWidth=(node)=>{
+            if(!node) return 0;
+            const cached=this.sizeCache.get(node.id);
+            if(cached && cached.width){ return cached.width; }
+            return 0;
+          };
+          const columnWidths=new Map();
+          const registerColumnWidth=(depth,node)=>{
+            if(!node) return;
+            const width=Math.max(1,getNodeWidth(node));
+            const prev=columnWidths.get(depth)||0;
+            if(width>prev){ columnWidths.set(depth,width); }
+          };
+          const gatherColumnWidths=(node,depth=0)=>{
+            if(!node) return;
+            registerColumnWidth(depth,node);
+            if(node.expanded!==false && node.children && node.children.length){
+              node.children.filter(Boolean).forEach(child=>gatherColumnWidths(child, depth+1));
+            }
+          };
+          gatherColumnWidths(this.root,0);
+          if(!columnWidths.has(0)){
+            columnWidths.set(0,Math.max(1,getNodeWidth(this.root)));
+          }
+          const columnPositions=new Map();
+          const depthKeys=[...columnWidths.keys()].sort((a,b)=>a-b);
+          columnPositions.set(0,0);
+          for(const depth of depthKeys){
+            if(depth===0) continue;
+            let anchorDepth=depth-1;
+            while(anchorDepth>=0 && !columnPositions.has(anchorDepth)){
+              anchorDepth--;
+            }
+            const anchorPos=anchorDepth>=0?columnPositions.get(anchorDepth):0;
+            const anchorWidth=anchorDepth>=0?(columnWidths.get(anchorDepth)||0):0;
+            const currentWidth=columnWidths.get(depth)||0;
+            const base=anchorPos + anchorWidth/2 + horizontalGap + currentWidth/2;
+            columnPositions.set(depth, base);
+          }
+          const measure=(node,depth=0)=>{
+            if(!node) return MIN_HEIGHT;
+            if(heightMap.has(node.id)) return heightMap.get(node.id);
+            const base=getNodeHeight(node);
+            if(!node.expanded || !node.children.length){ heightMap.set(node.id, base); return base; }
+            const visible=node.children.filter(Boolean);
+            if(!visible.length){ heightMap.set(node.id, base); return base; }
+            const childHeights=visible.map(child=>measure(child,depth+1));
+            let total=0;
+            for(let i=0;i<childHeights.length;i++){
+              total+=childHeights[i];
+              if(i<childHeights.length-1){ total+=verticalGap; }
+            }
+            const result=Math.max(base,total);
+            heightMap.set(node.id,result);
+            return result;
+          };
+          const subtreeHeight=(nodes,depth)=>{
+            if(!nodes || !nodes.length) return 0;
+            const visible=nodes.filter(Boolean);
+            if(!visible.length) return 0;
+            let total=0;
+            for(let i=0;i<visible.length;i++){
+              const node=visible[i];
+              const h=measure(node,depth);
+              total+=h;
+              if(i<visible.length-1){ total+=verticalGap; }
+            }
+            return total;
+          };
+          const right=this.root.children.filter(Boolean);
+          const rightHeight=subtreeHeight(right,1);
+          const rootHeight=getNodeHeight(this.root);
+          const canvasHeight=Math.max(rootHeight, rightHeight);
+          this.root.x=0;
+          this.root.y=canvasHeight/2;
+          this.root.dir=0;
+          this.root.direction='center';
+          this.root.depth=0;
+          this.root._layoutHeight=measure(this.root,0);
+          registerLayer(0,this.root);
+          if(this.root.model){ this.root.model.direction='center'; }
+          const assign=(node,depth,startTop)=>{
+            const height=measure(node,depth);
+            node.depth=depth;
+            node._layoutHeight=height;
+            const fallbackAnchor=depth>0 && columnPositions.has(depth-1)?columnPositions.get(depth-1):this.root.x;
+            const columnX=columnPositions.has(depth)?columnPositions.get(depth):fallbackAnchor+horizontalGap;
+            node.x=columnX;
+            node.y=startTop+height/2;
+            node.dir=depth===0?0:1;
+            node.direction=depth===0?'center':'right';
+            if(node.model){ node.model.direction=node.direction; }
+            registerLayer(depth,node);
+            if(!node.expanded || !node.children.length) return height;
+            let cursor=startTop;
+            const children=node.children.filter(Boolean);
+            for(let i=0;i<children.length;i++){
+              const child=children[i];
+              const childHeight=assign(child, depth+1, cursor);
+              cursor+=childHeight;
+              if(i<children.length-1){ cursor+=verticalGap; }
+            }
+            if(children.length===1){
+              node.y=children[0].y;
+            }else if(children.length>1){
+              const first=children[0];
+              const last=children[children.length-1];
+              node.y=(first.y + last.y)/2;
+            }
+            return height;
+          };
+          let rightTop=this.root.y - rightHeight/2;
+          for(let i=0;i<right.length;i++){
+            const child=right[i];
+            const h=assign(child,1,rightTop);
+            rightTop+=h;
+            if(i<right.length-1){ rightTop+=verticalGap; }
+          }
+          if(right.length){
+            if(right.length===1){
+              this.root.y=right[0].y;
+            }else{
+              this.root.y=(right[0].y + right[right.length-1].y)/2;
+            }
+          }
+          const shiftSubtree=(node,delta)=>{
+            if(!node || !delta) return;
+            const stack=[node];
+            while(stack.length){
+              const current=stack.pop();
+              current.y+=delta;
+              if(current.children && current.children.length && current.expanded!==false){
+                for(const child of current.children){ if(child) stack.push(child); }
+              }
+            }
+          };
+          const recenterAncestors=(node)=>{
+            let cursor=node;
+            while(cursor){
+              if(cursor.expanded!==false && cursor.children && cursor.children.length){
+                const visible=cursor.children.filter(Boolean);
+                if(visible.length===1){
+                  cursor.y=visible[0].y;
+                }else if(visible.length>1){
+                  const first=visible[0];
+                  const last=visible[visible.length-1];
+                  cursor.y=(first.y + last.y)/2;
+                }
+              }
+              cursor=cursor.parent||null;
+            }
+          };
+          const ensureLayerSpacing=()=>{
+            const entries=[...layers.entries()].sort((a,b)=>a[0]-b[0]);
+            for(const [depth,nodes] of entries){
+              if(depth===0 || nodes.length<2) continue;
+              const sorted=[...nodes].sort((a,b)=>a.y-b.y);
+              for(let i=1;i<sorted.length;i++){
+                const prev=sorted[i-1];
+                const current=sorted[i];
+                const prevDepth=(typeof prev.depth==='number')?prev.depth:depth;
+                const currentDepth=(typeof current.depth==='number')?current.depth:depth;
+                const prevHeight=(prev._layoutHeight!=null)?prev._layoutHeight:measure(prev, prevDepth);
+                const currentHeight=(current._layoutHeight!=null)?current._layoutHeight:measure(current, currentDepth);
+                const prevBottom=prev.y + prevHeight/2;
+                const minTop=prevBottom + verticalGap;
+                const currentTop=current.y - currentHeight/2;
+                if(currentTop<minTop){
+                  const delta=minTop-currentTop;
+                  shiftSubtree(current,delta);
+                  recenterAncestors(current.parent||null);
+                }
+              }
+            }
+          };
+          ensureLayerSpacing();
+          this.bounds={minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity};
+          for(const node of this.nodes.values()){
+            const nodeDepth=(typeof node.depth==='number')?node.depth:0;
+            const height=(node._layoutHeight!=null)?node._layoutHeight:measure(node, nodeDepth);
+            const top=node.y - height/2;
+            const bottom=node.y + height/2;
+            if(top<this.bounds.minY) this.bounds.minY=top;
+            if(bottom>this.bounds.maxY) this.bounds.maxY=bottom;
+            if(node.x<this.bounds.minX) this.bounds.minX=node.x;
+            if(node.x>this.bounds.maxX) this.bounds.maxX=node.x;
+          }
+          if(!isFinite(this.bounds.minY)){ this.bounds={minX:-100,maxX:100,minY:0,maxY:400}; }
+          const margin=80;
+          const shiftX=-this.bounds.minX+margin;
+          const shiftY=-this.bounds.minY+margin;
+          this.bounds.width=this.bounds.maxX-this.bounds.minX+margin*2;
+          this.bounds.height=this.bounds.maxY-this.bounds.minY+margin*2;
+          for(const node of this.nodes.values()){
+            node.absX=node.x+shiftX;
+            node.absY=node.y+shiftY;
+          }
+          if(this.guideLayer){
+            this.guideLayer.style.width=`${this.bounds.width}px`;
+            this.guideLayer.style.height=`${this.bounds.height}px`;
+          }
+          this.updateGuides(layers,columnPositions,shiftX,shiftY);
+          this.linkLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
+          this.linkLayer.setAttribute('width',`${this.bounds.width}`);
+          this.linkLayer.setAttribute('height',`${this.bounds.height}`);
+          this.linkLayer.style.width=`${this.bounds.width}px`;
+          this.linkLayer.style.height=`${this.bounds.height}px`;
+          if(this.relationLayer){
+            this.relationLayer.setAttribute('viewBox',`0 0 ${this.bounds.width} ${this.bounds.height}`);
+            this.relationLayer.setAttribute('width',`${this.bounds.width}`);
+            this.relationLayer.setAttribute('height',`${this.bounds.height}`);
+            this.relationLayer.style.width=`${this.bounds.width}px`;
+            this.relationLayer.style.height=`${this.bounds.height}px`;
+          }
+          if(this.linkControlLayer){
+            this.linkControlLayer.style.width='100%';
+            this.linkControlLayer.style.height='100%';
+          }
+          this.nodeLayer.style.width=`${this.bounds.width}px`;
+          this.nodeLayer.style.height=`${this.bounds.height}px`;
+          this.viewport.style.width=`${this.bounds.width}px`;
+          this.viewport.style.height=`${this.bounds.height}px`;
+        }
+        updateGuides(layers,columnPositions,shiftX,shiftY){
+          if(!this.guideLayer) return;
+          const layoutOptions=this.options && this.options.layout ? this.options.layout : {};
+          if(!layoutOptions.debugGuides){
+            this.guideLayer.style.display='none';
+            this.guideLayer.innerHTML='';
+            return;
+          }
+          this.guideLayer.style.display='block';
+          this.guideLayer.innerHTML='';
+          const columnEntries=[...columnPositions.entries()].sort((a,b)=>a[0]-b[0]);
+          const verticalColor='rgba(227,198,139,0.35)';
+          const horizontalColor='rgba(98,173,255,0.28)';
+          for(const [,x] of columnEntries){
+            const line=document.createElement('div');
+            line.className='guide-line guide-vertical';
+            line.style.position='absolute';
+            line.style.top='0';
+            line.style.bottom='0';
+            line.style.left=`${x+shiftX}px`;
+            line.style.width='1px';
+            line.style.background=verticalColor;
+            this.guideLayer.appendChild(line);
+          }
+          const seen=new Set();
+          for(const nodes of layers.values()){
+            for(const node of nodes){
+              const y=node.y+shiftY;
+              const key=Math.round(y*100)/100;
+              if(seen.has(key)) continue;
+              seen.add(key);
+              const line=document.createElement('div');
+              line.className='guide-line guide-horizontal';
+              line.style.position='absolute';
+              line.style.left='0';
+              line.style.right='0';
+              line.style.top=`${y}px`;
+              line.style.height='1px';
+              line.style.background=horizontalColor;
+              this.guideLayer.appendChild(line);
+            }
+          }
+        }
+        buildNodeElement(node,{forMeasure=false}={}){
+          const el=document.createElement('div');
+          el.className='jsmind-node';
+          if(node.isroot) el.classList.add('isroot');
+          if(node.children && node.children.length) el.classList.add('has-children');
+          if(node.expanded===false) el.classList.add('is-collapsed');
+          if(node.selected && !forMeasure){ el.classList.add('selected'); }
+          el.dataset.nodeid=node.id;
+          el.setAttribute('nodeid', node.id);
+          el.dataset.foldState=node.expanded===false?'collapsed':'expanded';
+          let orientation=null;
+          if(node.direction==='left' || node.dir===-1) orientation='left';
+          else if(node.direction==='right' || node.dir===1) orientation='right';
+          else if(node.parent){
+            if(node.absX < node.parent.absX) orientation='left';
+            else if(node.absX > node.parent.absX) orientation='right';
+          }
+          if(orientation){ el.dataset.direction=orientation; }
+          else{ el.removeAttribute('data-direction'); }
+          const span=document.createElement('span');
+          span.className='node-topic';
+          span.textContent=node.topic || '';
+          el.appendChild(span);
+          const data=node.data || {};
+          el.dataset.icon=DEFAULT_NODE_ICON;
+          el.dataset.depth=String(node.depth||0);
+          const attachments=gatherAttachments(data);
+          if(attachments.length){ el.classList.add('has-attachment'); }
+          if(data.url){ el.classList.add('has-link'); }
+          const noteText=typeof data.note==='string'?data.note:'';
+          if(noteText.trim()){
+            const note=document.createElement('div');
+            note.className='node-note';
+            note.textContent=noteText;
+            el.appendChild(note);
+          }
+          const badges=[];
+          if(attachments.length){
+            attachments.forEach(att=>{
+              const badge=document.createElement('button');
+              badge.type='button';
+              badge.className='node-badge attachment';
+              const label=attachmentLabel(att);
+              badge.textContent='📎 '+label;
+              badge.title=`打开附件：${label}`;
+              if(forMeasure){
+                badge.disabled=true;
+              }else{
+                badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapAttachment(att); });
+              }
+              badges.push(badge);
+            });
+          }
+          if(data.url){
+            const badge=document.createElement('button');
+            badge.type='button';
+            badge.className='node-badge link';
+            const linkLabel=data.linkTitle || '打开链接';
+            badge.textContent='🔗 '+linkLabel;
+            badge.title=linkLabel;
+            if(forMeasure){
+              badge.disabled=true;
+            }else{
+              badge.addEventListener('click',evt=>{ evt.preventDefault(); evt.stopPropagation(); openMindmapLink(data.url); });
+            }
+            badges.push(badge);
+          }
+          if(badges.length){
+            const wrap=document.createElement('div');
+            wrap.className='node-affordances';
+            badges.forEach(btn=>wrap.appendChild(btn));
+            el.appendChild(wrap);
+          }
+          if(!forMeasure && node.children && node.children.length && node.expanded===false){
+            const marker=document.createElement('button');
+            marker.type='button';
+            marker.className='node-collapse-marker';
+            marker.innerHTML='<span class="icon">⤴</span><span class="text">展开</span>';
+            marker.setAttribute('aria-label','展开节点');
+            marker.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              const latest=jm.get_node(node.id);
+              if(latest){ setNodeExpandedState(latest,true); }
+            });
+            el.appendChild(marker);
+          }
+          if(!forMeasure){
+            el.addEventListener('click',(evt)=>{
+              const wasSelected=!!node.selected;
+              this.select_node(node.id);
+              if(isCompactViewport()){
+                const now=Date.now();
+                if(wasSelected && lastTapInfo.id===node.id && (now-lastTapInfo.time)<=DOUBLE_TAP_WINDOW){
+                  evt.preventDefault();
+                  this.showNodeDetails(node);
+                }
+                lastTapInfo={id:node.id,time:now};
+              }
+            });
+            el.addEventListener('dblclick',()=>{ this.showNodeDetails(node); });
+          }
+          return el;
+        }
+        render(){
+          this.clearEdgeHover();
+          this.nodeLayer.innerHTML='';
+          while(this.linkLayer.firstChild){ this.linkLayer.removeChild(this.linkLayer.firstChild); }
+          if(this.linkControlLayer){ this.linkControlLayer.innerHTML=''; }
+          if(this.relationLayer){ while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); } }
+          if(this.resizeObserver){ this.resizeObserver.disconnect(); }
+          this.linkRegistry.clear();
+          if(this.relationRegistry){ this.relationRegistry.clear(); }
+          if(!this.root) return;
+          const walk=(node)=>{
+            node.el=this.buildNodeElement(node,{forMeasure:false});
+            if(node.style){
+              if(node.style.background){ node.el.style.background=node.style.background; }
+              if(node.style.foreground){ node.el.style.color=node.style.foreground; }
+            }
+            this.nodeLayer.appendChild(node.el);
+            node.width=node.el.offsetWidth;
+            node.height=node.el.offsetHeight;
+            this.sizeCache.set(node.id,{width:node.width,height:node.height});
+            this.updateNodePosition(node);
+            this.updateAnchors(node);
+            if(node.parent){
+              const group=document.createElementNS('http://www.w3.org/2000/svg','g');
+              group.classList.add('trace-group');
+              const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
+              shadow.classList.add('trace','shadow');
+              const core=document.createElementNS('http://www.w3.org/2000/svg','path');
+              core.classList.add('trace','core');
+              core.setAttribute('stroke','url(#mindGoldTrace)');
+              const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
+              highlight.classList.add('trace','highlight');
+              shadow.style.pointerEvents='none';
+              highlight.style.pointerEvents='none';
+              core.style.pointerEvents='visibleStroke';
+              group.appendChild(shadow);
+              group.appendChild(core);
+              group.appendChild(highlight);
+              group.dataset.from=node.parent.id;
+              group.dataset.to=node.id;
+              this.linkLayer.appendChild(group);
+              node.linkGroup=group;
+              node.linkShadow=shadow;
+              node.linkPath=core;
+              node.linkHighlight=highlight;
+              const parentId=node.parent.id;
+              const childId=node.id;
+              const enterEdge=()=>this.setEdgeHover(parentId, childId);
+              const leaveEdge=()=>this.clearEdgeHover(parentId, childId);
+              core.addEventListener('pointerenter', enterEdge);
+              core.addEventListener('pointerleave', leaveEdge);
+              core.addEventListener('pointercancel', leaveEdge);
+              this.linkRegistry.set(node.id,{group,shadow,core,highlight});
+              this.updateLinkPath(node);
+            }
+            if(this.resizeObserver){ this.resizeObserver.observe(node.el); }
+            if(node.expanded){
+              node.children.forEach(child=>walk(child));
+            }
+          };
+          walk(this.root);
+          this.renderRelations();
+          this.updateEdgeButtonScale();
+          this.enforceScaleBounds(null);
+          this.applyTransform(true);
+        }
+        renderRelations(){
+          if(!this.relationLayer) return;
+          while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); }
+          if(this.relationRegistry){ this.relationRegistry.clear(); }
+          if(!Array.isArray(this.relations) || !this.relations.length){
+            this.selectedRelationId=null;
+            return;
+          }
+          for(const relation of this.relations){
+            if(!relation) continue;
+            const fromNode=this.nodes.get(relation.from);
+            const toNode=this.nodes.get(relation.to);
+            if(!fromNode || !toNode || fromNode===toNode) continue;
+            const group=document.createElementNS('http://www.w3.org/2000/svg','g');
+            group.classList.add('relation-group');
+            group.dataset.id=relation.id;
+            group.dataset.from=relation.from;
+            group.dataset.to=relation.to;
+            const shadow=document.createElementNS('http://www.w3.org/2000/svg','path');
+            shadow.classList.add('relation-shadow');
+            const core=document.createElementNS('http://www.w3.org/2000/svg','path');
+            core.classList.add('relation-core');
+            core.dataset.bidirectional=relation.bidirectional?'true':'false';
+            const coreId=`relation-path-${relation.id}`;
+            core.setAttribute('id', coreId);
+            const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
+            highlight.classList.add('relation-highlight');
+            const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+            hit.classList.add('relation-hit');
+            hit.setAttribute('fill','none');
+            hit.setAttribute('stroke','transparent');
+            const direction=document.createElementNS('http://www.w3.org/2000/svg','text');
+            direction.classList.add('relation-direction');
+            direction.setAttribute('aria-hidden','true');
+            const directionPath=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+            directionPath.setAttribute('href', `#${coreId}`);
+            directionPath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            directionPath.setAttribute('startOffset','2%');
+            direction.appendChild(directionPath);
+            const directionReverse=document.createElementNS('http://www.w3.org/2000/svg','text');
+            directionReverse.classList.add('relation-direction','reverse');
+            directionReverse.setAttribute('aria-hidden','true');
+            directionReverse.setAttribute('hidden','true');
+            const directionReversePath=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+            directionReversePath.setAttribute('href', `#${coreId}`);
+            directionReversePath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            directionReversePath.setAttribute('startOffset','6%');
+            directionReverse.appendChild(directionReversePath);
+            if(this.selectedRelationId && this.selectedRelationId===relation.id){
+              group.dataset.selected='true';
+            }
+            group.appendChild(shadow);
+            group.appendChild(core);
+            group.appendChild(highlight);
+            group.appendChild(direction);
+            group.appendChild(directionReverse);
+            group.appendChild(hit);
+            this.relationLayer.appendChild(group);
+            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation,direction,directionReverse,directionPath,directionReversePath});
+            const handleSelect=evt=>{
+              if(evt){ evt.stopPropagation(); }
+              const isMouse=evt && evt.pointerType==='mouse';
+              if(evt && evt.type==='pointerdown' && isMouse && evt.button!==0) return;
+              const selected=this.select_relation(relation.id) || relation;
+              if(this.options && typeof this.options.onRelationSelect==='function'){
+                this.options.onRelationSelect(selected, this, evt||null);
+              }
+            };
+            const handleContext=evt=>{
+              if(evt){ evt.preventDefault(); evt.stopPropagation(); }
+              const selected=this.select_relation(relation.id) || relation;
+              if(this.options && typeof this.options.onRelationContext==='function'){
+                this.options.onRelationContext(selected, this, evt||null);
+              }
+            };
+            const interactionTargets=[core, hit];
+            interactionTargets.forEach(target=>{
+              if(!target) return;
+              target.addEventListener('pointerdown',evt=>{
+                handleSelect(evt);
+                if(evt && typeof beginRelationLongPress==='function'){
+                  if(evt.pointerType && ['touch','pen'].includes(evt.pointerType)){ beginRelationLongPress(evt, relation.id); }
+                  else{ cancelRelationLongPressState(); }
+                }
+              });
+              target.addEventListener('contextmenu',evt=>{
+                cancelRelationLongPressState();
+                handleContext(evt);
+              });
+            });
+            this.updateRelationPath(relation);
+          }
+        }
+        get_relation(id){
+          if(!id || !this.relationRegistry) return null;
+          const entry=this.relationRegistry.get(id);
+          return entry?entry.relation||null:null;
+        }
+        select_relation(id){
+          if(!this.relationRegistry) return null;
+          if(this.selectedRelationId && this.relationRegistry.has(this.selectedRelationId)){
+            const prev=this.relationRegistry.get(this.selectedRelationId);
+            if(prev && prev.group){ prev.group.removeAttribute('data-selected'); }
+          }
+          this.selectedRelationId=null;
+          if(!id || !this.relationRegistry.has(id)) return null;
+          const entry=this.relationRegistry.get(id);
+          this.selectedRelationId=id;
+          if(entry && entry.group){ entry.group.dataset.selected='true'; }
+          return entry?entry.relation||null:null;
+        }
+        clear_relation_selection(){
+          if(!this.selectedRelationId) return;
+          if(this.relationRegistry && this.relationRegistry.has(this.selectedRelationId)){
+            const entry=this.relationRegistry.get(this.selectedRelationId);
+            if(entry && entry.group){ entry.group.removeAttribute('data-selected'); }
+          }
+          this.selectedRelationId=null;
+        }
+        get_selected_relation(){
+          if(!this.selectedRelationId || !this.relationRegistry) return null;
+          const entry=this.relationRegistry.get(this.selectedRelationId);
+          return entry?entry.relation||null:null;
+        }
+        updateNodePosition(node){
+          if(!node || !node.el) return;
+          const width=node.width || node.el.offsetWidth || 0;
+          const height=node.height || node.el.offsetHeight || 0;
+          node.el.style.left=`${node.absX - width/2}px`;
+          node.el.style.top=`${node.absY - height/2}px`;
+        }
+        updateAnchors(node){
+          if(!node) return;
+          const width=node.width || (node.el?node.el.offsetWidth:0) || 0;
+          const height=node.height || (node.el?node.el.offsetHeight:0) || 0;
+          node.anchors={
+            center:{x:node.absX,y:node.absY},
+            left:{x:node.absX - width/2,y:node.absY},
+            right:{x:node.absX + width/2,y:node.absY},
+            top:{x:node.absX,y:node.absY - height/2},
+            bottom:{x:node.absX,y:node.absY + height/2},
+          };
+        }
+        updateLinkPath(node){
+          if(!node || !node.parent || !node.linkPath) return;
+          if(!node.anchors) this.updateAnchors(node);
+          if(!node.parent.anchors) this.updateAnchors(node.parent);
+          const parent=node.parent;
+          const isLeft=node.dir===-1 || node.direction==='left' || node.absX<=parent.absX;
+          const baseStart=isLeft ? parent.anchors.left : parent.anchors.right;
+          const end=isLeft ? node.anchors.right : node.anchors.left;
+          const siblings=(parent.children||[]).filter(Boolean);
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          let portYOffset=0;
+          if(siblings.length>1){
+            const index=siblings.indexOf(node);
+            if(index!==-1){
+              const mid=(siblings.length-1)/2;
+              portYOffset=(index-mid)*10/scale;
+            }
+          }
+          const start={x:baseStart.x,y:baseStart.y+portYOffset};
+          const route=buildTraceRoute(start,end,isLeft?-1:1);
+          let pathData=buildChamferedPath(route, TRACE_CHAMFER);
+          if(!pathData){
+            pathData=`M${start.x} ${start.y} L${end.x} ${end.y}`;
+          }
+          node.linkPath.setAttribute('d', pathData);
+          if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
+          if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
+          const routePoints=(Array.isArray(route) && route.length>=2)?route:[start,end];
+          const normalizedRoute=[];
+          const traceSegments=[];
+          for(let i=0;i<routePoints.length;i++){
+            const point=routePoints[i];
+            if(!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)){
+              continue;
+            }
+            const current={x:point.x,y:point.y};
+            normalizedRoute.push(current);
+            if(i>0){
+              const prev=normalizedRoute[normalizedRoute.length-2];
+              if(prev){
+                traceSegments.push({
+                  a:{x:prev.x,y:prev.y},
+                  b:{x:current.x,y:current.y},
+                });
+              }
+            }
+          }
+          node.traceRoute=normalizedRoute.length>=2?normalizedRoute:null;
+          node.traceSegments=traceSegments.length?traceSegments:null;
+          this.positionEdgeInsertButton(node, normalizedRoute.length?normalizedRoute:routePoints);
+        }
+        ensureEdgeInsertButton(node){
+          if(!node || !node.parent || !this.linkControlLayer) return null;
+          if(node.edgeButton && !node.edgeButton.isConnected){ node.edgeButton=null; }
+          let btn=node.edgeButton||null;
+          if(!btn){
+            btn=document.createElement('button');
+            btn.type='button';
+            btn.className='edge-insert-btn';
+            btn.textContent='＋';
+            btn.title='在该连线上插入节点';
+            btn.setAttribute('aria-label','在该连线上插入节点');
+            btn.dataset.parent=node.parent.id;
+            btn.dataset.child=node.id;
+            const stopPropagation=evt=>{ if(evt){ evt.stopPropagation(); } };
+            btn.addEventListener('pointerdown',stopPropagation);
+            btn.addEventListener('mousedown',stopPropagation);
+            btn.addEventListener('touchstart',stopPropagation,{passive:true});
+            btn.addEventListener('click',evt=>{
+              evt.preventDefault();
+              evt.stopPropagation();
+              if(typeof this.options.onInsertBetween==='function'){
+                try{ this.options.onInsertBetween(node.parent, node); }
+                catch(err){ console.error(err); }
+              }
+            });
+            const handleEnter=()=>{
+              const parentId=btn.dataset.parent;
+              const childId=btn.dataset.child;
+              btn._edgeHoverActivePair={parent:parentId, child:childId};
+              this.setEdgeHover(parentId, childId);
+            };
+            const handleLeave=()=>{
+              const pair=btn._edgeHoverActivePair;
+              if(pair && pair.parent && pair.child){
+                this.clearEdgeHover(pair.parent, pair.child);
+              }else{
+                this.clearEdgeHover();
+              }
+              btn._edgeHoverActivePair=null;
+            };
+            btn.addEventListener('pointerenter',handleEnter);
+            btn.addEventListener('pointerleave',handleLeave);
+            btn.addEventListener('pointercancel',handleLeave);
+            btn.addEventListener('focus',handleEnter);
+            btn.addEventListener('blur',handleLeave);
+            btn._edgeHoverHandlers={enter:handleEnter,leave:handleLeave};
+            this.linkControlLayer.appendChild(btn);
+            node.edgeButton=btn;
+          }
+          btn.dataset.parent=node.parent.id;
+          btn.dataset.child=node.id;
+          return btn;
+        }
+        computeRouteMidpoint(points){
+          if(!Array.isArray(points) || !points.length) return null;
+          let total=0;
+          for(let i=1;i<points.length;i++){
+            const prev=points[i-1];
+            const current=points[i];
+            total+=Math.hypot(current.x-prev.x, current.y-prev.y);
+          }
+          if(total<=0){
+            const first=points[0];
+            return first?{x:first.x,y:first.y}:null;
+          }
+          let traversed=0;
+          const halfway=total/2;
+          for(let i=1;i<points.length;i++){
+            const prev=points[i-1];
+            const current=points[i];
+            const segment=Math.hypot(current.x-prev.x, current.y-prev.y);
+            if(segment<=0){
+              continue;
+            }
+            if(traversed+segment>=halfway){
+              const ratio=(halfway-traversed)/segment;
+              return {
+                x:prev.x + (current.x-prev.x)*ratio,
+                y:prev.y + (current.y-prev.y)*ratio,
+              };
+            }
+            traversed+=segment;
+          }
+          const last=points[points.length-1];
+          return last?{x:last.x,y:last.y}:null;
+        }
+        positionEdgeInsertButton(node, points){
+          if(!node || !node.parent || !Array.isArray(points) || points.length<2) return;
+          const btn=this.ensureEdgeInsertButton(node);
+          if(!btn) return;
+          if(node.parent && node.parent.expanded===false){
+            btn.hidden=true;
+            this.clearEdgeHover(node.parent.id, node.id);
+            btn._logicalPosition=null;
+            delete btn.dataset.logicalX;
+            delete btn.dataset.logicalY;
+            return;
+          }
+          const mid=this.computeRouteMidpoint(points);
+          if(!mid){
+            btn.hidden=true;
+            this.clearEdgeHover(node.parent.id, node.id);
+            if(btn._edgeHoverActivePair){ btn._edgeHoverActivePair=null; }
+            btn._logicalPosition=null;
+            delete btn.dataset.logicalX;
+            delete btn.dataset.logicalY;
+            return;
+          }
+          if(!Number.isFinite(mid.x) || !Number.isFinite(mid.y)){
+            btn.hidden=true;
+            btn._logicalPosition=null;
+            delete btn.dataset.logicalX;
+            delete btn.dataset.logicalY;
+            return;
+          }
+          btn.hidden=false;
+          const logical={x:mid.x, y:mid.y};
+          btn._logicalPosition=logical;
+          btn.dataset.logicalX=String(logical.x);
+          btn.dataset.logicalY=String(logical.y);
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const offsetX=Number.isFinite(this.offsetX)?this.offsetX:0;
+          const offsetY=Number.isFinite(this.offsetY)?this.offsetY:0;
+          const screenX=logical.x*scale + offsetX;
+          const screenY=logical.y*scale + offsetY;
+          btn.style.left=`${screenX}px`;
+          btn.style.top=`${screenY}px`;
+        }
+        setEdgeHover(fromId,toId){
+          if(!fromId || !toId) return;
+          if(this.edgeHoverState && this.edgeHoverState.from===fromId && this.edgeHoverState.to===toId){
+            return;
+          }
+          this.clearEdgeHover();
+          this.edgeHoverState={from:fromId,to:toId};
+          const parent=this.nodes.get(fromId);
+          if(parent && parent.el){ parent.el.classList.add('edge-glow'); }
+          const child=this.nodes.get(toId);
+          if(child && child.el){ child.el.classList.add('edge-glow'); }
+        }
+        clearEdgeHover(expectedFrom, expectedTo){
+          if(!this.edgeHoverState) return;
+          if(expectedFrom && expectedTo){
+            if(this.edgeHoverState.from!==expectedFrom || this.edgeHoverState.to!==expectedTo){
+              return;
+            }
+          }
+          const {from,to}=this.edgeHoverState;
+          this.edgeHoverState=null;
+          const parent=this.nodes.get(from);
+          if(parent && parent.el){ parent.el.classList.remove('edge-glow'); }
+          const child=this.nodes.get(to);
+          if(child && child.el){ child.el.classList.remove('edge-glow'); }
+        }
+        updateEdgeButtonScale(){
+          if(!this.linkControlLayer || !this.nodes) return;
+          const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+          const offsetX=Number.isFinite(this.offsetX)?this.offsetX:0;
+          const offsetY=Number.isFinite(this.offsetY)?this.offsetY:0;
+          for(const node of this.nodes.values()){
+            if(!node) continue;
+            const btn=node.edgeButton;
+            if(!btn || !btn.isConnected || btn.hidden) continue;
+            let logical=btn._logicalPosition || null;
+            if((!logical || !Number.isFinite(logical.x) || !Number.isFinite(logical.y)) && btn.dataset){
+              const parsedX=parseFloat(btn.dataset.logicalX || '');
+              const parsedY=parseFloat(btn.dataset.logicalY || '');
+              if(Number.isFinite(parsedX) && Number.isFinite(parsedY)){
+                logical={x:parsedX,y:parsedY};
+                btn._logicalPosition=logical;
+              }
+            }
+            if(!logical || !Number.isFinite(logical.x) || !Number.isFinite(logical.y)) continue;
+            const screenX=logical.x*scale + offsetX;
+            const screenY=logical.y*scale + offsetY;
+            btn.style.left=`${screenX}px`;
+            btn.style.top=`${screenY}px`;
+          }
+        }
+        getRelationAnchor(node, side){
+          if(!node) return null;
+          if(!node.anchors) this.updateAnchors(node);
+          const anchors=node.anchors||{};
+          const anchor=anchors[side];
+          if(anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)){
+            return {x:anchor.x,y:anchor.y};
+          }
+          const width=node.width || (node.el?node.el.offsetWidth:0) || 0;
+          const height=node.height || (node.el?node.el.offsetHeight:0) || 0;
+          const centerX=Number.isFinite(node.absX)?node.absX:0;
+          const centerY=Number.isFinite(node.absY)?node.absY:0;
+          switch(side){
+            case 'left':
+              return {x:centerX - width/2,y:centerY};
+            case 'right':
+              return {x:centerX + width/2,y:centerY};
+            case 'top':
+              return {x:centerX,y:centerY - height/2};
+            case 'bottom':
+              return {x:centerX,y:centerY + height/2};
+            default:
+              return anchors.center && Number.isFinite(anchors.center.x) && Number.isFinite(anchors.center.y)
+                ? {x:anchors.center.x,y:anchors.center.y}
+                : {x:centerX,y:centerY};
+          }
+        }
+        getRelationSideVector(side){
+          switch(side){
+            case 'left': return {x:-1,y:0};
+            case 'right': return {x:1,y:0};
+            case 'top': return {x:0,y:-1};
+            case 'bottom': return {x:0,y:1};
+            default: return {x:0,y:0};
+          }
+        }
+        collectRelationAvoidRects(node, owner){
+          const rects=[];
+          if(!node) return rects;
+          const width=node.width || (node.el?node.el.offsetWidth:0) || 0;
+          const height=node.height || (node.el?node.el.offsetHeight:0) || 0;
+          const centerX=Number.isFinite(node.absX)?node.absX:0;
+          const centerY=Number.isFinite(node.absY)?node.absY:0;
+          if(width>0 && height>0){
+            rects.push({
+              left:centerX - width/2,
+              right:centerX + width/2,
+              top:centerY - height/2,
+              bottom:centerY + height/2,
+              owner,
+              type:'node',
+              margin:14,
+            });
+          }
+          const btn=node.edgeButton;
+          if(btn && btn.isConnected && !btn.hidden){
+            const scale=(typeof this.scale==='number' && this.scale>0)?this.scale:1;
+            const logicalX=parseFloat(btn.dataset.logicalX || '');
+            const logicalY=parseFloat(btn.dataset.logicalY || '');
+            if(Number.isFinite(logicalX) && Number.isFinite(logicalY)){
+              const btnWidth=(btn.offsetWidth||28)/scale;
+              const btnHeight=(btn.offsetHeight||28)/scale;
+              rects.push({
+                left:logicalX - btnWidth/2,
+                right:logicalX + btnWidth/2,
+                top:logicalY - btnHeight/2,
+                bottom:logicalY + btnHeight/2,
+                owner,
+                type:'button',
+                margin:10,
+              });
+            }
+          }
+          return rects;
+        }
+        collectTraceAvoidRects(node, owner){
+          const rects=[];
+          if(!node) return rects;
+          const segmentsSource=Array.isArray(node.traceSegments)?node.traceSegments:null;
+          if(!segmentsSource || !segmentsSource.length) return rects;
+          const segments=[];
+          let left=Infinity;
+          let right=-Infinity;
+          let top=Infinity;
+          let bottom=-Infinity;
+          for(const seg of segmentsSource){
+            if(!seg || !seg.a || !seg.b) continue;
+            const a={x:seg.a.x,y:seg.a.y};
+            const b={x:seg.b.x,y:seg.b.y};
+            if(!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+            segments.push({a,b});
+            left=Math.min(left,a.x,b.x);
+            right=Math.max(right,a.x,b.x);
+            top=Math.min(top,a.y,b.y);
+            bottom=Math.max(bottom,a.y,b.y);
+          }
+          if(!segments.length) return rects;
+          if(!Number.isFinite(left) || !Number.isFinite(right) || !Number.isFinite(top) || !Number.isFinite(bottom)){
+            return rects;
+          }
+          rects.push({
+            type:'trace',
+            owner,
+            segments,
+            left,
+            right,
+            top,
+            bottom,
+            margin:16,
+          });
+          return rects;
+        }
+        simplifyRelationRoute(points){
+          if(!Array.isArray(points) || !points.length) return [];
+          const cleaned=[];
+          for(const pt of points){
+            if(!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
+            const next={x:pt.x,y:pt.y};
+            if(cleaned.length){
+              const prev=cleaned[cleaned.length-1];
+              if(Math.abs(prev.x-next.x)<0.5 && Math.abs(prev.y-next.y)<0.5){
+                continue;
+              }
+            }
+            cleaned.push(next);
+          }
+          if(cleaned.length<=2) return cleaned;
+          const simplified=[cleaned[0]];
+          for(let i=1;i<cleaned.length-1;i++){
+            const prev=simplified[simplified.length-1];
+            const current=cleaned[i];
+            const next=cleaned[i+1];
+            const collinearX=Math.abs(prev.x-current.x)<0.5 && Math.abs(current.x-next.x)<0.5;
+            const collinearY=Math.abs(prev.y-current.y)<0.5 && Math.abs(current.y-next.y)<0.5;
+            if(collinearX || collinearY){
+              continue;
+            }
+            simplified.push(current);
+          }
+          simplified.push(cleaned[cleaned.length-1]);
+          return simplified;
+        }
+        segmentIntersectsRect(a,b,rect,margin){
+          if(!a || !b || !rect) return false;
+          const expand=Math.max(0, margin||0);
+          const left=rect.left - expand;
+          const right=rect.right + expand;
+          const top=rect.top - expand;
+          const bottom=rect.bottom + expand;
+          const dx=b.x - a.x;
+          const dy=b.y - a.y;
+          if(Math.abs(dy)<0.5){
+            const y=a.y;
+            if(y<top || y>bottom) return false;
+            const minX=Math.min(a.x,b.x);
+            const maxX=Math.max(a.x,b.x);
+            if(maxX<left || minX>right) return false;
+            return true;
+          }
+          if(Math.abs(dx)<0.5){
+            const x=a.x;
+            if(x<left || x>right) return false;
+            const minY=Math.min(a.y,b.y);
+            const maxY=Math.max(a.y,b.y);
+            if(maxY<top || minY>bottom) return false;
+            return true;
+          }
+          const minX=Math.min(a.x,b.x);
+          const maxX=Math.max(a.x,b.x);
+          const minY=Math.min(a.y,b.y);
+          const maxY=Math.max(a.y,b.y);
+          return !(maxX<left || minX>right || maxY<top || minY>bottom);
+        }
+        segmentRectDistance(a,b,rect){
+          if(!a || !b || !rect) return Infinity;
+          const dx=b.x - a.x;
+          const dy=b.y - a.y;
+          if(Math.abs(dy)<0.5){
+            const y=a.y;
+            let verticalGap=0;
+            if(y<rect.top){ verticalGap=rect.top - y; }
+            else if(y>rect.bottom){ verticalGap=y - rect.bottom; }
+            const minX=Math.min(a.x,b.x);
+            const maxX=Math.max(a.x,b.x);
+            let horizontalGap=0;
+            if(maxX<rect.left){ horizontalGap=rect.left - maxX; }
+            else if(minX>rect.right){ horizontalGap=minX - rect.right; }
+            return Math.hypot(horizontalGap, verticalGap);
+          }
+          if(Math.abs(dx)<0.5){
+            const x=a.x;
+            let horizontalGap=0;
+            if(x<rect.left){ horizontalGap=rect.left - x; }
+            else if(x>rect.right){ horizontalGap=x - rect.right; }
+            const minY=Math.min(a.y,b.y);
+            const maxY=Math.max(a.y,b.y);
+            let verticalGap=0;
+            if(maxY<rect.top){ verticalGap=rect.top - maxY; }
+            else if(minY>rect.bottom){ verticalGap=minY - rect.bottom; }
+            return Math.hypot(horizontalGap, verticalGap);
+          }
+          const cx=(rect.left+rect.right)/2;
+          const cy=(rect.top+rect.bottom)/2;
+          return Math.hypot(a.x-cx,a.y-cy);
+        }
+        pointSegmentDistance(point,a,b){
+          if(!point || !a || !b) return Infinity;
+          const dx=b.x - a.x;
+          const dy=b.y - a.y;
+          if(Math.abs(dx)<1e-9 && Math.abs(dy)<1e-9){
+            return Math.hypot(point.x-a.x, point.y-a.y);
+          }
+          const t=((point.x-a.x)*dx + (point.y-a.y)*dy)/(dx*dx + dy*dy);
+          if(t<=0){
+            return Math.hypot(point.x-a.x, point.y-a.y);
+          }
+          if(t>=1){
+            return Math.hypot(point.x-b.x, point.y-b.y);
+          }
+          const projX=a.x + t*dx;
+          const projY=a.y + t*dy;
+          return Math.hypot(point.x-projX, point.y-projY);
+        }
+        segmentsIntersect(a,b,c,d){
+          if(!a || !b || !c || !d) return false;
+          const orient=(p,q,r)=>{
+            return (q.x-p.x)*(r.y-p.y) - (q.y-p.y)*(r.x-p.x);
+          };
+          const onSegment=(p,q,r)=>{
+            return q.x<=Math.max(p.x,r.x)+1e-6 && q.x>=Math.min(p.x,r.x)-1e-6 && q.y<=Math.max(p.y,r.y)+1e-6 && q.y>=Math.min(p.y,r.y)-1e-6;
+          };
+          const o1=orient(a,b,c);
+          const o2=orient(a,b,d);
+          const o3=orient(c,d,a);
+          const o4=orient(c,d,b);
+          if((o1>0 && o2<0 || o1<0 && o2>0) && (o3>0 && o4<0 || o3<0 && o4>0)){
+            return true;
+          }
+          if(Math.abs(o1)<1e-6 && onSegment(a,c,b)) return true;
+          if(Math.abs(o2)<1e-6 && onSegment(a,d,b)) return true;
+          if(Math.abs(o3)<1e-6 && onSegment(c,a,d)) return true;
+          if(Math.abs(o4)<1e-6 && onSegment(c,b,d)) return true;
+          return false;
+        }
+        segmentSegmentDistance(a,b,c,d){
+          if(!a || !b || !c || !d) return Infinity;
+          if(this.segmentsIntersect(a,b,c,d)) return 0;
+          const distances=[
+            this.pointSegmentDistance(a,c,d),
+            this.pointSegmentDistance(b,c,d),
+            this.pointSegmentDistance(c,a,b),
+            this.pointSegmentDistance(d,a,b),
+          ];
+          let min=Infinity;
+          for(const value of distances){
+            if(Number.isFinite(value) && value<min){
+              min=value;
+            }
+          }
+          return min;
+        }
+        buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance){
+          const points=[];
+          const safeClearance=Math.max(18, Math.min(72, clearance));
+          const startExit={x:startAnchor.x + startVec.x*safeClearance,y:startAnchor.y + startVec.y*safeClearance};
+          const endEntry={x:endAnchor.x + endVec.x*safeClearance,y:endAnchor.y + endVec.y*safeClearance};
+          points.push({x:startAnchor.x,y:startAnchor.y});
+          points.push(startExit);
+          if((Math.abs(startVec.x)>0 && Math.abs(endVec.x)>0)){
+            const midX=(startExit.x + endEntry.x)/2;
+            points.push({x:midX,y:startExit.y});
+            points.push({x:midX,y:endEntry.y});
+          }else if((Math.abs(startVec.y)>0 && Math.abs(endVec.y)>0)){
+            const midY=(startExit.y + endEntry.y)/2;
+            points.push({x:startExit.x,y:midY});
+            points.push({x:endEntry.x,y:midY});
+          }else if(Math.abs(startVec.x)>0 && Math.abs(endVec.y)>0){
+            points.push({x:endEntry.x,y:startExit.y});
+          }else if(Math.abs(startVec.y)>0 && Math.abs(endVec.x)>0){
+            points.push({x:startExit.x,y:endEntry.y});
+          }else{
+            points.push({x:(startExit.x+endEntry.x)/2,y:(startExit.y+endEntry.y)/2});
+          }
+          points.push(endEntry);
+          points.push({x:endAnchor.x,y:endAnchor.y});
+          return points;
+        }
+        scoreRelationRoute(points, segments, meta, avoidRects){
+          if(!Array.isArray(points) || points.length<2 || !Array.isArray(segments) || !segments.length){
+            return null;
+          }
+          let length=0;
+          let penalty=0;
+          for(const segment of segments){
+            const segLen=Math.hypot(segment.b.x-segment.a.x, segment.b.y-segment.a.y);
+            length+=segLen;
+            for(const rect of avoidRects){
+              if(!rect) continue;
+              const margin=typeof rect.margin==='number'?rect.margin:8;
+              if(rect.type==='trace'){
+                const traceSegments=Array.isArray(rect.segments)?rect.segments:null;
+                if(!traceSegments || !traceSegments.length) continue;
+                const segMinX=Math.min(segment.a.x, segment.b.x);
+                const segMaxX=Math.max(segment.a.x, segment.b.x);
+                const segMinY=Math.min(segment.a.y, segment.b.y);
+                const segMaxY=Math.max(segment.a.y, segment.b.y);
+                if(Number.isFinite(rect.left) && Number.isFinite(rect.right) && Number.isFinite(rect.top) && Number.isFinite(rect.bottom)){
+                  if(segMaxX<rect.left-margin || segMinX>rect.right+margin || segMaxY<rect.top-margin || segMinY>rect.bottom+margin){
+                    continue;
+                  }
+                }
+                let intersectsTrace=false;
+                for(const traceSegment of traceSegments){
+                  if(!traceSegment || !traceSegment.a || !traceSegment.b) continue;
+                  if(this.segmentsIntersect(segment.a, segment.b, traceSegment.a, traceSegment.b)){
+                    penalty+=1600 + margin*50;
+                    intersectsTrace=true;
+                    break;
+                  }
+                }
+                if(intersectsTrace) continue;
+                let nearest=Infinity;
+                for(const traceSegment of traceSegments){
+                  if(!traceSegment || !traceSegment.a || !traceSegment.b) continue;
+                  const dist=this.segmentSegmentDistance(segment.a, segment.b, traceSegment.a, traceSegment.b);
+                  if(Number.isFinite(dist) && dist<nearest){
+                    nearest=dist;
+                  }
+                }
+                if(Number.isFinite(nearest) && nearest<margin){
+                  penalty+=(margin-nearest)*24;
+                }
+                continue;
+              }
+              if(rect.type==='node'){
+                if(rect.owner==='from' && segment.index===0) continue;
+                if(rect.owner==='to' && segment.index===segments.length-1) continue;
+              }
+              if(this.segmentIntersectsRect(segment.a, segment.b, rect, margin)){
+                penalty+=1200 + margin*40;
+                continue;
+              }
+              const distance=this.segmentRectDistance(segment.a, segment.b, rect);
+              if(Number.isFinite(distance) && distance<margin){
+                penalty+=(margin-distance)*18;
+              }
+            }
+          }
+          const startVec=meta.startVec||{x:0,y:0};
+          const endVec=meta.endVec||{x:0,y:0};
+          const startAnchor=meta.startAnchor||points[0];
+          const endAnchor=meta.endAnchor||points[points.length-1];
+          const deltaX=endAnchor.x - startAnchor.x;
+          const deltaY=endAnchor.y - startAnchor.y;
+          const horizontalSign=Math.sign(deltaX);
+          const verticalSign=Math.sign(deltaY);
+          const reverseHorizontalSign=Math.sign(startAnchor.x - endAnchor.x);
+          const reverseVerticalSign=Math.sign(startAnchor.y - endAnchor.y);
+          if(Math.abs(deltaX)>=Math.abs(deltaY)){
+            if(startVec.x===0){ penalty+=Math.abs(deltaX)*0.6; }
+            if(endVec.x===0){ penalty+=Math.abs(deltaX)*0.6; }
+            if(horizontalSign && startVec.x && horizontalSign!==startVec.x){ penalty+=Math.abs(deltaX)*1.2; }
+            if(reverseHorizontalSign && endVec.x && reverseHorizontalSign!==endVec.x){ penalty+=Math.abs(deltaX)*1.2; }
+          }
+          if(Math.abs(deltaY)>=Math.abs(deltaX)){
+            if(startVec.y===0){ penalty+=Math.abs(deltaY)*0.6; }
+            if(endVec.y===0){ penalty+=Math.abs(deltaY)*0.6; }
+            if(verticalSign && startVec.y && verticalSign!==startVec.y){ penalty+=Math.abs(deltaY)*1.2; }
+            if(reverseVerticalSign && endVec.y && reverseVerticalSign!==endVec.y){ penalty+=Math.abs(deltaY)*1.2; }
+          }
+          const bends=Math.max(0, points.length-2);
+          penalty+=bends*18;
+          return {length, penalty, score:length+penalty, bends};
+        }
+        evaluateRelationCombination(fromNode,toNode,startSide,endSide,avoidRects){
+          const startAnchor=this.getRelationAnchor(fromNode,startSide);
+          const endAnchor=this.getRelationAnchor(toNode,endSide);
+          if(!startAnchor || !endAnchor) return null;
+          const startVec=this.getRelationSideVector(startSide);
+          const endVec=this.getRelationSideVector(endSide);
+          if((!startVec || (!startVec.x && !startVec.y)) || (!endVec || (!endVec.x && !endVec.y))){
+            return null;
+          }
+          const dx=endAnchor.x - startAnchor.x;
+          const dy=endAnchor.y - startAnchor.y;
+          const distance=Math.hypot(dx,dy);
+          const clearance=Math.max(24, Math.min(60, distance*0.33));
+          const skeleton=this.buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance);
+          const points=this.simplifyRelationRoute(skeleton);
+          if(points.length<2) return null;
+          const segments=[];
+          for(let i=1;i<points.length;i++){
+            segments.push({a:points[i-1],b:points[i],index:i-1});
+          }
+          const metrics=this.scoreRelationRoute(points, segments, {startVec,endVec,startAnchor,endAnchor}, avoidRects);
+          if(!metrics || !Number.isFinite(metrics.score)) return null;
+          return {
+            points,
+            score:metrics.score,
+            length:metrics.length,
+            penalty:metrics.penalty,
+            bends:metrics.bends,
+            startSide,
+            endSide,
+          };
+        }
+        updateRelationPath(relation){
+          if(!relation) return;
+          const entry=this.relationRegistry ? this.relationRegistry.get(relation.id) : null;
+          if(!entry) return;
+          const fromNode=this.nodes.get(relation.from);
+          const toNode=this.nodes.get(relation.to);
+          if(!fromNode || !toNode) return;
+          if(!fromNode.anchors) this.updateAnchors(fromNode);
+          if(!toNode.anchors) this.updateAnchors(toNode);
+          const startCenter=fromNode.anchors ? fromNode.anchors.center : null;
+          const endCenter=toNode.anchors ? toNode.anchors.center : null;
+          if(!startCenter || !endCenter) return;
+          const avoidRects=[
+            ...this.collectRelationAvoidRects(fromNode,'from'),
+            ...this.collectRelationAvoidRects(toNode,'to'),
+            ...this.collectTraceAvoidRects(fromNode,'from'),
+            ...this.collectTraceAvoidRects(toNode,'to'),
+          ];
+          if(this.nodes && this.nodes.size){
+            for(const nodeEntry of this.nodes.values()){
+              if(!nodeEntry || nodeEntry===fromNode || nodeEntry===toNode) continue;
+              if(nodeEntry.el && !nodeEntry.el.isConnected) continue;
+              avoidRects.push(...this.collectRelationAvoidRects(nodeEntry,'other'));
+              avoidRects.push(...this.collectTraceAvoidRects(nodeEntry,'other'));
+            }
+          }
+          const sides=['left','right','top','bottom'];
+          let bestRoute=null;
+          for(const startSide of sides){
+            for(const endSide of sides){
+              const candidate=this.evaluateRelationCombination(fromNode,toNode,startSide,endSide,avoidRects);
+              if(!candidate) continue;
+              if(!bestRoute || candidate.score<bestRoute.score-0.5 || (Math.abs(candidate.score-bestRoute.score)<0.5 && candidate.bends<bestRoute.bends)){
+                bestRoute=candidate;
+              }
+            }
+          }
+          let pathData=null;
+          if(bestRoute && Array.isArray(bestRoute.points) && bestRoute.points.length>=2){
+            const approxLength=bestRoute.length||Math.hypot(endCenter.x-startCenter.x,endCenter.y-startCenter.y);
+            const chamfer=Math.min(18, Math.max(6, approxLength*0.05));
+            pathData=buildChamferedPath(bestRoute.points, chamfer);
+            if(!pathData){
+              const first=bestRoute.points[0];
+              const last=bestRoute.points[bestRoute.points.length-1];
+              pathData=`M${first.x} ${first.y} L${last.x} ${last.y}`;
+            }
+            entry.routePoints=bestRoute.points;
+          }
+          if(!pathData){
+            pathData=`M${startCenter.x} ${startCenter.y} L${endCenter.x} ${endCenter.y}`;
+            entry.routePoints=null;
+          }
+          entry.shadow.setAttribute('d', pathData);
+          entry.core.setAttribute('d', pathData);
+          entry.highlight.setAttribute('d', pathData);
+          if(entry.hit){ entry.hit.setAttribute('d', pathData); }
+          const coreId=entry.core && entry.core.getAttribute ? entry.core.getAttribute('id') : null;
+          if(coreId){
+            if(entry.directionPath){
+              entry.directionPath.setAttribute('href', `#${coreId}`);
+              entry.directionPath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            }
+            if(entry.directionReversePath){
+              entry.directionReversePath.setAttribute('href', `#${coreId}`);
+              entry.directionReversePath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href', `#${coreId}`);
+            }
+          }
+          entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
+          const totalLength=(()=>{
+            if(!entry.core || typeof entry.core.getTotalLength!=='function') return 0;
+            try{ return entry.core.getTotalLength(); }
+            catch(_){ return 0; }
+          })();
+          const margin=Math.min(48, Math.max(12, totalLength*0.18));
+          const usableLength=Math.max(0, totalLength - margin);
+          const arrowStep=14;
+          const forwardCount=Math.max(2, Math.floor(usableLength/arrowStep));
+          const startOffset=Math.max(0, Math.min(totalLength*0.25, margin*0.45));
+          if(entry.directionPath){
+            entry.directionPath.setAttribute('lengthAdjust','spacingAndGlyphs');
+            entry.directionPath.setAttribute('startOffset', `${startOffset}`);
+            entry.directionPath.textContent=forwardCount>0 ? '›'.repeat(forwardCount) : '››';
+            if(usableLength>1){ entry.directionPath.setAttribute('textLength', usableLength); }
+            else{ entry.directionPath.removeAttribute('textLength'); }
+          }
+          if(entry.directionReverse && entry.directionReversePath){
+            entry.directionReversePath.setAttribute('lengthAdjust','spacingAndGlyphs');
+            if(relation.bidirectional){
+              entry.directionReverse.removeAttribute('hidden');
+              const reverseCount=Math.max(2, Math.floor(usableLength/arrowStep));
+              const reverseOffsetBase=startOffset + Math.min(24, arrowStep);
+              const reverseOffset=Math.max(0, Math.min(totalLength*0.75, reverseOffsetBase));
+              entry.directionReversePath.setAttribute('startOffset', `${reverseOffset}`);
+              entry.directionReversePath.textContent=reverseCount>0 ? '‹'.repeat(reverseCount) : '‹‹';
+              if(usableLength>1){ entry.directionReversePath.setAttribute('textLength', usableLength); }
+              else{ entry.directionReversePath.removeAttribute('textLength'); }
+            }else{
+              entry.directionReverse.setAttribute('hidden','true');
+              entry.directionReversePath.textContent='';
+              entry.directionReversePath.removeAttribute('textLength');
+              entry.directionReversePath.removeAttribute('startOffset');
+            }
+          }
+          entry.relation=relation;
+        }
+        computeNodeBoundaryPoint(node, directionVector, padding){
+          if(!node || !directionVector) return null;
+          const width=Math.max(1, node.width || (node.el?node.el.offsetWidth:0) || 0);
+          const height=Math.max(1, node.height || (node.el?node.el.offsetHeight:0) || 0);
+          const halfW=width/2 + (padding||0);
+          const halfH=height/2 + (padding||0);
+          let dx=typeof directionVector.x==='number'?directionVector.x:0;
+          let dy=typeof directionVector.y==='number'?directionVector.y:0;
+          const tiny=1e-6;
+          if(Math.abs(dx)<tiny && Math.abs(dy)<tiny){
+            return {x:node.absX,y:node.absY};
+          }
+          if(Math.abs(dx)<tiny){ dx=dx>=0?tiny:-tiny; }
+          if(Math.abs(dy)<tiny){ dy=dy>=0?tiny:-tiny; }
+          const absDx=Math.abs(dx);
+          const absDy=Math.abs(dy);
+          let scale;
+          if(absDx<tiny){ scale=halfH/absDy; }
+          else if(absDy<tiny){ scale=halfW/absDx; }
+          else{ scale=Math.min(halfW/absDx, halfH/absDy); }
+          return {
+            x:node.absX + dx*scale,
+            y:node.absY + dy*scale,
+          };
+        }
+        updateRelationsForNode(node){
+          if(!node || !this.relationRegistry || !this.relationRegistry.size) return;
+          for(const entry of this.relationRegistry.values()){
+            if(!entry || !entry.relation) continue;
+            if(entry.relation.from===node.id || entry.relation.to===node.id){
+              this.updateRelationPath(entry.relation);
+            }
+          }
+        }
+        ensureRelationArray(){
+          if(!Array.isArray(this.relations)){ this.relations=[]; }
+          if(this.mind){ this.mind.relations=this.relations; }
+          return this.relations;
+        }
+        generateRelationId(){
+          const relations=this.ensureRelationArray();
+          let id;
+          do { id='rel-'+Math.random().toString(36).slice(2,10); }
+          while((this.relationRegistry && this.relationRegistry.has(id)) || relations.some(rel=>rel && rel.id===id));
+          return id;
+        }
+        add_relation(fromId,toId,options){
+          if(!fromId || !toId || fromId===toId) return null;
+          const source=this.get_node(fromId);
+          const target=this.get_node(toId);
+          if(!source || !target) return null;
+          const relations=this.ensureRelationArray();
+          const bidirectional=options && options.bidirectional===true;
+          const conflict=relations.some(rel=>rel && rel.from===fromId && rel.to===toId && (!!rel.bidirectional)===bidirectional);
+          if(conflict) return null;
+          const relation={
+            id:this.generateRelationId(),
+            from:fromId,
+            to:toId
+          };
+          if(options && options.label && typeof options.label==='string' && options.label.trim()!==''){
+            relation.label=options.label.trim();
+          }
+          if(bidirectional){ relation.bidirectional=true; }
+          relations.push(relation);
+          this.mind.relations=relations;
+          this.renderRelations();
+          this.emit(SimpleMind.event_type.update);
+          return relation;
+        }
+        remove_relation(id){
+          if(!id) return false;
+          const relations=this.ensureRelationArray();
+          const idx=relations.findIndex(rel=>rel && rel.id===id);
+          if(idx===-1) return false;
+          const [removed]=relations.splice(idx,1);
+          if(this.relationRegistry && this.relationRegistry.has(id)){
+            const entry=this.relationRegistry.get(id);
+            if(entry && entry.group && entry.group.parentNode){ entry.group.parentNode.removeChild(entry.group); }
+            this.relationRegistry.delete(id);
+          }
+          if(this.selectedRelationId===id){ this.selectedRelationId=null; }
+          this.mind.relations=relations;
+          if(removed){ this.renderRelations(); this.emit(SimpleMind.event_type.update); }
+          return true;
+        }
+        pruneRelations(predicate, options={}){
+          if(typeof predicate!=='function') return false;
+          const relations=this.ensureRelationArray();
+          let changed=false;
+          for(let i=relations.length-1;i>=0;i--){
+            const rel=relations[i];
+            if(!rel) continue;
+            if(predicate(rel)){
+              relations.splice(i,1);
+              changed=true;
+              if(this.relationRegistry){
+                const entry=this.relationRegistry.get(rel.id);
+                if(entry && entry.group && entry.group.parentNode){ entry.group.parentNode.removeChild(entry.group); }
+                this.relationRegistry.delete(rel.id);
+              }
+              if(this.selectedRelationId===rel.id){ this.selectedRelationId=null; }
+            }
+          }
+          if(changed){
+            this.mind.relations=relations;
+            if(!options || options.silent!==true){
+              this.renderRelations();
+              this.emit(SimpleMind.event_type.update);
+            }
+          }
+          return changed;
+        }
+        get_relations(nodeId){
+          const relations=this.ensureRelationArray();
+          const clone=input=>JSON.parse(JSON.stringify(input));
+          if(!nodeId) return clone(relations);
+          return clone(relations.filter(rel=>rel && (rel.from===nodeId || rel.to===nodeId)));
+        }
+        handleNodeResize(entries){
+          if(!entries || !entries.length) return;
+          const impacted=new Set();
+          entries.forEach(entry=>{
+            const target=entry.target;
+            if(!target) return;
+            const nodeId=target.getAttribute('nodeid');
+            if(!nodeId) return;
+            const node=this.nodes.get(nodeId);
+            if(!node) return;
+            const rect=entry.contentRect;
+            node.width=rect.width;
+            node.height=rect.height;
+            this.updateNodePosition(node);
+            this.updateAnchors(node);
+            impacted.add(node);
+          });
+          if(!impacted.size) return;
+          impacted.forEach(node=>{
+            this.updateLinkPath(node);
+            if(node.children && node.children.length){
+              node.children.forEach(child=>this.updateLinkPath(child));
+            }
+            this.updateRelationsForNode(node);
+            if(node.children && node.children.length){
+              node.children.forEach(child=>this.updateRelationsForNode(child));
+            }
+          });
+        }
+        applyTransform(initial){
+          if(!this.bounds){ return; }
+          if(initial && !this.hasCentered){ this.center_root(); this.hasCentered=true; return; }
+          const transform=`translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
+          this.viewport.style.transform=transform;
+          this.updateEdgeButtonScale();
+        }
+        zoom(step){
+          const prev=this.scale;
+          const next=this.clampScale(this.scale*step);
+          this.scale=next;
+          if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
+        }
+        viewCommand(cmd){
+          switch(cmd){
+            case 'zoomToFit': return this.zoomToFit();
+            case 'zoom_to_fit': return this.zoomToFit();
+            case 'set_zoom': return this.set_zoom(arguments[1]);
+            case 'move_to_center': return this.center_root();
+            case 'center_root': return this.center_root();
+            case 'zoomIn': this.zoom(1.15); return true;
+            case 'zoom_in': this.zoom(1.15); return true;
+            case 'zoomOut': this.zoom(1/1.15); return true;
+            case 'zoom_out': this.zoom(1/1.15); return true;
+            default: return false;
+          }
+        }
+        get view(){
+          return {
+            zoomToFit:()=>this.zoomToFit(),
+            zoom_to_fit:()=>this.zoomToFit(),
+            set_zoom:(v)=>this.set_zoom(v),
+            move_to_center:()=>this.center_root(),
+            center_root:()=>this.center_root(),
+            zoomIn:()=>{ this.zoom(1.15); return true; },
+            zoom_in:()=>{ this.zoom(1.15); return true; },
+            zoomOut:()=>{ this.zoom(1/1.15); return true; },
+            zoom_out:()=>{ this.zoom(1/1.15); return true; },
+          };
+        }
+        zoomToFit(){
+          if(!this.bounds) return false;
+          const rect=this.container.getBoundingClientRect();
+          if(rect.width<=0 || rect.height<=0) return false;
+          const padding=(typeof this.scalePadding==='number' && this.scalePadding>=0)?this.scalePadding:0;
+          const scale=Math.min(rect.width/(this.bounds.width+padding), rect.height/(this.bounds.height+padding));
+          this.scale=this.clampScale(scale, rect);
+          this.center_root();
+          return true;
+        }
+        set_zoom(z){
+          if(typeof z!=='number' || !isFinite(z)) return false;
+          this.scale=this.clampScale(z);
+          this.applyTransform();
+          return true;
+        }
+        center_root(){
+          if(!this.root || !this.bounds) return false;
+          const rect=this.container.getBoundingClientRect();
+          this.enforceScaleBounds(rect,{adjustOffset:false});
+          const centerX=this.root.absX + (this.root.el?this.root.el.offsetWidth/2:0);
+          const centerY=this.root.absY + (this.root.el?this.root.el.offsetHeight/2:0);
+          this.offsetX=rect.width/2 - centerX*this.scale;
+          this.offsetY=rect.height/2 - centerY*this.scale;
+          this.applyTransform();
+          return true;
+        }
+        center_node(target){
+          if(!target || !this.bounds) return false;
+          const node=typeof target==='string'?this.get_node(target):target;
+          if(!node) return false;
+          const rect=this.container.getBoundingClientRect();
+          if(rect.width<=0 || rect.height<=0) return false;
+          this.enforceScaleBounds(rect,{adjustOffset:false});
+          if(!node.anchors || !node.anchors.center){ this.updateAnchors(node); }
+          let anchor=null;
+          if(node.anchors && node.anchors.center){ anchor=node.anchors.center; }
+          if(!anchor){
+            const cached=this.sizeCache.get(node.id)||{};
+            const width=node.el?node.el.offsetWidth:(cached.width||0);
+            const height=node.el?node.el.offsetHeight:(cached.height||0);
+            const baseX=(Number.isFinite(node.absX)?node.absX:0);
+            const baseY=(Number.isFinite(node.absY)?node.absY:0);
+            anchor={
+              x:baseX + (width?width/2:0),
+              y:baseY + (height?height/2:0)
+            };
+          }
+          if(!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return false;
+          this.offsetX=rect.width/2 - anchor.x*this.scale;
+          this.offsetY=rect.height/2 - anchor.y*this.scale;
+          this.applyTransform();
+          return true;
+        }
+        showNodeDetails(node){
+          if(!node) return;
+          if(typeof this.options.onNodeDetails==='function'){
+            this.options.onNodeDetails(node, this);
+            return;
+          }
+          this.promptRename(node);
+        }
+        promptRename(node){
+          if(!node) return;
+          if(typeof this.options.onInlineEdit==='function'){
+            this.options.onInlineEdit(node, this);
+            return;
+          }
+          const text=prompt('请输入节点标题', node.topic || '');
+          if(text===null) return;
+          const cleaned=text.trim();
+          if(!cleaned) return;
+          this.update_node(node.id, cleaned);
+        }
+      }
+      SimpleMind.event_type={
+        show:'show',
+        select:'select',
+        refresh:'refresh',
+        update:'update',
+        edit:'edit',
+        after_edit:'after_edit'
+      };
+      if(typeof window.jsMind==='undefined'){ window.jsMind=SimpleMind; }
+      const parseJsonElement=(id,fallback)=>{
+        const el=document.getElementById(id);
+        if(!el) return fallback;
+        try{
+          const text=el.textContent || el.value || '';
+          if(!text.trim()) return fallback;
+          return JSON.parse(text);
+        }catch(_){
+          return fallback;
+        }
+      };
+      const defaultData = parseJsonElement('mindmap-default-data', null);
+      let initialData = parseJsonElement('mindmap-initial-data', null);
+      if(!initialData || !initialData.data){ initialData = defaultData ? JSON.parse(JSON.stringify(defaultData)) : {data:{}}; }
+      if(defaultData && defaultData.data){ enforceRightOrientation(defaultData.data); }
+      if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+      function hydrateMindmapAttachments(initialMindmapData, assetEntries, assetMetaMap){
+        if(!initialMindmapData || !initialMindmapData.data) return;
+        const root=initialMindmapData.data;
+        const nodesById=new Map();
+        (function walk(node){
+          if(!node || typeof node!=='object') return;
+          if(typeof node.id==='string' && node.id){ nodesById.set(node.id, node); }
+          if(Array.isArray(node.children)){
+            node.children=node.children.filter(child=>child && typeof child==='object');
+            node.children.forEach(child=>walk(child));
+          }
+        })(root);
+        if(!nodesById.size) return;
+        const ensureNodeAttachments=node=>{
+          if(!node || typeof node!=='object') return [];
+          if(!node.data || typeof node.data!=='object'){ node.data={}; }
+          const data=node.data;
+          if(data.attachment && !Array.isArray(data.attachments)){
+            data.attachments=Array.isArray(data.attachment)?data.attachment.slice():[data.attachment];
+          }
+          if(!Array.isArray(data.attachments)){ data.attachments=[]; }
+          else{ data.attachments=data.attachments.filter(att=>att && typeof att==='object'); }
+          return data.attachments;
+        };
+        const ensureAssetMeta=(assetId, nodeUid, seed)=>{
+          if(!(assetMetaMap instanceof Map)) return;
+          const base=assetMetaMap.get(assetId) || {};
+          const name=typeof seed?.name==='string' && seed.name ? seed.name : (base.name || `附件 #${assetId}`);
+          const sizeCandidate=Number(seed?.size);
+          const size=Number.isFinite(sizeCandidate) && sizeCandidate>=0 ? sizeCandidate : (Number(base.size)||0);
+          const mime=typeof seed?.mime==='string' && seed.mime ? seed.mime : (base.mime || 'application/octet-stream');
+          const url=typeof seed?.url==='string' && seed.url ? seed.url : (base.url || `?mindmap_asset=${assetId}`);
+          const createdRaw=Number(seed?.created_at ?? seed?.createdAt ?? base.created_at ?? 0) || 0;
+          const mindmapIdCandidate=Number(seed?.mindmap_id);
+          const mindmap_id=Number.isFinite(mindmapIdCandidate) && mindmapIdCandidate>0 ? mindmapIdCandidate : (base.mindmap_id ?? null);
+          const session_key=typeof seed?.session_key==='string' && seed.session_key ? seed.session_key : (base.session_key || null);
+          assetMetaMap.set(assetId,{id:assetId,name,size,mime,url,created_at:createdRaw,node_uid:nodeUid,mindmap_id,session_key});
+        };
+        if(Array.isArray(assetEntries)){
+          assetEntries.forEach(entry=>{
+            if(!entry || typeof entry!=='object') return;
+            const nodeUid=typeof entry.node_uid==='string' ? entry.node_uid.trim() : '';
+            if(!nodeUid) return;
+            const node=nodesById.get(nodeUid);
+            if(!node) return;
+            const attachments=ensureNodeAttachments(node);
+            const assetId=Number(entry.id);
+            if(!Number.isFinite(assetId) || assetId<=0) return;
+            let existing=null;
+            for(const att of attachments){
+              const id=Number(att && (att.assetId || att.id));
+              if(Number.isFinite(id) && id===assetId){ existing=att; break; }
+            }
+            const descriptor={
+              assetId,
+              name:typeof entry.name==='string' && entry.name ? entry.name : (existing?.name || `附件 #${assetId}`),
+              size:Number(entry.size)|| (existing ? Number(existing.size)||0 : 0),
+              mime:typeof entry.mime==='string' && entry.mime ? entry.mime : (existing?.mime || 'application/octet-stream'),
+              url:typeof entry.url==='string' && entry.url ? entry.url : (existing?.url || `?mindmap_asset=${assetId}`),
+            };
+            const created=Number(entry.created_at);
+            if(created>0){ descriptor.createdAt=created; }
+            if(existing){ Object.assign(existing, descriptor); }
+            else{ attachments.push(descriptor); }
+            ensureAssetMeta(assetId, nodeUid, entry);
+          });
+        }
+        nodesById.forEach((node,nodeUid)=>{
+          if(!node.data || typeof node.data!=='object'){ return; }
+          const data=node.data;
+          if(data.attachment && !Array.isArray(data.attachments)){
+            data.attachments=Array.isArray(data.attachment)?data.attachment.slice():[data.attachment];
+          }
+          if(!Array.isArray(data.attachments)) return;
+          const filtered=[];
+          const seen=new Set();
+          data.attachments.forEach(att=>{
+            if(!att || typeof att!=='object') return;
+            const assetId=Number(att.assetId || att.id);
+            if(!Number.isFinite(assetId) || assetId<=0) return;
+            if(seen.has(assetId)) return;
+            seen.add(assetId);
+            if(typeof att.name!=='string' || !att.name){ att.name=`附件 #${assetId}`; }
+            if(typeof att.url!=='string' || !att.url){ att.url=`?mindmap_asset=${assetId}`; }
+            if(typeof att.mime!=='string' || !att.mime){ att.mime='application/octet-stream'; }
+            const sizeNum=Number(att.size);
+            att.size=Number.isFinite(sizeNum) && sizeNum>=0 ? sizeNum : 0;
+            if(att.created_at && !att.createdAt){ att.createdAt=att.created_at; }
+            filtered.push(att);
+            ensureAssetMeta(assetId, nodeUid, att);
+          });
+          if(filtered.length){
+            data.attachments=filtered;
+            data.attachment=filtered[0];
+          }else{
+            delete data.attachments;
+            delete data.attachment;
+          }
+        });
+      }
+      const initialAssetMeta = parseJsonElement('mindmap-asset-meta', []);
+      const assetMeta=new Map();
+      if(Array.isArray(initialAssetMeta)){
+        initialAssetMeta.forEach(entry=>{
+          if(!entry || typeof entry!=='object') return;
+          const id=Number(entry.id);
+          if(!Number.isFinite(id) || id<=0) return;
+          assetMeta.set(id,{
+            id,
+            name:entry.name || `附件 #${id}`,
+            mime:typeof entry.mime==='string'?entry.mime:'application/octet-stream',
+            size:Number(entry.size)||0,
+            created_at:Number(entry.created_at)||0,
+            node_uid:typeof entry.node_uid==='string'?entry.node_uid:'',
+            mindmap_id:Number.isFinite(Number(entry.mindmap_id))?Number(entry.mindmap_id):null,
+            session_key:typeof entry.session_key==='string'?entry.session_key:null,
+            url:typeof entry.url==='string' && entry.url?entry.url:`?mindmap_asset=${id}`,
+          });
+        });
+      }
+      let attachmentManager=null;
+      const jmContainer=document.getElementById('jsmind-container');
+      let currentMapId=0;
+      if(jmContainer){
+        const parsed=parseInt(jmContainer.dataset.mapId || '0', 10);
+        currentMapId=Number.isFinite(parsed)?parsed:0;
+      }
+      hydrateMindmapAttachments(initialData, initialAssetMeta, assetMeta);
+      if(!window.jsMind){
+        if(jmContainer){
+          jmContainer.innerHTML='<div class="map-error"><strong>思维导图加载失败</strong><span>请刷新页面或稍后再试。</span></div>';
+        }
+        return;
+      }
+    const overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    overlay.id='drag-overlay';
+    overlay.dataset.exportIgnore='true';
+    overlay.setAttribute('width','100%');
+    overlay.setAttribute('height','100%');
+    overlay.setAttribute('viewBox','0 0 100 100');
+    const ghostLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ghostLine.setAttribute('opacity','0');
+    const ghostRing=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ghostRing.setAttribute('opacity','0');
+    overlay.appendChild(ghostLine);
+    overlay.appendChild(ghostRing);
+    const jm=new jsMind({
+      container:'jsmind-container',
+      editable:true,
+        theme:'fresh-blue',
+        support_html:true,
+        mode:'full',
+        onInsertBetween:(parent, child)=>handleInsertBetweenNodes(parent, child),
+        onRelationSelect:(relation, instance, evt)=>handleRelationSelect(relation, evt),
+        onRelationContext:(relation, instance, evt)=>handleRelationContext(relation, evt),
+      });
+      const blobUrlRegistry=new Set();
+      const externalScriptCache=new Map();
+      function loadExternalScript(src, resolver){
+        if(typeof resolver==='function'){
+          try{
+            const immediate=resolver();
+            if(immediate){ return Promise.resolve(immediate); }
+          }catch(_){ }
+        }
+        if(externalScriptCache.has(src)){
+          return externalScriptCache.get(src);
+        }
+        const promise=new Promise((resolve,reject)=>{
+          const script=document.createElement('script');
+          script.src=src;
+          script.async=true;
+          script.onload=()=>{
+            if(typeof resolver==='function'){
+              try{
+                const resolved=resolver();
+                if(resolved){ resolve(resolved); return; }
+              }catch(err){ console.warn(err); }
+            }
+            resolve();
+          };
+          script.onerror=()=>{
+            externalScriptCache.delete(src);
+            reject(new Error(`Failed to load script: ${src}`));
+          };
+          document.head.appendChild(script);
+        });
+        externalScriptCache.set(src,promise);
+        return promise;
+      }
+      async function ensureHtmlToImage(){
+        if(window.htmlToImage){ return window.htmlToImage; }
+        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js',()=>window.htmlToImage);
+        if(lib){ return lib; }
+        if(window.htmlToImage){ return window.htmlToImage; }
+        throw new Error('图像导出依赖加载失败');
+      }
+      async function ensureJsPDF(){
+        if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
+        const lib=await loadExternalScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>window.jspdf);
+        if(lib && lib.jsPDF){ return lib.jsPDF; }
+        if(window.jspdf && window.jspdf.jsPDF){ return window.jspdf.jsPDF; }
+        throw new Error('PDF 导出依赖加载失败');
+      }
+      function canvasToBlob(canvas, type, quality){
+        return new Promise((resolve,reject)=>{
+          if(!canvas || typeof canvas.toBlob!=='function'){
+            reject(new Error('Canvas 不受支持'));
+            return;
+          }
+          canvas.toBlob(blob=>{
+            if(blob){ resolve(blob); }
+            else{ reject(new Error('生成图像失败')); }
+          }, type, quality);
+        });
+      }
+      function buildExportFilename(extension, titleValue){
+        const safeTitle=(titleValue || 'mindmap').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim() || 'mindmap';
+        const now=new Date();
+        const pad=num=>String(num).padStart(2,'0');
+        const timestamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        return `${safeTitle}-${timestamp}.${extension}`;
+      }
+      function dataUrlToBlob(dataUrl){
+        if(typeof dataUrl!=='string') return null;
+        const match=dataUrl.match(/^data:(.*?);base64,(.*)$/);
+        if(!match) return null;
+        const mime=match[1]||'application/octet-stream';
+        const binary=atob(match[2].replace(/\s+/g,''));
+        const len=binary.length;
+        const bytes=new Uint8Array(len);
+        for(let i=0;i<len;i++){ bytes[i]=binary.charCodeAt(i); }
+        return new Blob([bytes],{type:mime});
+      }
+      function openMindmapAttachment(descriptor){
+        if(!descriptor) return;
+        const fallbackUrl=descriptor.url || (descriptor.assetId ? `?mindmap_asset=${descriptor.assetId}` : '');
+        const prettyName=attachmentLabel(descriptor);
+        const sizeValue=typeof descriptor.size==='number'?descriptor.size:(typeof descriptor.filesize==='number'?descriptor.filesize:(typeof descriptor.length==='number'?descriptor.length:null));
+        const mimeHint=typeof descriptor.mime==='string'?descriptor.mime:'';
+        if(window.AttachmentPreview){
+          if(descriptor.content){
+            const blob=dataUrlToBlob(descriptor.content);
+            if(!blob){ alert('附件不可用'); return; }
+            window.AttachmentPreview.open({kind:'blob',blob,name:prettyName,mime:mimeHint||blob.type||'',size:blob.size || sizeValue || null,downloadName:descriptor.name || descriptor.filename || prettyName});
+            return;
+          }
+          if(fallbackUrl){
+            window.AttachmentPreview.open({kind:'url',url:fallbackUrl,name:prettyName,mime:mimeHint,size:sizeValue||null});
+            return;
+          }
+        }
+        if(fallbackUrl){
+          const win=window.open(fallbackUrl,'_blank','noopener');
+          if(!win){ window.location.href=fallbackUrl; }
+        }
+      }
+      function openMindmapLink(raw){
+        if(!raw) return;
+        const value=String(raw).trim();
+        if(!value) return;
+        if(/^javascript:/i.test(value) || /^data:/i.test(value) || /^vbscript:/i.test(value)){
+          alert('该链接格式不受支持');
+          return;
+        }
+        const target=/^https?:/i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) ? value : (value.startsWith('//') ? 'https:'+value : (/^[a-z]+:/i.test(value)?value:`https://${value}`));
+        const win=window.open(target,'_blank','noopener');
+        if(!win){ window.location.href=target; }
+      }
+      function attachmentLabel(descriptor){
+        let label='附件';
+        if(descriptor){
+          if(descriptor.name) label=descriptor.name;
+          else if(descriptor.filename) label=descriptor.filename;
+          else if(descriptor.assetId) label=`附件 #${descriptor.assetId}`;
+        }
+        label=String(label || '附件');
+        return label.length>16 ? label.slice(0,15)+'…' : label;
+      }
+      async function uploadMindmapFile(file, nodeId){
+        const fd=new FormData();
+        fd.append('action','upload_mindmap_asset');
+        fd.append('map_id', String(currentMapId||0));
+        fd.append('node_id', nodeId);
+        fd.append('file', file);
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        if(!res.ok) throw new Error('网络异常');
+        const json=await res.json();
+        if(!json.ok) throw new Error(json.error||'上传失败');
+        return json;
+      }
+      let inlineEditState=null;
+      function finishInlineEditing(commit){
+        if(!inlineEditState) return;
+        const {span,nodeId,initialText,onBlur,onKeydown,onPaste}=inlineEditState;
+        inlineEditState=null;
+        span.removeEventListener('blur', onBlur);
+        span.removeEventListener('keydown', onKeydown);
+        span.removeEventListener('paste', onPaste);
+        span.contentEditable='false';
+        span.removeAttribute('data-editing');
+        if(span.parentElement){ span.parentElement.classList.remove('editing'); }
+        if(!commit){
+          span.textContent=initialText;
+          scheduleHandleRefresh();
+          return;
+        }
+        let value=span.textContent || '';
+        value=value.replace(/\r/g,'');
+        value=value.split('\n').map(line=>line.trim()).join('\n').trim();
+        if(!value){
+          span.textContent=initialText;
+          scheduleHandleRefresh();
+          return;
+        }
+        if(value!==initialText){
+          const target=jm.get_node(nodeId);
+          if(target){
+            performUndoable('rename-node',()=>{
+              if(typeof jm.update_node==='function'){ jm.update_node(nodeId, value); }
+              markDirty();
+              requestAnimationFrame(()=>refreshInspector(jm.get_node(nodeId)));
+              return true;
+            },{mergeKey:`rename:${nodeId}`});
+          }else if(typeof jm.update_node==='function'){
+            jm.update_node(nodeId, value);
+            markDirty();
+          }
+        }
+        scheduleHandleRefresh();
+      }
+      function startInlineEditing(node){
+        if(!node || !node.el) return;
+        if(inlineEditState && inlineEditState.nodeId===node.id) return;
+        finishInlineEditing(true);
+        const el=node.el;
+        const span=el.querySelector('.node-topic');
+        if(!span) return;
+        const initialText=node.topic || '';
+        const onBlur=()=>finishInlineEditing(true);
+        const onKeydown=(e)=>{
+          if(e.key==='Enter' && !e.shiftKey){
+            e.preventDefault();
+            span.blur();
+          }else if(e.key==='Escape'){
+            e.preventDefault();
+            finishInlineEditing(false);
+            span.blur();
+          }
+        };
+        const onPaste=(e)=>{
+          if(!e.clipboardData) return;
+          e.preventDefault();
+          const text=e.clipboardData.getData('text/plain');
+          if(!text) return;
+          const selection=window.getSelection();
+          if(selection && selection.rangeCount){
+            selection.deleteFromDocument();
+            const range=selection.getRangeAt(0);
+            const node=document.createTextNode(text);
+            range.insertNode(node);
+            range.setStartAfter(node);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }else{
+            span.textContent+=text;
+            const sel=window.getSelection();
+            if(sel){
+              const range=document.createRange();
+              range.selectNodeContents(span);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          }
+          span.normalize();
+        };
+        inlineEditState={nodeId:node.id, span, initialText, onBlur, onKeydown, onPaste};
+        el.classList.add('editing');
+        span.contentEditable='true';
+        span.spellcheck=false;
+        span.dataset.editing='1';
+        span.addEventListener('blur', onBlur);
+        span.addEventListener('keydown', onKeydown);
+        span.addEventListener('paste', onPaste);
+        hideHandle();
+        requestAnimationFrame(()=>{
+          try{ span.focus({preventScroll:true}); }
+          catch(_){ span.focus(); }
+          const selection=window.getSelection();
+          if(selection){
+            const range=document.createRange();
+            range.selectNodeContents(span);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        });
+      }
+      function commitInlineEditing(){ finishInlineEditing(true); }
+      function currentEditingId(){ return inlineEditState ? inlineEditState.nodeId : null; }
+      jm.options.onInlineEdit=startInlineEditing;
+      jm.show(initialData);
+      jmContainer.appendChild(overlay);
+      syncOverlaySize();
+      if(!jm.get_selected_node() && initialData && initialData.data){
+        jm.select_node(initialData.data.id);
+      }
+      function syncOverlaySize(){
+        const rect=jmContainer.getBoundingClientRect();
+        const width=Math.max(rect.width,1);
+        const height=Math.max(rect.height,1);
+        overlay.setAttribute('viewBox',`0 0 ${width} ${height}`);
+      }
+      syncOverlaySize();
+      const scheduleOverlaySync=()=>requestAnimationFrame(syncOverlaySize);
+      window.addEventListener('resize',scheduleOverlaySync);
+      if(jmContainer){
+        jmContainer.addEventListener('scroll',scheduleOverlaySync,{passive:true});
+      }
+      const dragHandle=document.createElement('div');
+      dragHandle.id='node-handle';
+      dragHandle.textContent='+';
+      dragHandle.dataset.exportIgnore='true';
+      let handleSource=null;
+      let pointerDragState=null;
+      function hideHandle(){
+        dragHandle.classList.remove('show','dragging');
+        if(dragHandle.parentElement){ dragHandle.remove(); }
+        handleSource=null;
+        hideGhost();
+        pointerDragState=null;
+      }
+      function updateHandlePosition(){
+        const node=jm.get_selected_node();
+        if(!node){ hideHandle(); return; }
+        const editingId=currentEditingId();
+        if(editingId && editingId===node.id){ hideHandle(); return; }
+        const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+        if(!el){ hideHandle(); return; }
+        if(dragHandle.parentElement!==el){
+          if(dragHandle.parentElement){ dragHandle.remove(); }
+          el.appendChild(dragHandle);
+        }
+        dragHandle.style.left='';
+        dragHandle.style.top='';
+        dragHandle.classList.add('show');
+        handleSource=node;
+        syncOverlaySize();
+      }
+      function scheduleHandleRefresh(){
+        requestAnimationFrame(()=>{
+          if(jm && typeof jm.enforceScaleBounds==='function'){
+            const changed=jm.enforceScaleBounds();
+            if(changed && typeof jm.applyTransform==='function'){
+              jm.applyTransform();
+            }
+          }
+          updateHandlePosition();
+          if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
+        });
+      }
+      function svgPointFromClient(x,y){
+        const matrix=overlay.getScreenCTM();
+        if(!matrix){ return {x,y}; }
+        const pt=overlay.createSVGPoint();
+        pt.x=x;
+        pt.y=y;
+        const result=pt.matrixTransform(matrix.inverse());
+        return {x:result.x, y:result.y};
+      }
+      function eventToSvgPoint(evt){ return svgPointFromClient(evt.clientX, evt.clientY); }
+      function nodeCenterSvg(nodeId){
+        if(!nodeId) return null;
+        const el=document.querySelector(`.jsmind-node[nodeid="${nodeId}"]`);
+        if(!el) return null;
+        const rect=el.getBoundingClientRect();
+        return svgPointFromClient(rect.left + rect.width/2, rect.top + rect.height/2);
+      }
+      function showGhost(start,end){
+        if(!start || !end){ hideGhost(); return; }
+        ghostLine.setAttribute('x1', start.x);
+        ghostLine.setAttribute('y1', start.y);
+        ghostLine.setAttribute('x2', end.x);
+        ghostLine.setAttribute('y2', end.y);
+        ghostLine.setAttribute('opacity','1');
+        ghostRing.setAttribute('cx', end.x);
+        ghostRing.setAttribute('cy', end.y);
+        ghostRing.setAttribute('r', 16);
+        ghostRing.setAttribute('opacity','1');
+      }
+      function hideGhost(){
+        ghostLine.setAttribute('opacity','0');
+        ghostRing.setAttribute('opacity','0');
+      }
+      dragHandle.addEventListener('pointerdown',e=>{
+        if(!handleSource){ return; }
+        e.preventDefault();
+        const origin=nodeCenterSvg(handleSource.id);
+        if(!origin){ return; }
+        syncOverlaySize();
+        dragHandle.setPointerCapture(e.pointerId);
+        dragHandle.classList.add('dragging');
+        const initialPoint=eventToSvgPoint(e);
+        pointerDragState={ pointerId:e.pointerId, sourceId:handleSource.id, lastPoint:initialPoint, origin };
+        showGhost(origin, initialPoint);
+      });
+      function finishPointerDrag(evt, cancelled){
+        if(!pointerDragState || evt.pointerId!==pointerDragState.pointerId) return;
+        const state=pointerDragState;
+        pointerDragState=null;
+        dragHandle.classList.remove('dragging');
+        hideGhost();
+        try{ dragHandle.releasePointerCapture(evt.pointerId); }catch(_){ }
+        if(cancelled){ return; }
+        const source=jm.get_node(state.sourceId);
+        if(!source) return;
+        const hovered=document.elementFromPoint(evt.clientX, evt.clientY);
+        const targetEl=hovered ? hovered.closest('.jsmind-node') : null;
+        if(targetEl){
+          const targetId=targetEl.getAttribute('nodeid');
+          const targetNode=targetId ? jm.get_node(targetId) : null;
+          if(targetNode && targetNode.id!==source.id){
+            executeCreateNodeCommand({
+              parentId:source.id,
+              topic:'🔗 '+targetNode.topic,
+              data:{link:targetNode.id},
+              meta:{relation:true,source:'handle'}
+            });
+            return;
+          }
+        }
+        const dropPoint=eventToSvgPoint(evt);
+        executeCreateNodeCommand({ parentId:source.id, topic:'子节点', position:dropPoint, meta:{source:'handle'} });
+      }
+      window.addEventListener('pointermove',e=>{
+        if(!pointerDragState || e.pointerId!==pointerDragState.pointerId) return;
+        const hovered=document.elementFromPoint(e.clientX, e.clientY);
+        let ringPoint=eventToSvgPoint(e);
+        if(hovered){
+          const targetEl=hovered.closest('.jsmind-node');
+          if(targetEl){
+            const targetId=targetEl.getAttribute('nodeid');
+            const center=nodeCenterSvg(targetId);
+            if(center) ringPoint=center;
+          }
+        }
+        pointerDragState.lastPoint=ringPoint;
+        showGhost(pointerDragState.origin, ringPoint);
+      });
+      window.addEventListener('pointerup',e=>finishPointerDrag(e,false));
+      window.addEventListener('pointercancel',e=>finishPointerDrag(e,true));
+      window.addEventListener('resize',scheduleHandleRefresh);
+      if(jmContainer){
+        const refreshOnScroll=()=>scheduleHandleRefresh();
+        jmContainer.addEventListener('scroll',refreshOnScroll,{passive:true});
+      }
+      scheduleHandleRefresh();
+      const titleInput=document.getElementById('map-title');
+      const saveState=document.getElementById('save-state');
+      const importInput=document.getElementById('import-input');
+      const attachInput=document.getElementById('attach-file-input');
+      const inspector=document.getElementById('node-inspector');
+      const nodeTopicInput=document.getElementById('node-topic-input');
+      const nodeNoteInput=document.getElementById('node-note');
+      const nodeFoldField=document.getElementById('node-fold-field');
+      const nodeFoldToggle=document.getElementById('node-fold-toggle');
+      const nodeFoldToggleText=document.getElementById('node-fold-toggle-text');
+      const nodeFoldHint=document.getElementById('node-fold-hint');
+      const mindShell=document.querySelector('.mind-shell');
+      const mindInfoBar=document.getElementById('mind-info-bar');
+      const mindInfoHandle=document.getElementById('mind-info-handle');
+      const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
+      const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
+      const dock=document.getElementById('mind-dock');
+      const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
+      const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
+      const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
+      const dockRedoButton=dock ? dock.querySelector('.dock-btn[data-action="redo"]') : null;
+      const dockFoldButton=dock ? dock.querySelector('.dock-btn[data-action="fold"]') : null;
+      const dockFoldLabel=dockFoldButton ? dockFoldButton.querySelector('[data-fold-label]') : null;
+      const dockFoldIcon=dockFoldButton ? dockFoldButton.querySelector('[data-fold-icon]') : null;
+      const exportOverlay=document.getElementById('mind-export-overlay');
+      const mapIo=document.getElementById('map-io');
+      const mapIoButton=document.getElementById('map-io-button');
+      const mapIoMenu=document.getElementById('map-io-menu');
+      const mapDeleteButton=document.getElementById('map-delete-btn');
+      const importModal=document.getElementById('mind-import-modal');
+      const importModalName=importModal ? importModal.querySelector('[data-import-name]') : null;
+      const importModeButtons=importModal ? Array.from(importModal.querySelectorAll('[data-import-mode]')) : [];
+      const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
+      const relationToast=document.getElementById('mind-relation-toast');
+      const relationContextMenu=document.getElementById('relation-context-menu');
+      let pendingImportPayload=null;
+      let pendingImportFileName='';
+      const foldAllMenuItem=null;
+      const nodePopover=document.getElementById('node-popover');
+      const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
+      const popoverHeader=nodePopover ? nodePopover.querySelector('header') : null;
+      const nodeContextMenu=document.getElementById('node-context-menu');
+      const settingsLayer=document.getElementById('mind-settings');
+      const gridToggle=document.getElementById('setting-grid');
+      let exportOverlayHideTimer=null;
+      if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+      let infoBarCollapsed=false;
+      function applyInfoBarState(){
+        if(!mindInfoBar) return;
+        mindInfoBar.dataset.collapsed=infoBarCollapsed?'true':'false';
+        if(mindInfoHandle){
+          mindInfoHandle.setAttribute('aria-expanded', infoBarCollapsed?'false':'true');
+          mindInfoHandle.setAttribute('aria-label', infoBarCollapsed?'展开顶部栏':'收起顶部栏');
+        }
+        if(mindInfoHandleIcon){
+          mindInfoHandleIcon.textContent=infoBarCollapsed ? '∨' : '∧';
+        }
+        if(mindInfoContent){
+          mindInfoContent.setAttribute('aria-hidden', infoBarCollapsed?'true':'false');
+        }
+      }
+      function collapseInfoBar(force=false){
+        if(!mindInfoBar || infoBarCollapsed) return;
+        if(!force && document.activeElement && mindInfoBar.contains(document.activeElement)){ return; }
+        infoBarCollapsed=true;
+        applyInfoBarState();
+      }
+      function expandInfoBar(){
+        if(!mindInfoBar || !infoBarCollapsed) return;
+        infoBarCollapsed=false;
+        applyInfoBarState();
+      }
+      function toggleInfoBar(){
+        if(infoBarCollapsed){ expandInfoBar(); }
+        else{ collapseInfoBar(true); }
+      }
+      applyInfoBarState();
+      if(mindInfoHandle){
+        mindInfoHandle.addEventListener('click',e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          toggleInfoBar();
+        });
+      }
+      if(mindInfoBar){
+        mindInfoBar.addEventListener('focusin',()=>{ expandInfoBar(); });
+      }
+      function showExportOverlay(){
+        if(!exportOverlay) return;
+        if(exportOverlayHideTimer){
+          clearTimeout(exportOverlayHideTimer);
+          exportOverlayHideTimer=null;
+        }
+        exportOverlay.dataset.active='true';
+        exportOverlay.setAttribute('aria-hidden','false');
+      }
+      function hideExportOverlay(){
+        if(!exportOverlay) return;
+        exportOverlay.dataset.active='false';
+        if(exportOverlayHideTimer){
+          clearTimeout(exportOverlayHideTimer);
+        }
+        exportOverlayHideTimer=setTimeout(()=>{
+          exportOverlay.setAttribute('aria-hidden','true');
+          exportOverlayHideTimer=null;
+        },360);
+      }
+      const UNDO_MAX_DEPTH=100;
+      const UNDO_MERGE_WINDOW=200;
+      class MindUndoManager{
+        constructor(options={}){
+          this.maxDepth=typeof options.maxDepth==='number' && options.maxDepth>0 ? options.maxDepth : UNDO_MAX_DEPTH;
+          this.stack=[];
+          this.redoStack=[];
+          this.isRestoring=false;
+        }
+        clear(){ this.stack.length=0; this.redoStack.length=0; }
+        canUndo(){ return this.stack.length>0; }
+        canRedo(){ return this.redoStack.length>0; }
+        push(entry){
+          if(!entry) return;
+          const now=entry.timestamp || Date.now();
+          const prev=this.stack[this.stack.length-1];
+          if(prev && entry.mergeKey && prev.mergeKey===entry.mergeKey && (now - prev.timestamp) <= UNDO_MERGE_WINDOW){
+            prev.after=entry.after;
+            prev.afterSerialized=entry.afterSerialized;
+            prev.timestamp=now;
+            return;
+          }
+          this.stack.push({
+            label:entry.label || '',
+            before:entry.before,
+            after:entry.after,
+            beforeSerialized:entry.beforeSerialized,
+            afterSerialized:entry.afterSerialized,
+            timestamp:now,
+            mergeKey:entry.mergeKey || null,
+          });
+          if(this.stack.length>this.maxDepth){ this.stack.shift(); }
+          this.redoStack.length=0;
+        }
+        pushExisting(entry){
+          if(!entry) return;
+          this.stack.push(entry);
+          if(this.stack.length>this.maxDepth){ this.stack.shift(); }
+        }
+        popUndoEntry(){ return this.stack.pop() || null; }
+        pushRedo(entry){ if(entry){ this.redoStack.push(entry); if(this.redoStack.length>this.maxDepth){ this.redoStack.shift(); } } }
+        popRedoEntry(){ return this.redoStack.pop() || null; }
+      }
+      const undoManager=new MindUndoManager({maxDepth:UNDO_MAX_DEPTH});
+      function snapshotSignature(snapshot){
+        if(!snapshot || !snapshot.tree) return '';
+        try{ return JSON.stringify(snapshot.tree); }
+        catch(_){ return ''; }
+      }
+      function captureMindSnapshot(){
+        if(!jm || typeof jm.get_data!=='function') return null;
+        let data=null;
+        try{ data=jm.get_data('node_tree'); }
+        catch(err){ console.warn(err); return null; }
+        if(!data) return null;
+        const selected=typeof jm.get_selected_node==='function' ? jm.get_selected_node() : null;
+        return {
+          tree:deepClone(data),
+          selectedId:selected && selected.id ? selected.id : null,
+          view:{
+            offsetX:Number.isFinite(jm.offsetX)?jm.offsetX:null,
+            offsetY:Number.isFinite(jm.offsetY)?jm.offsetY:null,
+            scale:Number.isFinite(jm.scale)?jm.scale:null,
+          }
+        };
+      }
+      function applyViewState(view){
+        if(!jm || !view) return;
+        if(typeof view.scale==='number' && isFinite(view.scale)){ jm.scale=view.scale; }
+        if(typeof view.offsetX==='number' && isFinite(view.offsetX)){ jm.offsetX=view.offsetX; }
+        if(typeof view.offsetY==='number' && isFinite(view.offsetY)){ jm.offsetY=view.offsetY; }
+        if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+      }
+      function afterMindStateChange(){
+        if(typeof cancelRelationMode==='function'){ cancelRelationMode(true); }
+        scheduleHandleRefresh();
+        requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+        updateFoldAllLabel();
+        updateFoldButtonState();
+        if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
+        if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+      }
+      function updateFoldButtonState(){
+        if(!dockFoldButton) return;
+        const node=jm && typeof jm.get_selected_node==='function' ? jm.get_selected_node() : null;
+        const hasChildren=!!(node && node.children && node.children.length);
+        let label='折叠';
+        let icon='⇅';
+        if(hasChildren){
+          const collapsed=node.expanded===false;
+          label=collapsed?'展开':'折叠';
+          icon=collapsed?'⤴':'⤵';
+        }
+        if(dockFoldLabel){ dockFoldLabel.textContent=label; }
+        if(dockFoldIcon){ dockFoldIcon.textContent=icon; }
+        dockFoldButton.disabled=!hasChildren;
+        dockFoldButton.setAttribute('aria-label', hasChildren ? `${label}节点` : '折叠或展开节点');
+      }
+      function restoreMindSnapshot(snapshot){
+        if(!snapshot || !snapshot.tree) return false;
+        if(!jm || typeof jm.show!=='function') return false;
+        undoManager.isRestoring=true;
+        try{
+          jm.show(deepClone(snapshot.tree));
+          if(snapshot.view){ applyViewState(snapshot.view); }
+          if(snapshot.selectedId && typeof jm.select_node==='function'){
+            try{ jm.select_node(snapshot.selectedId); }
+            catch(_){ /* ignore */ }
+          }
+          afterMindStateChange();
+          markDirty();
+          return true;
+        }catch(err){
+          console.error(err);
+          return false;
+        }finally{
+          undoManager.isRestoring=false;
+        }
+      }
+      function updateUndoRedoButtons(){
+        if(dockUndoButton){ dockUndoButton.disabled=!undoManager.canUndo(); }
+        if(dockRedoButton){ dockRedoButton.disabled=!undoManager.canRedo(); }
+      }
+      function performUndoable(label, action, options={}){
+        if(typeof action!=='function') return;
+        if(undoManager.isRestoring) return action();
+        const before=captureMindSnapshot();
+        const result=action();
+        if(result instanceof Promise){
+          console.warn('performUndoable 不支持异步操作');
+          return result;
+        }
+        if(result===false && !options.force){ return result; }
+        const after=captureMindSnapshot();
+        if(!before || !after) return result;
+        const beforeSerialized=snapshotSignature(before);
+        const afterSerialized=snapshotSignature(after);
+        if(!beforeSerialized || beforeSerialized===afterSerialized) return result;
+        undoManager.push({
+          label:label||'',
+          before,
+          after,
+          beforeSerialized,
+          afterSerialized,
+          mergeKey:options.mergeKey||null,
+          timestamp:Date.now(),
+        });
+        updateUndoRedoButtons();
+        return result;
+      }
+      function undoMindChange(){
+        if(!undoManager.canUndo()) return false;
+        const entry=undoManager.popUndoEntry();
+        if(!entry) return false;
+        const success=restoreMindSnapshot(entry.before);
+        if(success){
+          undoManager.pushRedo(entry);
+        }else{
+          undoManager.pushExisting(entry);
+        }
+        updateUndoRedoButtons();
+        return success;
+      }
+      function redoMindChange(){
+        if(!undoManager.canRedo()) return false;
+        const entry=undoManager.popRedoEntry();
+        if(!entry) return false;
+        const success=restoreMindSnapshot(entry.after);
+        if(success){
+          entry.timestamp=Date.now();
+          undoManager.pushExisting(entry);
+        }else{
+          undoManager.pushRedo(entry);
+        }
+        updateUndoRedoButtons();
+        return success;
+      }
+      let panAnimation=null;
+      function stopPanAnimation(){
+        if(panAnimation && panAnimation.raf){ cancelAnimationFrame(panAnimation.raf); }
+        panAnimation=null;
+      }
+      function centerOnNodeSmooth(node, options={}){
+        if(!jm || !node || typeof jm.center_node!=='function') return false;
+        const container=jm.container || (jm.view && jm.view.container) || null;
+        const rect=container ? container.getBoundingClientRect() : null;
+        const hasRect=!!(rect && rect.width>0 && rect.height>0);
+        const halfWidth=hasRect ? rect.width/2 : 0;
+        const halfHeight=hasRect ? rect.height/2 : 0;
+        const startX=Number.isFinite(jm.offsetX)?jm.offsetX:0;
+        const startY=Number.isFinite(jm.offsetY)?jm.offsetY:0;
+        const startScale=Number.isFinite(jm.scale)?jm.scale:1;
+        const prevHasCentered=jm.hasCentered;
+        const animate=options.animate!==false;
+        const startCenterWorld=(hasRect && startScale)
+          ? {x:(halfWidth-startX)/startScale,y:(halfHeight-startY)/startScale}
+          : null;
+        const centered=jm.center_node(node);
+        if(!centered){ return false; }
+        const targetX=Number.isFinite(jm.offsetX)?jm.offsetX:startX;
+        const targetY=Number.isFinite(jm.offsetY)?jm.offsetY:startY;
+        const targetScale=Number.isFinite(jm.scale)?jm.scale:startScale;
+        const targetHasCentered=jm.hasCentered;
+        const targetCenterWorld=(hasRect && targetScale)
+          ? {x:(halfWidth-targetX)/targetScale,y:(halfHeight-targetY)/targetScale}
+          : null;
+        jm.offsetX=startX;
+        jm.offsetY=startY;
+        jm.scale=startScale;
+        jm.hasCentered=prevHasCentered;
+        if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+        stopPanAnimation();
+        const deltaOffsetX=targetX-startX;
+        const deltaOffsetY=targetY-startY;
+        const deltaScale=targetScale-startScale;
+        const canInterpolateCenter=!!(startCenterWorld && targetCenterWorld && hasRect);
+        if(Math.abs(deltaOffsetX)<0.5 && Math.abs(deltaOffsetY)<0.5 && Math.abs(deltaScale)<0.0001){
+          jm.offsetX=targetX;
+          jm.offsetY=targetY;
+          jm.scale=targetScale;
+          jm.hasCentered=targetHasCentered;
+          if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          return true;
+        }
+        if(!animate){
+          jm.offsetX=targetX;
+          jm.offsetY=targetY;
+          jm.scale=targetScale;
+          jm.hasCentered=targetHasCentered;
+          if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          return true;
+        }
+        const avgScale=(startScale+targetScale)/2 || 1;
+        let pixelDistance=Math.hypot(deltaOffsetX, deltaOffsetY);
+        if(canInterpolateCenter){
+          const worldDx=targetCenterWorld.x-startCenterWorld.x;
+          const worldDy=targetCenterWorld.y-startCenterWorld.y;
+          pixelDistance=Math.hypot(worldDx, worldDy)*Math.max(avgScale,0.01);
+        }
+        const baseDuration=260;
+        const scaleContribution=Math.min(360, Math.abs(deltaScale)*420);
+        const duration=Math.min(720, Math.max(220, baseDuration + pixelDistance*0.35 + scaleContribution));
+        const startTime=performance.now();
+        const ease=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+        function step(now){
+          const elapsed=now-startTime;
+          const progress=Math.min(1, elapsed/duration);
+          const eased=ease(progress);
+          const currentScale=startScale + deltaScale*eased;
+          jm.scale=currentScale;
+          if(canInterpolateCenter && currentScale){
+            const centerX=startCenterWorld.x + (targetCenterWorld.x-startCenterWorld.x)*eased;
+            const centerY=startCenterWorld.y + (targetCenterWorld.y-startCenterWorld.y)*eased;
+            jm.offsetX=halfWidth - centerX*currentScale;
+            jm.offsetY=halfHeight - centerY*currentScale;
+          }else{
+            jm.offsetX=startX + deltaOffsetX*eased;
+            jm.offsetY=startY + deltaOffsetY*eased;
+          }
+          if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          if(progress<1){
+            panAnimation={raf:requestAnimationFrame(step)};
+          }else{
+            panAnimation=null;
+            jm.offsetX=targetX;
+            jm.offsetY=targetY;
+            jm.scale=targetScale;
+            jm.hasCentered=targetHasCentered;
+            if(typeof jm.applyTransform==='function'){ jm.applyTransform(); }
+          }
+        }
+        panAnimation={raf:requestAnimationFrame(step)};
+        return true;
+      }
+      function centerOnNearestVisible(node){
+        if(!node) return false;
+        let current=node;
+        while(current){
+          if(centerOnNodeSmooth(current)) return true;
+          current=current.parent || null;
+        }
+        return false;
+      }
+      const deleteMapForm=document.getElementById('delete-map-form');
+      let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
+      if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
+      let dirty=false;
+      let relationMode=null;
+      let relationToastTimer=null;
+      let selectedRelationId=null;
+      let relationBlankClickTs=0;
+      let nodeClipboardTemplate=null;
+      let contextMenuState=null;
+      const ATTACH_MAX_BYTES=15*1024*1024;
+      const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
+      const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log','.tsv'];
+      const videoExts=['.mp4','.mov','.mkv','.avi','.webm','.m4v','.ogv'];
+      const audioExts=['.mp3','.m4a','.aac','.wav','.ogg','.oga','.opus','.flac','.weba'];
+      const officeExts=['.pdf','.doc','.docx','.docm','.dotx','.dotm','.xls','.xlsx','.xlsm','.xlsb','.xltx','.xltm'];
+      const archiveExts=['.zip','.rar'];
+      function setSaveButtonState(text, disabled, state){
+        if(dockSaveLabel){
+          if(typeof text==='string'){ dockSaveLabel.textContent=text; }
+          else if(text===null){ dockSaveLabel.textContent=saveButtonDefault; }
+        }
+        if(dockSaveButton && typeof disabled==='boolean'){ dockSaveButton.disabled=disabled; }
+        if(dockSaveButton){
+          if(state){ dockSaveButton.dataset.state=state; }
+          else{ dockSaveButton.removeAttribute('data-state'); }
+        }
+      }
+      function markDirty(){
+        dirty=true;
+        if(saveState){
+          saveState.textContent='未保存';
+          saveState.classList.add('show','dirty');
+        }
+        setSaveButtonState('未保存',false,'dirty');
+      }
+      function showSaving(){
+        if(saveState){
+          saveState.textContent='保存中...';
+          saveState.classList.add('show');
+          saveState.classList.remove('dirty');
+        }
+        setSaveButtonState('保存中...', true,'saving');
+      }
+      function markSaved(){
+        dirty=false;
+        if(saveState){
+          saveState.textContent='保存成功';
+          saveState.classList.add('show');
+          saveState.classList.remove('dirty');
+        }
+        setSaveButtonState('保存成功', false,'saved');
+        setTimeout(()=>{
+          if(!dirty){
+            if(saveState) saveState.classList.remove('show');
+            setSaveButtonState(null,false,null);
+          }
+        },1500);
+      }
+      function clearRelationHighlights(){
+        document.querySelectorAll('.jsmind-node.relation-source,.jsmind-node.relation-target').forEach(el=>{
+          el.classList.remove('relation-source','relation-target');
+        });
+      }
+      function clearRelationSelection(){
+        if(typeof jm?.clear_relation_selection==='function'){ jm.clear_relation_selection(); }
+        selectedRelationId=null;
+      }
+      function closeRelationContextMenu(){
+        if(!relationContextMenu) return;
+        relationContextMenu.hidden=true;
+        relationContextMenu.removeAttribute('style');
+      }
+      function showRelationToast(message, sticky=false){
+        if(!relationToast) return;
+        relationToast.textContent=message || '';
+        relationToast.dataset.visible='true';
+        if(relationToastTimer){ clearTimeout(relationToastTimer); relationToastTimer=null; }
+        if(!sticky){
+          relationToastTimer=window.setTimeout(()=>{ relationToast.dataset.visible='false'; relationToastTimer=null; },2600);
+        }
+      }
+      function hideRelationToast(){
+        if(relationToast){ relationToast.dataset.visible='false'; }
+        if(relationToastTimer){ clearTimeout(relationToastTimer); relationToastTimer=null; }
+      }
+      function updateRelationModeState(){
+        if(!mindShell) return;
+        if(!relationMode){ mindShell.removeAttribute('data-relation-mode'); return; }
+        mindShell.dataset.relationMode=relationMode.sourceId?'awaiting-target':'ready';
+      }
+      function startRelationMode(){
+        commitInlineEditing();
+        relationMode={sourceId:null, options:{}};
+        hideHandle();
+        clearRelationHighlights();
+        clearRelationSelection();
+        closeRelationContextMenu();
+        updateRelationModeState();
+        relationBlankClickTs=0;
+        showRelationToast('关联模式开启：点击节点选择起点', true);
+        return true;
+      }
+      function resetRelationSource(message){
+        if(!relationMode) return;
+        relationMode.sourceId=null;
+        clearRelationHighlights();
+        updateRelationModeState();
+        relationBlankClickTs=0;
+        if(message){ showRelationToast(message); }
+      }
+      function cancelRelationMode(notify=false){
+        if(!relationMode) return;
+        relationMode=null;
+        updateRelationModeState();
+        clearRelationHighlights();
+        closeRelationContextMenu();
+        clearRelationSelection();
+        relationBlankClickTs=0;
+        if(notify){ showRelationToast('已退出关联模式'); }
+        else{ hideRelationToast(); }
+        scheduleHandleRefresh();
+      }
+      function updateRelationHover(nodeId){
+        if(!relationMode || !relationMode.sourceId) return;
+        const targetId=(nodeId && nodeId!==relationMode.sourceId)?nodeId:null;
+        document.querySelectorAll('.jsmind-node.relation-target').forEach(el=>el.classList.remove('relation-target'));
+        if(targetId){
+          const el=document.querySelector(`.jsmind-node[nodeid="${targetId}"]`);
+          if(el){ el.classList.add('relation-target'); }
+        }
+      }
+      function handleRelationNodeClick(node){
+        if(!relationMode || !node) return;
+        closeRelationContextMenu();
+        if(!relationMode.sourceId){
+          relationMode.sourceId=node.id;
+          clearRelationHighlights();
+          const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+          if(el){ el.classList.add('relation-source'); }
+          updateRelationModeState();
+          relationBlankClickTs=0;
+          showRelationToast('已选择起点，点击另一节点完成关联');
+          return;
+        }
+        if(node.id===relationMode.sourceId){
+          resetRelationSource('已取消起点选择');
+          return;
+        }
+        const sourceId=relationMode.sourceId;
+        const options=relationMode.options || {};
+        const existing=typeof jm.get_relations==='function' ? jm.get_relations(sourceId) : [];
+        const duplicate=existing.some(rel=>rel && ((rel.from===sourceId && rel.to===node.id) || (rel.bidirectional && rel.from===node.id && rel.to===sourceId)));
+        if(duplicate){
+          showRelationToast('已存在关联');
+          return;
+        }
+        let createdRelation=null;
+        const result=performUndoable('add-relation',()=>{
+          const relation=typeof jm.add_relation==='function' ? jm.add_relation(sourceId, node.id, options) : null;
+          if(!relation) return false;
+          createdRelation=relation;
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          return true;
+        },{mergeKey:`relation:add:${sourceId}`});
+        if(result!==false && createdRelation){
+          if(typeof jm.select_relation==='function'){ jm.select_relation(createdRelation.id); }
+          selectedRelationId=createdRelation.id;
+          showRelationToast('关联已创建，可继续选择下一条');
+          resetRelationSource();
+        }
+      }
+      function handleRelationBlankInteraction(){
+        if(!relationMode) return;
+        if(relationMode.sourceId){
+          resetRelationSource('已取消起点选择');
+          return;
+        }
+        const now=Date.now();
+        if(now - relationBlankClickTs < 400){
+          cancelRelationMode(true);
+          relationBlankClickTs=0;
+        }else{
+          relationBlankClickTs=now;
+          showRelationToast('再次点击画布空白处可退出关联模式');
+        }
+      }
+      function toggleRelationMode(){
+        if(relationMode){ cancelRelationMode(true); }
+        else{ startRelationMode(); }
+      }
+      function handleRelationSelect(relation, evt){
+        cancelRelationLongPressState();
+        if(relation && relation.id){ selectedRelationId=relation.id; }
+        else{ selectedRelationId=null; }
+        closeNodeContextMenu();
+        closeRelationContextMenu();
+        if(evt && evt.type==='contextmenu'){ evt.preventDefault(); }
+      }
+      function handleRelationContext(relation, evt){
+        cancelRelationLongPressState();
+        if(relation && relation.id){ selectedRelationId=relation.id; }
+        else{ selectedRelationId=null; }
+        closeNodeContextMenu();
+        openRelationContextMenu(relation, evt || null);
+      }
+      function deleteSelectedRelation(){
+        cancelRelationLongPressState();
+        if(!selectedRelationId || typeof jm?.remove_relation!=='function') return false;
+        const targetId=selectedRelationId;
+        const result=performUndoable('remove-relation',()=>{
+          const removed=jm.remove_relation(targetId);
+          if(!removed) return false;
+          clearRelationSelection();
+          closeRelationContextMenu();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          markDirty();
+          return true;
+        },{mergeKey:`relation:remove:${targetId}`});
+        if(result===false){ return false; }
+        showRelationToast('关联已删除');
+        return true;
+      }
+      function toggleSettings(forceShow){
+        if(!settingsLayer) return;
+        const currentHidden=settingsLayer.getAttribute('aria-hidden')!=='false';
+        const willShow=typeof forceShow==='boolean' ? forceShow : currentHidden;
+        settingsLayer.setAttribute('aria-hidden', willShow ? 'false' : 'true');
+      }
+      if(settingsLayer){
+        settingsLayer.addEventListener('click',e=>{
+          if(e.target===settingsLayer){ toggleSettings(false); }
+        });
+        settingsLayer.querySelectorAll('[data-settings-close]').forEach(btn=>{
+          btn.addEventListener('click',()=>toggleSettings(false));
+        });
+      }
+      const inspectorFields=[nodeTopicInput,nodeNoteInput,nodeFoldToggle].filter(Boolean);
+      let inspectorSyncing=false;
+      function setInspectorEnabled(enabled){
+        inspectorFields.forEach(el=>{ el.disabled=!enabled; });
+        if(inspector){ inspector.classList.toggle('disabled', !enabled); }
+      }
+      function updateFoldToggleUI(node){
+        if(!nodeFoldField || !nodeFoldToggle || !nodeFoldToggleText) return;
+        const hasChildren=!!(node && node.children && node.children.length);
+        nodeFoldField.hidden=!hasChildren;
+        if(!hasChildren){
+          nodeFoldToggle.checked=true;
+          if(nodeFoldToggleText) nodeFoldToggleText.textContent='展开中';
+          if(nodeFoldHint) nodeFoldHint.textContent='';
+          return;
+        }
+        const count=node.children ? node.children.filter(Boolean).length : 0;
+        const expanded=node.expanded!==false;
+        nodeFoldToggle.checked=expanded;
+        if(nodeFoldToggleText) nodeFoldToggleText.textContent=expanded?'展开中':'已折叠';
+        if(nodeFoldHint){
+          nodeFoldHint.textContent=expanded
+            ? `共有 ${count} 个直接子节点`
+            : `已折叠 ${count} 个直接子节点`;
+        }
+      }
+      function hasCollapsedNodes(){
+        if(typeof jm?.has_collapsed_nodes==='function'){
+          try{ return !!jm.has_collapsed_nodes(); }
+          catch(_){ /* ignore */ }
+        }
+        if(!jm || !jm.nodes || typeof jm.nodes.values!=='function') return false;
+        for(const node of jm.nodes.values()){
+          if(node && node.children && node.children.length && node.expanded===false){
+            return true;
+          }
+        }
+        return false;
+      }
+      function updateFoldAllLabel(){
+        if(!foldAllMenuItem) return;
+        foldAllMenuItem.textContent=hasCollapsedNodes() ? '展开全部' : '折叠全部';
+      }
+      function setAllNodesExpanded(expanded){
+        if(!jm) return false;
+        if(typeof jm.set_all_expanded==='function'){
+          try{ return !!jm.set_all_expanded(expanded); }
+          catch(_){ /* ignore */ }
+        }
+        if(!jm.nodes || typeof jm.nodes.values!=='function') return false;
+        const desired=!!expanded;
+        let changed=false;
+        for(const node of jm.nodes.values()){
+          if(!node || node.isroot) continue;
+          if(!node.children || !node.children.length) continue;
+          if(node.expanded===desired) continue;
+          node.expanded=desired;
+          if(node.model){ node.model.expanded=desired; }
+          changed=true;
+        }
+        if(changed){
+          jm.computeLayout();
+          jm.render();
+          if(typeof jm.emit==='function' && jsMind?.event_type?.refresh){
+            jm.emit(jsMind.event_type.refresh);
+          }
+        }
+        return changed;
+      }
+      function toggleFoldAll(){
+        const target=hasCollapsedNodes() ? true : false;
+        performUndoable('toggle-all',()=>{
+          const changed=setAllNodesExpanded(target);
+          if(changed){
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          }
+          updateFoldAllLabel();
+          updateFoldButtonState();
+          return changed;
+        },{mergeKey:'fold:all'});
+      }
+      function setNodeExpandedState(node, expanded, options={}){
+        if(!node) return;
+        const mergeKey=`fold:${node.id}`;
+        performUndoable('toggle-node',()=>{
+          let changed=false;
+          if(typeof jm.set_node_expanded==='function'){
+            try{ changed=!!jm.set_node_expanded(node.id, expanded); }
+            catch(_){ changed=false; }
+          }
+          if(!changed && typeof jm.set_node_expanded!=='function'){
+            const desired=expanded!==false;
+            if(node.expanded!==desired){
+              node.expanded=desired;
+              if(node.model){ node.model.expanded=desired; }
+              jm.computeLayout();
+              jm.render();
+              if(typeof jm.emit==='function' && jsMind?.event_type?.refresh){
+                jm.emit(jsMind.event_type.refresh);
+              }
+              changed=true;
+            }
+          }
+          if(changed){
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>{
+              const latest=jm.get_node(node.id);
+              if(latest){
+                refreshInspector(latest);
+                if(options.focus!==false){ centerOnNearestVisible(latest); }
+              }
+            });
+          }else{
+            updateFoldToggleUI(jm.get_node(node.id));
+          }
+          updateFoldAllLabel();
+          updateFoldButtonState();
+          return changed;
+        },{mergeKey});
+      }
+      let popoverOpen=false;
+      let sheetDragState=null;
+      let longPressState=null;
+      let relationLongPressState=null;
+      function cancelRelationLongPressState(){
+        if(relationLongPressState && relationLongPressState.timer){
+          clearTimeout(relationLongPressState.timer);
+        }
+        relationLongPressState=null;
+      }
+      function beginRelationLongPress(evt, relationId){
+        if(!evt || !relationId) return;
+        if(evt.pointerType && !['touch','pen'].includes(evt.pointerType)){
+          cancelRelationLongPressState();
+          return;
+        }
+        cancelRelationLongPressState();
+        relationLongPressState={
+          pointerId:evt.pointerId,
+          relationId,
+          startX:evt.clientX,
+          startY:evt.clientY,
+          triggered:false,
+          timer:window.setTimeout(()=>{
+            if(!relationLongPressState || relationLongPressState.pointerId!==evt.pointerId) return;
+            relationLongPressState.triggered=true;
+            relationLongPressState.timer=null;
+            if(typeof jm?.select_relation==='function'){ jm.select_relation(relationId); }
+            selectedRelationId=relationId;
+            deleteSelectedRelation();
+          }, LONG_PRESS_DELAY)
+        };
+      }
+      function handleRelationLongPressMove(e){
+        if(!relationLongPressState || e.pointerId!==relationLongPressState.pointerId) return;
+        if(relationLongPressState.triggered) return;
+        const dx=Math.abs(e.clientX - relationLongPressState.startX);
+        const dy=Math.abs(e.clientY - relationLongPressState.startY);
+        if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){
+          cancelRelationLongPressState();
+        }
+      }
+      function finishRelationLongPress(e){
+        if(!relationLongPressState || e.pointerId!==relationLongPressState.pointerId) return;
+        const triggered=relationLongPressState.triggered;
+        cancelRelationLongPressState();
+        if(triggered){ e.preventDefault(); }
+      }
+      document.addEventListener('pointermove',handleRelationLongPressMove,{passive:true});
+      document.addEventListener('pointerup',finishRelationLongPress);
+      document.addEventListener('pointercancel',finishRelationLongPress);
+      const popoverMedia=window.matchMedia('(max-width: 768px)');
+      function updatePopoverMode(){
+        if(!nodePopover) return;
+        nodePopover.dataset.mode = popoverMedia.matches ? 'sheet' : 'panel';
+        nodePopover.classList.remove('dragging');
+        if(!sheetDragState){ nodePopover.style.transform=''; }
+        if(popoverOpen){ positionInspectorPopover(jm.get_selected_node()); }
+      }
+      updatePopoverMode();
+      if(popoverMedia.addEventListener) popoverMedia.addEventListener('change',()=>updatePopoverMode());
+      else if(popoverMedia.addListener) popoverMedia.addListener(()=>updatePopoverMode());
+      function isContextMenuOpen(){ return !!(nodeContextMenu && !nodeContextMenu.hidden); }
+      function closeNodeContextMenu(){
+        if(!nodeContextMenu) return;
+        nodeContextMenu.hidden=true;
+        nodeContextMenu.removeAttribute('style');
+        nodeContextMenu.removeAttribute('data-mode');
+        contextMenuState=null;
+      }
+      function isRelationContextMenuOpen(){ return !!(relationContextMenu && !relationContextMenu.hidden); }
+      function openRelationContextMenu(relation, anchorEvent){
+        if(!relationContextMenu || !relation) return;
+        closeRelationContextMenu();
+        relationContextMenu.hidden=false;
+        relationContextMenu.style.left='';
+        relationContextMenu.style.top='';
+        const margin=12;
+        requestAnimationFrame(()=>{
+          const rect=relationContextMenu.getBoundingClientRect();
+          const baseX=anchorEvent && typeof anchorEvent.clientX==='number' ? anchorEvent.clientX : window.innerWidth/2;
+          const baseY=anchorEvent && typeof anchorEvent.clientY==='number' ? anchorEvent.clientY : window.innerHeight/2;
+          let left=baseX - rect.width/2;
+          let top=baseY;
+          if(left<margin) left=margin;
+          if(left+rect.width>window.innerWidth-margin){ left=window.innerWidth-rect.width-margin; }
+          if(top<margin) top=margin;
+          if(top+rect.height>window.innerHeight-margin){ top=window.innerHeight-rect.height-margin; }
+          relationContextMenu.style.left=`${Math.round(left)}px`;
+          relationContextMenu.style.top=`${Math.round(top)}px`;
+        });
+      }
+      function closeAllContextMenus(){
+        closeNodeContextMenu();
+        closeRelationContextMenu();
+      }
+      function openNodeContextMenu(node, anchor){
+        if(!nodeContextMenu || !node) return;
+        closeRelationContextMenu();
+        try{ jm.select_node(node.id); }catch(_){ }
+        contextMenuState={nodeId:node.id};
+        nodeContextMenu.hidden=false;
+        const mode=popoverMedia.matches ? 'sheet' : 'menu';
+        nodeContextMenu.dataset.mode=mode;
+        if(mode==='sheet'){
+          nodeContextMenu.style.left='';
+          nodeContextMenu.style.top='';
+          return;
+        }
+        nodeContextMenu.style.left='';
+        nodeContextMenu.style.top='';
+        requestAnimationFrame(()=>{
+          const rect=nodeContextMenu.getBoundingClientRect();
+          const margin=12;
+          const fallback=node.el ? node.el.getBoundingClientRect() : null;
+          const baseX=anchor && typeof anchor.x==='number' ? anchor.x : (fallback ? fallback.right : window.innerWidth/2);
+          const baseY=anchor && typeof anchor.y==='number' ? anchor.y : (fallback ? fallback.top : window.innerHeight/2);
+          let left=baseX - rect.width/2;
+          let top=baseY;
+          if(left < margin) left=margin;
+          if(left + rect.width > window.innerWidth - margin){ left = window.innerWidth - rect.width - margin; }
+          if(top < margin) top=margin;
+          if(top + rect.height > window.innerHeight - margin){ top = window.innerHeight - rect.height - margin; }
+          nodeContextMenu.style.left=`${Math.round(left)}px`;
+          nodeContextMenu.style.top=`${Math.round(top)}px`;
+        });
+      }
+      function isPopoverOpen(){ return popoverOpen; }
+      function openInspectorPopover(node){
+        if(!nodePopover || !node) return;
+        closeAllContextMenus();
+        popoverOpen=true;
+        updatePopoverMode();
+        nodePopover.hidden=false;
+        nodePopover.classList.remove('dragging');
+        nodePopover.style.transform='';
+        refreshInspector(node);
+        if(nodeTopicInput){
+          requestAnimationFrame(()=>{
+            try{ nodeTopicInput.focus({preventScroll:true}); }
+            catch(_){ nodeTopicInput.focus(); }
+          });
+        }
+      }
+      function closeInspectorPopover(){
+        if(!nodePopover) return;
+        popoverOpen=false;
+        nodePopover.hidden=true;
+        nodePopover.classList.remove('dragging');
+        nodePopover.style.transform='';
+        if(sheetDragState && sheetDragState.pointerId!=null && nodePopover.releasePointerCapture){
+          try{ nodePopover.releasePointerCapture(sheetDragState.pointerId); }catch(_){ }
+        }
+        sheetDragState=null;
+      }
+      function positionInspectorPopover(node){
+        if(!nodePopover) return;
+        if(nodePopover.dataset.mode==='sheet'){ nodePopover.style.left=''; nodePopover.style.top=''; return; }
+        const el=node ? document.querySelector(`.jsmind-node[nodeid="${node.id}"]`) : null;
+        const rect=el ? el.getBoundingClientRect() : null;
+        const popRect=nodePopover.getBoundingClientRect();
+        const margin=24;
+        let left=rect ? rect.right + 16 : margin;
+        let top=rect ? rect.top : margin;
+        if(left + popRect.width > window.innerWidth - margin){ left = window.innerWidth - popRect.width - margin; }
+        if(top + popRect.height > window.innerHeight - margin){ top = window.innerHeight - popRect.height - margin; }
+        nodePopover.style.left=`${Math.max(margin,left)}px`;
+        nodePopover.style.top=`${Math.max(margin,top)}px`;
+      }
+      if(nodePopover){
+        nodePopover.addEventListener('click',e=>{
+          if(e.target.closest('[data-pop-close]')){ e.preventDefault(); closeInspectorPopover(); }
+          if(e.target.closest('[data-pop-save]')){ e.preventDefault(); commitInlineEditing(); closeInspectorPopover(); }
+        });
+      }
+      const startSheetDrag=(e)=>{
+        if(!nodePopover || nodePopover.dataset.mode!=='sheet') return;
+        if(e.pointerType==='mouse' && e.button!==0) return;
+        const isHandle=sheetHandle && sheetHandle.contains(e.target);
+        const isHeaderDrag=popoverHeader && popoverHeader.contains(e.target) && !e.target.closest('button, [data-pop-close], [data-pop-save]');
+        if(!isHandle && !isHeaderDrag) return;
+        sheetDragState={pointerId:e.pointerId,startY:e.clientY,translate:0};
+        nodePopover.classList.add('dragging');
+        try{ nodePopover.setPointerCapture(e.pointerId); }catch(_){ }
+        e.preventDefault();
+      };
+      const moveSheetDrag=(e)=>{
+        if(!sheetDragState || !nodePopover || e.pointerId!==sheetDragState.pointerId) return;
+        const delta=Math.max(0, e.clientY - sheetDragState.startY);
+        sheetDragState.translate=delta;
+        nodePopover.style.transform=`translateX(-50%) translateY(${delta}px)`;
+      };
+      const endSheetDrag=(e,cancelled=false)=>{
+        if(!sheetDragState || !nodePopover || e.pointerId!==sheetDragState.pointerId) return;
+        const delta=sheetDragState.translate || 0;
+        const pointerId=sheetDragState.pointerId;
+        sheetDragState=null;
+        if(nodePopover.releasePointerCapture){ try{ nodePopover.releasePointerCapture(pointerId); }catch(_){ } }
+        if(!cancelled && delta>120){
+          closeInspectorPopover();
+        }else{
+          nodePopover.classList.remove('dragging');
+          nodePopover.style.transform='';
+        }
+      };
+      if(sheetHandle){ sheetHandle.addEventListener('pointerdown', startSheetDrag); }
+      if(popoverHeader){ popoverHeader.addEventListener('pointerdown', startSheetDrag); }
+      if(nodePopover){
+        nodePopover.addEventListener('pointermove', moveSheetDrag);
+        nodePopover.addEventListener('pointerup',e=>endSheetDrag(e,false));
+        nodePopover.addEventListener('pointercancel',e=>endSheetDrag(e,true));
+      }
+      document.addEventListener('pointerdown',e=>{
+        cancelRelationLongPressState();
+        if(!popoverOpen || !nodePopover) return;
+        if(nodePopover.contains(e.target)) return;
+        if(e.target.closest && e.target.closest('.jsmind-node')) return;
+        closeInspectorPopover();
+      });
+      document.addEventListener('keydown',e=>{
+        if(e.key==='Escape'){
+          if(relationMode){
+            if(relationMode.sourceId){ resetRelationSource('已取消起点选择'); }
+            else{ cancelRelationMode(true); }
+            return;
+          }
+          if(popoverOpen){ closeInspectorPopover(); }
+          if(isContextMenuOpen() || isRelationContextMenuOpen()){ closeAllContextMenus(); }
+        }
+      });
+      document.addEventListener('keydown',e=>{
+        if(!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+        if(e.key && e.key.toLowerCase()==='a'){
+          const target=e.target;
+          if(target && (target.closest('input,textarea,[contenteditable="true"]') || target.isContentEditable)) return;
+          e.preventDefault();
+          if(attachmentManager){ attachmentManager.toggle(); }
+        }
+      });
+      document.addEventListener('pointerdown',e=>{
+        cancelRelationLongPressState();
+        const target=e.target;
+        if(nodeContextMenu && !nodeContextMenu.hidden && !nodeContextMenu.contains(target)){ closeNodeContextMenu(); }
+        if(relationContextMenu && !relationContextMenu.hidden && !relationContextMenu.contains(target)){ closeRelationContextMenu(); }
+      });
+      if(nodeContextMenu){
+        nodeContextMenu.addEventListener('click',e=>{
+          const btn=e.target.closest('button[data-menu-action]');
+          if(!btn) return;
+          const action=btn.dataset.menuAction;
+          if(action==='edit'){
+            const nodeId=contextMenuState?.nodeId;
+            const node=nodeId ? jm.get_node(nodeId) : ensureNode();
+            closeNodeContextMenu();
+            if(node){ openInspectorPopover(node); }
+          }
+        });
+      }
+      if(relationContextMenu){
+        relationContextMenu.addEventListener('click',e=>{
+          const btn=e.target.closest('[data-relation-menu-action]');
+          if(!btn) return;
+          const action=btn.dataset.relationMenuAction;
+          if(action==='delete'){ deleteSelectedRelation(); }
+        });
+      }
+      window.addEventListener('resize',closeNodeContextMenu);
+      window.addEventListener('resize',closeRelationContextMenu);
+      const cancelLongPressState=()=>{
+        if(longPressState && longPressState.timer){ clearTimeout(longPressState.timer); }
+        longPressState=null;
+      };
+      if(jmContainer){
+        jmContainer.addEventListener('pointerdown',e=>{
+          cancelRelationLongPressState();
+          const nodeEl=e.target.closest('.jsmind-node');
+          if(!nodeEl){ cancelLongPressState(); return; }
+          if(e.pointerType && !['touch','pen'].includes(e.pointerType)){ cancelLongPressState(); return; }
+          const nodeId=nodeEl.getAttribute('nodeid');
+          if(!nodeId){ cancelLongPressState(); return; }
+          cancelLongPressState();
+          longPressState={
+            pointerId:e.pointerId,
+            nodeId,
+            startX:e.clientX,
+            startY:e.clientY,
+            triggered:false,
+            timer:window.setTimeout(()=>{
+              if(!longPressState || longPressState.pointerId!==e.pointerId) return;
+              longPressState.triggered=true;
+              longPressState.timer=null;
+              const node=jm.get_node(longPressState.nodeId);
+              if(node){
+                try{ jm.select_node(node.id); }catch(_){ }
+                openInspectorPopover(node);
+              }
+            }, LONG_PRESS_DELAY)
+          };
+        });
+        jmContainer.addEventListener('pointermove',e=>{
+          if(relationMode){
+            const nodeEl=e.target.closest('.jsmind-node');
+            const nodeId=nodeEl ? nodeEl.getAttribute('nodeid') : null;
+            updateRelationHover(nodeId);
+          }
+          if(!longPressState || e.pointerId!==longPressState.pointerId) return;
+          if(longPressState.triggered) return;
+          const dx=Math.abs(e.clientX-longPressState.startX);
+          const dy=Math.abs(e.clientY-longPressState.startY);
+          if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){ cancelLongPressState(); }
+        });
+        jmContainer.addEventListener('pointerleave',()=>{ if(relationMode){ updateRelationHover(null); } });
+        const finishLongPress=(e)=>{
+          if(!longPressState || e.pointerId!==longPressState.pointerId) return;
+          const triggered=!!longPressState.triggered;
+          cancelLongPressState();
+          if(triggered){ e.preventDefault(); e.stopPropagation(); }
+        };
+        jmContainer.addEventListener('pointerup',finishLongPress);
+        jmContainer.addEventListener('pointercancel',finishLongPress);
+        jmContainer.addEventListener('click',e=>{
+          if(!relationMode) return;
+          const nodeEl=e.target.closest('.jsmind-node');
+          if(!nodeEl){ handleRelationBlankInteraction(); return; }
+          const nodeId=nodeEl.getAttribute('nodeid');
+          if(!nodeId) return;
+          const node=jm.get_node(nodeId);
+          if(node){ handleRelationNodeClick(node); }
+        });
+        jmContainer.addEventListener('contextmenu',e=>{
+          const nodeEl=e.target.closest('.jsmind-node');
+          if(!nodeEl) return;
+          e.preventDefault();
+          cancelLongPressState();
+          const node=jm.get_node(nodeEl.getAttribute('nodeid'));
+          if(node){ openNodeContextMenu(node,{x:e.clientX,y:e.clientY}); }
+        });
+      }
+      function refreshInspector(node){
+        inspectorSyncing=true;
+        if(!node){
+          setInspectorEnabled(false);
+          if(nodeTopicInput) nodeTopicInput.value='';
+          if(nodeNoteInput) nodeNoteInput.value='';
+          updateFoldToggleUI(null);
+          updateFoldAllLabel();
+          inspectorSyncing=false;
+          if(popoverOpen){ positionInspectorPopover(null); }
+          return;
+        }
+        setInspectorEnabled(true);
+        if(nodeTopicInput) nodeTopicInput.value=node.topic || '';
+        const data=normalizeNodeData(deepClone(node.data||{}));
+        if(nodeNoteInput) nodeNoteInput.value=data.note || '';
+        updateFoldToggleUI(node);
+        updateFoldAllLabel();
+        inspectorSyncing=false;
+        if(popoverOpen){ positionInspectorPopover(node); }
+      }
+      refreshInspector(jm.get_selected_node());
+      if(jm.options){ jm.options.onNodeDetails=openInspectorPopover; }
+      updateFoldButtonState();
+      updateUndoRedoButtons();
+      function applyInspectorChange(mutator){
+        if(typeof mutator!=='function') return;
+        const node=ensureNode();
+        if(!node) return;
+        performUndoable('update-node-data',()=>{
+          commitInlineEditing();
+          const data=ensureNodeDataObject(node);
+          mutator(data,node);
+          node.model.data=data;
+          node.data=data;
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(node.id);
+          markDirty();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(node.id);
+            if(latest){
+              updateHandlePosition();
+              refreshInspector(latest);
+            }
+          });
+          return true;
+        },{mergeKey:`data:${node.id}`});
+      }
+      function deepClone(obj){ return obj ? JSON.parse(JSON.stringify(obj)) : null; }
+      function ensureNode(){
+        let node=jm.get_selected_node();
+        if(node) return node;
+        if(typeof jm.get_root === 'function'){ node=jm.get_root(); }
+        if(!node && initialData && initialData.data){ jm.select_node(initialData.data.id); node=jm.get_selected_node(); }
+        if(node && !node.selected){ jm.select_node(node.id); node=jm.get_selected_node(); }
+        return node;
+      }
+      function ensureNodeDataObject(node){
+        if(!node) return null;
+        const current=node.model && node.model.data ? node.model.data : {};
+        const normalized=normalizeNodeData(current);
+        node.model.data=normalized;
+        node.data=normalized;
+        return normalized;
+      }
+      function executeCreateNodeCommand(input){
+        const mergeKey=input && input.meta && input.meta.source ? `create:${input.meta.source}` : null;
+        return performUndoable('create-node',()=>{
+          commitInlineEditing();
+          if(!input || !input.parentId) return null;
+          const parent=jm.get_node(input.parentId);
+          if(!parent) return null;
+          const nodeId=input.id || randomId();
+          const payloadData=deepClone(input.data)||{};
+          const newNode=jm.add_node(parent, nodeId, input.topic || '新节点', payloadData);
+          const style=deepClone(input.style);
+          if(style && (style.background || style.foreground)){
+            jm.set_node_color(newNode.id, style.background || null, style.foreground || null);
+          }
+          if(input.position){
+            newNode.data = newNode.data || {};
+            newNode.data.position = {x:input.position.x, y:input.position.y};
+          }
+          jm.select_node(newNode.id);
+          markDirty();
+          scheduleHandleRefresh();
+          refreshInspector(jm.get_node(newNode.id));
+          requestAnimationFrame(()=>{
+            const target=jm.get_node(newNode.id);
+            if(target){ centerOnNodeSmooth(target,{animate:false}); }
+          });
+          return newNode;
+        },{mergeKey});
+      }
+      function randomId(){ return 'node-' + Math.random().toString(36).slice(2,10); }
+      function generateUniqueNodeId(){
+        let candidate;
+        do { candidate=randomId(); }
+        while(jm && jm.nodes && typeof jm.nodes.has==='function' && jm.nodes.has(candidate));
+        return candidate;
+      }
+      function prepareClipboardTemplate(template, options={}){
+        if(!template) return null;
+        const baseDirection=(options.baseDirection==='left')?'left':'right';
+        const normalize=(node, depth)=>{
+          if(!node || typeof node!=='object') return null;
+          const normalized={
+            topic:typeof node.topic==='string'?node.topic:'',
+            data:node.data?deepClone(node.data):{},
+            style:node.style?deepClone(node.style):null,
+            meta:node.meta?deepClone(node.meta):null,
+            expanded:node.expanded!==false,
+            direction:depth===0?baseDirection:(node.direction==='left' || node.dir===-1?'left':'right'),
+            children:[],
+          };
+          if(Array.isArray(node.children)){
+            normalized.children=node.children.map(child=>normalize(child, depth+1)).filter(Boolean);
+          }
+          return normalized;
+        };
+        return normalize(template,0);
+      }
+      function buildNodeFromTemplate(template,parentNode,options={}){
+        if(!template || !parentNode) return null;
+        const parentChildren=parentNode.children || (parentNode.children=[]);
+        const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+          ? jm.ensureModelChildren(parentNode)
+          : (parentNode.model.children = parentNode.model.children || []);
+        let childIndex=typeof options.insertIndex==='number'?options.insertIndex:parentChildren.length;
+        if(childIndex<0 || childIndex>parentChildren.length){ childIndex=parentChildren.length; }
+        let modelIndex=typeof options.modelIndex==='number'?options.modelIndex:parentModelChildren.length;
+        if(modelIndex<0 || modelIndex>parentModelChildren.length){ modelIndex=parentModelChildren.length; }
+        const id=generateUniqueNodeId();
+        const normalizedData=normalizeNodeData(deepClone(template.data)||{});
+        const style=template.style?deepClone(template.style):null;
+        const meta=template.meta?deepClone(template.meta):null;
+        const direction=template.direction==='left'?'left':'right';
+        const expanded=template.expanded!==false;
+        const model={
+          id,
+          topic:template.topic || '新节点',
+          data:normalizedData,
+          children:[],
+          direction,
+          expanded,
+        };
+        if(style){ model.style=deepClone(style); }
+        if(meta){ model.meta=deepClone(meta); }
+        model.parentId=parentNode.id;
+        const node={
+          id,
+          topic:model.topic,
+          data:normalizedData,
+          parent:parentNode,
+          children:[],
+          direction,
+          expanded,
+          isroot:false,
+          style:style,
+          meta:meta,
+          model:model,
+          depth:(parentNode.depth||0)+1,
+        };
+        node.dir=direction==='left'?-1:1;
+        parentChildren.splice(childIndex,0,node);
+        parentModelChildren.splice(modelIndex,0,model);
+        jm.nodes.set(id,node);
+        const childTemplates=Array.isArray(template.children)?template.children:[];
+        if(childTemplates.length){
+          childTemplates.forEach(childTpl=>{ buildNodeFromTemplate(childTpl, node); });
+        }
+        return node;
+      }
+      function copySelectedNode(){
+        const node=ensureNode();
+        if(!node || !node.model) return false;
+        nodeClipboardTemplate=deepClone(node.model);
+        return !!nodeClipboardTemplate;
+      }
+      function pasteNodeAsSibling(){
+        if(!nodeClipboardTemplate){
+          showRelationToast('请先复制一个节点');
+          return null;
+        }
+        const target=ensureNode();
+        if(!target || !target.parent){
+          showRelationToast('根节点无法粘贴为同级');
+          return null;
+        }
+        return performUndoable('paste-node',()=>{
+          commitInlineEditing();
+          const parent=target.parent;
+          const baseDirection=(target.direction==='left' || target.dir===-1)?'left':'right';
+          const template=prepareClipboardTemplate(nodeClipboardTemplate,{baseDirection});
+          if(!template) return null;
+          const parentChildren=parent.children || [];
+          const insertIndex=parentChildren.indexOf(target)+1;
+          const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+            ? jm.ensureModelChildren(parent)
+            : (parent.model.children = parent.model.children || []);
+          const modelIndex=parentModelChildren.findIndex(child=>child && child.id===target.id)+1;
+          const created=buildNodeFromTemplate(template,parent,{insertIndex,modelIndex});
+          if(!created) return null;
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(created.id);
+          if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(created.id);
+            if(latest){
+              refreshInspector(latest);
+              updateHandlePosition();
+              centerOnNodeSmooth(latest,{animate:false});
+            }
+            updateFoldAllLabel();
+            if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+          });
+          return created;
+        },{mergeKey:`paste:${target.parent.id}`});
+      }
+      function promoteNodeLevel(){
+        const node=ensureNode();
+        if(!node || !node.parent || node.parent.isroot) return false;
+        return performUndoable('promote-node',()=>{
+          commitInlineEditing();
+          const parent=node.parent;
+          const grand=parent.parent;
+          if(!grand) return false;
+          const parentChildren=parent.children || (parent.children=[]);
+          const parentIndex=parentChildren.indexOf(node);
+          if(parentIndex!==-1){ parentChildren.splice(parentIndex,1); }
+          const parentModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+            ? jm.ensureModelChildren(parent)
+            : (parent.model.children = parent.model.children || []);
+          const modelIdx=parentModelChildren.findIndex(child=>child && child.id===node.id);
+          if(modelIdx!==-1){ parentModelChildren.splice(modelIdx,1); }
+          const direction=(parent.direction==='left' || parent.dir===-1)?'left':'right';
+          node.parent=grand;
+          node.direction=direction;
+          node.dir=direction==='left'?-1:1;
+          if(node.model){
+            node.model.direction=direction;
+            node.model.parentId=grand.id;
+          }
+          const grandChildren=grand.children || (grand.children=[]);
+          const grandModelChildren=(jm && typeof jm.ensureModelChildren==='function')
+            ? jm.ensureModelChildren(grand)
+            : (grand.model.children = grand.model.children || []);
+          const parentPosition=grandChildren.indexOf(parent);
+          const insertIndex=parentPosition===-1?grandChildren.length:parentPosition+1;
+          const parentModelPosition=grandModelChildren.findIndex(child=>child && child.id===parent.id);
+          const modelInsertIndex=parentModelPosition===-1?grandModelChildren.length:parentModelPosition+1;
+          grandChildren.splice(insertIndex,0,node);
+          grandModelChildren.splice(modelInsertIndex,0,node.model);
+          const updateDepth=(current, depth)=>{
+            if(!current) return;
+            current.depth=depth;
+            if(current.model){ current.model.depth=depth; }
+            if(current.children && current.children.length){
+              current.children.forEach(child=>updateDepth(child, depth+1));
+            }
+          };
+          updateDepth(node,(grand.depth||0)+1);
+          jm.computeLayout();
+          jm.render();
+          jm.select_node(node.id);
+          if(typeof jm.emit==='function'){ jm.emit(SimpleMind.event_type.update); }
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(node.id);
+            if(latest){
+              refreshInspector(latest);
+              updateHandlePosition();
+              centerOnNodeSmooth(latest,{animate:false});
+            }
+            updateFoldAllLabel();
+            if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+          });
+          return true;
+        },{mergeKey:`promote:${node.id}`});
+      }
+      function toggleBranch(){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return false;
+        const next=node.expanded===false;
+        setNodeExpandedState(node, next);
+        return true;
+      }
+      function expandSelectedNode(){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return false;
+        if(node.expanded!==false) return false;
+        setNodeExpandedState(node,true);
+        return true;
+      }
+      function collapseSelectedNode(){
+        const node=ensureNode();
+        if(!node || !node.children || !node.children.length) return false;
+        if(node.expanded===false) return false;
+        setNodeExpandedState(node,false);
+        return true;
+      }
+      function isProbablyUrl(text){
+        const value=(text||'').trim();
+        return /^https?:\/\//i.test(value) || /^mailto:/i.test(value) || /^ftp:/i.test(value) || /^www\./i.test(value);
+      }
+      function findNodeElementByEvent(event){
+        if(!event) return null;
+        if(event.target && event.target.closest){
+          const el=event.target.closest('.jsmind-node');
+          if(el) return el;
+        }
+        if(event.composedPath){
+          for(const entry of event.composedPath()){
+            if(entry && entry.classList && entry.classList.contains && entry.classList.contains('jsmind-node')){ return entry; }
+          }
+        }
+        if(typeof event.clientX==='number' && typeof event.clientY==='number'){
+          const hovered=document.elementFromPoint(event.clientX, event.clientY);
+          if(hovered && hovered.closest){
+            const el=hovered.closest('.jsmind-node');
+            if(el) return el;
+          }
+        }
+        return null;
+      }
+      function resolveDropParent(event){
+        const el=findNodeElementByEvent(event);
+        if(el){
+          const nodeId=el.getAttribute('nodeid');
+          if(nodeId){ const node=jm.get_node(nodeId); if(node) return node; }
+        }
+        const selected=jm.get_selected_node();
+        if(selected) return selected;
+        return jm.get_root();
+      }
+      function fileExtension(name){
+        if(!name) return '';
+        const idx=name.lastIndexOf('.');
+        return idx>=0 ? name.slice(idx).toLowerCase() : '';
+      }
+      function isAllowedAttachment(file){
+        const type=(file.type||'').toLowerCase();
+        if(type.startsWith('image/')) return true;
+        if(type.startsWith('video/')) return true;
+        if(type.startsWith('audio/')) return true;
+        if(type.startsWith('text/')) return true;
+        if(type==='application/json') return true;
+        if(['application/pdf','application/zip','application/x-zip-compressed','application/x-rar-compressed','application/vnd.rar','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-word.document.macroenabled.12','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel.sheet.macroenabled.12','application/vnd.ms-excel.sheet.binary.macroenabled.12'].includes(type)) return true;
+        const ext=fileExtension(file.name);
+        if(!ext) return false;
+        if(imageExts.includes(ext) || textExts.includes(ext) || videoExts.includes(ext) || audioExts.includes(ext) || officeExts.includes(ext) || archiveExts.includes(ext)) return true;
+        return false;
+      }
+      function sanitizeAttachmentFiles(files){
+        const limit=Math.min(files.length,5);
+        const accepted=[];
+        for(let i=0;i<limit;i++){
+          const file=files[i];
+          if(file.size>ATTACH_MAX_BYTES){
+            alert(file.name+' 超过 15MB，已跳过。');
+            continue;
+          }
+          if(!isAllowedAttachment(file)){
+            alert(file.name+' 类型不支持，仅可上传图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件。');
+            continue;
+          }
+          accepted.push(file);
+        }
+        return accepted;
+      }
+      async function attachFilesToNode(targetNode, files){
+        if(!targetNode || !files || !files.length) return;
+        const accepted=sanitizeAttachmentFiles(files);
+        if(!accepted.length) return;
+        const data=ensureNodeDataObject(targetNode);
+        data.attachments=data.attachments || [];
+        const uploadedEntries=[];
+        for(const file of accepted){
+          try{
+            const uploaded=await uploadMindmapFile(file, targetNode.id);
+            const createdTs=Number(uploaded.created_at)||Math.floor(Date.now()/1000);
+            const normalized={
+              assetId:uploaded.id,
+              name:uploaded.name || file.name,
+              size:uploaded.size ?? file.size,
+              mime:uploaded.mime || file.type || 'application/octet-stream',
+              url:uploaded.url,
+              createdAt:createdTs
+            };
+            data.attachments.push(normalized);
+            assetMeta.set(uploaded.id,{
+              id:uploaded.id,
+              name:normalized.name,
+              size:normalized.size,
+              mime:normalized.mime,
+              created_at:createdTs,
+              node_uid:targetNode.id,
+              mindmap_id:Number.isFinite(currentMapId)?currentMapId:null,
+              session_key:null,
+              url:uploaded.url
+            });
+            uploadedEntries.push({
+              id:uploaded.id,
+              name:normalized.name,
+              size:normalized.size,
+              mime:normalized.mime,
+              created_at:createdTs,
+              url:uploaded.url,
+              nodeId:targetNode.id,
+            });
+          }catch(err){
+            console.error(err);
+            alert((file.name||'文件')+' 上传失败：'+(err && err.message ? err.message : err));
+          }
+        }
+        targetNode.model.data=data;
+        targetNode.data=data;
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(targetNode.id);
+        markDirty();
+        scheduleHandleRefresh();
+        refreshInspector(jm.get_node(targetNode.id));
+        if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
+      }
+      function handleDroppedText(text, parent, event){
+        if(!text || !parent) return;
+        commitInlineEditing();
+        const cleaned=text.trim();
+        if(!cleaned) return;
+        const firstLine=cleaned.split(/\r?\n/)[0].slice(0,100) || '新节点';
+        const data={};
+        if(isProbablyUrl(cleaned)) data.url=cleaned;
+        if(cleaned.includes('\n')) data.note=cleaned;
+        executeCreateNodeCommand({
+          parentId:parent.id,
+          topic:firstLine,
+          data:Object.keys(data).length?data:null,
+          position:event ? eventToSvgPoint(event) : null,
+          meta:{source:'text'}
+        });
+      }
+      async function handleDroppedFiles(files, targetNode){
+        if(!files || !files.length) return;
+        if(!targetNode){
+          alert('请将文件拖放到具体的节点上以附加到该节点。');
+          return;
+        }
+        commitInlineEditing();
+        await attachFilesToNode(targetNode, files);
+      }
+      function handleInsertBetweenNodes(parentNode, childNode){
+        if(!parentNode || !childNode || typeof jm.insert_node_between!=='function') return;
+        performUndoable('insert-between',()=>{
+          commitInlineEditing();
+          const created=jm.insert_node_between(parentNode.id, childNode.id, {topic:'新节点'});
+          if(!created) return false;
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>{
+            const latest=jm.get_node(created.id);
+            if(latest){
+              jm.select_node(latest.id);
+              refreshInspector(latest);
+              startInlineEditing(latest);
+              centerOnNodeSmooth(latest,{animate:false});
+            }
+          });
+          return true;
+        },{mergeKey:`insert:${parentNode.id}`});
+      }
+      function addSiblingNode(){
+        const node=ensureNode();
+        if(!node || node.isroot || !node.parent) return;
+        commitInlineEditing();
+        executeCreateNodeCommand({ parentId:node.parent.id, topic:'新节点' });
+      }
+      function addChildNode(){
+        const node=ensureNode();
+        if(node){
+          commitInlineEditing();
+          executeCreateNodeCommand({ parentId:node.id, topic:'子节点' });
+        }
+      }
+      function deleteSelectedNode(){
+        const node=ensureNode(); if(!node || node.isroot) return;
+        performUndoable('delete-node',()=>{
+          commitInlineEditing();
+          jm.remove_node(node.id);
+          markDirty();
+          scheduleHandleRefresh();
+          requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+          return true;
+        },{mergeKey:`delete:${node.parent ? node.parent.id : 'root'}`});
+      }
+      function renameSelectedNode(){
+        const node=ensureNode();
+        if(!node) return;
+        startInlineEditing(node);
+      }
+      function focusParentNode(){
+        const node=ensureNode();
+        if(node && node.parent){ jm.select_node(node.parent.id); scheduleHandleRefresh(); }
+      }
+      function openAttachmentDialog(){
+        commitInlineEditing();
+        const node=ensureNode();
+        if(!node){ alert('请先选择一个节点'); return; }
+        if(!attachInput) return;
+        attachInput.dataset.targetId=node.id;
+        attachInput.value='';
+        attachInput.click();
+      }
+      function openLinkPrompt(){
+        commitInlineEditing();
+        const node=ensureNode();
+        if(!node){ alert('请先选择一个节点'); return; }
+        const raw=prompt('请输入链接地址');
+        if(!raw) return;
+        const cleaned=raw.trim();
+        if(!cleaned) return;
+        if(!isProbablyUrl(cleaned) && !confirm('该内容看起来不像链接，仍要创建吗？')) return;
+        const title=prompt('请输入链接标题', cleaned) || cleaned;
+        const data=ensureNodeDataObject(node);
+        data.url=cleaned;
+        data.linkTitle=(title||'').trim()||cleaned;
+        node.model.data=data;
+        node.data=data;
+        jm.computeLayout();
+        jm.render();
+        jm.select_node(node.id);
+        markDirty();
+        scheduleHandleRefresh();
+        refreshInspector(jm.get_node(node.id));
+      }
+      if(attachInput){
+        attachInput.addEventListener('change',async e=>{
+          const files=Array.from(e.target.files||[]);
+          attachInput.value='';
+          if(!files.length) return;
+          const targetId=attachInput.dataset.targetId;
+          const node=targetId ? jm.get_node(targetId) : ensureNode();
+          if(!node){ alert('请先选择一个节点'); return; }
+          await attachFilesToNode(node, files);
+          refreshInspector(jm.get_node(node.id));
+        });
+      }
+      if(nodeTopicInput){
+        const commitTopic=()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node) return;
+          const value=(nodeTopicInput.value||'').trim();
+          if(!value){
+            nodeTopicInput.value=node.topic || '';
+            return;
+          }
+          if(value===node.topic) return;
+          commitInlineEditing();
+          if(typeof jm.update_node==='function'){ jm.update_node(node.id, value); }
+        };
+        nodeTopicInput.addEventListener('change',commitTopic);
+        nodeTopicInput.addEventListener('blur',commitTopic);
+        nodeTopicInput.addEventListener('keydown',e=>{
+          if(e.key==='Enter' && !e.shiftKey){
+            e.preventDefault();
+            commitTopic();
+          }
+        });
+      }
+      if(nodeNoteInput){
+        const commitNote=()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node) return;
+          const value=(nodeNoteInput.value||'').replace(/\r\n?/g,'\n');
+          const current=typeof (node.data && node.data.note)==='string'?node.data.note:'';
+          if(current===value) return;
+          applyInspectorChange(data=>{ data.note=value; });
+        };
+        nodeNoteInput.addEventListener('change',commitNote);
+        nodeNoteInput.addEventListener('blur',commitNote);
+      }
+      if(nodeFoldToggle){
+        nodeFoldToggle.addEventListener('change',()=>{
+          if(inspectorSyncing) return;
+          const node=ensureNode();
+          if(!node) return;
+          setNodeExpandedState(node, nodeFoldToggle.checked);
+        });
+      }
+      const closeMapIoMenu=()=>{
+        if(mapIo){ mapIo.setAttribute('aria-expanded','false'); }
+        if(mapIoButton){ mapIoButton.setAttribute('aria-expanded','false'); }
+      };
+      const openMapIoMenu=()=>{
+        if(mapIo){ mapIo.setAttribute('aria-expanded','true'); }
+        if(mapIoButton){ mapIoButton.setAttribute('aria-expanded','true'); }
+      };
+      const toggleMapIoMenu=()=>{
+        const expanded=mapIoButton && mapIoButton.getAttribute('aria-expanded')==='true';
+        if(expanded) closeMapIoMenu(); else openMapIoMenu();
+      };
+      function createAttachmentManager(){
+        const FILTERS=[
+          {id:'all',label:'全部'},
+          {id:'image',label:'图片'},
+          {id:'document',label:'文档'},
+          {id:'audio',label:'音频'},
+          {id:'video',label:'视频'},
+          {id:'archive',label:'压缩包'},
+          {id:'other',label:'其他'},
+        ];
+        const PAGE_SIZE=40;
+        const elements={
+          backdrop:document.getElementById('mind-attachment-manager'),
+          summary:document.getElementById('mind-attachment-summary'),
+          list:document.getElementById('mind-attachment-list'),
+          selectionInfo:document.getElementById('mind-attachment-selection-info'),
+          sort:document.getElementById('mind-attachment-sort'),
+          filters:document.getElementById('mind-attachment-filters'),
+          deleteBtn:document.getElementById('mind-attachment-delete'),
+          closeBtn:document.querySelector('[data-attachment-close]'),
+        };
+        const state={
+          open:false,
+          filter:'all',
+          sort:'time-desc',
+          items:[],
+          filtered:[],
+          selection:new Set(),
+          renderedCount:0,
+          lastIndex:null,
+          initialized:false,
+        };
+        let loadObserver=null;
+        let loadSentinel=null;
+        let lastFocused=null;
+        function ensureInit(){
+          if(state.initialized) return;
+          state.initialized=true;
+          if(elements.filters){ elements.filters.addEventListener('click',handleFilterClick); }
+          if(elements.sort){ elements.sort.addEventListener('change',()=>{ state.sort=elements.sort.value; refresh(); }); }
+          if(elements.closeBtn){ elements.closeBtn.addEventListener('click',()=>close()); }
+          if(elements.backdrop){ elements.backdrop.addEventListener('click',evt=>{ if(evt.target===elements.backdrop) close(); }); }
+          if(elements.list){
+            elements.list.addEventListener('click',handleListClick);
+            elements.list.addEventListener('dblclick',handleListDblClick);
+          }
+          if(elements.deleteBtn){ elements.deleteBtn.addEventListener('click',()=>handleDelete(Array.from(state.selection))); }
+          document.addEventListener('keydown',handleManagerKey);
+          updateFilterButtons();
+          updateSummary();
+        }
+        function handleFilterClick(evt){
+          const btn=evt.target.closest('.mind-attachment-filter');
+          if(!btn) return;
+          const value=btn.dataset.filter || 'all';
+          if(state.filter===value) return;
+          state.filter=value;
+          updateFilterButtons();
+          refresh(true);
+        }
+        function updateFilterButtons(){
+          if(!elements.filters) return;
+          const buttons=Array.from(elements.filters.querySelectorAll('.mind-attachment-filter'));
+          buttons.forEach(btn=>{
+            const active=(btn.dataset.filter||'all')===state.filter;
+            btn.dataset.active=active?'true':'false';
+            btn.setAttribute('aria-pressed',active?'true':'false');
+          });
+        }
+        function handleListClick(evt){
+          const actionBtn=evt.target.closest('[data-action]');
+          const row=evt.target.closest('.mind-attachment-row');
+          if(actionBtn && row){
+            const id=Number(row.dataset.assetId);
+            const item=state.filtered.find(entry=>entry.assetId===id);
+            if(!item) return;
+            const action=actionBtn.dataset.action;
+            if(action==='preview'){ openMindmapAttachment(item); return; }
+            if(action==='download'){ triggerDirectDownload(item); return; }
+            if(action==='delete'){ handleDelete([item.assetId]); return; }
+          }
+          if(evt.target.closest('.mind-attachment-select')) return;
+          if(!row) return;
+          handleRowSelection(row, evt);
+        }
+        function handleListDblClick(evt){
+          const row=evt.target.closest('.mind-attachment-row');
+          if(!row) return;
+          const id=Number(row.dataset.assetId);
+          const item=state.filtered.find(entry=>entry.assetId===id);
+          if(item){ openMindmapAttachment(item); }
+        }
+        function handleManagerKey(evt){
+          if(!state.open) return;
+          if(evt.key==='Escape'){ evt.preventDefault(); close(); }
+          else if((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase()==='a'){ evt.preventDefault(); selectAll(); }
+        }
+        function selectAll(){
+          state.selection=new Set(state.filtered.map(item=>item.assetId));
+          state.lastIndex=null;
+          syncSelectionState();
+        }
+        function triggerDirectDownload(item){
+          if(!item || !item.url) return;
+          const a=document.createElement('a');
+          a.href=item.url;
+          a.download=sanitizeFilename(item.name || `attachment-${item.assetId}`);
+          a.rel='noopener';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        function formatBytesLocal(value){
+          if(!Number.isFinite(value) || value<=0) return '—';
+          const units=['B','KB','MB','GB','TB'];
+          let num=value;
+          let i=0;
+          while(num>=1024 && i<units.length-1){ num/=1024; i++; }
+          const decimals=num>=100 || i===0 ? 0 : 1;
+          return num.toFixed(decimals)+' '+units[i];
+        }
+        function formatDateLocal(value){
+          if(!Number.isFinite(value) || value<=0) return '—';
+          const ms=value>1e12?value:value*1000;
+          if(!Number.isFinite(ms) || ms<=0) return '—';
+          const d=new Date(ms);
+          if(Number.isNaN(d.getTime())) return '—';
+          const pad=n=>String(n).padStart(2,'0');
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+        function getTypeLabel(type){
+          switch(type){
+            case 'image': return '图片';
+            case 'document': return '文档';
+            case 'audio': return '音频';
+            case 'video': return '视频';
+            case 'archive': return '压缩包';
+            default: return '其他';
+          }
+        }
+        function getTypeIcon(type){
+          switch(type){
+            case 'image': return '🖼';
+            case 'video': return '🎬';
+            case 'audio': return '🎵';
+            case 'document': return '📄';
+            case 'archive': return '🗜';
+            default: return '📎';
+          }
+        }
+        function sanitizeFilename(name){
+          return (name||'attachment').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').trim() || 'attachment';
+        }
+        function categorizeAttachment(item){
+          const mime=(item.mime||'').toLowerCase();
+          const name=(item.name||'').toLowerCase();
+          const ext=name.includes('.')?name.slice(name.lastIndexOf('.')):'';
+          if(mime.startsWith('image/') || imageExts.includes(ext)) return 'image';
+          if(mime.startsWith('video/') || videoExts.includes(ext)) return 'video';
+          if(mime.startsWith('audio/') || audioExts.includes(ext)) return 'audio';
+          if(mime==='application/pdf' || mime.includes('word') || mime.includes('excel') || mime.includes('sheet') || mime.includes('presentation') || textExts.includes(ext) || officeExts.includes(ext)) return 'document';
+          if(mime.includes('zip') || mime.includes('rar') || archiveExts.includes(ext)) return 'archive';
+          return 'other';
+        }
+        function backupAndRemoveAssetMeta(ids){
+          const stash=new Map();
+          if(!Array.isArray(ids)) return stash;
+          ids.forEach(id=>{
+            const numeric=Number(id);
+            if(!Number.isFinite(numeric)) return;
+            if(assetMeta.has(numeric)){
+              const meta=assetMeta.get(numeric);
+              stash.set(numeric, meta && typeof meta==='object'?{...meta}:meta);
+              assetMeta.delete(numeric);
+            }
+          });
+          return stash;
+        }
+        function restoreAssetMeta(stash){
+          if(!(stash instanceof Map)) return;
+          stash.forEach((meta,id)=>{
+            if(meta && typeof meta==='object'){
+              assetMeta.set(id,{...meta});
+            }else if(meta!=null){
+              assetMeta.set(id,meta);
+            }
+          });
+        }
+        function collectAttachments(){
+          const items=[];
+          if(!jm || !jm.nodes || typeof jm.nodes.forEach!=='function') return items;
+          jm.nodes.forEach(node=>{
+            if(!node) return;
+            const attachments=gatherAttachments(node.data||{});
+            if(!attachments || !attachments.length) return;
+            attachments.forEach(att=>{
+              if(!att || typeof att!=='object') return;
+              const assetId=Number(att.assetId || att.id);
+              if(!Number.isFinite(assetId) || assetId<=0) return;
+              const meta=assetMeta.get(assetId) || {};
+              const name=att.name || meta.name || attachmentLabel(att) || `附件 #${assetId}`;
+              const size=Number(att.size || meta.size || 0);
+              const mime=att.mime || meta.mime || 'application/octet-stream';
+              const url=att.url || meta.url || `?mindmap_asset=${assetId}`;
+              const createdRaw=Number(att.createdAt || att.created_at || meta.created_at || 0);
+              assetMeta.set(assetId,{
+                id:assetId,
+                name,
+                size,
+                mime,
+                created_at:createdRaw,
+                node_uid:node.id,
+                mindmap_id:meta.mindmap_id ?? (Number.isFinite(currentMapId)?currentMapId:null),
+                session_key:meta.session_key || null,
+                url,
+              });
+              items.push({
+                assetId,
+                name,
+                size,
+                mime,
+                url,
+                nodeId:node.id,
+                nodeTopic:node.topic || '',
+                createdAt:createdRaw,
+                type:categorizeAttachment({name,mime})
+              });
+            });
+          });
+          return items;
+        }
+        function applyFilterAndSort(){
+          const filtered=state.items.filter(item=>state.filter==='all' || item.type===state.filter);
+          const compareName=(a,b)=>a.name.localeCompare(b.name,'zh-Hans',{sensitivity:'base'});
+          filtered.sort((a,b)=>{
+            switch(state.sort){
+              case 'time-asc': {
+                const ta=Number(a.createdAt)||0; const tb=Number(b.createdAt)||0;
+                if(ta!==tb) return ta-tb;
+                return compareName(a,b);
+              }
+              case 'time-desc': {
+                const ta=Number(a.createdAt)||0; const tb=Number(b.createdAt)||0;
+                if(ta!==tb) return tb-ta;
+                return compareName(a,b);
+              }
+              case 'size-asc': {
+                if(a.size!==b.size) return a.size-b.size;
+                return compareName(a,b);
+              }
+              case 'size-desc': {
+                if(a.size!==b.size) return b.size-a.size;
+                return compareName(a,b);
+              }
+              case 'type': {
+                if(a.type!==b.type) return a.type.localeCompare(b.type,'zh-Hans');
+                return compareName(a,b);
+              }
+              case 'name':
+                return compareName(a,b);
+              default:
+                return 0;
+            }
+          });
+          state.filtered=filtered;
+          if(state.renderedCount>filtered.length){ state.renderedCount=filtered.length; }
+        }
+        function renderList(forceReset){
+          if(!elements.list) return;
+          detachObserver();
+          elements.list.innerHTML='';
+          if(!state.filtered.length){
+            const empty=document.createElement('div');
+            empty.className='mind-attachment-empty';
+            empty.textContent='未找到符合条件的附件。';
+            elements.list.appendChild(empty);
+            updateSelectionInfo();
+            return;
+          }
+          if(forceReset || state.renderedCount<=0){ state.renderedCount=Math.min(state.filtered.length,PAGE_SIZE); }
+          state.filtered.slice(0,state.renderedCount).forEach((item,index)=>{
+            elements.list.appendChild(buildRow(item,index));
+          });
+          if(state.renderedCount<state.filtered.length){
+            loadSentinel=document.createElement('div');
+            loadSentinel.className='load-more';
+            loadSentinel.textContent='加载更多…';
+            elements.list.appendChild(loadSentinel);
+            attachObserver();
+          }
+          syncSelectionState();
+        }
+        function buildRow(item,index){
+          const row=document.createElement('div');
+          row.className='mind-attachment-row';
+          row.dataset.assetId=String(item.assetId);
+          row.dataset.index=String(index);
+          row.setAttribute('role','option');
+          const selected=state.selection.has(item.assetId);
+          if(selected) row.dataset.selected='true';
+          row.setAttribute('aria-selected',selected?'true':'false');
+          const selectBox=document.createElement('label');
+          selectBox.className='mind-attachment-select';
+          selectBox.setAttribute('aria-label',`选择附件：${item.name}`);
+          selectBox.addEventListener('click',evt=>evt.stopPropagation());
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';
+          checkbox.className='mind-attachment-checkbox';
+          checkbox.setAttribute('aria-label',`选择附件：${item.name}`);
+          checkbox.checked=selected;
+          checkbox.addEventListener('pointerdown',evt=>{ checkbox.dataset.shift=evt.shiftKey?'true':'false'; });
+          checkbox.addEventListener('change',evt=>handleCheckboxChange(row, checkbox, evt));
+          selectBox.addEventListener('pointerdown',evt=>{ checkbox.dataset.shift=evt.shiftKey?'true':'false'; });
+          const fauxBox=document.createElement('span');
+          fauxBox.className='mind-attachment-checkbox-box';
+          selectBox.appendChild(checkbox);
+          selectBox.appendChild(fauxBox);
+          const thumb=document.createElement('div');
+          thumb.className='mind-attachment-thumb';
+          if(item.type==='image'){
+            const img=document.createElement('img');
+            img.loading='lazy';
+            img.src=item.url;
+            img.alt=item.name;
+            thumb.appendChild(img);
+          }else{
+            thumb.textContent=getTypeIcon(item.type);
+          }
+          const info=document.createElement('div');
+          info.className='mind-attachment-info';
+          const nameEl=document.createElement('div');
+          nameEl.className='mind-attachment-name';
+          nameEl.textContent=item.name;
+          nameEl.title=item.name;
+          const metaRow=document.createElement('div');
+          metaRow.className='mind-attachment-meta';
+          const tag=document.createElement('span');
+          tag.className='mind-attachment-tag';
+          tag.textContent=getTypeLabel(item.type);
+          metaRow.appendChild(tag);
+          if(item.nodeTopic){
+            const nodeBtn=document.createElement('button');
+            nodeBtn.type='button';
+            nodeBtn.className='mind-attachment-node';
+            nodeBtn.textContent=item.nodeTopic;
+            nodeBtn.addEventListener('click',evt=>{
+              evt.stopPropagation();
+              close();
+              requestAnimationFrame(()=>focusAttachmentNode(item.nodeId));
+            });
+            metaRow.appendChild(nodeBtn);
+          }
+          info.appendChild(metaRow);
+          const sizeEl=document.createElement('div');
+          sizeEl.className='mind-attachment-size';
+          sizeEl.textContent=formatBytesLocal(item.size);
+          const timeEl=document.createElement('div');
+          timeEl.className='mind-attachment-time';
+          timeEl.textContent=formatDateLocal(item.createdAt);
+          const actions=document.createElement('div');
+          actions.className='mind-attachment-actions';
+          const previewBtn=document.createElement('button');
+          previewBtn.type='button';
+          previewBtn.dataset.action='preview';
+          previewBtn.textContent='预览';
+          const downloadBtn=document.createElement('button');
+          downloadBtn.type='button';
+          downloadBtn.dataset.action='download';
+          downloadBtn.textContent='下载';
+          const deleteBtn=document.createElement('button');
+          deleteBtn.type='button';
+          deleteBtn.dataset.action='delete';
+          deleteBtn.className='danger';
+          deleteBtn.textContent='删除';
+          actions.appendChild(previewBtn);
+          actions.appendChild(downloadBtn);
+          actions.appendChild(deleteBtn);
+          const attrs=document.createElement('div');
+          attrs.className='mind-attachment-attrs';
+          attrs.appendChild(sizeEl);
+          attrs.appendChild(timeEl);
+          const header=document.createElement('div');
+          header.className='mind-attachment-header';
+          header.appendChild(nameEl);
+          header.appendChild(actions);
+          const content=document.createElement('div');
+          content.className='mind-attachment-content';
+          content.appendChild(header);
+          content.appendChild(info);
+          content.appendChild(attrs);
+          row.appendChild(selectBox);
+          row.appendChild(thumb);
+          row.appendChild(content);
+          return row;
+        }
+        function attachObserver(){
+          if(!loadSentinel) return;
+          loadObserver=new IntersectionObserver(entries=>{
+            entries.forEach(entry=>{
+              if(entry.isIntersecting){
+                const next=Math.min(state.filtered.length,state.renderedCount+PAGE_SIZE);
+                if(next>state.renderedCount){
+                  state.renderedCount=next;
+                  renderList(false);
+                }
+              }
+            });
+          },{root:elements.list,threshold:0.1});
+          loadObserver.observe(loadSentinel);
+        }
+        function detachObserver(){
+          if(loadObserver){ loadObserver.disconnect(); loadObserver=null; }
+          loadSentinel=null;
+        }
+        function syncSelectionState(){
+          if(!elements.list) return;
+          const rows=Array.from(elements.list.querySelectorAll('.mind-attachment-row'));
+          rows.forEach(row=>{
+            const id=Number(row.dataset.assetId);
+            const selected=state.selection.has(id);
+            if(selected) row.dataset.selected='true';
+            else row.removeAttribute('data-selected');
+            row.setAttribute('aria-selected',selected?'true':'false');
+            const checkbox=row.querySelector('.mind-attachment-checkbox');
+            if(checkbox){ checkbox.checked=selected; }
+          });
+          updateSelectionInfo();
+        }
+        function updateSelectionInfo(){
+          if(elements.deleteBtn) elements.deleteBtn.disabled=state.selection.size===0;
+          if(!elements.selectionInfo) return;
+          const count=state.selection.size;
+          if(count===0){
+            elements.selectionInfo.textContent='已选择 0 个附件';
+            return;
+          }
+          let total=0;
+          state.items.forEach(item=>{ if(state.selection.has(item.assetId)) total+=Number(item.size)||0; });
+          const sizeText=total>0?formatBytesLocal(total):'';
+          elements.selectionInfo.textContent=sizeText?`已选择 ${count} 个附件 · ${sizeText}`:`已选择 ${count} 个附件`;
+        }
+        function handleCheckboxChange(row, checkbox, evt){
+          if(!row || !checkbox) return;
+          if(evt){ evt.stopPropagation(); }
+          const index=Number(row.dataset.index);
+          const id=Number(row.dataset.assetId);
+          if(!Number.isFinite(index) || !Number.isFinite(id)) return;
+          const selection=new Set(state.selection);
+          const shiftKey=(evt && evt.shiftKey) || checkbox.dataset.shift==='true';
+          if(checkbox.checked){
+            if(shiftKey && state.lastIndex!==null){
+              const start=Math.min(state.lastIndex,index);
+              const end=Math.max(state.lastIndex,index);
+              for(let i=start;i<=end;i++){
+                const item=state.filtered[i];
+                if(!item) continue;
+                const asset=Number(item.assetId);
+                if(Number.isFinite(asset)){ selection.add(asset); }
+              }
+            }else{
+              selection.add(id);
+            }
+            state.lastIndex=index;
+          }else{
+            selection.delete(id);
+            if(state.lastIndex===index){ state.lastIndex=null; }
+          }
+          state.selection=selection;
+          checkbox.dataset.shift='';
+          syncSelectionState();
+        }
+        function handleRowSelection(row,evt){
+          const index=Number(row.dataset.index);
+          const id=Number(row.dataset.assetId);
+          if(!Number.isFinite(index) || !Number.isFinite(id)) return;
+          const selection=new Set(state.selection);
+          if(evt.shiftKey && state.lastIndex!==null){
+            const start=Math.min(state.lastIndex,index);
+            const end=Math.max(state.lastIndex,index);
+            if(!(evt.ctrlKey || evt.metaKey)) selection.clear();
+            for(let i=start;i<=end;i++){
+              const item=state.filtered[i];
+              if(item) selection.add(item.assetId);
+            }
+          }else if(evt.ctrlKey || evt.metaKey){
+            if(selection.has(id)) selection.delete(id);
+            else selection.add(id);
+            state.lastIndex=index;
+          }else{
+            if(selection.size===1 && selection.has(id)){
+              selection.clear();
+              state.lastIndex=null;
+            }else{
+              selection.clear();
+              selection.add(id);
+              state.lastIndex=index;
+            }
+          }
+          state.selection=selection;
+          syncSelectionState();
+        }
+        function focusAttachmentNode(nodeId){
+          if(!nodeId || !jm) return;
+          const node=jm.get_node(nodeId);
+          if(!node) return;
+          try{ jm.select_node(node.id); }catch(_){ }
+          centerOnNodeSmooth(node,{animate:false});
+          const el=document.querySelector(`.jsmind-node[nodeid="${node.id}"]`);
+          if(el){
+            el.classList.add('mind-node-highlight');
+            setTimeout(()=>el.classList.remove('mind-node-highlight'),1000);
+          }
+        }
+        function handleDelete(ids){
+          const unique=Array.from(new Set(ids.map(id=>Number(id)).filter(id=>Number.isFinite(id) && id>0)));
+          if(!unique.length) return;
+          let total=0;
+          state.items.forEach(item=>{ if(unique.includes(item.assetId)) total+=Number(item.size)||0; });
+          const sizeText=total>0?`（总计 ${formatBytesLocal(total)}）`:'';
+          if(!confirm(`确定要删除 ${unique.length} 个附件${sizeText}吗？`)) return;
+          const changed=removeAttachmentsFromMind(unique);
+          const metaBackup=backupAndRemoveAssetMeta(unique);
+          refresh(true);
+          requestDelete(unique).then(()=>{
+            state.selection.clear();
+            refresh(true);
+          }).catch(err=>{
+            alert(err && err.message ? err.message : '删除附件失败');
+            restoreAssetMeta(metaBackup);
+            if(changed){ undoMindChange(); }
+            refresh(true);
+          });
+        }
+        function removeAttachmentsFromMind(ids){
+          if(!ids || !ids.length) return false;
+          const idSet=new Set(ids);
+          let changed=false;
+          performUndoable('delete-attachments',()=>{
+            commitInlineEditing();
+            jm.nodes.forEach(node=>{
+              if(!node) return;
+              const data=ensureNodeDataObject(node);
+              if(!Array.isArray(data.attachments) || !data.attachments.length) return;
+              const before=data.attachments.length;
+              data.attachments=data.attachments.filter(att=>!idSet.has(Number(att.assetId||att.id)));
+              if(data.attachments.length!==before){
+                changed=true;
+                if(data.attachments.length){ data.attachment=data.attachments[0]; }
+                else { delete data.attachments; delete data.attachment; }
+                node.model.data=data;
+                node.data=data;
+              }
+            });
+            if(!changed) return false;
+            jm.computeLayout();
+            jm.render();
+            markDirty();
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+            return true;
+          },{mergeKey:'delete:attachments'});
+          return changed;
+        }
+        async function requestDelete(ids){
+          const fd=new FormData();
+          fd.append('action','delete_mindmap_assets');
+          fd.append('ids',JSON.stringify(ids));
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('网络异常，删除失败');
+          const json=await res.json();
+          if(!json.ok) throw new Error(json.error||'删除失败');
+          return json;
+        }
+        function updateSummary(){
+          if(!elements.summary) return;
+          const total=state.items.length;
+          const totalSize=state.items.reduce((sum,item)=>sum+(Number(item.size)||0),0);
+          if(total===0){ elements.summary.textContent='暂无附件'; }
+          else{
+            const sizeText=totalSize>0?formatBytesLocal(totalSize):'';
+            elements.summary.textContent=sizeText?`共 ${total} 个附件 · 总计 ${sizeText}`:`共 ${total} 个附件`;
+          }
+        }
+        function refresh(forceReset=false){
+          ensureInit();
+          state.items=collectAttachments();
+          const availableIds=new Set(state.items.map(item=>item.assetId));
+          state.selection.forEach(id=>{ if(!availableIds.has(id)) state.selection.delete(id); });
+          updateSummary();
+          applyFilterAndSort();
+          renderList(forceReset);
+        }
+        function refreshWhenClosed(){
+          state.items=collectAttachments();
+          updateSummary();
+        }
+        function open(){
+          ensureInit();
+          state.open=true;
+          refresh(true);
+          if(elements.backdrop){ elements.backdrop.dataset.open='true'; }
+          lastFocused=document.activeElement instanceof HTMLElement?document.activeElement:null;
+          if(elements.closeBtn){ setTimeout(()=>elements.closeBtn.focus(),0); }
+        }
+        function close(){
+          if(!state.open) return;
+          state.open=false;
+          if(elements.backdrop){ elements.backdrop.dataset.open='false'; }
+          if(lastFocused && typeof lastFocused.focus==='function'){ setTimeout(()=>lastFocused.focus(),0); }
+        }
+        function toggle(){ state.open ? close() : open(); }
+        function onFilesUploaded(entries){
+          if(entries && entries.length){
+            entries.forEach(entry=>{
+              const existing=assetMeta.get(entry.id) || {};
+              assetMeta.set(entry.id,{
+                id:entry.id,
+                name:entry.name || existing.name || `附件 #${entry.id}`,
+                size:entry.size ?? existing.size ?? 0,
+                mime:entry.mime || existing.mime || 'application/octet-stream',
+                created_at:entry.created_at || existing.created_at || 0,
+                node_uid:entry.nodeId || existing.node_uid || '',
+                mindmap_id:existing.mindmap_id ?? (Number.isFinite(currentMapId)?currentMapId:null),
+                session_key:existing.session_key || null,
+                url:entry.url || existing.url || `?mindmap_asset=${entry.id}`,
+              });
+            });
+          }
+          if(state.open){ refresh(true); }
+          else{ refreshWhenClosed(); }
+        }
+        function onMindUpdate(){
+          if(state.open){ refresh(); }
+          else{ refreshWhenClosed(); }
+        }
+        return { open, close, toggle, refresh, onFilesUploaded, onMindUpdate };
+      }
+      attachmentManager=createAttachmentManager();
+      if(attachmentManager && typeof attachmentManager.onMindUpdate==='function'){
+        attachmentManager.onMindUpdate();
+      }
+      const handleMindAction=(action)=>{
+        if(!action) return;
+        closeMapIoMenu();
+        if(action!=='relation' && relationMode){ cancelRelationMode(true); }
+        switch(action){
+          case 'save': saveMindmap(); break;
+          case 'undo': undoMindChange(); break;
+          case 'redo': redoMindChange(); break;
+          case 'sibling': addSiblingNode(); break;
+          case 'child': addChildNode(); break;
+          case 'fold': {
+            const node=ensureNode();
+            if(node && node.children && node.children.length){
+              const next=node.expanded===false;
+              setNodeExpandedState(node, next);
+            }
+            break;
+          }
+          case 'attach': openAttachmentDialog(); break;
+          case 'manage-attachments': if(attachmentManager){ attachmentManager.open(); } break;
+          case 'relation': toggleRelationMode(); break;
+          case 'link': openLinkPrompt(); break;
+          case 'delete': deleteSelectedNode(); break;
+          case 'import': triggerImport(); break;
+          case 'export':
+          case 'export-json':
+            exportMindmapAsJson();
+            break;
+          case 'export-pdf':
+            exportMindmapAsImage('pdf');
+            break;
+          case 'export-jpg':
+            exportMindmapAsImage('jpg');
+            break;
+          case 'delete-map':
+            if(!currentMapId){
+              alert('该导图尚未保存，无法删除。');
+              break;
+            }
+            if(deleteMapForm && confirm('确认删除该导图？')){ deleteMapForm.submit(); }
+            break;
+        }
+      };
+      if(mapIoButton){
+        mapIoButton.addEventListener('click',e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          toggleMapIoMenu();
+        });
+      }
+      if(mapIoMenu){
+        mapIoMenu.addEventListener('click',e=>{
+          const item=e.target.closest('button[data-action]');
+          if(!item) return;
+          e.preventDefault();
+          handleMindAction(item.dataset.action);
+        });
+      }
+      if(mapIo){
+        document.addEventListener('pointerdown',e=>{
+          if(mapIo.getAttribute('aria-expanded')!=='true') return;
+          if(mapIo.contains(e.target)) return;
+          closeMapIoMenu();
+        });
+      }
+      if(importModal){
+        importModal.addEventListener('click',e=>{
+          if(e.target===importModal){ closeImportModeDialog(); }
+        });
+      }
+      if(importCancelButton){
+        importCancelButton.addEventListener('click',e=>{ e.preventDefault(); closeImportModeDialog(); });
+      }
+      if(importModeButtons.length){
+        importModeButtons.forEach(btn=>{
+          btn.addEventListener('click',e=>{
+            e.preventDefault();
+            const mode=btn.dataset.importMode;
+            if(!mode){ return; }
+            if(!pendingImportPayload){ closeImportModeDialog(); return; }
+            handleImportModeSelection(mode);
+          });
+        });
+      }
+      if(mapDeleteButton){
+        mapDeleteButton.addEventListener('click',e=>{
+          e.preventDefault();
+          handleMindAction('delete-map');
+        });
+      }
+      if(dock){
+        dock.addEventListener('click',e=>{
+          const btn=e.target.closest('.dock-btn');
+          if(!btn || !dock.contains(btn)) return;
+          const action=btn.dataset.action;
+          if(action){
+            handleMindAction(action);
+          }
+        });
+        dock.addEventListener('keydown',e=>{
+          if((e.key==='Enter' || e.key===' ') && e.target instanceof HTMLElement && e.target.closest('.dock-btn')){
+            const btn=e.target.closest('.dock-btn');
+            if(btn && btn.dataset.action){
+              e.preventDefault();
+              handleMindAction(btn.dataset.action);
+            }
+          }
+        });
+      }
+      document.addEventListener('keydown',e=>{
+        if(e.key==='Escape'){ closeMapIoMenu(); }
+      }, true);
+      document.addEventListener('keydown',e=>{
+        const key=(e.key||'').toLowerCase();
+        if(key==='s' && (e.ctrlKey || e.metaKey)){
+          e.preventDefault();
+          saveMindmap();
+        }
+      });
+      document.addEventListener('keydown',e=>{
+        const activeEl=document.activeElement;
+        if(activeEl){
+          const tag=activeEl.tagName || '';
+          if(activeEl.isContentEditable || /input|textarea|select/i.test(tag)) return;
+        }
+        if(currentEditingId()) return;
+        const key=e.key || '';
+        const lowerKey=key.toLowerCase();
+        if((e.ctrlKey || e.metaKey) && !e.shiftKey && lowerKey==='z'){
+          e.preventDefault();
+          undoMindChange();
+          return;
+        }
+        if((e.ctrlKey || e.metaKey) && ((e.shiftKey && lowerKey==='z') || (!e.metaKey && lowerKey==='y'))){
+          e.preventDefault();
+          redoMindChange();
+          return;
+        }
+        if((e.ctrlKey || e.metaKey) && lowerKey==='c'){
+          e.preventDefault();
+          if(copySelectedNode()){ showRelationToast('节点已复制'); }
+          return;
+        }
+        if((e.ctrlKey || e.metaKey) && lowerKey==='v'){
+          e.preventDefault();
+          const pasted=pasteNodeAsSibling();
+          if(pasted){ showRelationToast('已粘贴节点'); }
+          return;
+        }
+        if(key==='Enter' && !e.shiftKey){
+          e.preventDefault();
+          addSiblingNode();
+        }else if(key==='Tab' && e.shiftKey){
+          e.preventDefault();
+          if(!promoteNodeLevel()){ focusParentNode(); }
+        }else if(key==='Tab'){
+          e.preventDefault();
+          addChildNode();
+        }else if(key==='Delete' || key==='Backspace'){
+          e.preventDefault();
+          if(selectedRelationId && deleteSelectedRelation()) return;
+          deleteSelectedNode();
+        }else if(key===' ' || e.code==='Space'){
+          e.preventDefault();
+          toggleBranch();
+        }else if(key==='ArrowRight'){
+          e.preventDefault();
+          expandSelectedNode();
+        }else if(key==='ArrowLeft'){
+          e.preventDefault();
+          if(!collapseSelectedNode()){ focusParentNode(); }
+        }else if(key==='F2'){
+          e.preventDefault();
+          renameSelectedNode();
+        }
+      });
+      function callView(method, ...args){
+        if(jm.view && typeof jm.view[method] === 'function'){
+          try{ jm.view[method](...args); return true; }catch(err){ console.warn(err); }
+        }
+        return false;
+      }
+      let dropHoverNode=null;
+      function clearDropHover(){
+        if(dropHoverNode){ dropHoverNode.classList.remove('drop-target'); dropHoverNode=null; }
+      }
+      if(jmContainer){
+        jmContainer.addEventListener('pointerdown',()=>{ collapseInfoBar(true); });
+      }
+      jmContainer.addEventListener('dragenter',e=>{
+        e.preventDefault();
+        jmContainer.classList.add('dragover');
+      });
+      jmContainer.addEventListener('dragleave',e=>{
+        if(!jmContainer.contains(e.relatedTarget)){ jmContainer.classList.remove('dragover'); clearDropHover(); }
+      });
+      jmContainer.addEventListener('dragover',e=>{
+        e.preventDefault();
+        const nodeEl=findNodeElementByEvent(e);
+        if(dropHoverNode!==nodeEl){
+          clearDropHover();
+          if(nodeEl){ nodeEl.classList.add('drop-target'); dropHoverNode=nodeEl; }
+        }
+        const types=Array.from(e.dataTransfer?.types || []);
+        const isFileDrag=types.includes('Files');
+        if(isFileDrag && !nodeEl){ e.dataTransfer.dropEffect='none'; }
+        else{ e.dataTransfer.dropEffect='copy'; }
+      });
+      jmContainer.addEventListener('drop',e=>{
+        e.preventDefault();
+        jmContainer.classList.remove('dragover');
+        clearDropHover();
+        syncOverlaySize();
+        const nodeEl=findNodeElementByEvent(e);
+        const target=nodeEl ? jm.get_node(nodeEl.getAttribute('nodeid')) : null;
+        const parent=target || resolveDropParent(e);
+        const files=e.dataTransfer.files && e.dataTransfer.files.length ? Array.from(e.dataTransfer.files) : [];
+        if(files.length){
+          handleDroppedFiles(files, target).catch(err=>console.error(err));
+          return;
+        }
+        const uri=e.dataTransfer.getData('text/uri-list');
+        let text='';
+        if(uri){ text=uri; } else { text=e.dataTransfer.getData('text/plain') || ''; }
+        if(text){
+          handleDroppedText(text, parent, e);
+        }
+      });
+      if(titleInput){ titleInput.addEventListener('input', markDirty); }
+      if(window.jsMind && jsMind.event_type){
+        jm.add_event_listener(type=>{
+          if((isContextMenuOpen() || isRelationContextMenuOpen()) && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
+            closeAllContextMenus();
+          }
+          if(type===jsMind.event_type.select){
+            const selected=jm.get_selected_node();
+            const editingId=currentEditingId();
+            if(editingId && (!selected || selected.id!==editingId)){
+              commitInlineEditing();
+            }
+            collapseInfoBar();
+          }
+          if(type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.after_edit || type===jsMind.event_type.show){
+            scheduleHandleRefresh();
+            requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+            updateFoldAllLabel();
+            updateFoldButtonState();
+            if(attachmentManager && typeof attachmentManager.onMindUpdate==='function'){
+              attachmentManager.onMindUpdate();
+            }
+          }
+          if(type===jsMind.event_type.edit || type===jsMind.event_type.after_edit || type===jsMind.event_type.update){
+            markDirty();
+            if(attachmentManager && typeof attachmentManager.onMindUpdate==='function'){
+              attachmentManager.onMindUpdate();
+            }
+          }
+          updateUndoRedoButtons();
+        });
+      }
+      function captureLayoutSnapshot(mind){
+        if(!mind) return null;
+        const captureElementState=(el, includeContent)=>{
+          if(!el) return null;
+          const style=el.style ? {
+            width:el.style.width||'',
+            height:el.style.height||'',
+            transform:el.style.transform||'',
+            left:el.style.left||'',
+            top:el.style.top||'',
+            display:el.style.display||'',
+          } : null;
+          const isSvg=(typeof SVGElement!=='undefined' && el instanceof SVGElement);
+          const attrs=isSvg?{
+            viewBox:el.getAttribute('viewBox'),
+            width:el.getAttribute('width'),
+            height:el.getAttribute('height'),
+          }:null;
+          const html=includeContent?el.innerHTML:null;
+          return {style,attrs,html};
+        };
+        const nodes=[];
+        if(mind.nodes && typeof mind.nodes.forEach==='function'){
+          mind.nodes.forEach(node=>{
+            if(!node) return;
+            nodes.push({
+              id:node.id,
+              x:node.x,
+              y:node.y,
+              absX:node.absX,
+              absY:node.absY,
+              layoutHeight:node._layoutHeight,
+              depth:node.depth,
+              direction:node.direction,
+              dir:node.dir,
+              modelDirection:node.model && typeof node.model.direction!=='undefined'?node.model.direction:undefined,
+            });
+          });
+        }
+        return {
+          bounds:mind.bounds?{...mind.bounds}:null,
+          viewport:captureElementState(mind.viewport,false),
+          nodeLayer:captureElementState(mind.nodeLayer,false),
+          linkLayer:captureElementState(mind.linkLayer,true),
+          relationLayer:captureElementState(mind.relationLayer,true),
+          guideLayer:captureElementState(mind.guideLayer,true),
+          view:{
+            scale:typeof mind.scale==='number'?mind.scale:null,
+            offsetX:typeof mind.offsetX==='number'?mind.offsetX:null,
+            offsetY:typeof mind.offsetY==='number'?mind.offsetY:null,
+          },
+          nodes,
+        };
+      }
+      function restoreLayoutSnapshot(mind,snapshot){
+        if(!mind || !snapshot) return;
+        const rebuildLinkRegistry=(mindInstance)=>{
+          if(!mindInstance || !mindInstance.nodes || !mindInstance.linkLayer) return;
+          if(mindInstance.linkRegistry && typeof mindInstance.linkRegistry.clear==='function'){
+            mindInstance.linkRegistry.clear();
+          }
+          mindInstance.nodes.forEach(node=>{
+            if(!node) return;
+            if(!node.parent){
+              node.linkGroup=null;
+              node.linkShadow=null;
+              node.linkPath=null;
+              node.linkHighlight=null;
+              return;
+            }
+            const selector=`g.trace-group[data-from="${node.parent.id}"][data-to="${node.id}"]`;
+            const group=mindInstance.linkLayer.querySelector(selector);
+            if(!group){
+              node.linkGroup=null;
+              node.linkShadow=null;
+              node.linkPath=null;
+              node.linkHighlight=null;
+              return;
+            }
+            const shadow=group.querySelector('.trace.shadow');
+            const core=group.querySelector('.trace.core');
+            const highlight=group.querySelector('.trace.highlight');
+            node.linkGroup=group;
+            node.linkShadow=shadow||null;
+            node.linkPath=core||null;
+            node.linkHighlight=highlight||null;
+            if(core){
+              const parentId=node.parent.id;
+              const childId=node.id;
+              const enterEdge=()=>{ if(typeof mindInstance.setEdgeHover==='function'){ mindInstance.setEdgeHover(parentId, childId); } };
+              const leaveEdge=()=>{ if(typeof mindInstance.clearEdgeHover==='function'){ mindInstance.clearEdgeHover(parentId, childId); } };
+              core.addEventListener('pointerenter', enterEdge);
+              core.addEventListener('pointerleave', leaveEdge);
+              core.addEventListener('pointercancel', leaveEdge);
+            }
+            if(mindInstance.linkRegistry){
+              mindInstance.linkRegistry.set(node.id,{group,shadow,core,highlight});
+            }
+          });
+        };
+        const rebuildRelationRegistry=(mindInstance)=>{
+          if(!mindInstance || !mindInstance.relationLayer) return;
+          if(mindInstance.relationRegistry && typeof mindInstance.relationRegistry.clear==='function'){
+            mindInstance.relationRegistry.clear();
+          }
+          if(!Array.isArray(mindInstance.relations)) return;
+          for(const relation of mindInstance.relations){
+            if(!relation) continue;
+            const group=mindInstance.relationLayer.querySelector(`g.relation-group[data-id="${relation.id}"]`);
+            if(!group) continue;
+            const shadow=group.querySelector('.relation-shadow');
+            const core=group.querySelector('.relation-core');
+            const highlight=group.querySelector('.relation-highlight');
+            const hit=group.querySelector('.relation-hit');
+            if(core){ core.dataset.bidirectional=relation.bidirectional?'true':'false'; }
+            if(mindInstance.relationRegistry){
+              mindInstance.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
+            }
+          }
+        };
+        const restoreElementState=(el,state)=>{
+          if(!el || !state) return;
+          if(state.style){
+            Object.entries(state.style).forEach(([key,value])=>{
+              if(el.style){ el.style[key]=value||''; }
+            });
+          }
+          if(state.attrs){
+            Object.entries(state.attrs).forEach(([key,value])=>{
+              if(value==null || value===''){ el.removeAttribute(key); }
+              else{ el.setAttribute(key,value); }
+            });
+          }
+          if(typeof state.html==='string'){ el.innerHTML=state.html; }
+        };
+        mind.bounds=snapshot.bounds?{...snapshot.bounds}:null;
+        restoreElementState(mind.viewport,snapshot.viewport);
+        restoreElementState(mind.nodeLayer,snapshot.nodeLayer);
+        restoreElementState(mind.linkLayer,snapshot.linkLayer);
+        restoreElementState(mind.relationLayer,snapshot.relationLayer);
+        restoreElementState(mind.guideLayer,snapshot.guideLayer);
+        if(snapshot.view){
+          if(typeof snapshot.view.scale==='number' && isFinite(snapshot.view.scale)){ mind.scale=snapshot.view.scale; }
+          if(typeof snapshot.view.offsetX==='number' && isFinite(snapshot.view.offsetX)){ mind.offsetX=snapshot.view.offsetX; }
+          if(typeof snapshot.view.offsetY==='number' && isFinite(snapshot.view.offsetY)){ mind.offsetY=snapshot.view.offsetY; }
+        }
+        rebuildLinkRegistry(mind);
+        rebuildRelationRegistry(mind);
+        if(Array.isArray(snapshot.nodes) && mind.nodes && typeof mind.nodes.get==='function'){
+          for(const nodeState of snapshot.nodes){
+            if(!nodeState || !nodeState.id) continue;
+            const node=mind.nodes.get(nodeState.id);
+            if(!node) continue;
+            node.x=nodeState.x;
+            node.y=nodeState.y;
+            node.absX=nodeState.absX;
+            node.absY=nodeState.absY;
+            node._layoutHeight=nodeState.layoutHeight;
+            node.depth=nodeState.depth;
+            node.direction=nodeState.direction;
+            node.dir=nodeState.dir;
+            if(node.model && nodeState.modelDirection!==undefined){ node.model.direction=nodeState.modelDirection; }
+            if(node.el){
+              const width=node.el.offsetWidth||0;
+              const height=node.el.offsetHeight||0;
+              if(Number.isFinite(node.absX)){ node.el.style.left=`${node.absX - width/2}px`; }
+              if(Number.isFinite(node.absY)){ node.el.style.top=`${node.absY - height/2}px`; }
+            }
+            if(typeof mind.updateAnchors==='function'){ mind.updateAnchors(node); }
+            if(typeof mind.updateLinkPath==='function'){ mind.updateLinkPath(node); }
+            if(typeof mind.updateRelationsForNode==='function'){ mind.updateRelationsForNode(node); }
+          }
+        }
+        if(typeof mind.updateEdgeButtonScale==='function'){ mind.updateEdgeButtonScale(); }
+        if(typeof mind.applyTransform==='function'){ mind.applyTransform(); }
+        if(typeof syncOverlaySize==='function'){ syncOverlaySize(); }
+        if(typeof updateHandlePosition==='function'){ updateHandlePosition(); }
+        updateFoldAllLabel();
+      }
+      function exportMindmapAsJson(){
+        if(!jm){
+          alert('思维导图尚未加载');
+          return;
+        }
+        const data=jm.get_data('node_tree');
+        if(data && data.data){ enforceRightOrientation(data.data); }
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=buildExportFilename('json', titleInput ? titleInput.value.trim() : '');
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      }
+      async function exportMindmapAsImage(format){
+        if(!jmContainer){
+          alert('思维导图尚未加载');
+          return;
+        }
+        const titleValue=titleInput ? titleInput.value.trim() : '';
+        const overlayDisplay=overlay ? overlay.style.display : null;
+        const shouldAnimate=format==='pdf' || format==='jpg';
+        if(shouldAnimate){
+          showExportOverlay();
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        }
+        let exportHost=null;
+        let layoutSnapshot=null;
+        try{
+          const htmlToImage=await ensureHtmlToImage();
+          const computedStyle=getComputedStyle(document.body);
+          const backgroundColor=(computedStyle.getPropertyValue('--bg-void') || computedStyle.backgroundColor || '#0A0C0E').trim() || '#0A0C0E';
+          if(overlay){ overlay.style.display='none'; }
+          if(jm){ layoutSnapshot=captureLayoutSnapshot(jm); }
+          if(typeof jm.computeLayout==='function'){ try{ jm.computeLayout(); }catch(err){ console.warn(err); } }
+          const viewport=jm && jm.viewport ? jm.viewport : jmContainer.querySelector('.mind-viewport');
+          if(!viewport){ throw new Error('无法定位导出视图'); }
+          const bounds=jm && jm.bounds ? jm.bounds : null;
+          if(!bounds || !isFinite(bounds.width) || !isFinite(bounds.height)){
+            throw new Error('无法计算导图范围');
+          }
+          const viewportWidth=Math.max(1, Math.ceil(bounds.width));
+          const viewportHeight=Math.max(1, Math.ceil(bounds.height));
+          const SAFE_CANVAS_BOUND=16384;
+          const basePixelRatio=window.devicePixelRatio || 1;
+          const targetPixelRatio=Math.max(2, basePixelRatio * 2);
+          const maxPixelRatio=6;
+          const sizeLimitedRatio=Math.max(1, Math.floor(SAFE_CANVAS_BOUND / Math.max(viewportWidth, viewportHeight)));
+          const pixelRatio=Math.min(maxPixelRatio, targetPixelRatio, sizeLimitedRatio);
+          exportHost=document.createElement('div');
+          exportHost.style.position='fixed';
+          exportHost.style.left='-120vw';
+          exportHost.style.top='0';
+          exportHost.style.opacity='0';
+          exportHost.style.pointerEvents='none';
+          const clone=viewport.cloneNode(true);
+          clone.style.transform='translate(0px, 0px) scale(1)';
+          clone.style.transformOrigin='top left';
+          clone.style.width=`${viewportWidth}px`;
+          clone.style.height=`${viewportHeight}px`;
+          clone.style.overflow='visible';
+          clone.style.position='absolute';
+          clone.style.left='0';
+          clone.style.top='0';
+          const exportWrapper=document.createElement('div');
+          exportWrapper.style.position='relative';
+          exportWrapper.style.width=`${viewportWidth}px`;
+          exportWrapper.style.height=`${viewportHeight}px`;
+          exportWrapper.style.pointerEvents='none';
+          exportWrapper.style.overflow='visible';
+          exportWrapper.appendChild(clone);
+          if(jm && jm.linkControlLayer){
+            const overlayClone=jm.linkControlLayer.cloneNode(true);
+            overlayClone.style.position='absolute';
+            overlayClone.style.left='0';
+            overlayClone.style.top='0';
+            overlayClone.style.width=`${viewportWidth}px`;
+            overlayClone.style.height=`${viewportHeight}px`;
+            overlayClone.style.pointerEvents='none';
+            overlayClone.style.transform='none';
+            const buttons=overlayClone.querySelectorAll('.edge-insert-btn');
+            buttons.forEach(btn=>{
+              const rawX=btn.dataset ? btn.dataset.logicalX : null;
+              const rawY=btn.dataset ? btn.dataset.logicalY : null;
+              const logicalX=rawX!=null?parseFloat(rawX):NaN;
+              const logicalY=rawY!=null?parseFloat(rawY):NaN;
+              if(Number.isFinite(logicalX) && Number.isFinite(logicalY)){
+                btn.style.left=`${logicalX}px`;
+                btn.style.top=`${logicalY}px`;
+              }else{
+                btn.setAttribute('hidden','');
+              }
+            });
+            exportWrapper.appendChild(overlayClone);
+          }
+          exportHost.appendChild(exportWrapper);
+          document.body.appendChild(exportHost);
+          const canvas=await htmlToImage.toCanvas(exportWrapper,{
+            backgroundColor,
+            pixelRatio,
+            filter:node=>{
+              if(!(node instanceof Element)) return true;
+              return node.dataset.exportIgnore!=='true';
+            }
+          });
+          if(!canvas){ throw new Error('无法生成导出图像'); }
+          if(format==='jpg'){
+            const blob=await canvasToBlob(canvas,'image/jpeg',0.98);
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');
+            a.href=url;
+            a.download=buildExportFilename('jpg', titleValue);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(()=>URL.revokeObjectURL(url), 1500);
+          }else if(format==='pdf'){
+            const jsPDF=await ensureJsPDF();
+            const isLandscape=canvas.width>=canvas.height;
+            const pageSize=isLandscape?[canvas.height, canvas.width]:[canvas.width, canvas.height];
+            const pdf=new jsPDF({orientation:isLandscape?'landscape':'portrait', unit:'px', format:pageSize});
+            const dataUrl=canvas.toDataURL('image/png',1.0);
+            const pageWidth=pdf.internal.pageSize.getWidth();
+            const pageHeight=pdf.internal.pageSize.getHeight();
+            pdf.addImage(dataUrl,'PNG',0,0,pageWidth,pageHeight,undefined,'MEDIUM');
+            pdf.save(buildExportFilename('pdf', titleValue));
+          }else{
+            throw new Error('不支持的导出格式');
+          }
+        }catch(error){
+          console.error(error);
+          const message=error && error.message ? `导出失败：${error.message}` : '导出失败，请稍后重试。';
+          alert(message);
+        }finally{
+          if(layoutSnapshot){ restoreLayoutSnapshot(jm, layoutSnapshot); }
+          if(exportHost && exportHost.parentElement){ exportHost.remove(); }
+          if(overlay){ overlay.style.display=overlayDisplay || ''; }
+          if(shouldAnimate){ hideExportOverlay(); }
+        }
+      }
+      function openImportModeDialog(fileName, data){
+        pendingImportPayload=data;
+        pendingImportFileName=fileName || '导图文件';
+        if(importModalName){ importModalName.textContent=pendingImportFileName; }
+        if(importModal){ importModal.dataset.open='true'; }
+      }
+      function closeImportModeDialog(){
+        pendingImportPayload=null;
+        pendingImportFileName='';
+        if(importModal){ importModal.dataset.open='false'; }
+      }
+      function handleImportModeSelection(mode){
+        if(!pendingImportPayload) return;
+        const payload=JSON.parse(JSON.stringify(pendingImportPayload));
+        try{
+          commitInlineEditing();
+          if(mapDeleteButton && mode!=='new-map'){ mapDeleteButton.disabled=!currentMapId; }
+          switch(mode){
+            case 'replace':
+              jm.show(payload);
+              initialData=JSON.parse(JSON.stringify(payload));
+              if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+              markDirty();
+              break;
+            case 'append-node':
+              importJsonAsSubtree(payload);
+              break;
+            case 'new-map':
+              importJsonAsNewMap(payload);
+              break;
+            default:
+              break;
+          }
+          closeImportModeDialog();
+        }catch(err){
+          alert(err.message || '导入失败');
+        }
+      }
+      function triggerImport(){
+        if(importInput){ importInput.click(); }
+      }
+      function findModelById(node,id){
+        if(!node || !id) return null;
+        if(node.id===id) return node;
+        if(Array.isArray(node.children)){
+          for(const child of node.children){
+            const found=findModelById(child,id);
+            if(found) return found;
+          }
+        }
+        return null;
+      }
+      function cloneImportSubtree(source){
+        if(!source || typeof source!=='object') return null;
+        const cloned={
+          id:'node-'+Math.random().toString(36).slice(2,10),
+          topic:typeof source.topic==='string' && source.topic.trim()?source.topic.trim():'导入节点',
+          data:normalizeNodeData(source.data ? JSON.parse(JSON.stringify(source.data)) : {}),
+          expanded:source.expanded!==false,
+          direction:'right',
+          children:[]
+        };
+        if(source.meta){ cloned.meta=JSON.parse(JSON.stringify(source.meta)); }
+        if(source.style){ cloned.style=JSON.parse(JSON.stringify(source.style)); }
+        if(Array.isArray(source.children)){
+          cloned.children=source.children.map(child=>cloneImportSubtree(child)).filter(Boolean);
+        }
+        return cloned;
+      }
+      function importJsonAsSubtree(json){
+        const tree=json && json.data ? json.data : null;
+        if(!tree){ alert('文件格式不兼容'); return; }
+        const target=jm.get_selected_node() || jm.get_root();
+        if(!target){ alert('请选择要导入到的节点'); return; }
+        const current=jm.get_data('node_tree');
+        if(!current || !current.data){ alert('当前导图数据异常'); return; }
+        const parentModel=findModelById(current.data, target.id);
+        if(!parentModel){ alert('无法定位目标节点'); return; }
+        const newNode=cloneImportSubtree(tree);
+        if(!newNode){ alert('导入数据为空'); return; }
+        if(!Array.isArray(parentModel.children)){ parentModel.children=[]; }
+        parentModel.children.push(newNode);
+        parentModel.expanded=true;
+        enforceRightOrientation(current.data);
+        jm.show(current);
+        requestAnimationFrame(()=>{ jm.select_node(newNode.id); scheduleHandleRefresh(); });
+        markDirty();
+      }
+      function importJsonAsNewMap(json){
+        const cloned=JSON.parse(JSON.stringify(json));
+        if(cloned && cloned.data){ enforceRightOrientation(cloned.data); }
+        jm.show(cloned);
+        initialData=JSON.parse(JSON.stringify(cloned));
+        if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+        currentMapId=0;
+        if(jmContainer){ jmContainer.dataset.mapId='0'; }
+        if(deleteMapForm){
+          const idInput=deleteMapForm.querySelector('input[name="id"]');
+          if(idInput){ idInput.value=''; }
+        }
+        if(mapDeleteButton){ mapDeleteButton.disabled=true; }
+        if(titleInput){
+          const metaName=cloned?.meta && typeof cloned.meta.name==='string' ? cloned.meta.name.trim() : '';
+          const topicName=cloned?.data && typeof cloned.data.topic==='string' ? cloned.data.topic.trim() : '';
+          const nextTitle=metaName || topicName || titleInput.value;
+          if(nextTitle){ titleInput.value=nextTitle; }
+        }
+        markDirty();
+        scheduleHandleRefresh();
+      }
+      if(importInput){
+        importInput.addEventListener('change', e=>{
+          const file=e.target.files[0]; if(!file) return;
+          const reader=new FileReader();
+          reader.onload=evt=>{
+            try{
+              const json=JSON.parse(evt.target.result);
+              if(!json || !json.data){ alert('文件格式不兼容'); return; }
+              enforceRightOrientation(json.data);
+              closeImportModeDialog();
+              pendingImportPayload=json;
+              pendingImportFileName=file.name;
+              openImportModeDialog(file.name, json);
+            }catch(err){
+              pendingImportPayload=null;
+              pendingImportFileName='';
+              alert('无法解析 JSON：'+err.message);
+            }
+            finally{
+              importInput.value='';
+            }
+          };
+          reader.onerror=()=>{
+            pendingImportPayload=null;
+            pendingImportFileName='';
+            alert('读取文件失败');
+            importInput.value='';
+          };
+          reader.readAsText(file,'utf-8');
+        });
+      }
+      async function saveMindmap(){
+        commitInlineEditing();
+        const title=titleInput.value.trim()||'未命名导图';
+        const currentData=jm.get_data('node_tree');
+        if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
+        const payload=JSON.stringify(currentData);
+        const fd=new FormData();
+        fd.append('action','save_mindmap');
+        fd.append('id', String(currentMapId||0));
+        fd.append('title', title);
+        fd.append('content', payload);
+        try{
+          showSaving();
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          if(!res.ok) throw new Error('网络异常');
+          const json=await res.json();
+          if(!json.ok) throw new Error(json.error||'保存失败');
+          currentMapId=parseInt(json.id,10)||0;
+          document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+          if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+          if(deleteMapForm){
+            const idInput=deleteMapForm.querySelector('input[name="id"]');
+            if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+          }
+          history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+          initialData=JSON.parse(payload);
+          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+          markSaved();
+        }catch(err){
+          alert(err.message||'保存失败');
+          markDirty();
+        }
+      }
+      window.addEventListener('beforeunload',e=>{
+        commitInlineEditing();
+        if(blobUrlRegistry.size){
+          blobUrlRegistry.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(_){ } });
+          blobUrlRegistry.clear();
+        }
+        if(dirty){ e.preventDefault(); e.returnValue=''; }
+      });
+      })();
