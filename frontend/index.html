@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Memo SPA</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar">
+        <header>
+          <h1>分类</h1>
+          <button id="refresh" type="button">刷新</button>
+        </header>
+        <ul id="category-list" class="category-list"></ul>
+        <form id="category-form" class="category-form">
+          <input type="text" name="name" placeholder="新增分类" required />
+          <button type="submit">添加</button>
+        </form>
+      </aside>
+      <main class="content">
+        <header class="content__header">
+          <div class="filters">
+            <select id="status-filter">
+              <option value="active">未完成</option>
+              <option value="completed">已完成</option>
+              <option value="all">全部</option>
+            </select>
+            <input type="search" id="search-input" placeholder="搜索标题/描述" />
+          </div>
+          <form id="item-form" class="item-form">
+            <input type="text" name="title" placeholder="新建备忘录标题" required />
+            <textarea name="description" placeholder="描述"></textarea>
+            <select name="category_id" id="category-select"></select>
+            <button type="submit">创建</button>
+          </form>
+        </header>
+        <section>
+          <ul id="item-list" class="item-list"></ul>
+        </section>
+      </main>
+    </div>
+    <template id="item-template">
+      <li class="item">
+        <div class="item__header">
+          <label>
+            <input type="checkbox" class="item-done" />
+            <span class="item-title"></span>
+          </label>
+          <div class="item-meta"></div>
+        </div>
+        <p class="item-desc"></p>
+        <ul class="step-list"></ul>
+        <div class="item-actions">
+          <button class="add-step" type="button">添加步骤</button>
+          <button class="delete-item" type="button">删除</button>
+        </div>
+      </li>
+    </template>
+    <template id="step-template">
+      <li class="step">
+        <label>
+          <input type="checkbox" class="step-done" />
+          <span class="step-title"></span>
+        </label>
+        <button class="delete-step" type="button">删除</button>
+      </li>
+    </template>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
