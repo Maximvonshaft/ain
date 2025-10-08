@@ -6378,7 +6378,28 @@ if ($view === 'map_edit') {
           if(node.linkShadow){ node.linkShadow.setAttribute('d', pathData); }
           if(node.linkHighlight){ node.linkHighlight.setAttribute('d', pathData); }
           const routePoints=(Array.isArray(route) && route.length>=2)?route:[start,end];
-          this.positionEdgeInsertButton(node, routePoints);
+          const normalizedRoute=[];
+          const traceSegments=[];
+          for(let i=0;i<routePoints.length;i++){
+            const point=routePoints[i];
+            if(!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)){
+              continue;
+            }
+            const current={x:point.x,y:point.y};
+            normalizedRoute.push(current);
+            if(i>0){
+              const prev=normalizedRoute[normalizedRoute.length-2];
+              if(prev){
+                traceSegments.push({
+                  a:{x:prev.x,y:prev.y},
+                  b:{x:current.x,y:current.y},
+                });
+              }
+            }
+          }
+          node.traceRoute=normalizedRoute.length>=2?normalizedRoute:null;
+          node.traceSegments=traceSegments.length?traceSegments:null;
+          this.positionEdgeInsertButton(node, normalizedRoute.length?normalizedRoute:routePoints);
         }
         ensureEdgeInsertButton(node){
           if(!node || !node.parent || !this.linkControlLayer) return null;
@@ -6634,6 +6655,43 @@ if ($view === 'map_edit') {
           }
           return rects;
         }
+        collectTraceAvoidRects(node, owner){
+          const rects=[];
+          if(!node) return rects;
+          const segmentsSource=Array.isArray(node.traceSegments)?node.traceSegments:null;
+          if(!segmentsSource || !segmentsSource.length) return rects;
+          const segments=[];
+          let left=Infinity;
+          let right=-Infinity;
+          let top=Infinity;
+          let bottom=-Infinity;
+          for(const seg of segmentsSource){
+            if(!seg || !seg.a || !seg.b) continue;
+            const a={x:seg.a.x,y:seg.a.y};
+            const b={x:seg.b.x,y:seg.b.y};
+            if(!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+            segments.push({a,b});
+            left=Math.min(left,a.x,b.x);
+            right=Math.max(right,a.x,b.x);
+            top=Math.min(top,a.y,b.y);
+            bottom=Math.max(bottom,a.y,b.y);
+          }
+          if(!segments.length) return rects;
+          if(!Number.isFinite(left) || !Number.isFinite(right) || !Number.isFinite(top) || !Number.isFinite(bottom)){
+            return rects;
+          }
+          rects.push({
+            type:'trace',
+            owner,
+            segments,
+            left,
+            right,
+            top,
+            bottom,
+            margin:16,
+          });
+          return rects;
+        }
         simplifyRelationRoute(points){
           if(!Array.isArray(points) || !points.length) return [];
           const cleaned=[];
@@ -6727,6 +6785,62 @@ if ($view === 'map_edit') {
           const cy=(rect.top+rect.bottom)/2;
           return Math.hypot(a.x-cx,a.y-cy);
         }
+        pointSegmentDistance(point,a,b){
+          if(!point || !a || !b) return Infinity;
+          const dx=b.x - a.x;
+          const dy=b.y - a.y;
+          if(Math.abs(dx)<1e-9 && Math.abs(dy)<1e-9){
+            return Math.hypot(point.x-a.x, point.y-a.y);
+          }
+          const t=((point.x-a.x)*dx + (point.y-a.y)*dy)/(dx*dx + dy*dy);
+          if(t<=0){
+            return Math.hypot(point.x-a.x, point.y-a.y);
+          }
+          if(t>=1){
+            return Math.hypot(point.x-b.x, point.y-b.y);
+          }
+          const projX=a.x + t*dx;
+          const projY=a.y + t*dy;
+          return Math.hypot(point.x-projX, point.y-projY);
+        }
+        segmentsIntersect(a,b,c,d){
+          if(!a || !b || !c || !d) return false;
+          const orient=(p,q,r)=>{
+            return (q.x-p.x)*(r.y-p.y) - (q.y-p.y)*(r.x-p.x);
+          };
+          const onSegment=(p,q,r)=>{
+            return q.x<=Math.max(p.x,r.x)+1e-6 && q.x>=Math.min(p.x,r.x)-1e-6 && q.y<=Math.max(p.y,r.y)+1e-6 && q.y>=Math.min(p.y,r.y)-1e-6;
+          };
+          const o1=orient(a,b,c);
+          const o2=orient(a,b,d);
+          const o3=orient(c,d,a);
+          const o4=orient(c,d,b);
+          if((o1>0 && o2<0 || o1<0 && o2>0) && (o3>0 && o4<0 || o3<0 && o4>0)){
+            return true;
+          }
+          if(Math.abs(o1)<1e-6 && onSegment(a,c,b)) return true;
+          if(Math.abs(o2)<1e-6 && onSegment(a,d,b)) return true;
+          if(Math.abs(o3)<1e-6 && onSegment(c,a,d)) return true;
+          if(Math.abs(o4)<1e-6 && onSegment(c,b,d)) return true;
+          return false;
+        }
+        segmentSegmentDistance(a,b,c,d){
+          if(!a || !b || !c || !d) return Infinity;
+          if(this.segmentsIntersect(a,b,c,d)) return 0;
+          const distances=[
+            this.pointSegmentDistance(a,c,d),
+            this.pointSegmentDistance(b,c,d),
+            this.pointSegmentDistance(c,a,b),
+            this.pointSegmentDistance(d,a,b),
+          ];
+          let min=Infinity;
+          for(const value of distances){
+            if(Number.isFinite(value) && value<min){
+              min=value;
+            }
+          }
+          return min;
+        }
         buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance){
           const points=[];
           const safeClearance=Math.max(18, Math.min(72, clearance));
@@ -6765,6 +6879,41 @@ if ($view === 'map_edit') {
             for(const rect of avoidRects){
               if(!rect) continue;
               const margin=typeof rect.margin==='number'?rect.margin:8;
+              if(rect.type==='trace'){
+                const traceSegments=Array.isArray(rect.segments)?rect.segments:null;
+                if(!traceSegments || !traceSegments.length) continue;
+                const segMinX=Math.min(segment.a.x, segment.b.x);
+                const segMaxX=Math.max(segment.a.x, segment.b.x);
+                const segMinY=Math.min(segment.a.y, segment.b.y);
+                const segMaxY=Math.max(segment.a.y, segment.b.y);
+                if(Number.isFinite(rect.left) && Number.isFinite(rect.right) && Number.isFinite(rect.top) && Number.isFinite(rect.bottom)){
+                  if(segMaxX<rect.left-margin || segMinX>rect.right+margin || segMaxY<rect.top-margin || segMinY>rect.bottom+margin){
+                    continue;
+                  }
+                }
+                let intersectsTrace=false;
+                for(const traceSegment of traceSegments){
+                  if(!traceSegment || !traceSegment.a || !traceSegment.b) continue;
+                  if(this.segmentsIntersect(segment.a, segment.b, traceSegment.a, traceSegment.b)){
+                    penalty+=1600 + margin*50;
+                    intersectsTrace=true;
+                    break;
+                  }
+                }
+                if(intersectsTrace) continue;
+                let nearest=Infinity;
+                for(const traceSegment of traceSegments){
+                  if(!traceSegment || !traceSegment.a || !traceSegment.b) continue;
+                  const dist=this.segmentSegmentDistance(segment.a, segment.b, traceSegment.a, traceSegment.b);
+                  if(Number.isFinite(dist) && dist<nearest){
+                    nearest=dist;
+                  }
+                }
+                if(Number.isFinite(nearest) && nearest<margin){
+                  penalty+=(margin-nearest)*24;
+                }
+                continue;
+              }
               if(rect.type==='node'){
                 if(rect.owner==='from' && segment.index===0) continue;
                 if(rect.owner==='to' && segment.index===segments.length-1) continue;
@@ -6851,8 +7000,18 @@ if ($view === 'map_edit') {
           if(!startCenter || !endCenter) return;
           const avoidRects=[
             ...this.collectRelationAvoidRects(fromNode,'from'),
-            ...this.collectRelationAvoidRects(toNode,'to')
+            ...this.collectRelationAvoidRects(toNode,'to'),
+            ...this.collectTraceAvoidRects(fromNode,'from'),
+            ...this.collectTraceAvoidRects(toNode,'to'),
           ];
+          if(this.nodes && this.nodes.size){
+            for(const nodeEntry of this.nodes.values()){
+              if(!nodeEntry || nodeEntry===fromNode || nodeEntry===toNode) continue;
+              if(nodeEntry.el && !nodeEntry.el.isConnected) continue;
+              avoidRects.push(...this.collectRelationAvoidRects(nodeEntry,'other'));
+              avoidRects.push(...this.collectTraceAvoidRects(nodeEntry,'other'));
+            }
+          }
           const sides=['left','right','top','bottom'];
           let bestRoute=null;
           for(const startSide of sides){
