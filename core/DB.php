@@ -56,6 +56,8 @@ class DB
             updated_at INTEGER NOT NULL,
             FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL
         );');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_done_order ON items(category_id, done, order_index)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_updated ON items(done, updated_at)');
         $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             item_id INTEGER NOT NULL,
@@ -67,6 +69,8 @@ class DB
             updated_at INTEGER NOT NULL,
             FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
         );');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_done_order ON steps(item_id, done, order_index)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at)');
         $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             item_id INTEGER,
@@ -81,6 +85,7 @@ class DB
         );');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item_created ON attachments(item_id, created_at)');
         $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
         foreach (["备忘录", "流程", "其他"] as $name) {
             $stmt->execute([$name, $now]);
