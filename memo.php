@@ -3970,6 +3970,9 @@ if ($view === 'map_edit') {
       .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition)}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
+      .mind-relations .relation-direction{font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.24em;text-transform:uppercase;fill:rgba(227,198,139,.82);pointer-events:none;filter:drop-shadow(0 0 6px rgba(0,0,0,.45))}
+      .mind-relations .relation-direction textPath{font-size:11px}
+      .mind-relations .relation-direction-backward{fill:rgba(191,242,255,.78)}
       .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-highlight{pointer-events:none}
       .mind-relations .relation-group[data-selected="true"]{filter:drop-shadow(0 0 6px rgba(191,242,255,.45)) drop-shadow(0 0 18px rgba(191,242,255,.3))}
@@ -4010,15 +4013,11 @@ if ($view === 'map_edit') {
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
       .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:pan-x pan-y;flex:0 1 auto;margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
       .mind-dock::-webkit-scrollbar{display:none}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px}
+      .dock-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:66px;border-radius:18px;padding:10px 8px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 1 clamp(90px,9vw,132px);min-width:74px;max-width:148px}
       .dock-btn .icon{font-size:20px}
+      .dock-btn .label-group{display:flex;flex-direction:column;align-items:center;gap:2px}
       .dock-btn .label{font-size:12px}
-      @media (hover:hover) and (pointer:fine){
-        .dock-btn[data-tip]::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);padding:6px 10px;border-radius:12px;border:1px solid rgba(201,168,106,.38);background:rgba(12,16,18,.92);color:var(--gold-400);font:600 11px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);box-shadow:0 12px 28px rgba(0,0,0,.45)}
-        .dock-btn[data-tip]::before{content:"";position:absolute;bottom:100%;left:50%;transform:translate(-50%,6px);border-width:6px;border-style:solid;border-color:rgba(12,16,18,.92) transparent transparent transparent;opacity:0;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
-        .dock-btn[data-tip]:hover::after,.dock-btn[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,-4px)}
-        .dock-btn[data-tip]:hover::before,.dock-btn[data-tip]:focus-visible::before{opacity:1;transform:translate(-50%,-4px)}
-      }
+      .dock-btn .shortcut{font-size:10px;letter-spacing:.16em;color:rgba(201,168,106,.72);text-transform:uppercase}
       .dock-btn:hover{transform:translateY(-3px);border-color:var(--gold-500);background:rgba(201,168,106,.16);box-shadow:0 0 26px rgba(227,198,139,.18)}
       .dock-btn:active{transform:translateY(-1px)}
       .dock-btn:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
@@ -4029,9 +4028,9 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:1 1 clamp(82px,11vw,124px);min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start}.dock-btn{height:58px;flex:0 1 clamp(72px,24vw,112px);min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 1 clamp(66px,28vw,98px);min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{min-height:62px;flex:1 1 clamp(82px,11vw,124px);min-width:70px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start}.dock-btn{min-height:58px;flex:0 1 clamp(72px,24vw,112px);min-width:64px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{min-height:56px;flex:0 1 clamp(66px,28vw,98px);min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
       @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -4186,9 +4185,6 @@ if ($view === 'map_edit') {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <marker id="mindRelationArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
-          <path d="M0 0 L12 6 L0 12 Z" fill="#E3C68B" />
-        </marker>
       </defs>
     </svg>
     <div class="mind-shell">
@@ -4234,49 +4230,79 @@ if ($view === 'map_edit') {
       <?php endif; ?>
       <div class="mind-dock-wrap">
         <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
-          <button class="dock-btn" data-action="save" data-default-label="保存" data-tip="保存（Ctrl+S）" aria-label="保存">
+          <button class="dock-btn" data-action="save" data-default-label="保存" aria-label="保存（Ctrl+S）">
             <span class="icon">💾</span>
-            <span class="label">保存</span>
+            <span class="label-group">
+              <span class="label">保存</span>
+              <span class="shortcut">Ctrl+S</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="undo" data-tip="撤销（Ctrl/⌘+Z）" aria-label="撤销操作">
+          <button class="dock-btn" data-action="undo" aria-label="撤销操作（Ctrl/⌘+Z）">
             <span class="icon">↺</span>
-            <span class="label">撤销</span>
+            <span class="label-group">
+              <span class="label">撤销</span>
+              <span class="shortcut">Ctrl/⌘+Z</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="redo" data-tip="重做（Ctrl+Shift+Z）" aria-label="重做操作">
+          <button class="dock-btn" data-action="redo" aria-label="重做操作（Ctrl+Shift+Z）">
             <span class="icon">↻</span>
-            <span class="label">重做</span>
+            <span class="label-group">
+              <span class="label">重做</span>
+              <span class="shortcut">Ctrl+Shift+Z</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="sibling" data-tip="同级节点（Enter）" aria-label="新增同级节点">
+          <button class="dock-btn" data-action="sibling" aria-label="新增同级节点（Enter）">
             <span class="icon">⧉</span>
-            <span class="label">同级</span>
+            <span class="label-group">
+              <span class="label">同级</span>
+              <span class="shortcut">Enter</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="child" data-tip="子级节点（Tab）" aria-label="新增子级节点">
+          <button class="dock-btn" data-action="child" aria-label="新增子级节点（Tab）">
             <span class="icon">↳</span>
-            <span class="label">子级</span>
+            <span class="label-group">
+              <span class="label">子级</span>
+              <span class="shortcut">Tab</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="fold" data-tip="折叠/展开（Space 或 ←/→）" aria-label="折叠或展开节点">
+          <button class="dock-btn" data-action="fold" aria-label="折叠或展开节点（Space 或 ←/→）">
             <span class="icon" data-fold-icon>⇅</span>
-            <span class="label" data-fold-label>折叠</span>
+            <span class="label-group">
+              <span class="label" data-fold-label>折叠</span>
+              <span class="shortcut" data-fold-shortcut>Space 或 ←/→</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="attach" data-tip="上传附件" aria-label="上传附件">
+          <button class="dock-btn" data-action="attach" aria-label="上传附件">
             <span class="icon">📎</span>
-            <span class="label">附件</span>
+            <span class="label-group">
+              <span class="label">附件</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="manage-attachments" data-tip="附件管理（Ctrl+Shift+A）" aria-label="附件管理">
+          <button class="dock-btn" data-action="manage-attachments" aria-label="附件管理（Ctrl+Shift+A）">
             <span class="icon">🗂</span>
-            <span class="label">管理</span>
+            <span class="label-group">
+              <span class="label">管理</span>
+              <span class="shortcut">Ctrl+Shift+A</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="relation" data-tip="建立关联" aria-label="关联节点">
+          <button class="dock-btn" data-action="relation" aria-label="关联节点">
             <span class="icon">🪢</span>
-            <span class="label">关联</span>
+            <span class="label-group">
+              <span class="label">关联</span>
+            </span>
           </button>
-          <button class="dock-btn" data-action="link" data-tip="新增链接" aria-label="新增链接">
+          <button class="dock-btn" data-action="link" aria-label="新增链接">
             <span class="icon">🔗</span>
-            <span class="label">链接</span>
+            <span class="label-group">
+              <span class="label">链接</span>
+            </span>
           </button>
-          <button class="dock-btn danger" data-action="delete" data-tip="删除（Backspace/Del）" aria-label="删除节点">
+          <button class="dock-btn danger" data-action="delete" aria-label="删除节点（Backspace/Del）">
             <span class="icon">🗑</span>
-            <span class="label">删除</span>
+            <span class="label-group">
+              <span class="label">删除</span>
+              <span class="shortcut">Backspace / Del</span>
+            </span>
           </button>
         </nav>
       </div>
@@ -6235,11 +6261,29 @@ if ($view === 'map_edit') {
             const core=document.createElementNS('http://www.w3.org/2000/svg','path');
             core.classList.add('relation-core');
             core.dataset.bidirectional=relation.bidirectional?'true':'false';
-            core.setAttribute('marker-end','url(#mindRelationArrow)');
-            if(relation.bidirectional){ core.setAttribute('marker-start','url(#mindRelationArrow)'); }
-            else{ core.removeAttribute('marker-start'); }
+            const coreId=`relation-path-${relation.id}`;
+            core.setAttribute('id', coreId);
             const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
             highlight.classList.add('relation-highlight');
+            const makeDirectionElement=(className)=>{
+              const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+              text.classList.add('relation-direction', className);
+              text.setAttribute('aria-hidden','true');
+              const textPath=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+              textPath.setAttribute('startOffset','0%');
+              textPath.setAttribute('lengthAdjust','spacingAndGlyphs');
+              textPath.setAttribute('method','align');
+              textPath.setAttribute('spacing','auto');
+              textPath.setAttributeNS('http://www.w3.org/1999/xlink','href',`#${coreId}`);
+              textPath.setAttribute('href',`#${coreId}`);
+              text.appendChild(textPath);
+              return {text,textPath};
+            };
+            const {text:directionForward,textPath:directionForwardPath}=makeDirectionElement('relation-direction-forward');
+            directionForward.setAttribute('dy','-5');
+            const {text:directionBackward,textPath:directionBackwardPath}=makeDirectionElement('relation-direction-backward');
+            directionBackward.setAttribute('dy','5');
+            if(!relation.bidirectional){ directionBackward.setAttribute('display','none'); }
             const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
             hit.classList.add('relation-hit');
             hit.setAttribute('fill','none');
@@ -6250,9 +6294,11 @@ if ($view === 'map_edit') {
             group.appendChild(shadow);
             group.appendChild(core);
             group.appendChild(highlight);
+            group.appendChild(directionForward);
+            group.appendChild(directionBackward);
             group.appendChild(hit);
             this.relationLayer.appendChild(group);
-            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
+            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation,directionForward,directionForwardPath,directionBackward,directionBackwardPath});
             const handleSelect=evt=>{
               if(evt){ evt.stopPropagation(); }
               const isMouse=evt && evt.pointerType==='mouse';
@@ -6579,52 +6625,67 @@ if ($view === 'map_edit') {
           };
           const startSide=determineSide(fromNode);
           const endSide=determineSide(toNode);
-          const adjustVector=(vector, side)=>{
-            if(!vector) return vector;
-            if(!side) return {x:vector.x,y:vector.y};
-            const biasBase=Math.hypot(vector.x, vector.y) || 1;
-            const bias=Math.min(Math.max(biasBase*0.35, 18), 72);
-            return {x:vector.x + side*bias, y:vector.y};
+          const chooseVerticalAnchor=(node, counterpartCenter)=>{
+            if(!node || !node.anchors || !counterpartCenter) return null;
+            const {top, bottom, center}=node.anchors;
+            const fallback=center?{x:center.x,y:center.y}:null;
+            const topPoint=top?{x:top.x,y:top.y}:fallback;
+            const bottomPoint=bottom?{x:bottom.x,y:bottom.y}:fallback;
+            if(!topPoint || !bottomPoint) return fallback?{point:fallback,normal:{x:0,y:0},position:'center'}:null;
+            const topDistance=Math.abs(counterpartCenter.y - topPoint.y);
+            const bottomDistance=Math.abs(counterpartCenter.y - bottomPoint.y);
+            if(topDistance<=bottomDistance){
+              return {point:topPoint,normal:{x:0,y:-1},position:'top'};
+            }
+            return {point:bottomPoint,normal:{x:0,y:1},position:'bottom'};
           };
-          const startVector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
-          const endVector={x:startCenter.x-endCenter.x,y:startCenter.y-endCenter.y};
-          const startInner=this.computeNodeBoundaryPoint(fromNode, adjustVector(startVector, startSide), 8);
-          const endInner=this.computeNodeBoundaryPoint(toNode, adjustVector(endVector, endSide), 8);
-          if(!startInner || !endInner) return;
-          let vector={x:endInner.x-startInner.x,y:endInner.y-startInner.y};
-          let segmentLength=Math.hypot(vector.x, vector.y);
-          if(segmentLength<0.001){
-            vector={x:endCenter.x-startCenter.x,y:endCenter.y-startCenter.y};
-            segmentLength=Math.hypot(vector.x, vector.y);
-            if(segmentLength<0.001) return;
-            startInner={x:startCenter.x,y:startCenter.y};
-            endInner={x:endCenter.x,y:endCenter.y};
+          const startAnchor=chooseVerticalAnchor(fromNode, endCenter);
+          const endAnchor=chooseVerticalAnchor(toNode, startCenter);
+          if(!startAnchor || !endAnchor) return;
+          const startPoint={x:startAnchor.point.x,y:startAnchor.point.y};
+          const endPoint={x:endAnchor.point.x,y:endAnchor.point.y};
+          let dx=endPoint.x-startPoint.x;
+          let dy=endPoint.y-startPoint.y;
+          let distance=Math.hypot(dx,dy);
+          if(distance<0.001){
+            const offset=8;
+            startPoint.y+=startAnchor.normal.y*offset;
+            endPoint.y-=endAnchor.normal.y*offset;
+            dx=endPoint.x-startPoint.x;
+            dy=endPoint.y-startPoint.y;
+            distance=Math.hypot(dx,dy);
           }
-          const norm={x:vector.x/segmentLength,y:vector.y/segmentLength};
-          const arrowBase=Math.min(22, Math.max(10, segmentLength*0.18));
-          const halfDistance=segmentLength/2;
-          const clearanceLimit=Math.max(0, halfDistance - 6);
-          const effectiveClearance=Math.max(0, Math.min(arrowBase, clearanceLimit, segmentLength - 8));
-          const endClearance=effectiveClearance;
-          const startClearance=relation.bidirectional ? effectiveClearance : 0;
-          const startPoint={x:startInner.x - norm.x*startClearance,y:startInner.y - norm.y*startClearance};
-          const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
-          const dx=endPoint.x-startPoint.x;
-          const dy=endPoint.y-startPoint.y;
-          const distance=Math.hypot(dx,dy) || 1;
+          if(distance<0.001) return;
           const baseNormal={x:distance?-dy/distance:0,y:distance?dx/distance:0};
           const tangentLength=Math.min(96, Math.max(24, distance*0.28));
           const curvature=Math.min(160, Math.max(26, distance*0.42));
-          const verticalHint=Math.abs(dy)>4 ? Math.sign(dy) : 0;
+          const verticalTrend=Math.abs(dy)>6 ? Math.sign(dy) : 0;
           const fallbackHorizontal=(()=>{ const direct=Math.sign(dx); if(direct) return direct; return (startSide||endSide||1); })();
-          const buildTangent=(side, fallback, normalBias)=>{
+          const computeHorizontal=(side, fallback)=>{
             let horizontal=side;
             if(horizontal===0){ horizontal=fallback; }
             if(horizontal===0){ horizontal=fallback>=0?1:-1; }
-            let vertical=verticalHint ? verticalHint*0.6 : normalBias*0.6;
+            return horizontal;
+          };
+          const buildTangent=(side, fallback, anchorNormal)=>{
+            const horizontal=computeHorizontal(side, fallback);
+            let vertical=anchorNormal*1.15 + verticalTrend*0.35;
+            if(!vertical){ vertical=anchorNormal || verticalTrend || 0.8; }
             const len=Math.hypot(horizontal, vertical);
-            if(len===0){ return {x:horizontal||0,y:vertical||0}; }
+            if(len===0){
+              return {x:0,y:anchorNormal || verticalTrend || 0};
+            }
             return {x:horizontal/len,y:vertical/len};
+          };
+          const startTangent=buildTangent(startSide, fallbackHorizontal, startAnchor.normal.y || 0);
+          const endTangent=buildTangent(endSide, fallbackHorizontal, endAnchor.normal.y || 0);
+          const startCtrlBase={
+            x:startPoint.x + startTangent.x*tangentLength,
+            y:startPoint.y + startTangent.y*tangentLength
+          };
+          const endCtrlBase={
+            x:endPoint.x + endTangent.x*tangentLength,
+            y:endPoint.y + endTangent.y*tangentLength
           };
           const bezierPoint=(t,p0,p1,p2,p3)=>{
             const mt=1-t;
@@ -6639,16 +6700,6 @@ if ($view === 'map_edit') {
           const evaluatePath=normalSign=>{
             const normalX=baseNormal.x*normalSign;
             const normalY=baseNormal.y*normalSign;
-            const startTangent=buildTangent(startSide, fallbackHorizontal, normalSign||1);
-            const endTangent=buildTangent(endSide, fallbackHorizontal, normalSign||1);
-            const startCtrlBase={
-              x:startPoint.x + startTangent.x*tangentLength,
-              y:startPoint.y + startTangent.y*tangentLength
-            };
-            const endCtrlBase={
-              x:endPoint.x + endTangent.x*tangentLength,
-              y:endPoint.y + endTangent.y*tangentLength
-            };
             const ctrl1={x:startCtrlBase.x + normalX*curvature,y:startCtrlBase.y + normalY*curvature};
             const ctrl2={x:endCtrlBase.x + normalX*curvature,y:endCtrlBase.y + normalY*curvature};
             const q1=bezierPoint(0.25,startPoint,ctrl1,ctrl2,endPoint);
@@ -6681,34 +6732,31 @@ if ($view === 'map_edit') {
           entry.highlight.setAttribute('d', pathData);
           if(entry.hit){ entry.hit.setAttribute('d', pathData); }
           entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
-          if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
-          else{ entry.core.removeAttribute('marker-start'); }
-          entry.relation=relation;
-        }
-        computeNodeBoundaryPoint(node, directionVector, padding){
-          if(!node || !directionVector) return null;
-          const width=Math.max(1, node.width || (node.el?node.el.offsetWidth:0) || 0);
-          const height=Math.max(1, node.height || (node.el?node.el.offsetHeight:0) || 0);
-          const halfW=width/2 + (padding||0);
-          const halfH=height/2 + (padding||0);
-          let dx=typeof directionVector.x==='number'?directionVector.x:0;
-          let dy=typeof directionVector.y==='number'?directionVector.y:0;
-          const tiny=1e-6;
-          if(Math.abs(dx)<tiny && Math.abs(dy)<tiny){
-            return {x:node.absX,y:node.absY};
+          if(entry.directionBackward){
+            if(relation.bidirectional){ entry.directionBackward.removeAttribute('display'); }
+            else{ entry.directionBackward.setAttribute('display','none'); }
           }
-          if(Math.abs(dx)<tiny){ dx=dx>=0?tiny:-tiny; }
-          if(Math.abs(dy)<tiny){ dy=dy>=0?tiny:-tiny; }
-          const absDx=Math.abs(dx);
-          const absDy=Math.abs(dy);
-          let scale;
-          if(absDx<tiny){ scale=halfH/absDy; }
-          else if(absDy<tiny){ scale=halfW/absDx; }
-          else{ scale=Math.min(halfW/absDx, halfH/absDy); }
-          return {
-            x:node.absX + dx*scale,
-            y:node.absY + dy*scale,
+          const totalLength=(()=>{
+            try{ return entry.core.getTotalLength(); }
+            catch(_){ return null; }
+          })();
+          const applyDirectionTexture=(textPathEl, textEl, glyph, shouldShow)=>{
+            if(!textPathEl || !textEl){ return; }
+            if(!shouldShow || !Number.isFinite(totalLength) || totalLength<24){
+              textPathEl.textContent='';
+              textPathEl.removeAttribute('textLength');
+              textEl.setAttribute('display','none');
+              return;
+            }
+            const spacing=Math.max(8, Math.min(16, totalLength/18));
+            const count=Math.max(3, Math.floor(totalLength/spacing));
+            textPathEl.textContent=glyph.repeat(count);
+            textPathEl.setAttribute('textLength', totalLength);
+            textEl.removeAttribute('display');
           };
+          applyDirectionTexture(entry.directionForwardPath, entry.directionForward, '›', true);
+          applyDirectionTexture(entry.directionBackwardPath, entry.directionBackward, '‹', !!relation.bidirectional);
+          entry.relation=relation;
         }
         updateRelationsForNode(node){
           if(!node || !this.relationRegistry || !this.relationRegistry.size) return;
@@ -7538,6 +7586,7 @@ if ($view === 'map_edit') {
       const dockFoldButton=dock ? dock.querySelector('.dock-btn[data-action="fold"]') : null;
       const dockFoldLabel=dockFoldButton ? dockFoldButton.querySelector('[data-fold-label]') : null;
       const dockFoldIcon=dockFoldButton ? dockFoldButton.querySelector('[data-fold-icon]') : null;
+      const dockFoldShortcut=dockFoldButton ? dockFoldButton.querySelector('[data-fold-shortcut]') : null;
       const exportOverlay=document.getElementById('mind-export-overlay');
       const mapIo=document.getElementById('map-io');
       const mapIoButton=document.getElementById('map-io-button');
@@ -7709,18 +7758,28 @@ if ($view === 'map_edit') {
         const hasChildren=!!(node && node.children && node.children.length);
         let label='折叠';
         let icon='⇅';
-        let tip='折叠/展开（Space 或 ←/→）';
+        let shortcut='Space 或 ←/→';
         if(hasChildren){
           const collapsed=node.expanded===false;
           label=collapsed?'展开':'折叠';
           icon=collapsed?'⤴':'⤵';
-          tip=collapsed?'展开（Space 或 →）':'折叠（Space 或 ←）';
+          shortcut=collapsed?'Space 或 →':'Space 或 ←';
         }
         if(dockFoldLabel){ dockFoldLabel.textContent=label; }
         if(dockFoldIcon){ dockFoldIcon.textContent=icon; }
-        dockFoldButton.dataset.tip=tip;
+        if(dockFoldShortcut){
+          if(shortcut){
+            dockFoldShortcut.textContent=shortcut;
+            dockFoldShortcut.hidden=false;
+          }else{
+            dockFoldShortcut.textContent='';
+            dockFoldShortcut.hidden=true;
+          }
+        }
         dockFoldButton.disabled=!hasChildren;
-        dockFoldButton.setAttribute('aria-label', hasChildren ? `${label}节点` : '折叠或展开节点');
+        const shortcutSuffix=shortcut ? `（${shortcut}）` : '';
+        const ariaLabel=hasChildren ? `${label}节点${shortcutSuffix}` : `折叠或展开节点${shortcutSuffix}`;
+        dockFoldButton.setAttribute('aria-label', ariaLabel);
       }
       function restoreMindSnapshot(snapshot){
         if(!snapshot || !snapshot.tree) return false;
