@@ -3968,6 +3968,7 @@ if ($view === 'map_edit') {
       .mind-relations path{fill:none;stroke-linecap:round;stroke-linejoin:round}
       .mind-relations .relation-shadow{stroke:rgba(122,94,54,.55);stroke-width:2.1;opacity:.65;filter:url(#mindSoftGlow);transition:stroke var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{stroke:url(#mindGoldTrace);stroke-width:1.6;filter:url(#mindSoftGlow);transition:stroke var(--transition),stroke-width var(--transition)}
+      .mind-relations .relation-hit{stroke:rgba(255,255,255,.001);stroke-width:22;pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-highlight{stroke:rgba(255,242,218,.32);stroke-width:0.8;transition:stroke var(--transition),stroke-width var(--transition),opacity var(--transition)}
       .mind-relations .relation-core{pointer-events:stroke;cursor:pointer}
       .mind-relations .relation-highlight{pointer-events:none}
@@ -3975,6 +3976,7 @@ if ($view === 'map_edit') {
       .mind-relations .relation-group[data-selected="true"] .relation-shadow{stroke:rgba(75,195,209,.85);opacity:.9}
       .mind-relations .relation-group[data-selected="true"] .relation-core{stroke-width:2.6;stroke:rgba(191,242,255,.92);filter:url(#mindSoftGlow)}
       .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(255,255,255,.88);stroke-width:2;opacity:1;animation:relationGlowPulse 1.2s ease-in-out infinite}
+      .mind-relations .relation-group[data-selected="true"] .relation-hit{stroke-width:28}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0;pointer-events:none}
       .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto}
@@ -4007,8 +4009,9 @@ if ($view === 'map_edit') {
       .node-collapse-marker .icon{font-size:14px;line-height:1}
       .jsmind-node.is-collapsed .node-collapse-marker{background:rgba(201,168,106,.2);border-color:rgba(201,168,106,.46)}
       .mind-dock-wrap{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 18px);transform:translateX(-50%);pointer-events:none;z-index:120;max-width:min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)),1120px);width:100%;display:flex;justify-content:center}
-      .mind-dock{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:auto;max-width:100%;box-sizing:border-box;touch-action:manipulation;flex:0 1 auto;margin:0 auto}
-      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:0 0 92px;min-width:76px}
+      .mind-dock{pointer-events:auto;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:14px;padding:16px 24px;border-radius:32px;background:linear-gradient(180deg,rgba(21,26,30,.9),rgba(12,16,18,.85));border:1px solid rgba(201,168,106,.32);box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 32px rgba(227,198,139,.12) inset;backdrop-filter:blur(12px);position:relative;width:100%;max-width:100%;box-sizing:border-box;touch-action:pan-x;flex:0 1 auto;margin:0 auto;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .mind-dock::-webkit-scrollbar{display:none}
+      .dock-btn{position:relative;display:grid;grid-template-rows:auto auto;align-items:center;justify-items:center;height:66px;border-radius:18px;padding:8px 6px;background:rgba(201,168,106,.08);border:1px solid rgba(201,168,106,.36);color:var(--gold-400);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition),background-color var(--transition);touch-action:manipulation;flex:1 0 clamp(88px,8.2vw,124px);min-width:clamp(72px,7vw,112px);max-width:140px}
       .dock-btn .icon{font-size:20px}
       .dock-btn .label{font-size:12px}
       @media (hover:hover) and (pointer:fine){
@@ -4027,11 +4030,11 @@ if ($view === 'map_edit') {
       .dock-btn[data-state="saving"]{color:var(--gold-500)}
       .dock-btn[data-state="saved"]{color:var(--gold-400)}
       .dock-sep{width:12px;height:44px;border-right:1px solid rgba(201,168,106,.24);opacity:.6}
-      .mind-shell[data-fisheye="on"] .dock-btn{transform-origin:50% 65%}
       @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:0 0 88px;min-width:70px}}
-      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;flex-wrap:nowrap;width:100%}.mind-dock::-webkit-scrollbar{display:none}.dock-btn{height:58px;flex:0 0 78px;min-width:64px}.dock-btn .label{font-size:11px}}
-      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:0 0 70px;min-width:58px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
-      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}.mind-shell[data-fisheye="on"] .dock-btn{transform:none!important}}
+      @media (max-width:960px){.mind-dock-wrap{max-width:min(calc(100vw - 28px),940px)}.mind-dock{gap:12px;padding:14px 20px;border-radius:30px}.dock-btn{height:62px;flex:1 0 clamp(82px,11vw,118px);min-width:68px;max-width:132px}}
+      @media (max-width:720px){.mind-dock-wrap{max-width:calc(100vw - 24px)}.mind-dock{padding:12px 18px;border-radius:26px;gap:10px;justify-content:flex-start}.dock-btn{height:58px;flex:1 0 clamp(76px,20vw,110px);min-width:64px;max-width:120px}.dock-btn .label{font-size:11px}}
+      @media (max-width:520px){.mind-dock-wrap{max-width:calc(100vw - 20px)}.mind-dock{padding:12px 16px;gap:8px;justify-content:flex-start}.dock-btn{height:56px;flex:1 0 clamp(70px,28vw,104px);min-width:58px;max-width:112px}.dock-btn .icon{font-size:18px}.dock-sep{display:none}}
+      @media (prefers-reduced-motion: reduce){.dock-btn,.dock-btn:hover{transition:none!important;transform:none!important}}
       .mind-relation-toast{position:absolute;left:50%;top:24px;transform:translateX(-50%) translateY(-8px);padding:10px 16px;border-radius:18px;border:1px solid rgba(75,195,209,.4);background:rgba(10,16,20,.88);color:rgba(191,242,255,.92);font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 18px 40px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--transition),transform var(--transition);z-index:110}
       .mind-relation-toast[data-visible="true"]{opacity:1;transform:translateX(-50%) translateY(0)}
       .mind-shell[data-relation-mode] .mind-stage::after{content:"";position:absolute;inset:0;border:1px dashed rgba(75,195,209,.35);border-radius:inherit;pointer-events:none;animation:relationPulse 1.2s infinite ease-in-out}
@@ -4190,7 +4193,7 @@ if ($view === 'map_edit') {
         </marker>
       </defs>
     </svg>
-    <div class="mind-shell" data-fisheye="on">
+    <div class="mind-shell">
       <div class="mind-stage">
         <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
           <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
@@ -4338,7 +4341,6 @@ if ($view === 'map_edit') {
           <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
         </header>
         <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
-        <label><input type="checkbox" id="setting-fisheye" checked> Dock 鱼眼放大</label>
         <div class="settings-actions">
           <button type="button" data-settings-close>关闭</button>
         </div>
@@ -4903,6 +4905,7 @@ if ($view === 'map_edit') {
       const DEFAULT_NODE_ICON='🧠';
       const isCompactViewport=()=>window.matchMedia('(max-width: 900px)').matches;
       let lastTapInfo={id:null,time:0};
+      let relationLongPressState=null;
       const TRACE_GRID=8;
       const TRACE_CHAMFER=3;
       const nearlyEqual=(a,b)=>Math.abs(a-b)<0.5;
@@ -6214,6 +6217,7 @@ if ($view === 'map_edit') {
         }
         renderRelations(){
           if(!this.relationLayer) return;
+          if(typeof cancelRelationLongPressState==='function'){ cancelRelationLongPressState(); }
           while(this.relationLayer.firstChild){ this.relationLayer.removeChild(this.relationLayer.firstChild); }
           if(this.relationRegistry){ this.relationRegistry.clear(); }
           if(!Array.isArray(this.relations) || !this.relations.length){
@@ -6240,14 +6244,18 @@ if ($view === 'map_edit') {
             else{ core.removeAttribute('marker-start'); }
             const highlight=document.createElementNS('http://www.w3.org/2000/svg','path');
             highlight.classList.add('relation-highlight');
+            const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+            hit.classList.add('relation-hit');
+            hit.setAttribute('fill','none');
             if(this.selectedRelationId && this.selectedRelationId===relation.id){
               group.dataset.selected='true';
             }
             group.appendChild(shadow);
             group.appendChild(core);
             group.appendChild(highlight);
+            group.appendChild(hit);
             this.relationLayer.appendChild(group);
-            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+            this.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
             const handleSelect=evt=>{
               if(evt){ evt.stopPropagation(); }
               const isMouse=evt && evt.pointerType==='mouse';
@@ -6264,8 +6272,65 @@ if ($view === 'map_edit') {
                 this.options.onRelationContext(selected, this, evt||null);
               }
             };
-            core.addEventListener('pointerdown',handleSelect);
-            core.addEventListener('contextmenu',handleContext);
+            const handlePointerDown=evt=>{
+              handleSelect(evt);
+              if(!evt || !evt.pointerType || !['touch','pen'].includes(evt.pointerType)){
+                if(typeof cancelRelationLongPressState==='function'){ cancelRelationLongPressState(); }
+                return;
+              }
+              if(typeof cancelRelationLongPressState==='function'){ cancelRelationLongPressState(); }
+              relationLongPressState={
+                pointerId:evt.pointerId,
+                relationId:relation.id,
+                startX:evt.clientX,
+                startY:evt.clientY,
+                target:evt.currentTarget || evt.target || null,
+                triggered:false,
+                timer:window.setTimeout(()=>{
+                  if(!relationLongPressState || relationLongPressState.pointerId!==evt.pointerId || relationLongPressState.relationId!==relation.id) return;
+                  relationLongPressState.triggered=true;
+                  relationLongPressState.timer=null;
+                  if(relationLongPressState.target && relationLongPressState.pointerId!=null && relationLongPressState.target.releasePointerCapture){
+                    try{ relationLongPressState.target.releasePointerCapture(relationLongPressState.pointerId); }
+                    catch(_){ /* ignore */ }
+                  }
+                  relationLongPressState.target=null;
+                  if(typeof deleteSelectedRelation==='function' && selectedRelationId===relation.id){
+                    deleteSelectedRelation();
+                  }
+                }, LONG_PRESS_DELAY)
+              };
+              if(relationLongPressState.target && relationLongPressState.target.setPointerCapture){
+                try{ relationLongPressState.target.setPointerCapture(evt.pointerId); }
+                catch(_){ /* ignore */ }
+              }
+            };
+            const handlePointerMove=evt=>{
+              if(!relationLongPressState || evt.pointerId!==relationLongPressState.pointerId) return;
+              if(relationLongPressState.triggered) return;
+              const dx=Math.abs(evt.clientX-relationLongPressState.startX);
+              const dy=Math.abs(evt.clientY-relationLongPressState.startY);
+              if(dx>LONG_PRESS_TOLERANCE || dy>LONG_PRESS_TOLERANCE){
+                if(typeof cancelRelationLongPressState==='function'){ cancelRelationLongPressState(); }
+              }
+            };
+            const finishRelationLongPress=evt=>{
+              if(!relationLongPressState || evt.pointerId!==relationLongPressState.pointerId) return;
+              const triggered=!!relationLongPressState.triggered;
+              if(typeof cancelRelationLongPressState==='function'){ cancelRelationLongPressState(); }
+              if(triggered){
+                evt.preventDefault();
+                evt.stopPropagation();
+              }
+            };
+            [core, hit].forEach(target=>{
+              if(!target) return;
+              target.addEventListener('pointerdown',handlePointerDown);
+              target.addEventListener('pointermove',handlePointerMove);
+              target.addEventListener('pointerup',finishRelationLongPress);
+              target.addEventListener('pointercancel',finishRelationLongPress);
+              target.addEventListener('contextmenu',handleContext);
+            });
             this.updateRelationPath(relation);
           }
         }
@@ -6528,6 +6593,50 @@ if ($view === 'map_edit') {
             btn.style.top=`${screenY}px`;
           }
         }
+        buildRoundedPath(points, radius){
+          if(!Array.isArray(points) || points.length<2) return '';
+          const fmt=value=>{
+            if(!Number.isFinite(value)) return 0;
+            return Math.round(value*100)/100;
+          };
+          const commands=[];
+          const sanitize=point=>({x:Number(point.x), y:Number(point.y)});
+          let previous=sanitize(points[0]);
+          commands.push(`M${fmt(previous.x)} ${fmt(previous.y)}`);
+          for(let i=1;i<points.length;i++){
+            const rawPoint=points[i];
+            if(!rawPoint) continue;
+            const point=sanitize(rawPoint);
+            if(i===points.length-1){
+              commands.push(`L${fmt(point.x)} ${fmt(point.y)}`);
+              previous=point;
+              continue;
+            }
+            const nextRaw=points[i+1];
+            if(!nextRaw){
+              commands.push(`L${fmt(point.x)} ${fmt(point.y)}`);
+              previous=point;
+              continue;
+            }
+            const next=sanitize(nextRaw);
+            const prevVec={x:point.x-previous.x,y:point.y-previous.y};
+            const nextVec={x:next.x-point.x,y:next.y-point.y};
+            const prevLen=Math.hypot(prevVec.x, prevVec.y) || 1;
+            const nextLen=Math.hypot(nextVec.x, nextVec.y) || 1;
+            const corner=Math.min(radius, prevLen/2, nextLen/2);
+            const entryPoint={
+              x:point.x - (prevVec.x/prevLen)*corner,
+              y:point.y - (prevVec.y/prevLen)*corner,
+            };
+            const exitPoint={
+              x:point.x + (nextVec.x/nextLen)*corner,
+              y:point.y + (nextVec.y/nextLen)*corner,
+            };
+            commands.push(`L${fmt(entryPoint.x)} ${fmt(entryPoint.y)} Q${fmt(point.x)} ${fmt(point.y)} ${fmt(exitPoint.x)} ${fmt(exitPoint.y)}`);
+            previous=exitPoint;
+          }
+          return commands.join(' ');
+        }
         updateRelationPath(relation){
           if(!relation) return;
           const entry=this.relationRegistry ? this.relationRegistry.get(relation.id) : null;
@@ -6563,18 +6672,75 @@ if ($view === 'map_edit') {
           const endPoint={x:endInner.x - norm.x*endClearance,y:endInner.y - norm.y*endClearance};
           const dx=endPoint.x-startPoint.x;
           const dy=endPoint.y-startPoint.y;
-          const distance=Math.hypot(dx,dy) || 1;
-          const normalX=distance?-dy/distance:0;
-          const normalY=distance?dx/distance:0;
-          const offset=Math.min(140, Math.max(30, distance*0.2));
-          const ctrl1x=startPoint.x + dx*0.25 + normalX*offset;
-          const ctrl1y=startPoint.y + dy*0.25 + normalY*offset;
-          const ctrl2x=startPoint.x + dx*0.75 - normalX*offset;
-          const ctrl2y=startPoint.y + dy*0.75 - normalY*offset;
-          const pathData=`M${startPoint.x} ${startPoint.y} C ${ctrl1x} ${ctrl1y}, ${ctrl2x} ${ctrl2y}, ${endPoint.x} ${endPoint.y}`;
+          const absDx=Math.abs(dx);
+          const absDy=Math.abs(dy);
+          const fallbackDir=dx>=0?1:-1;
+          const directionHint=(node, fallback)=>{
+            if(!node) return fallback;
+            if(node.direction==='left' || node.dir===-1) return -1;
+            if(node.direction==='right' || node.dir===1) return 1;
+            if(this.root && Number.isFinite(this.root.absX) && Number.isFinite(node.absX)){
+              return node.absX>=this.root.absX ? 1 : -1;
+            }
+            return fallback;
+          };
+          const fromDir=directionHint(fromNode, fallbackDir);
+          const toDir=directionHint(toNode, fallbackDir);
+          const baseOffset=Math.max(60, Math.min(220, absDx*0.35 + absDy*0.25));
+          let startOutX=startPoint.x + fromDir*baseOffset;
+          let endOutX=endPoint.x + toDir*baseOffset;
+          const minimumSeparation=36;
+          if(fromDir===toDir){
+            if(fromDir>0 && startOutX > endOutX - minimumSeparation){
+              const mid=(startOutX+endOutX)/2;
+              startOutX=mid - minimumSeparation/2;
+              endOutX=mid + minimumSeparation/2;
+            }else if(fromDir<0 && startOutX < endOutX + minimumSeparation){
+              const mid=(startOutX+endOutX)/2;
+              startOutX=mid + minimumSeparation/2;
+              endOutX=mid - minimumSeparation/2;
+            }
+          }
+          let midY=(startPoint.y + endPoint.y)/2;
+          const verticalDistance=Math.abs(endPoint.y-startPoint.y);
+          if(verticalDistance<90){
+            const bend=Math.max(120, baseOffset*0.9);
+            let bias=0;
+            if(verticalDistance>0){ bias=endPoint.y>startPoint.y?1:-1; }
+            else if(fromNode && toNode){ bias=toNode.absY>=fromNode.absY?1:-1; }
+            if(bias===0){ bias=fallbackDir>=0?1:-1; }
+            midY=startPoint.y + bend*bias;
+          }
+          const points=[];
+          const pushPoint=(arr, point)=>{
+            if(!point) return;
+            const px=Number(point.x);
+            const py=Number(point.y);
+            if(!Number.isFinite(px) || !Number.isFinite(py)) return;
+            if(arr.length){
+              const last=arr[arr.length-1];
+              if(Math.abs(last.x-px)<0.5 && Math.abs(last.y-py)<0.5) return;
+            }
+            arr.push({x:px,y:py});
+          };
+          pushPoint(points,startPoint);
+          pushPoint(points,{x:startOutX,y:startPoint.y});
+          if(Math.abs(midY-startPoint.y)>1 || Math.abs(midY-endPoint.y)>1){
+            pushPoint(points,{x:startOutX,y:midY});
+            pushPoint(points,{x:endOutX,y:midY});
+          }else{
+            const midX=(startOutX+endOutX)/2;
+            pushPoint(points,{x:midX,y:startPoint.y});
+          }
+          pushPoint(points,{x:endOutX,y:endPoint.y});
+          pushPoint(points,endPoint);
+          const cornerRadius=Math.min(60, Math.max(18, Math.max(absDx, absDy)*0.16));
+          const pathData=this.buildRoundedPath(points, cornerRadius);
+          if(!pathData) return;
           entry.shadow.setAttribute('d', pathData);
           entry.core.setAttribute('d', pathData);
-          entry.highlight.setAttribute('d', pathData);
+          if(entry.highlight){ entry.highlight.setAttribute('d', pathData); }
+          if(entry.hit){ entry.hit.setAttribute('d', pathData); }
           entry.core.dataset.bidirectional=relation && relation.bidirectional?'true':'false';
           if(relation.bidirectional){ entry.core.setAttribute('marker-start','url(#mindRelationArrow)'); }
           else{ entry.core.removeAttribute('marker-start'); }
@@ -7426,7 +7592,6 @@ if ($view === 'map_edit') {
       const mindInfoHandleIcon=mindInfoHandle ? mindInfoHandle.querySelector('.icon') : null;
       const mindInfoContent=mindInfoBar ? mindInfoBar.querySelector('.mind-info-content') : null;
       const dock=document.getElementById('mind-dock');
-      const dockButtons=dock ? Array.from(dock.querySelectorAll('.dock-btn[data-action]')) : [];
       const dockSaveButton=dock ? dock.querySelector('.dock-btn[data-action="save"]') : null;
       const dockSaveLabel=dockSaveButton ? dockSaveButton.querySelector('.label') : null;
       const dockUndoButton=dock ? dock.querySelector('.dock-btn[data-action="undo"]') : null;
@@ -7454,12 +7619,8 @@ if ($view === 'map_edit') {
       const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
-      const fisheyeToggle=document.getElementById('setting-fisheye');
-      const pointerMedia=window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-      let pointerIsCoarse=pointerMedia ? pointerMedia.matches : false;
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-      if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
       let infoBarCollapsed=false;
       function applyInfoBarState(){
         if(!mindInfoBar) return;
@@ -7520,24 +7681,6 @@ if ($view === 'map_edit') {
           exportOverlay.setAttribute('aria-hidden','true');
           exportOverlayHideTimer=null;
         },360);
-      }
-      function isFisheyeEnabled(){
-        return !pointerIsCoarse && (!fisheyeToggle || fisheyeToggle.checked);
-      }
-      function syncFisheyeState(){
-        const enabled=isFisheyeEnabled();
-        if(mindShell){ mindShell.dataset.fisheye=enabled?'on':'off'; }
-        if(!enabled && dockButtons.length){ dockButtons.forEach(btn=>btn.style.transform=''); }
-      }
-      function handlePointerPrecisionChange(event){
-        pointerIsCoarse=event ? !!event.matches : pointerIsCoarse;
-        if(pointerIsCoarse && fisheyeToggle){ fisheyeToggle.checked=false; }
-        syncFisheyeState();
-      }
-      syncFisheyeState();
-      if(pointerMedia){
-        if(pointerMedia.addEventListener) pointerMedia.addEventListener('change',handlePointerPrecisionChange);
-        else if(pointerMedia.addListener) pointerMedia.addListener(handlePointerPrecisionChange);
       }
       const UNDO_MAX_DEPTH=100;
       const UNDO_MERGE_WINDOW=200;
@@ -7892,6 +8035,7 @@ if ($view === 'map_edit') {
       function clearRelationSelection(){
         if(typeof jm?.clear_relation_selection==='function'){ jm.clear_relation_selection(); }
         selectedRelationId=null;
+        cancelRelationLongPressState();
       }
       function closeRelationContextMenu(){
         if(!relationContextMenu) return;
@@ -8033,6 +8177,7 @@ if ($view === 'map_edit') {
       }
       function deleteSelectedRelation(){
         if(!selectedRelationId || typeof jm?.remove_relation!=='function') return false;
+        cancelRelationLongPressState();
         const targetId=selectedRelationId;
         const result=performUndoable('remove-relation',()=>{
           const removed=jm.remove_relation(targetId);
@@ -8379,6 +8524,7 @@ if ($view === 'map_edit') {
         const target=e.target;
         if(nodeContextMenu && !nodeContextMenu.hidden && !nodeContextMenu.contains(target)){ closeNodeContextMenu(); }
         if(relationContextMenu && !relationContextMenu.hidden && !relationContextMenu.contains(target)){ closeRelationContextMenu(); }
+        cancelRelationLongPressState();
       });
       if(nodeContextMenu){
         nodeContextMenu.addEventListener('click',e=>{
@@ -8407,6 +8553,16 @@ if ($view === 'map_edit') {
         if(longPressState && longPressState.timer){ clearTimeout(longPressState.timer); }
         longPressState=null;
       };
+      function cancelRelationLongPressState(){
+        if(relationLongPressState){
+          if(relationLongPressState.timer){ clearTimeout(relationLongPressState.timer); }
+          if(relationLongPressState.target && relationLongPressState.pointerId!=null && relationLongPressState.target.releasePointerCapture){
+            try{ relationLongPressState.target.releasePointerCapture(relationLongPressState.pointerId); }
+            catch(_){ /* ignore */ }
+          }
+        }
+        relationLongPressState=null;
+      }
       if(jmContainer){
         jmContainer.addEventListener('pointerdown',e=>{
           const nodeEl=e.target.closest('.jsmind-node');
@@ -8426,7 +8582,7 @@ if ($view === 'map_edit') {
               longPressState.triggered=true;
               longPressState.timer=null;
               const node=jm.get_node(longPressState.nodeId);
-              if(node){ openNodeContextMenu(node,{x:longPressState.startX,y:longPressState.startY}); }
+              if(node){ openInspectorPopover(node); }
             }, LONG_PRESS_DELAY)
           };
         });
@@ -9826,27 +9982,6 @@ if ($view === 'map_edit') {
             }
           }
         });
-        const applyFisheye=(event)=>{
-          if(!dockButtons.length) return;
-          if(!isFisheyeEnabled()){ dockButtons.forEach(btn=>btn.style.transform=''); return; }
-          const rect=dock.getBoundingClientRect();
-          const centerX=event.clientX-rect.left + dock.scrollLeft;
-          dockButtons.forEach(btn=>{
-            const bx=btn.offsetLeft + btn.offsetWidth/2;
-            const dist=Math.abs(centerX-bx);
-            const scale=Math.max(1, 1.18 - dist/800);
-            btn.style.transform=`scale(${scale})`;
-          });
-        };
-        if(dockButtons.length){
-          dock.addEventListener('mousemove',applyFisheye);
-          dock.addEventListener('mouseleave',()=>{ dockButtons.forEach(btn=>btn.style.transform=''); });
-        }
-        if(fisheyeToggle){
-          fisheyeToggle.addEventListener('change',()=>{
-            syncFisheyeState();
-          });
-        }
       }
       document.addEventListener('keydown',e=>{
         if(e.key==='Escape'){ closeMapIoMenu(); }
@@ -10112,9 +10247,10 @@ if ($view === 'map_edit') {
             const shadow=group.querySelector('.relation-shadow');
             const core=group.querySelector('.relation-core');
             const highlight=group.querySelector('.relation-highlight');
+            const hit=group.querySelector('.relation-hit');
             if(core){ core.dataset.bidirectional=relation.bidirectional?'true':'false'; }
             if(mindInstance.relationRegistry){
-              mindInstance.relationRegistry.set(relation.id,{group,shadow,core,highlight,relation});
+              mindInstance.relationRegistry.set(relation.id,{group,shadow,core,highlight,hit,relation});
             }
           }
         };
