@@ -14,11 +14,11 @@ return [
     'csp' => [
         'mode' => 'report-only',
         'directives' => [
-            'default-src' => "'self' cdn.jsdelivr.net",
+            'default-src' => "'self' fastly.jsdelivr.net",
             'img-src' => "'self' data: blob:",
-            'style-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com",
-            'font-src' => "fonts.gstatic.com",
-            'script-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net",
+            'style-src' => "'self' 'unsafe-inline' fastly.jsdelivr.net",
+            'font-src' => "fastly.jsdelivr.net",
+            'script-src' => "'self' 'unsafe-inline' fastly.jsdelivr.net",
             'base-uri' => "'self'",
             'form-action' => "'self'",
             'frame-ancestors' => "'self'",
