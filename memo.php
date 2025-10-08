@@ -6873,21 +6873,126 @@ if ($view === 'map_edit') {
           }
           return min;
         }
-        buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance){
+        buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance,avoidRects){
           const points=[];
           const safeClearance=Math.max(18, Math.min(72, clearance));
           const startExit={x:startAnchor.x + startVec.x*safeClearance,y:startAnchor.y + startVec.y*safeClearance};
           const endEntry={x:endAnchor.x + endVec.x*safeClearance,y:endAnchor.y + endVec.y*safeClearance};
+          const rects=Array.isArray(avoidRects)?avoidRects:[];
+          const preferredDetour=(axis)=>{
+            const buffer=Math.max(6, safeClearance*0.25);
+            if(axis==='horizontal'){
+              const baseY=startExit.y;
+              const minX=Math.min(startExit.x,endEntry.x);
+              const maxX=Math.max(startExit.x,endEntry.x);
+              let upRequired=0;
+              let downRequired=0;
+              let hasBlock=false;
+              for(const rect of rects){
+                if(!rect || rect.owner==='from' || rect.owner==='to') continue;
+                const margin=typeof rect.margin==='number'?rect.margin:8;
+                const left=Number.isFinite(rect.left)?rect.left - margin:null;
+                const right=Number.isFinite(rect.right)?rect.right + margin:null;
+                const top=Number.isFinite(rect.top)?rect.top - margin:null;
+                const bottom=Number.isFinite(rect.bottom)?rect.bottom + margin:null;
+                if(left===null || right===null || top===null || bottom===null) continue;
+                if(maxX<left || minX>right) continue;
+                if(baseY<top - buffer) continue;
+                if(baseY>bottom + buffer) continue;
+                hasBlock=true;
+                if(baseY>top - buffer){
+                  const needed=baseY - (top - buffer);
+                  if(needed>upRequired){ upRequired=needed; }
+                }
+                if(baseY<bottom + buffer){
+                  const needed=(bottom + buffer) - baseY;
+                  if(needed>downRequired){ downRequired=needed; }
+                }
+              }
+              if(!hasBlock){
+                return null;
+              }
+              let direction=-1;
+              let requirement=upRequired;
+              if(downRequired>0 && (upRequired<=0 || downRequired<upRequired)){
+                direction=1;
+                requirement=downRequired;
+              }
+              if(requirement<=0){
+                requirement=safeClearance;
+              }
+              const offset=Math.max(safeClearance, requirement);
+              return {pivot:baseY + direction*offset};
+            }
+            if(axis==='vertical'){
+              const baseX=startExit.x;
+              const minY=Math.min(startExit.y,endEntry.y);
+              const maxY=Math.max(startExit.y,endEntry.y);
+              let leftRequired=0;
+              let rightRequired=0;
+              let hasBlock=false;
+              for(const rect of rects){
+                if(!rect || rect.owner==='from' || rect.owner==='to') continue;
+                const margin=typeof rect.margin==='number'?rect.margin:8;
+                const left=Number.isFinite(rect.left)?rect.left - margin:null;
+                const right=Number.isFinite(rect.right)?rect.right + margin:null;
+                const top=Number.isFinite(rect.top)?rect.top - margin:null;
+                const bottom=Number.isFinite(rect.bottom)?rect.bottom + margin:null;
+                if(left===null || right===null || top===null || bottom===null) continue;
+                if(maxY<top || minY>bottom) continue;
+                if(baseX<left - buffer) continue;
+                if(baseX>right + buffer) continue;
+                hasBlock=true;
+                if(baseX>left - buffer){
+                  const needed=baseX - (left - buffer);
+                  if(needed>leftRequired){ leftRequired=needed; }
+                }
+                if(baseX<right + buffer){
+                  const needed=(right + buffer) - baseX;
+                  if(needed>rightRequired){ rightRequired=needed; }
+                }
+              }
+              if(!hasBlock){
+                return null;
+              }
+              let direction=-1;
+              let requirement=leftRequired;
+              if(rightRequired>0 && (leftRequired<=0 || rightRequired<leftRequired)){
+                direction=1;
+                requirement=rightRequired;
+              }
+              if(requirement<=0){
+                requirement=safeClearance;
+              }
+              const offset=Math.max(safeClearance, requirement);
+              return {pivot:baseX + direction*offset};
+            }
+            return null;
+          };
           points.push({x:startAnchor.x,y:startAnchor.y});
           points.push(startExit);
           if((Math.abs(startVec.x)>0 && Math.abs(endVec.x)>0)){
-            const midX=(startExit.x + endEntry.x)/2;
-            points.push({x:midX,y:startExit.y});
-            points.push({x:midX,y:endEntry.y});
+            const aligned=Math.abs(startExit.y - endEntry.y)<0.5;
+            const detour=aligned ? preferredDetour('horizontal') : null;
+            if(detour){
+              points.push({x:startExit.x,y:detour.pivot});
+              points.push({x:endEntry.x,y:detour.pivot});
+            }else{
+              const midX=(startExit.x + endEntry.x)/2;
+              points.push({x:midX,y:startExit.y});
+              points.push({x:midX,y:endEntry.y});
+            }
           }else if((Math.abs(startVec.y)>0 && Math.abs(endVec.y)>0)){
-            const midY=(startExit.y + endEntry.y)/2;
-            points.push({x:startExit.x,y:midY});
-            points.push({x:endEntry.x,y:midY});
+            const aligned=Math.abs(startExit.x - endEntry.x)<0.5;
+            const detour=aligned ? preferredDetour('vertical') : null;
+            if(detour){
+              points.push({x:detour.pivot,y:startExit.y});
+              points.push({x:detour.pivot,y:endEntry.y});
+            }else{
+              const midY=(startExit.y + endEntry.y)/2;
+              points.push({x:startExit.x,y:midY});
+              points.push({x:endEntry.x,y:midY});
+            }
           }else if(Math.abs(startVec.x)>0 && Math.abs(endVec.y)>0){
             points.push({x:endEntry.x,y:startExit.y});
           }else if(Math.abs(startVec.y)>0 && Math.abs(endVec.x)>0){
@@ -6999,7 +7104,7 @@ if ($view === 'map_edit') {
           const dy=endAnchor.y - startAnchor.y;
           const distance=Math.hypot(dx,dy);
           const clearance=Math.max(24, Math.min(60, distance*0.33));
-          const skeleton=this.buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance);
+          const skeleton=this.buildRelationRouteSkeleton(startAnchor,endAnchor,startVec,endVec,clearance,avoidRects);
           const points=this.simplifyRelationRoute(skeleton);
           if(points.length<2) return null;
           const segments=[];
