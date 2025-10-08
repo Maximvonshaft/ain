@@ -27,6 +27,7 @@ header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 's
 const DB_FILE = __DIR__ . '/memo.sqlite';
 const UPLOAD_DIR = __DIR__ . '/storage/uploads';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
+const ITEMS_PER_PAGE = 40;
 const ALLOWED_UPLOAD_MIME_MAP = [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
   'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
@@ -121,6 +122,72 @@ function mindmap_force_right_orientation(&$node, int $depth = 0): void {
     $normalized[] = $child;
   }
   $node['children'] = $normalized;
+}
+
+function mindmap_metadata_from_content(string $json, int $outlineLimit = 8): array {
+  $outline = '';
+  $nodeCount = 0;
+  $decoded = json_decode($json, true);
+  if (!is_array($decoded) || !isset($decoded['data']) || !is_array($decoded['data'])) {
+    return ['outline' => $outline, 'node_count' => $nodeCount];
+  }
+  $root = $decoded['data'];
+  $stack = [[$root, 0]];
+  $maxNodes = 5000;
+  $lines = [];
+  while ($stack) {
+    [$node, $depth] = array_pop($stack);
+    if (!is_array($node)) {
+      continue;
+    }
+    $nodeCount++;
+    if (count($lines) < $outlineLimit && isset($node['topic'])) {
+      $topic = is_string($node['topic']) ? trim($node['topic']) : '';
+      if ($topic !== '') {
+        $lines[] = str_repeat('  ', $depth) . '- ' . $topic;
+      }
+    }
+    if ($nodeCount >= $maxNodes) {
+      continue;
+    }
+    if (!empty($node['children']) && is_array($node['children'])) {
+      for ($i = count($node['children']) - 1; $i >= 0; $i--) {
+        $child = $node['children'][$i];
+        if (is_array($child)) {
+          $stack[] = [$child, $depth + 1];
+        }
+      }
+    }
+  }
+  if ($lines) {
+    $outline = implode("\n", $lines);
+  }
+  return ['outline' => $outline, 'node_count' => $nodeCount];
+}
+
+function ensure_mindmap_metadata(PDO $pdo): void {
+  try {
+    $limit = 20;
+    $st = $pdo->prepare('SELECT id, content FROM mindmaps WHERE summary_outline IS NULL OR summary_outline = "" OR node_count <= 0 LIMIT ?');
+    $st->bindValue(1, $limit, PDO::PARAM_INT);
+    $st->execute();
+    $rows = $st->fetchAll();
+    if (!$rows) {
+      return;
+    }
+    $update = $pdo->prepare('UPDATE mindmaps SET summary_outline = ?, node_count = ? WHERE id = ?');
+    foreach ($rows as $row) {
+      $content = (string)($row['content'] ?? '');
+      $meta = mindmap_metadata_from_content($content);
+      $update->execute([
+        $meta['outline'],
+        $meta['node_count'],
+        (int)$row['id'],
+      ]);
+    }
+  } catch (Throwable $e) {
+    // 忽略摘要刷新中的错误，避免影响主流程
+  }
 }
 
 // —— 基础辅助函数 ——
@@ -244,13 +311,31 @@ function db(): PDO {
     $stmt=$pdo->prepare('INSERT INTO categories(name,created_at) VALUES(?,?)');
     foreach(['备忘录','流程','其他'] as $n){ $stmt->execute([$n, now()]); }
   }
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_done_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_updated_at ON items(updated_at DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_done ON steps(item_id, done, order_index)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item_created ON attachments(item_id, created_at DESC)');
   $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
+    summary_outline TEXT,
+    node_count INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmaps_updated ON mindmaps(updated_at DESC, id DESC)');
+  $mindmapCols=$pdo->query('PRAGMA table_info(mindmaps)')->fetchAll();
+  $mindmapNames=array_map(fn($col)=>$col['name']??'', $mindmapCols);
+  if(!in_array('summary_outline',$mindmapNames,true)){
+    $pdo->exec('ALTER TABLE mindmaps ADD COLUMN summary_outline TEXT');
+  }
+  if(!in_array('node_count',$mindmapNames,true)){
+    $pdo->exec('ALTER TABLE mindmaps ADD COLUMN node_count INTEGER NOT NULL DEFAULT 0');
+  }
+  ensure_mindmap_metadata($pdo);
   $pdo->exec('CREATE TABLE IF NOT EXISTS mindmap_assets(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mindmap_id INTEGER,
@@ -290,24 +375,71 @@ function db(): PDO {
 }
 
 // —— 获取分类及计数 ——
-function get_categories(): array {
+function get_categories(bool $forceRefresh = false): array {
+  static $cache = null;
+  if (!$forceRefresh && $cache !== null) {
+    return $cache;
+  }
   $pdo=db();
   ensure_done_category();
-  $cats=$pdo->query('SELECT id,name FROM categories ORDER BY name COLLATE NOCASE')->fetchAll();
-  $map=[]; foreach($cats as $c) $map[$c['id']] = 0;
-  $rows=$pdo->query('SELECT category_id, COUNT(*) AS c FROM items GROUP BY category_id')->fetchAll();
-  foreach($rows as $r){ $cid=$r['category_id']; if($cid!==null&&isset($map[$cid])) $map[$cid]=(int)$r['c']; }
-  $statsRow=$pdo->query('SELECT
-    (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
-    (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized,
-    (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
-  ')->fetch() ?: [];
+  $sql = <<<SQL
+WITH cat_counts AS (
+  SELECT category_id, COUNT(*) AS total_count
+  FROM items
+  GROUP BY category_id
+),
+stats AS (
+  SELECT
+    COALESCE(SUM(CASE WHEN done = 0 THEN 1 ELSE 0 END), 0) AS active_total,
+    COALESCE(SUM(CASE WHEN done = 0 AND category_id IS NULL THEN 1 ELSE 0 END), 0) AS active_uncategorized
+  FROM items
+),
+mindmap_stats AS (
+  SELECT COUNT(*) AS mindmap_total FROM mindmaps
+)
+SELECT
+  c.id,
+  c.name,
+  COALESCE(cat_counts.total_count, 0) AS total_count,
+  stats.active_total,
+  stats.active_uncategorized,
+  mindmap_stats.mindmap_total
+FROM categories c
+LEFT JOIN cat_counts ON cat_counts.category_id = c.id
+CROSS JOIN stats
+CROSS JOIN mindmap_stats
+ORDER BY c.name COLLATE NOCASE
+SQL;
+  $rows=$pdo->query($sql)->fetchAll();
+  $cats=[];
+  $counts=[];
   $stats=[
-    'active_total'=>(int)($statsRow['active_total'] ?? 0),
-    'active_uncategorized'=>(int)($statsRow['active_uncategorized'] ?? 0),
-    'mindmap_total'=>(int)($statsRow['mindmap_total'] ?? 0),
+    'active_total'=>0,
+    'active_uncategorized'=>0,
+    'mindmap_total'=>0,
   ];
-  return [$cats,$map,$stats];
+  if($rows){
+    $first=$rows[0];
+    $stats['active_total']=(int)($first['active_total'] ?? 0);
+    $stats['active_uncategorized']=(int)($first['active_uncategorized'] ?? 0);
+    $stats['mindmap_total']=(int)($first['mindmap_total'] ?? 0);
+    foreach($rows as $row){
+      $cid=(int)$row['id'];
+      $cats[]=['id'=>$cid,'name'=>$row['name']];
+      $counts[$cid]=(int)$row['total_count'];
+    }
+  } else {
+    $statsRow=$pdo->query('SELECT
+      (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
+      (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized,
+      (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
+    ')->fetch() ?: [];
+    $stats['active_total']=(int)($statsRow['active_total'] ?? 0);
+    $stats['active_uncategorized']=(int)($statsRow['active_uncategorized'] ?? 0);
+    $stats['mindmap_total']=(int)($statsRow['mindmap_total'] ?? 0);
+  }
+  $cache=[$cats,$counts,$stats];
+  return $cache;
 }
 
 function ensure_done_category(): int {
@@ -471,18 +603,31 @@ function prune_mindmap_assets(int $map_id, array $keep_ids): void {
   $params=$ids;
   array_unshift($params,$map_id);
   $sql=$ids?
-    "SELECT id FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
-    "SELECT id FROM mindmap_assets WHERE mindmap_id=?";
+    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
+    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=?";
   $st=$pdo->prepare($sql);
   $st->execute($params);
   $rows=$st->fetchAll();
-  foreach($rows as $row){ delete_mindmap_asset((int)$row['id']); }
+  if(!$rows){ return; }
+  $idsToRemove=[];
+  foreach($rows as $row){
+    $idsToRemove[]=(int)$row['id'];
+    $stored=is_string($row['stored_name'] ?? null)?$row['stored_name']:'';
+    if($stored!==''){
+      $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored;
+      if(is_file($path)) @unlink($path);
+    }
+  }
+  if(!$idsToRemove){ return; }
+  $in=implode(',',array_fill(0,count($idsToRemove),'?'));
+  $del=$pdo->prepare("DELETE FROM mindmap_assets WHERE id IN ($in)");
+  $del->execute($idsToRemove);
 }
 
 // —— 思维导图 ——
 function get_mindmaps(): array {
   $pdo=db();
-  return $pdo->query('SELECT * FROM mindmaps ORDER BY updated_at DESC, id DESC')->fetchAll();
+  return $pdo->query('SELECT id,title,content,summary_outline,node_count,created_at,updated_at FROM mindmaps ORDER BY updated_at DESC, id DESC')->fetchAll();
 }
 
 function get_mindmap(int $id): ?array {
@@ -495,8 +640,9 @@ function get_mindmap(int $id): ?array {
 function create_mindmap(string $title, string $content): array {
   $pdo=db();
   $nowTs=now();
-  $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
-      ->execute([$title,$content,$nowTs,$nowTs]);
+  $meta=mindmap_metadata_from_content($content);
+  $pdo->prepare('INSERT INTO mindmaps(title, content, summary_outline, node_count, created_at, updated_at) VALUES(?,?,?,?,?,?)')
+      ->execute([$title,$content,$meta['outline'],$meta['node_count'],$nowTs,$nowTs]);
   $id=(int)$pdo->lastInsertId();
   return ['id'=>$id,'updated_at'=>$nowTs];
 }
@@ -504,8 +650,9 @@ function create_mindmap(string $title, string $content): array {
 function update_mindmap(int $id, string $title, string $content): array {
   $pdo=db();
   $nowTs=now();
-  $pdo->prepare('UPDATE mindmaps SET title=?, content=?, updated_at=? WHERE id=?')
-      ->execute([$title,$content,$nowTs,$id]);
+  $meta=mindmap_metadata_from_content($content);
+  $pdo->prepare('UPDATE mindmaps SET title=?, content=?, summary_outline=?, node_count=?, updated_at=? WHERE id=?')
+      ->execute([$title,$content,$meta['outline'],$meta['node_count'],$nowTs,$id]);
   return ['id'=>$id,'updated_at'=>$nowTs];
 }
 
@@ -516,25 +663,15 @@ function delete_mindmap(int $id): void {
   $pdo->prepare('DELETE FROM mindmaps WHERE id=?')->execute([$id]);
 }
 
-function mindmap_outline_preview(string $json, int $limit = 8): string {
-  $data=json_decode($json,true);
-  if(!is_array($data) || !isset($data['data'])) return '';
-  $root=$data['data'];
-  $lines=[];
-  $stack=[[$root,0]];
-  while($stack && count($lines)<$limit){
-    [$node,$depth]=array_pop($stack);
-    if(!is_array($node) || !isset($node['topic'])) continue;
-    $indent=str_repeat('  ',$depth);
-    $lines[]=$indent.'- '.$node['topic'];
-    if(!empty($node['children']) && is_array($node['children'])){
-      for($i=count($node['children'])-1; $i>=0; $i--){
-        $child=$node['children'][$i];
-        $stack[]=[$child,$depth+1];
-      }
-    }
+function mindmap_outline_preview(?string $json, int $limit = 8, ?string $precomputed = null): string {
+  if (is_string($precomputed) && $precomputed !== '') {
+    return $precomputed;
   }
-  return implode("\n", $lines);
+  if ($json === null || $json === '') {
+    return '';
+  }
+  $meta = mindmap_metadata_from_content($json, $limit);
+  return $meta['outline'];
 }
 
 function create_mindmap_asset_from_dataurl(string $data_url, string $name, ?int $map_id, string $node_uid, string $session_key): ?array {
@@ -722,15 +859,25 @@ function json_cats(): void {
   $total = (int)($stats['active_total'] ?? 0);
   $uncat = (int)($stats['active_uncategorized'] ?? 0);
   $mindmapTotal = (int)($stats['mindmap_total'] ?? 0);
-  header('Content-Type: application/json; charset=utf-8');
-  echo json_encode([
+  $payload=[
     'ok'=>1,
     'cats'=>$cats,
     'counts'=>$counts,
     'total'=>$total,
     'uncat'=>$uncat,
     'mindmap_total'=>$mindmapTotal,
-  ], JSON_UNESCAPED_UNICODE);
+  ];
+  $json=json_encode($payload, JSON_UNESCAPED_UNICODE);
+  $etag='"'.substr(hash('sha256', (string)$json),0,32).'"';
+  $requestEtag=isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) : '';
+  header('Cache-Control: no-cache, must-revalidate');
+  header('ETag: '.$etag);
+  if($requestEtag!=='' && $requestEtag===$etag){
+    http_response_code(304);
+    exit;
+  }
+  header('Content-Type: application/json; charset=utf-8');
+  echo $json;
   exit;
 }
 
@@ -11081,23 +11228,83 @@ $mindmap_total = (int)($stats['mindmap_total'] ?? 0);
 $isMindmapCategory = $cat === 'mindmaps';
 $items=[];
 $mindmapsAll=[];
+$pagination=[
+  'current'=>1,
+  'total'=>1,
+  'count'=>0,
+  'has_prev'=>false,
+  'has_next'=>false,
+  'prev'=>null,
+  'next'=>null,
+  'prev_url'=>null,
+  'next_url'=>null,
+  'limit'=>ITEMS_PER_PAGE,
+];
 if($isMindmapCategory){
   $mindmapsAll=get_mindmaps();
   foreach($mindmapsAll as &$map){
-    $map['outline']=mindmap_outline_preview($map['content']);
+    $map['outline']=mindmap_outline_preview($map['content'], 8, $map['summary_outline'] ?? null);
   }
   unset($map);
+  $pagination['count']=count($mindmapsAll);
 } else {
+  $page=1;
+  if(isset($_GET['page']) && ctype_digit((string)$_GET['page']) && (int)$_GET['page']>0){
+    $page=(int)$_GET['page'];
+  }
   $params=[]; $where=[];
   if($cat==='all'){
     $where[]='done = 0';
   }
   if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
   if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
-  $sql='SELECT * FROM items';
+  $countSql='SELECT COUNT(*) FROM items';
+  if($where) $countSql.=' WHERE '.implode(' AND ',$where);
+  $countSt=$pdo->prepare($countSql);
+  foreach($params as $key=>$value){
+    $countSt->bindValue($key,$value,is_int($value)?PDO::PARAM_INT:PDO::PARAM_STR);
+  }
+  $countSt->execute();
+  $totalMatching=(int)$countSt->fetchColumn();
+  $limit=ITEMS_PER_PAGE;
+  $totalPages=max(1,(int)ceil($totalMatching / $limit));
+  if($page>$totalPages){ $page=$totalPages; }
+  $offset=max(0,($page-1)*$limit);
+  $sql='SELECT id,title,description,done,category_id,order_index,created_at,updated_at FROM items';
   if($where) $sql.=' WHERE '.implode(' AND ',$where);
-  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
-  $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
+  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC LIMIT :limit OFFSET :offset';
+  $st=$pdo->prepare($sql);
+  foreach($params as $key=>$value){
+    $st->bindValue($key,$value,is_int($value)?PDO::PARAM_INT:PDO::PARAM_STR);
+  }
+  $st->bindValue(':limit',$limit,PDO::PARAM_INT);
+  $st->bindValue(':offset',$offset,PDO::PARAM_INT);
+  $st->execute();
+  $items=$st->fetchAll();
+  $baseQuery=['cat'=>$cat];
+  if($q!==''){ $baseQuery['q']=$q; }
+  $buildUrl=function(int $pageNum) use ($baseQuery): string {
+    $query=$baseQuery;
+    if($pageNum>1){
+      $query['page']=$pageNum;
+    } else {
+      unset($query['page']);
+    }
+    $queryString=http_build_query($query);
+    return $queryString!==''?'?'.$queryString:'?';
+  };
+  $pagination=[
+    'current'=>$page,
+    'total'=>$totalPages,
+    'count'=>$totalMatching,
+    'has_prev'=>$page>1,
+    'has_next'=>$page<$totalPages,
+    'prev'=>$page>1?$page-1:null,
+    'next'=>$page<$totalPages?$page+1:null,
+    'prev_url'=>$page>1?$buildUrl($page-1):null,
+    'next_url'=>$page<$totalPages?$buildUrl($page+1):null,
+    'limit'=>$limit,
+  ];
 }
 $all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];
@@ -11200,6 +11407,7 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .btn-icon{font-size:14px;line-height:1}
   .btn-label{display:inline-flex}
   .btn:active{transform:translateY(0);box-shadow:none}
+  .btn.disabled,.btn[disabled]{opacity:.45;pointer-events:none;cursor:default}
 
   .section-title{font:600 12px/1 'Cinzel','Noto Serif SC',serif;text-transform:uppercase;letter-spacing:.24em;color:var(--gold-400);margin:14px 0 8px;text-shadow:0 0 14px rgba(227,198,139,.24)}
   .cat-list{display:flex;flex-direction:column;gap:8px}
@@ -11228,6 +11436,9 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
   .density-toggle .btn:hover{background:rgba(230,192,137,.08);color:var(--gold-400)}
   .density-toggle .btn.active{background:rgba(230,192,137,.16);color:var(--gold-400);box-shadow:inset 0 0 0 1px rgba(230,192,137,.25)}
   .items{display:grid;gap:var(--item-grid-gap);position:relative;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .pagination-nav{display:flex;justify-content:space-between;align-items:center;margin:20px 0 6px;padding:12px 14px;border-radius:16px;border:1px solid rgba(201,168,106,.18);background:rgba(15,19,22,.68);box-shadow:inset 0 0 18px rgba(0,0,0,.28)}
+  .pagination-nav .page-info{font:600 12px/1.4 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim)}
+  .pagination-nav .page-actions{display:flex;gap:10px;align-items:center}
   .item{position:relative;padding:var(--item-padding);border-radius:var(--item-radius);background:linear-gradient(140deg,rgba(15,19,22,.9),rgba(10,12,14,.9));border:1px solid rgba(201,168,106,.28);box-shadow:var(--shadow);display:grid;gap:var(--item-gap);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),opacity var(--transition)}
   .item::before{content:"";position:absolute;inset:6px;border-radius:14px;border:1px dashed rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 26px rgba(227,198,139,.18)}
   .item::after{content:"";position:absolute;top:14px;right:16px;width:11px;height:11px;border-radius:50%;background:var(--gold-500);box-shadow:0 0 12px rgba(207,166,107,.5),0 0 22px rgba(142,107,61,.45)}
@@ -11525,6 +11736,8 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
         'id'=>$m['id'],
         'title'=>$m['title'],
         'content'=>$m['content'],
+        'outline'=>$m['outline'] ?? ($m['summary_outline'] ?? ''),
+        'node_count'=>$m['node_count'] ?? 0,
         'created_at'=>$m['created_at'],
         'updated_at'=>$m['updated_at'],
       ], $mindmapsAll), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
@@ -11631,6 +11844,23 @@ foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
           </article>
         <?php endforeach; ?>
       </div>
+      <?php if ($pagination['total'] > 1): ?>
+        <nav class="pagination-nav" aria-label="分页导航">
+          <div class="page-info">第 <?php echo $pagination['current']; ?> / <?php echo $pagination['total']; ?> 页 · 共 <?php echo $pagination['count']; ?> 项</div>
+          <div class="page-actions">
+            <?php if ($pagination['has_prev'] && $pagination['prev_url']): ?>
+              <a class="btn btn-ghost btn-small" href="<?php echo h($pagination['prev_url']); ?>" rel="prev">&larr; 上一页</a>
+            <?php else: ?>
+              <span class="btn btn-ghost btn-small disabled" aria-disabled="true">&larr; 上一页</span>
+            <?php endif; ?>
+            <?php if ($pagination['has_next'] && $pagination['next_url']): ?>
+              <a class="btn btn-ghost btn-small" href="<?php echo h($pagination['next_url']); ?>" rel="next">下一页 &rarr;</a>
+            <?php else: ?>
+              <span class="btn btn-ghost btn-small disabled" aria-disabled="true">下一页 &rarr;</span>
+            <?php endif; ?>
+          </div>
+        </nav>
+      <?php endif; ?>
       <div class="shortcuts">
         快捷键：<span class="kbd">/</span> 聚焦搜索。
       </div>
