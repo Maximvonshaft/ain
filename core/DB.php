@@ -25,6 +25,7 @@ class DB
             self::bootstrap($pdo);
         }
         self::ensureMindmapTables($pdo);
+        self::runMigrations($pdo);
         self::$pdo = $pdo;
         return self::$pdo;
     }
@@ -130,6 +131,15 @@ class DB
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
                 ->execute(['默认导图', $defaultPayload, $now, $now]);
+        }
+    }
+
+    private static function runMigrations(PDO $pdo): void
+    {
+        $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll();
+        $names = array_map(static fn ($column) => $column['name'] ?? null, $columns);
+        if (!in_array('previous_category_id', $names, true)) {
+            $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
         }
     }
 }

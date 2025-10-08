@@ -16,6 +16,9 @@ class Request
         $this->basePath = $this->normalizeBasePath($basePath ?: $this->detectBasePath($server));
     }
 
+    private ?array $jsonBody = null;
+    private bool $jsonParsed = false;
+
     public static function fromGlobals(string $basePath = ''): self
     {
         return new self($_GET, $_POST, $_SERVER, $_FILES, $_COOKIE, $_SESSION, $basePath);
@@ -45,6 +48,22 @@ class Request
             return $this->post;
         }
         return $this->post[$key] ?? $default;
+    }
+
+    public function json(?string $key = null, mixed $default = null): mixed
+    {
+        if (!$this->jsonParsed) {
+            $this->jsonBody = $this->parseJsonBody();
+            $this->jsonParsed = true;
+        }
+
+        $data = $this->jsonBody ?? [];
+
+        if ($key === null) {
+            return $data;
+        }
+
+        return $data[$key] ?? $default;
     }
 
     public function files(?string $key = null, mixed $default = null): mixed
@@ -145,5 +164,27 @@ class Request
         }
 
         return $directory;
+    }
+
+    private function parseJsonBody(): ?array
+    {
+        $method = $this->method();
+        $contentType = (string)($this->server['CONTENT_TYPE'] ?? '');
+        $expectsJson = str_contains($contentType, 'application/json');
+        if (!$expectsJson && !in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            return [];
+        }
+
+        $raw = file_get_contents('php://input');
+        if ($raw === false || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            return [];
+        }
+
+        return $decoded;
     }
 }

@@ -1,24 +1,12 @@
 <?php
 
-use App\Controllers\LegacyMemoController;
 use Core\Request;
-use Core\Router;
+use Core\Response;
 
-$legacy = new LegacyMemoController();
+/** @var \Core\Router $router */
 
-/** @var Router $router */
-$router->get('/', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->post('/', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->get('/index.php', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->post('/index.php', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
+$router->get('/', function (Request $request): void {
+    Response::json([
+        'message' => 'Memo API 服务已就绪。请使用前端 SPA 通过 /api/* 访问数据接口。',
+    ]);
 });
