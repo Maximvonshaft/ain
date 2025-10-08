@@ -6744,9 +6744,15 @@ if ($view === 'map_edit') {
             const prev=simplified[simplified.length-1];
             const current=cleaned[i];
             const next=cleaned[i+1];
-            const collinearX=Math.abs(prev.x-current.x)<0.5 && Math.abs(current.x-next.x)<0.5;
-            const collinearY=Math.abs(prev.y-current.y)<0.5 && Math.abs(current.y-next.y)<0.5;
-            if(collinearX || collinearY){
+            const prevDx=current.x - prev.x;
+            const prevDy=current.y - prev.y;
+            const nextDx=next.x - current.x;
+            const nextDy=next.y - current.y;
+            const prevIsHorizontal=Math.abs(prevDy)<0.5;
+            const prevIsVertical=Math.abs(prevDx)<0.5;
+            const nextIsHorizontal=Math.abs(nextDy)<0.5;
+            const nextIsVertical=Math.abs(nextDx)<0.5;
+            if((prevIsHorizontal && nextIsHorizontal) || (prevIsVertical && nextIsVertical)){
               continue;
             }
             simplified.push(current);
