@@ -1419,7 +1419,8 @@
             const isPrimary=button===0;
             const isMiddle=button===1;
             if(!isPrimary && !isMiddle) return;
-            if(onNode && !(this.spacePanActive || isMiddle)) return;
+            const interactiveTarget=evt.target && evt.target.closest && evt.target.closest('input,textarea,select,button,[contenteditable="true"],a');
+            if(interactiveTarget) return;
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
             try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
             this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
@@ -1543,16 +1544,37 @@
           }
           return false;
         }
+        isTrackpadPanEvent(evt){
+          if(!evt || evt.ctrlKey || evt.metaKey) return false;
+          const wheelDeltaY=typeof evt.wheelDeltaY==='number'?evt.wheelDeltaY:null;
+          if(wheelDeltaY!==null && Math.abs(wheelDeltaY)%120!==0){ return true; }
+          if(evt.deltaMode===0){
+            const maxDelta=Math.max(Math.abs(evt.deltaX||0),Math.abs(evt.deltaY||0));
+            if(maxDelta<=0) return false;
+            if(maxDelta<60) return true;
+          }
+          return false;
+        }
         handleWheel(evt){
           if(!evt) return;
           const rect=this.container.getBoundingClientRect();
           if(!rect) return;
           evt.preventDefault();
+          const isPinchGesture=evt.ctrlKey || evt.metaKey || (typeof evt.deltaZ==='number' && evt.deltaZ!==0);
+          if(!isPinchGesture && this.isTrackpadPanEvent(evt)){
+            const deltaX=evt.deltaX||0;
+            const deltaY=evt.deltaY||0;
+            if(deltaX===0 && deltaY===0) return;
+            this.offsetX-=deltaX;
+            this.offsetY-=deltaY;
+            this.applyTransform();
+            return;
+          }
           const baseScale=this.scale>0?this.scale:1;
           const dominantDelta=(Math.abs(evt.deltaY||0)>=Math.abs(evt.deltaX||0))? (evt.deltaY||0) : (evt.deltaX||0);
           const delta=dominantDelta!==0?dominantDelta:((typeof evt.deltaZ==='number' && evt.deltaZ!==0)?evt.deltaZ:evt.deltaY||0);
           if(delta===0) return;
-          const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
+          const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:(isPinchGesture?0.0045:0.0025));
           const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
           if(Math.abs(nextScale-baseScale)<0.0001) return;
           const anchorX=evt.clientX-rect.left;
