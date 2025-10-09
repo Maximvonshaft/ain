@@ -8,14 +8,20 @@
 //   4. 修复搜索框颜色变量 bug（color:var(--text)）。
 
 declare(strict_types=1);
+
+use App\Memo\Config\AllowedMimes;
+use App\Memo\Legacy\Environment as MemoEnvironment;
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 mb_internal_encoding('UTF-8');
 
-if (!isset($GLOBALS['_legacy_security_headers_applied'])) {
-  if (isset($GLOBALS['_legacy_config']) && $GLOBALS['_legacy_config'] instanceof \Core\Config && class_exists('App\\Support\\SecurityHeaders')) {
-    \App\Support\SecurityHeaders::apply($GLOBALS['_legacy_config']);
+if (!MemoEnvironment::securityHeadersApplied()) {
+  $config = MemoEnvironment::config();
+  if ($config instanceof \Core\Config && class_exists('App\\Support\\SecurityHeaders')) {
+    \App\Support\SecurityHeaders::apply($config);
+    MemoEnvironment::markSecurityHeadersApplied();
   } else {
     memo_apply_default_security_headers();
   }
@@ -88,117 +94,27 @@ const DEFAULT_MINDMAP = [
 ];
 
 function memo_default_allowed_mimes(): array {
-  return [
-    'image/png' => 'png',
-    'image/jpeg' => 'jpg',
-    'image/webp' => 'webp',
-    'image/gif' => 'gif',
-    'image/svg+xml' => 'svg',
-    'image/avif' => 'avif',
-    'image/bmp' => 'bmp',
-    'image/x-icon' => 'ico',
-    'application/pdf' => 'pdf',
-    'application/zip' => 'zip',
-    'application/x-zip-compressed' => 'zip',
-    'application/x-rar-compressed' => 'rar',
-    'application/vnd.rar' => 'rar',
-    'application/msword' => 'doc',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-    'application/vnd.ms-word.document.macroenabled.12' => 'docm',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.template' => 'dotx',
-    'application/vnd.ms-word.template.macroenabled.12' => 'dotm',
-    'application/vnd.ms-excel' => 'xls',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
-    'application/vnd.ms-excel.sheet.macroenabled.12' => 'xlsm',
-    'application/vnd.ms-excel.sheet.binary.macroenabled.12' => 'xlsb',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.template' => 'xltx',
-    'application/vnd.ms-excel.template.macroenabled.12' => 'xltm',
-    'text/csv' => 'csv',
-    'text/plain' => 'txt',
-    'text/markdown' => 'md',
-    'text/x-markdown' => 'md',
-    'application/json' => 'json',
-    'text/json' => 'json',
-    'text/yaml' => 'yaml',
-    'application/yaml' => 'yaml',
-    'text/x-yaml' => 'yaml',
-    'text/tab-separated-values' => 'tsv',
-    'text/x-log' => 'log',
-    'audio/mpeg' => 'mp3',
-    'audio/mp3' => 'mp3',
-    'audio/ogg' => 'ogg',
-    'audio/opus' => 'opus',
-    'audio/wav' => 'wav',
-    'audio/x-wav' => 'wav',
-    'audio/webm' => 'weba',
-    'audio/mp4' => 'm4a',
-    'audio/aac' => 'aac',
-    'audio/flac' => 'flac',
-    'video/mp4' => 'mp4',
-    'video/quicktime' => 'mov',
-    'video/x-matroska' => 'mkv',
-    'video/webm' => 'webm',
-    'video/x-msvideo' => 'avi',
-    'video/mpeg' => 'mpeg',
-    'video/ogg' => 'ogv',
-  ];
+  return AllowedMimes::defaults();
 }
 
 function memo_runtime_config(): array {
-  static $config = null;
-  if ($config !== null) {
-    return $config;
-  }
-  $config = [
-    'timezone' => 'Asia/Shanghai',
-    'db_file' => __DIR__ . '/memo.sqlite',
-    'upload_dir' => __DIR__ . '/storage/uploads',
-    'max_upload_bytes' => 15 * 1024 * 1024,
-    'allowed_mimes' => memo_default_allowed_mimes(),
-  ];
-
-  if (isset($GLOBALS['_legacy_config']) && is_object($GLOBALS['_legacy_config']) && method_exists($GLOBALS['_legacy_config'], 'get')) {
-    $appConfig = $GLOBALS['_legacy_config'];
-    $timezone = $appConfig->get('app.timezone');
-    if (is_string($timezone) && $timezone !== '') {
-      $config['timezone'] = $timezone;
-    }
-    $dbPath = $appConfig->get('app.database.path');
-    if (is_string($dbPath) && $dbPath !== '') {
-      $config['db_file'] = $dbPath;
-    }
-    $uploadDir = $appConfig->get('app.uploads.path');
-    if (is_string($uploadDir) && $uploadDir !== '') {
-      $config['upload_dir'] = $uploadDir;
-    }
-    $maxBytes = $appConfig->get('app.uploads.max_bytes');
-    if (is_numeric($maxBytes)) {
-      $config['max_upload_bytes'] = (int)$maxBytes;
-    }
-    $mimes = $appConfig->get('app.uploads.allowed_mimes');
-    if (is_array($mimes) && $mimes) {
-      $config['allowed_mimes'] = $mimes;
-    }
-  }
-
-  return $config;
+  return MemoEnvironment::runtimeConfig()->all();
 }
 
 function memo_db_file(): string {
-  return (string)(memo_runtime_config()['db_file'] ?? (__DIR__ . '/memo.sqlite'));
+  return MemoEnvironment::runtimeConfig()->dbFile();
 }
 
 function memo_upload_dir(): string {
-  return (string)(memo_runtime_config()['upload_dir'] ?? (__DIR__ . '/storage/uploads'));
+  return MemoEnvironment::runtimeConfig()->uploadDir();
 }
 
 function memo_max_upload_bytes(): int {
-  return (int)(memo_runtime_config()['max_upload_bytes'] ?? (15 * 1024 * 1024));
+  return MemoEnvironment::runtimeConfig()->maxUploadBytes();
 }
 
 function memo_allowed_upload_mime_map(): array {
-  $map = memo_runtime_config()['allowed_mimes'] ?? memo_default_allowed_mimes();
-  return is_array($map) ? $map : memo_default_allowed_mimes();
+  return MemoEnvironment::runtimeConfig()->allowedMimes();
 }
 
 function memo_extension_for_mime(string $mime): ?string {
@@ -229,12 +145,13 @@ function memo_apply_default_security_headers(): void {
   header('Referrer-Policy: strict-origin-when-cross-origin');
   header('X-Content-Type-Options: nosniff');
   header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
-  $GLOBALS['_legacy_security_headers_applied'] = true;
+  MemoEnvironment::markSecurityHeadersApplied();
 }
 
 function csrf_token(): string {
-  if (isset($GLOBALS['_legacy_csrf_token']) && is_string($GLOBALS['_legacy_csrf_token'])) {
-    return $GLOBALS['_legacy_csrf_token'];
+  $token = MemoEnvironment::csrfToken();
+  if (is_string($token) && $token !== '') {
+    return $token;
   }
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();

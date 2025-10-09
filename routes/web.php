@@ -1,26 +1,16 @@
 <?php
 
-use App\Controllers\LegacyMemoController;
+use App\Controllers\MemoController;
+use App\Memo\Legacy\LegacyMemoRunner;
 use App\Middlewares\CsrfMiddleware;
-use Core\Request;
 use Core\Router;
 
 $csrf = new CsrfMiddleware();
-$legacy = new LegacyMemoController($config, $csrf);
+$runner = new LegacyMemoRunner($config);
+$controller = new MemoController($runner, $csrf);
 
 /** @var Router $router */
-$router->get('/', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->post('/', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->get('/index.php', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->post('/index.php', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
+$router->get('/', [$controller, 'index']);
+$router->post('/', [$controller, 'store']);
+$router->get('/index.php', [$controller, 'index']);
+$router->post('/index.php', [$controller, 'store']);
