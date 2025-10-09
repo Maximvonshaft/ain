@@ -297,7 +297,7 @@
   }
 </style>
 </head>
-<body>
+<body data-csrf="<?php echo h($memo_csrf_token ?? csrf_token()); ?>">
   <div class="scanlines" aria-hidden="true"></div>
   <div class="app">
   <aside class="sidebar" role="region" aria-label="侧边栏导航">
@@ -382,6 +382,7 @@
                 <div class="mindmap-card-actions">
                   <a class="btn btn-primary btn-small" href="?view=map_edit&id=<?php echo $m['id']; ?>">编辑</a>
                   <form method="post" onsubmit="return confirm('确认删除该导图？');">
+                    <?php echo csrf_field(); ?>
                     <input type="hidden" name="action" value="delete_mindmap">
                     <input type="hidden" name="id" value="<?php echo $m['id']; ?>">
                     <button class="btn btn-danger btn-small" type="submit">删除</button>
@@ -464,6 +465,7 @@
           <article class="item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>" data-title="<?php echo h($titlePlain); ?>" data-updated="<?php echo dt((int)$it['updated_at']); ?>">
             <div class="item-head" style="display:flex;gap:8px;align-items:flex-start">
               <form method="post" class="form-toggle-item" onsubmit="return false" style="margin:0">
+                <?php echo csrf_field(); ?>
                 <input type="hidden" name="action" value="toggle_done">
                 <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
                 <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
@@ -479,6 +481,7 @@
                     <div class="tlrow <?php echo $s['done']?'done':''; ?>">
                       <span class="dot"></span>
                       <form method="post" class="form-toggle-step" onsubmit="return false" style="margin:0;display:inline-block">
+                        <?php echo csrf_field(); ?>
                         <input type="hidden" name="action" value="toggle_step">
                         <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
                         <input type="checkbox" class="step-toggle" <?php echo $s['done']?'checked':''; ?> title="完成">
@@ -518,6 +521,7 @@
                 <span class="btn-label">详情</span>
               </a>
               <form method="post" class="form-delete-item" style="margin:0">
+                <?php echo csrf_field(); ?>
                 <input type="hidden" name="action" value="delete_item">
                 <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
                 <button class="btn btn-danger btn-small" type="submit">删除</button>
@@ -541,6 +545,7 @@
     </div>
     <div id="cat-rows" class="modal-list"></div>
     <form onsubmit="return addCat(event)" class="modal-form">
+      <?php echo csrf_field(); ?>
       <input type="text" id="new-cat-name" class="modal-input" placeholder="新增分类名" required>
       <button class="btn btn-primary">新增</button>
     </form>
@@ -549,6 +554,37 @@
 <script>
 const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
 const throttle=(fn,ms)=>{let t=0;return (...a)=>{const n=Date.now();if(n-t>ms){t=n;fn(...a);} }};
+const CSRF_TOKEN=document.body.dataset.csrf||'';
+const CSRF_FIELD_HTML=<?php echo json_encode(csrf_field()); ?>;
+const appendCsrf=fd=>{try{if(fd instanceof FormData){if(CSRF_TOKEN && !fd.has('_csrf')){fd.append('_csrf',CSRF_TOKEN);}}else if(fd instanceof URLSearchParams){if(CSRF_TOKEN && !fd.has('_csrf')){fd.append('_csrf',CSRF_TOKEN);}}}catch(_){/* ignore */}return fd;};
+if(window.fetch){
+  const originalFetch=window.fetch.bind(window);
+  window.fetch=(input, init={})=>{
+    init=init||{};
+    const headers=new Headers(init.headers||{});
+    if(CSRF_TOKEN){ headers.set('X-CSRF-Token', CSRF_TOKEN); }
+    init.headers=headers;
+    if(init.body instanceof FormData || init.body instanceof URLSearchParams){
+      appendCsrf(init.body);
+    }else if(typeof init.body==='string' && CSRF_TOKEN){
+      const contentType=headers.get('Content-Type')||'';
+      if(contentType.includes('application/x-www-form-urlencoded')){
+        const params=new URLSearchParams(init.body);
+        if(!params.has('_csrf')){ params.append('_csrf', CSRF_TOKEN); }
+        init.body=params.toString();
+      }
+    }
+    return originalFetch(input, init);
+  };
+}
+document.addEventListener('submit',ev=>{
+  const form=ev.target;
+  if(form instanceof HTMLFormElement && form.method && form.method.toLowerCase()==='post'){
+    if(!form.querySelector('input[name="_csrf"]')){
+      form.insertAdjacentHTML('afterbegin', CSRF_FIELD_HTML);
+    }
+  }
+},{capture:true});
 const newMenuToggle=document.getElementById('btn-new-menu');
 const newMenu=document.getElementById('new-menu');
 if(newMenuToggle && newMenu){
@@ -1006,6 +1042,7 @@ function renderCatRows(cats, counts){
     const row=document.createElement('div');
     row.innerHTML=`\
       <form onsubmit="return saveCat(event, ${c.id})" class="modal-form">\
+        ${CSRF_FIELD_HTML}\
         <input type="text" name="name" value="${escapeHtml(c.name)}" class="modal-input"/>\
         <span class="modal-count">共 ${counts[c.id]||0}</span>\
         <button class="btn btn-outline btn-small">保存</button>\

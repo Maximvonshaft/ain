@@ -4,7 +4,15 @@ namespace Core;
 
 class Config
 {
-    private array $items = [];
+    /**
+     * @var array<string, mixed>
+     */
+    private array $cache = [];
+
+    /**
+     * @var array<string, array|null>
+     */
+    private array $fileCache = [];
 
     public function __construct(private string $path)
     {
@@ -12,20 +20,34 @@ class Config
 
     public function get(string $key, mixed $default = null): mixed
     {
-        if (isset($this->items[$key])) {
-            return $this->items[$key];
+        if (array_key_exists($key, $this->cache)) {
+            return $this->cache[$key];
         }
 
         $segments = explode('.', $key);
         $file = array_shift($segments);
-        $configFile = rtrim($this->path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $file . '.php';
-        if (!is_file($configFile)) {
+        if ($file === null || $file === '') {
             return $default;
         }
 
-        $data = require $configFile;
+        if (!array_key_exists($file, $this->fileCache)) {
+            $configFile = rtrim($this->path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $file . '.php';
+            if (!is_file($configFile)) {
+                $this->fileCache[$file] = null;
+            } else {
+                $data = require $configFile;
+                $this->fileCache[$file] = is_array($data) ? $data : null;
+            }
+        }
+
+        $data = $this->fileCache[$file];
         if (!is_array($data)) {
             return $default;
+        }
+
+        if (count($segments) === 0) {
+            $this->cache[$key] = $data;
+            return $data;
         }
 
         $value = $data;
@@ -35,6 +57,8 @@ class Config
             }
             $value = $value[$segment];
         }
+
+        $this->cache[$key] = $value;
 
         return $value;
     }
