@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Support\SecurityHeaders;
 use Core\Config;
 use Core\DB;
+use App\Memo\Legacy\Runtime as LegacyRuntime;
 
 spl_autoload_register(function (string $class): void {
     $prefixes = [
@@ -23,11 +24,14 @@ spl_autoload_register(function (string $class): void {
 });
 
 require_once __DIR__ . '/app/Support/helpers.php';
+require_once __DIR__ . '/app/Memo/Legacy/Application.php';
 
 $config = new Config(__DIR__ . '/config');
-$GLOBALS['_legacy_config'] = $config;
 
 SecurityHeaders::apply($config);
+if (class_exists(LegacyRuntime::class)) {
+    LegacyRuntime::markSecurityHeadersApplied();
+}
 
 $timezone = $config->get('app.timezone', 'UTC');
 if ($timezone) {

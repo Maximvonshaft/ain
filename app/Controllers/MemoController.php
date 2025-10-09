@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controllers;
 
 use App\Middlewares\CsrfMiddleware;
@@ -7,7 +9,9 @@ use Core\Config;
 use Core\Request;
 use RuntimeException;
 
-class LegacyMemoController
+use function App\Memo\Legacy\run as runLegacyMemo;
+
+final class MemoController
 {
     public function __construct(
         private Config $config,
@@ -29,9 +33,6 @@ class LegacyMemoController
 
         $token = $this->csrf->token($request);
 
-        $GLOBALS['_legacy_config'] = $this->config;
-        $GLOBALS['_legacy_csrf_token'] = $token;
-
-        require __DIR__ . '/../../memo.php';
+        runLegacyMemo($this->config, $token, $request);
     }
 }

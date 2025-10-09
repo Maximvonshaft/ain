@@ -8,23 +8,48 @@
 //   4. 修复搜索框颜色变量 bug（color:var(--text)）。
 
 declare(strict_types=1);
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-mb_internal_encoding('UTF-8');
 
-if (!isset($GLOBALS['_legacy_security_headers_applied'])) {
-  if (isset($GLOBALS['_legacy_config']) && $GLOBALS['_legacy_config'] instanceof \Core\Config && class_exists('App\\Support\\SecurityHeaders')) {
-    \App\Support\SecurityHeaders::apply($GLOBALS['_legacy_config']);
-  } else {
-    memo_apply_default_security_headers();
+namespace App\Memo\Legacy;
+
+use App\Support\SecurityHeaders;
+use Core\Config;
+use Core\Request;
+use RuntimeException;
+
+final class Runtime
+{
+  private static ?Config $config = null;
+  private static ?string $csrfToken = null;
+  private static bool $securityHeadersApplied = false;
+
+  public static function bootstrap(Config $config, string $csrfToken): void
+  {
+    self::$config = $config;
+    self::$csrfToken = $csrfToken;
+  }
+
+  public static function config(): ?Config
+  {
+    return self::$config;
+  }
+
+  public static function csrfToken(): ?string
+  {
+    return self::$csrfToken;
+  }
+
+  public static function securityHeadersApplied(): bool
+  {
+    return self::$securityHeadersApplied;
+  }
+
+  public static function markSecurityHeadersApplied(): void
+  {
+    self::$securityHeadersApplied = true;
   }
 }
 
-$memoConfig = memo_runtime_config();
-if (!empty($memoConfig['timezone'])) {
-  date_default_timezone_set((string)$memoConfig['timezone']);
-}
+const LEGACY_BASE_PATH = __DIR__ . '/../../..';
 
 // —— 思维导图默认内容 ——
 const DEFAULT_MINDMAP = [
@@ -151,14 +176,14 @@ function memo_runtime_config(): array {
   }
   $config = [
     'timezone' => 'Asia/Shanghai',
-    'db_file' => __DIR__ . '/memo.sqlite',
-    'upload_dir' => __DIR__ . '/storage/uploads',
+    'db_file' => LEGACY_BASE_PATH . '/memo.sqlite',
+    'upload_dir' => LEGACY_BASE_PATH . '/storage/uploads',
     'max_upload_bytes' => 15 * 1024 * 1024,
     'allowed_mimes' => memo_default_allowed_mimes(),
   ];
 
-  if (isset($GLOBALS['_legacy_config']) && is_object($GLOBALS['_legacy_config']) && method_exists($GLOBALS['_legacy_config'], 'get')) {
-    $appConfig = $GLOBALS['_legacy_config'];
+  $appConfig = Runtime::config();
+  if ($appConfig instanceof Config) {
     $timezone = $appConfig->get('app.timezone');
     if (is_string($timezone) && $timezone !== '') {
       $config['timezone'] = $timezone;
@@ -185,11 +210,11 @@ function memo_runtime_config(): array {
 }
 
 function memo_db_file(): string {
-  return (string)(memo_runtime_config()['db_file'] ?? (__DIR__ . '/memo.sqlite'));
+  return (string)(memo_runtime_config()['db_file'] ?? (LEGACY_BASE_PATH . '/memo.sqlite'));
 }
 
 function memo_upload_dir(): string {
-  return (string)(memo_runtime_config()['upload_dir'] ?? (__DIR__ . '/storage/uploads'));
+  return (string)(memo_runtime_config()['upload_dir'] ?? (LEGACY_BASE_PATH . '/storage/uploads'));
 }
 
 function memo_max_upload_bytes(): int {
@@ -229,12 +254,13 @@ function memo_apply_default_security_headers(): void {
   header('Referrer-Policy: strict-origin-when-cross-origin');
   header('X-Content-Type-Options: nosniff');
   header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
-  $GLOBALS['_legacy_security_headers_applied'] = true;
+  Runtime::markSecurityHeadersApplied();
 }
 
 function csrf_token(): string {
-  if (isset($GLOBALS['_legacy_csrf_token']) && is_string($GLOBALS['_legacy_csrf_token'])) {
-    return $GLOBALS['_legacy_csrf_token'];
+  $token = Runtime::csrfToken();
+  if (is_string($token) && $token !== '') {
+    return $token;
   }
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -344,7 +370,7 @@ function highlight_text(string $text, string $term): string {
 
 
 // —— 数据库 ——
-function db(): PDO {
+function db(): \PDO {
   if (class_exists('Core\\DB')) {
     try {
       $pdo = \Core\DB::pdo();
@@ -356,15 +382,15 @@ function db(): PDO {
   }
 
   static $pdo;
-  if ($pdo instanceof PDO) {
+  if ($pdo instanceof \PDO) {
     return $pdo;
   }
 
   $dbFile = memo_db_file();
   $init = !file_exists($dbFile);
-  $pdo = new PDO('sqlite:' . $dbFile, null, null, [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+  $pdo = new \PDO('sqlite:' . $dbFile, null, null, [
+    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+    \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA journal_mode = WAL;');
   $pdo->exec('PRAGMA foreign_keys = ON;');
@@ -373,7 +399,7 @@ function db(): PDO {
   return $pdo;
 }
 
-function memo_run_legacy_migrations(PDO $pdo, bool $init): void {
+function memo_run_legacy_migrations(\PDO $pdo, bool $init): void {
   $currentVersion = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
 
   if ($currentVersion < 1) {
@@ -393,11 +419,11 @@ function memo_run_legacy_migrations(PDO $pdo, bool $init): void {
   }
 }
 
-function memo_set_user_version(PDO $pdo, int $version): void {
+function memo_set_user_version(\PDO $pdo, int $version): void {
   $pdo->exec('PRAGMA user_version = ' . max(0, $version));
 }
 
-function memo_ensure_base_tables(PDO $pdo): void {
+function memo_ensure_base_tables(\PDO $pdo): void {
   $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
@@ -442,7 +468,7 @@ function memo_ensure_base_tables(PDO $pdo): void {
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
 
-  $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(PDO::FETCH_ASSOC);
+  $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(\PDO::FETCH_ASSOC);
   $hasColumn = false;
   foreach ($columns as $column) {
     if (($column['name'] ?? null) === 'previous_category_id') {
@@ -455,7 +481,7 @@ function memo_ensure_base_tables(PDO $pdo): void {
   }
 }
 
-function memo_seed_default_categories(PDO $pdo): void {
+function memo_seed_default_categories(\PDO $pdo): void {
   $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
   if ($count > 0) {
     return;
@@ -467,7 +493,7 @@ function memo_seed_default_categories(PDO $pdo): void {
   }
 }
 
-function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
+function memo_ensure_mindmap_tables(\PDO $pdo, bool $withDefault): void {
   $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -973,6 +999,29 @@ function json_cats(): void {
   exit;
 }
 
+function run(Config $config, string $csrfToken, Request $request): void {
+  if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+  }
+  mb_internal_encoding('UTF-8');
+
+  Runtime::bootstrap($config, $csrfToken);
+
+  if (!Runtime::securityHeadersApplied()) {
+    if (class_exists(SecurityHeaders::class)) {
+      SecurityHeaders::apply($config);
+      Runtime::markSecurityHeadersApplied();
+    } else {
+      memo_apply_default_security_headers();
+    }
+  }
+
+  $memoConfig = memo_runtime_config();
+  if (!empty($memoConfig['timezone'])) {
+    date_default_timezone_set((string)$memoConfig['timezone']);
+  }
+
+
 // —— 下载附件 ——
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
@@ -1142,7 +1191,7 @@ if (is_post()) {
             $imported++;
           }
           $pdo->commit();
-        } catch(Throwable $inner){
+        } catch(\Throwable $inner){
           $pdo->rollBack();
           throw $inner;
         }
@@ -1206,7 +1255,7 @@ if (is_post()) {
             if($restoreName){ $categoryLabel=$restoreName; }
           }
           $pdo->commit();
-        } catch(Throwable $err){
+        } catch(\Throwable $err){
           $pdo->rollBack();
           throw $err;
         }
@@ -1243,7 +1292,7 @@ if (is_post()) {
         try {
           $pdo->prepare('DELETE FROM items WHERE id=?')->execute([$id]);
           $pdo->commit();
-        } catch(Throwable $err){
+        } catch(\Throwable $err){
           $pdo->rollBack();
           throw $err;
         }
@@ -1338,7 +1387,7 @@ if (is_post()) {
             }
           }
           $pdo->commit();
-        } catch(Throwable $err){
+        } catch(\Throwable $err){
           $pdo->rollBack();
           throw $err;
         }
@@ -1540,7 +1589,7 @@ if (is_post()) {
         break;
       }
     }
-  } catch(Throwable $e){
+  } catch(\Throwable $e){
     if(is_ajax()){ header('Content-Type: application/json',true,400); echo json_encode(['ok'=>0,'error'=>$e->getMessage()]); exit; }
     $_SESSION['flash']=$e->getMessage();
   }
@@ -1553,7 +1602,7 @@ $view = $_GET['view'] ?? '';
 // 新建页面
 if ($view === 'new') {
   [$cats,$_counts]=get_categories();
-  require __DIR__ . '/resources/views/memo/new.phtml';
+  require LEGACY_BASE_PATH . '/resources/views/memo/new.phtml';
   exit;
 }
 
@@ -1562,7 +1611,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
   $it=get_item((int)$_GET['id']); if(!$it){ http_response_code(404); echo 'Not Found'; exit; }
   $steps=get_steps((int)$it['id']); $itemAtts=attachments_for_item((int)$it['id']); [$cats,$_counts]=get_categories();
   $doneView = $it['done'] ? 'done-view' : '';
-  require __DIR__ . '/resources/views/memo/item.phtml';
+  require LEGACY_BASE_PATH . '/resources/views/memo/item.phtml';
   exit;
 }
 
@@ -1625,7 +1674,7 @@ if ($view === 'map_edit') {
       'url' => '?mindmap_asset=' . $id,
     ];
   }, $assetPool));
-  require __DIR__ . '/resources/views/memo/map_edit.phtml';
+  require LEGACY_BASE_PATH . '/resources/views/memo/map_edit.phtml';
   exit;
 }
 
@@ -1662,5 +1711,6 @@ if($isMindmapCategory){
 $all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];
 foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
-require __DIR__ . '/resources/views/memo/index.phtml';
+require LEGACY_BASE_PATH . '/resources/views/memo/index.phtml';
 exit;
+}
