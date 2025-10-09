@@ -180,6 +180,24 @@ function boolish(mixed $value): bool {
   return (bool)$value;
 }
 
+function cdn_attributes(array $entry): string {
+  $integrity = $entry['integrity'] ?? '';
+  if ($integrity === '') {
+    return '';
+  }
+
+  $attributes = [
+    sprintf(' integrity="%s"', htmlspecialchars($integrity, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+    sprintf(' crossorigin="%s"', htmlspecialchars($entry['crossorigin'] ?? 'anonymous', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+  ];
+
+  if (!empty($entry['referrerpolicy'])) {
+    $attributes[] = sprintf(' referrerpolicy="%s"', htmlspecialchars($entry['referrerpolicy'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+  }
+
+  return implode('', $attributes);
+}
+
 function normalize_timestamp(mixed $value, ?int $fallback=null): int {
   if(is_int($value)) return $value;
   if(is_string($value)){
