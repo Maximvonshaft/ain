@@ -1,26 +1,20 @@
 <?php
 
-use App\Controllers\LegacyMemoController;
+use App\Controllers\MemoController;
 use App\Middlewares\CsrfMiddleware;
 use Core\Request;
 use Core\Router;
 
 $csrf = new CsrfMiddleware();
-$legacy = new LegacyMemoController($config, $csrf);
+$memo = new MemoController($config, $csrf);
 
 /** @var Router $router */
-$router->get('/', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
+foreach (['/', '/index.php'] as $path) {
+    $router->get($path, function (Request $request) use ($memo) {
+        $memo->handle($request);
+    });
 
-$router->post('/', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->get('/index.php', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
-
-$router->post('/index.php', function (Request $request) use ($legacy) {
-    $legacy->handle($request);
-});
+    $router->post($path, function (Request $request) use ($memo) {
+        $memo->handle($request);
+    });
+}
