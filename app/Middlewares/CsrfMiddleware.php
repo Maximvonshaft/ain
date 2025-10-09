@@ -11,7 +11,7 @@ class CsrfMiddleware
     {
     }
 
-    public function token(Request $request): string
+    public function token(?Request $request = null): string
     {
         $session =& $_SESSION;
         if (!isset($session[$this->sessionKey])) {

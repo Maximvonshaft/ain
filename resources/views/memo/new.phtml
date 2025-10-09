@@ -1,3 +1,4 @@
+<?php $csrfToken = csrf_token(); ?>
   <!doctype html>
   <html lang="zh-Hans">
   <head>
@@ -5,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>新建备忘录</title>
     <meta name="color-scheme" content="dark"/>
+    <meta name="csrf-token" content="<?php echo h($csrfToken); ?>"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -132,6 +134,58 @@
       .save-tip.show{display:inline-block}
       .placeholder-muted{color:var(--text-muted)}
     </style>
+    <script>
+      (function(){
+        var token = '<?php echo h($csrfToken); ?>';
+        if (!token || window.__csrfEnhancerApplied) { return; }
+        window.__csrfEnhancerApplied = true;
+        window.csrfToken = token;
+
+        var ensureFormToken = function(form){
+          if (!form || typeof form.getAttribute !== 'function') { return; }
+          if ((form.getAttribute('method') || '').toLowerCase() !== 'post') { return; }
+          if (!form.querySelector('input[name="_csrf"]')) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = '_csrf';
+            input.value = token;
+            form.appendChild(input);
+          }
+        };
+
+        document.addEventListener('DOMContentLoaded', function(){
+          document.querySelectorAll('form[method="post"]').forEach(ensureFormToken);
+        });
+
+        document.addEventListener('submit', function(event){
+          if (event && event.target instanceof HTMLFormElement) {
+            ensureFormToken(event.target);
+          }
+        }, true);
+
+        var originalFetch = window.fetch;
+        if (typeof originalFetch === 'function') {
+          window.fetch = function(resource, init){
+            init = init || {};
+            var headers = new Headers(init.headers || {});
+            if (!headers.has('X-CSRF-Token')) {
+              headers.set('X-CSRF-Token', token);
+            }
+            if (init.body instanceof FormData) {
+              if (!init.body.has('_csrf')) {
+                init.body.append('_csrf', token);
+              }
+            } else if (init.body instanceof URLSearchParams) {
+              if (!init.body.has('_csrf')) {
+                init.body.append('_csrf', token);
+              }
+            }
+            init.headers = headers;
+            return originalFetch.call(this, resource, init);
+          };
+        }
+      })();
+    </script>
   </head>
   <body data-density="comfortable">
     <div class="scanlines" aria-hidden="true"></div>
