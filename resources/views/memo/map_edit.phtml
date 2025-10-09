@@ -204,12 +204,15 @@
       .mind-relations .relation-group[data-selected="true"] .relation-highlight{stroke:rgba(255,255,255,.88);stroke-width:2;opacity:1;animation:relationGlowPulse 1.2s ease-in-out infinite}
       .mind-relations .relation-core[data-bidirectional="true"]{stroke-dasharray:0}
       .mind-nodes{position:absolute;top:0;left:0;pointer-events:none}
-      .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto}
+      .jsmind-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px 20px;border-radius:var(--r-md);color:var(--text-strong);font:600 14px/1.5 'Inter','Noto Sans SC',sans-serif;min-width:170px;max-width:320px;background:linear-gradient(180deg,rgba(21,26,30,.94),rgba(15,19,22,.96));border:1.6px solid rgba(201,168,106,.32);box-shadow:0 20px 48px rgba(0,0,0,.58),0 0 30px rgba(227,198,139,.12);transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition),filter var(--transition);backdrop-filter:blur(12px);letter-spacing:.04em;pointer-events:auto;-webkit-user-select:none;-moz-user-select:none;user-select:none}
       .jsmind-node::before{content:"";position:absolute;inset:10px;border-radius:calc(var(--r-md) - 4px);border:1px solid rgba(201,168,106,.28);opacity:.85;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.18)}
       .jsmind-node::after{content:"";position:absolute;inset:-14px;border-radius:calc(var(--r-md) + 10px);border:1px dashed rgba(201,168,106,.26);opacity:0;pointer-events:none;box-shadow:0 0 24px rgba(227,198,139,.16)}
       .jsmind-node .node-topic{font:600 16px/1.45 'Cinzel','Noto Serif SC',serif;color:var(--gold-400);letter-spacing:.06em;text-transform:uppercase}
       .jsmind-node .node-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-dim);font:500 12px/1.4 'Inter','Noto Sans SC',sans-serif;text-transform:uppercase;letter-spacing:.16em}
       .jsmind-node .node-meta span{padding:2px 8px;border-radius:999px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78)}
+      .jsmind-node .node-topic,
+      .jsmind-node .node-body,
+      .jsmind-node .node-note{user-select:text}
       .jsmind-node .node-body{color:var(--text-muted);font:400 13px/1.7 'Noto Sans SC','Inter',sans-serif}
       .jsmind-node .node-note{color:var(--text-muted);font:400 13px/1.7 'Noto Sans SC','Inter',sans-serif;white-space:pre-wrap;word-break:break-word}
       .jsmind-node .node-footer{display:flex;gap:8px;flex-wrap:wrap;font:600 11px/1 'Inter','Noto Sans SC',sans-serif;color:var(--text-dim);letter-spacing:.14em;text-transform:uppercase}
