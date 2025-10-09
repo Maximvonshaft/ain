@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Support\SecurityHeaders;
+use App\Support\SessionConfigurator;
 use Core\Config;
 use Core\DB;
 
@@ -28,6 +29,7 @@ $config = new Config(__DIR__ . '/config');
 $GLOBALS['_legacy_config'] = $config;
 
 SecurityHeaders::apply($config);
+SessionConfigurator::apply($config);
 
 $timezone = $config->get('app.timezone', 'UTC');
 if ($timezone) {
@@ -42,8 +44,8 @@ if (!is_string($dbPath)) {
 DB::connect($dbPath);
 
 $uploadDir = $config->get('app.uploads.path');
-if (is_string($uploadDir) && !is_dir($uploadDir)) {
-    @mkdir($uploadDir, 0775, true);
+if (is_string($uploadDir) && $uploadDir !== '') {
+    ensure_directory($uploadDir);
 }
 
 return $config;

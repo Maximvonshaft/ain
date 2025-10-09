@@ -9,6 +9,9 @@
 
 declare(strict_types=1);
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    if (isset($GLOBALS['_legacy_config']) && $GLOBALS['_legacy_config'] instanceof \Core\Config && class_exists('App\\Support\\SessionConfigurator')) {
+        \App\Support\SessionConfigurator::apply($GLOBALS['_legacy_config']);
+    }
     session_start();
 }
 mb_internal_encoding('UTF-8');
@@ -21,9 +24,9 @@ if (!isset($GLOBALS['_legacy_security_headers_applied'])) {
   }
 }
 
-$memoConfig = memo_runtime_config();
-if (!empty($memoConfig['timezone'])) {
-  date_default_timezone_set((string)$memoConfig['timezone']);
+$timezone = memo_config_get('app.timezone', 'Asia/Shanghai');
+if (is_string($timezone) && $timezone !== '') {
+  date_default_timezone_set($timezone);
 }
 
 // —— 思维导图默认内容 ——
@@ -88,9 +91,9 @@ const DEFAULT_MINDMAP = [
 ];
 
 function memo_default_allowed_mimes(): array {
-  return [
+  return memo_normalize_mime_map([
     'image/png' => 'png',
-    'image/jpeg' => 'jpg',
+    'image/jpeg' => ['jpg', 'jpeg'],
     'image/webp' => 'webp',
     'image/gif' => 'gif',
     'image/svg+xml' => 'svg',
@@ -114,15 +117,15 @@ function memo_default_allowed_mimes(): array {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.template' => 'xltx',
     'application/vnd.ms-excel.template.macroenabled.12' => 'xltm',
     'text/csv' => 'csv',
-    'text/plain' => 'txt',
+    'text/plain' => ['txt', 'text'],
     'text/markdown' => 'md',
     'text/x-markdown' => 'md',
     'application/json' => 'json',
     'text/json' => 'json',
-    'text/yaml' => 'yaml',
-    'application/yaml' => 'yaml',
-    'text/x-yaml' => 'yaml',
-    'text/tab-separated-values' => 'tsv',
+    'text/yaml' => ['yaml', 'yml'],
+    'application/yaml' => ['yaml', 'yml'],
+    'text/x-yaml' => ['yaml', 'yml'],
+    'text/tab-separated-values' => ['tsv', 'tab'],
     'text/x-log' => 'log',
     'audio/mpeg' => 'mp3',
     'audio/mp3' => 'mp3',
@@ -141,70 +144,140 @@ function memo_default_allowed_mimes(): array {
     'video/x-msvideo' => 'avi',
     'video/mpeg' => 'mpeg',
     'video/ogg' => 'ogv',
-  ];
+  ]);
 }
 
-function memo_runtime_config(): array {
-  static $config = null;
-  if ($config !== null) {
-    return $config;
+function memo_config(): ?\Core\Config {
+  if (isset($GLOBALS['_legacy_config']) && $GLOBALS['_legacy_config'] instanceof \Core\Config) {
+    return $GLOBALS['_legacy_config'];
   }
-  $config = [
-    'timezone' => 'Asia/Shanghai',
-    'db_file' => __DIR__ . '/memo.sqlite',
-    'upload_dir' => __DIR__ . '/storage/uploads',
-    'max_upload_bytes' => 15 * 1024 * 1024,
-    'allowed_mimes' => memo_default_allowed_mimes(),
-  ];
+  return null;
+}
 
-  if (isset($GLOBALS['_legacy_config']) && is_object($GLOBALS['_legacy_config']) && method_exists($GLOBALS['_legacy_config'], 'get')) {
-    $appConfig = $GLOBALS['_legacy_config'];
-    $timezone = $appConfig->get('app.timezone');
-    if (is_string($timezone) && $timezone !== '') {
-      $config['timezone'] = $timezone;
+function memo_config_get(string $key, mixed $default = null): mixed {
+  $config = memo_config();
+  if ($config instanceof \Core\Config) {
+    return $config->get($key, $default);
+  }
+  return $default;
+}
+
+function memo_normalize_mime_map(array $map): array {
+  $normalized = [];
+  foreach ($map as $mime => $extensions) {
+    if (!is_string($mime) || $mime === '') {
+      continue;
     }
-    $dbPath = $appConfig->get('app.database.path');
-    if (is_string($dbPath) && $dbPath !== '') {
-      $config['db_file'] = $dbPath;
+    $normalizedMime = strtolower($mime);
+    $extensionList = [];
+    if (is_array($extensions)) {
+      foreach ($extensions as $extension) {
+        if (is_string($extension) && $extension !== '') {
+          $extensionList[] = strtolower($extension);
+        }
+      }
+    } elseif (is_string($extensions) && $extensions !== '') {
+      $extensionList[] = strtolower($extensions);
     }
-    $uploadDir = $appConfig->get('app.uploads.path');
-    if (is_string($uploadDir) && $uploadDir !== '') {
-      $config['upload_dir'] = $uploadDir;
-    }
-    $maxBytes = $appConfig->get('app.uploads.max_bytes');
-    if (is_numeric($maxBytes)) {
-      $config['max_upload_bytes'] = (int)$maxBytes;
-    }
-    $mimes = $appConfig->get('app.uploads.allowed_mimes');
-    if (is_array($mimes) && $mimes) {
-      $config['allowed_mimes'] = $mimes;
+    if ($extensionList) {
+      $normalized[$normalizedMime] = array_values(array_unique($extensionList));
     }
   }
-
-  return $config;
+  return $normalized;
 }
 
 function memo_db_file(): string {
-  return (string)(memo_runtime_config()['db_file'] ?? (__DIR__ . '/memo.sqlite'));
+  $path = memo_config_get('app.database.path', __DIR__ . '/memo.sqlite');
+  return is_string($path) && $path !== '' ? $path : (__DIR__ . '/memo.sqlite');
 }
 
 function memo_upload_dir(): string {
-  return (string)(memo_runtime_config()['upload_dir'] ?? (__DIR__ . '/storage/uploads'));
+  $dir = memo_config_get('app.uploads.path', __DIR__ . '/storage/uploads');
+  return is_string($dir) && $dir !== '' ? $dir : (__DIR__ . '/storage/uploads');
 }
 
 function memo_max_upload_bytes(): int {
-  return (int)(memo_runtime_config()['max_upload_bytes'] ?? (15 * 1024 * 1024));
+  $max = memo_config_get('app.uploads.max_bytes', 15 * 1024 * 1024);
+  if (is_numeric($max)) {
+    $int = (int)$max;
+    return $int > 0 ? $int : 15 * 1024 * 1024;
+  }
+  return 15 * 1024 * 1024;
 }
 
 function memo_allowed_upload_mime_map(): array {
-  $map = memo_runtime_config()['allowed_mimes'] ?? memo_default_allowed_mimes();
-  return is_array($map) ? $map : memo_default_allowed_mimes();
+  $configured = memo_config_get('app.uploads.allowed_mimes');
+  if (is_array($configured)) {
+    $normalized = memo_normalize_mime_map($configured);
+    if ($normalized) {
+      return $normalized;
+    }
+  }
+  return memo_default_allowed_mimes();
 }
 
 function memo_extension_for_mime(string $mime): ?string {
   $map = memo_allowed_upload_mime_map();
   $normalized = strtolower(trim($mime));
-  return $map[$normalized] ?? null;
+  if (!isset($map[$normalized]) || !is_array($map[$normalized]) || $map[$normalized] === []) {
+    return null;
+  }
+  return $map[$normalized][0];
+}
+
+function memo_extensions_for_mime(string $mime): array {
+  $map = memo_allowed_upload_mime_map();
+  $normalized = strtolower(trim($mime));
+  $extensions = $map[$normalized] ?? [];
+  if (!is_array($extensions)) {
+    return [];
+  }
+  $expanded = [];
+  foreach ($extensions as $extension) {
+    $expanded = array_merge($expanded, memo_extension_aliases($extension));
+  }
+  return array_values(array_unique($expanded));
+}
+
+function memo_extension_aliases(string $extension): array {
+  $extension = strtolower($extension);
+  $aliases = [
+    'jpg' => ['jpg', 'jpeg', 'jpe'],
+    'jpeg' => ['jpg', 'jpeg', 'jpe'],
+    'yaml' => ['yaml', 'yml'],
+    'yml' => ['yaml', 'yml'],
+    'tsv' => ['tsv', 'tab'],
+    'tab' => ['tsv', 'tab'],
+    'txt' => ['txt', 'text'],
+    'text' => ['txt', 'text'],
+  ];
+  $list = [$extension];
+  if (isset($aliases[$extension])) {
+    $list = array_merge($list, $aliases[$extension]);
+  }
+  return array_values(array_unique($list));
+}
+
+function memo_is_filename_extension_allowed(string $filename, string $mime): bool {
+  $extension = strtolower((string)pathinfo($filename, PATHINFO_EXTENSION));
+  if ($extension === '') {
+    return false;
+  }
+  $allowed = memo_extensions_for_mime($mime);
+  return $allowed !== [] && in_array($extension, $allowed, true);
+}
+
+function memo_generate_upload_destination(string $extension): array {
+  $directory = memo_upload_dir();
+  $extension = ltrim(strtolower($extension), '.');
+  for ($attempt = 0; $attempt < 5; $attempt++) {
+    $stored = bin2hex(random_bytes(16)) . '.' . $extension;
+    $path = $directory . DIRECTORY_SEPARATOR . $stored;
+    if (!file_exists($path)) {
+      return [$stored, $path];
+    }
+  }
+  throw new RuntimeException('无法生成唯一的文件名，请稍后重试');
 }
 
 function memo_upload_accept_attribute(): string {
@@ -218,6 +291,27 @@ function memo_upload_accept_attribute(): string {
   $acceptList = array_values(array_unique(array_merge($prefixes, $all)));
   $accept = implode(',', $acceptList);
   return $accept;
+}
+
+function memo_is_safe_inline_mime(string $mime): bool {
+  $mime = strtolower(trim($mime));
+  if (str_starts_with($mime, 'image/')) {
+    return $mime !== 'image/svg+xml';
+  }
+  return str_starts_with($mime, 'audio/') || str_starts_with($mime, 'video/');
+}
+
+function memo_format_content_disposition(string $filename, bool $inline = false): string {
+  $type = $inline ? 'inline' : 'attachment';
+  $sanitized = str_replace(["\r", "\n"], '', $filename);
+  $sanitized = trim($sanitized);
+  if ($sanitized === '') {
+    $sanitized = 'download';
+  }
+  $sanitized = basename($sanitized);
+  $sanitized = str_replace(['"', ';'], ["'", '-'], $sanitized);
+  $encoded = rawurlencode($sanitized);
+  return sprintf("%s; filename=\"%s\"; filename*=UTF-8''%s", $type, $sanitized, $encoded);
 }
 
 function memo_apply_default_security_headers(): void {
@@ -275,21 +369,9 @@ function mindmap_force_right_orientation(&$node, int $depth = 0): void {
 }
 
 // —— 基础辅助函数 ——
-if (!function_exists('h')) {
-  function h(?string $s): string { return htmlspecialchars($s ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-}
-if (!function_exists('now')) {
-  function now(): int { return time(); }
-}
 function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'; }
 function is_ajax(): bool { return !empty($_SERVER['HTTP_X_REQUESTED_WITH']); }
 function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
-if (!function_exists('bytes_h')) {
-  function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
-}
-if (!function_exists('dt')) {
-  function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
-}
 
 if(!function_exists('array_is_list')){
   function array_is_list(array $array): bool {
@@ -510,9 +592,10 @@ function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
 
 function memo_ensure_upload_directory(): void {
   $dir = memo_upload_dir();
-  if (!is_dir($dir)) {
-    @mkdir($dir, 0775, true);
+  if ($dir === '') {
+    throw new RuntimeException('上传目录未配置');
   }
+  ensure_directory($dir);
 }
 
 // —— 获取分类及计数 ——
@@ -977,27 +1060,25 @@ function json_cats(): void {
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
   $path=memo_upload_dir().DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=strtolower((string)$att['mime']);
-  $filename=$att['orig_name'];
-  $inlineTypes=['application/pdf','application/zip','application/x-zip-compressed','application/x-rar-compressed','application/vnd.rar'];
-  $isInline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || str_starts_with($mime,'audio/') || in_array($mime,$inlineTypes,true);
-  $contentType=$att['mime']!=='' ? $att['mime'] : 'application/octet-stream';
-  header('Content-Length: '.$att['size']);
+  $mime=(string)($att['mime'] ?? 'application/octet-stream');
+  $filename=is_string($att['orig_name'] ?? null) ? (string)$att['orig_name'] : 'download';
+  $isInline=memo_is_safe_inline_mime($mime);
+  $contentType=$mime !== '' ? $mime : 'application/octet-stream';
+  header('Content-Length: '.(int)$att['size']);
   header('X-Content-Type-Options: nosniff');
   header('Content-Type: '.$contentType);
-  header('Content-Disposition: '.($isInline?'inline':'attachment').'; filename="'.rawurlencode($filename).'"');
+  header('Content-Disposition: '.memo_format_content_disposition($filename, $isInline));
   readfile($path); exit;
 }
 
 if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])) {
   $asset=get_mindmap_asset((int)$_GET['mindmap_asset']); if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
   $path=memo_upload_dir().DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$asset['mime'];
-  $filename=$asset['orig_name'];
-  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || str_starts_with($mime,'audio/') || $mime==='application/pdf';
-  header('Content-Length: '.$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
-  if($inline){ header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
-  else { header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
+  $mime=(string)($asset['mime'] ?? 'application/octet-stream');
+  $filename=is_string($asset['orig_name'] ?? null) ? (string)$asset['orig_name'] : 'mindmap-asset';
+  $inline=memo_is_safe_inline_mime($mime);
+  header('Content-Length: '.(int)$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
+  header('Content-Disposition: '.memo_format_content_disposition($filename, $inline));
   readfile($path); exit;
 }
 
@@ -1430,8 +1511,19 @@ if (is_post()) {
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
         $ext = memo_extension_for_mime($mime);
         if(!$ext) throw new RuntimeException('仅允许图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件');
-        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
-        $orig=$f['name']; $itemIdForTouch=null;
+        $orig = isset($f['name']) ? (string)$f['name'] : '';
+        $orig = trim($orig);
+        if ($orig === '') {
+          $orig = 'upload';
+        }
+        $orig = basename($orig);
+        if (!memo_is_filename_extension_allowed($orig, $mime)) {
+          throw new RuntimeException('文件扩展名与内容类型不匹配或未被允许');
+        }
+        memo_ensure_upload_directory();
+        [$stored, $dest] = memo_generate_upload_destination($ext);
+        if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
+        $itemIdForTouch=null;
         if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
         else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
@@ -1450,9 +1542,19 @@ if (is_post()) {
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
         $ext = memo_extension_for_mime($mime);
         if(!$ext) throw new RuntimeException('仅允许图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件');
+        $orig = isset($f['name']) ? (string)$f['name'] : '';
+        $orig = trim($orig);
+        if ($orig === '') {
+          $orig = 'asset';
+        }
+        $orig = basename($orig);
+        if (!memo_is_filename_extension_allowed($orig, $mime)) {
+          throw new RuntimeException('文件扩展名与内容类型不匹配或未被允许');
+        }
         memo_ensure_upload_directory();
-        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
-        $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
+        [$stored, $dest] = memo_generate_upload_destination($ext);
+        if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
+        $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$orig,$stored,$mime,(int)$f['size'],session_id());
         if(is_ajax()){
           header('Content-Type: application/json'); echo json_encode([
             'ok'=>1,
