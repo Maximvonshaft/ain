@@ -1466,11 +1466,19 @@
                 const centerX=((a.x+b.x)/2)-rect.left;
                 const centerY=((a.y+b.y)/2)-rect.top;
                 const nextScale=this.clampScale(pinch.baseScale * (distance / pinch.initialDistance), rect);
-                if(Math.abs(nextScale-this.scale)>0.0001){
+                const nextOffsetX=centerX - pinch.originX*nextScale;
+                const nextOffsetY=centerY - pinch.originY*nextScale;
+                const scaleChanged=Math.abs(nextScale-this.scale)>0.0001;
+                const offsetChanged=(Math.abs(nextOffsetX-this.offsetX)>0.1) || (Math.abs(nextOffsetY-this.offsetY)>0.1);
+                if(scaleChanged || offsetChanged){
                   this.scale=nextScale;
-                  this.offsetX=centerX - pinch.originX*this.scale;
-                  this.offsetY=centerY - pinch.originY*this.scale;
+                  this.offsetX=nextOffsetX;
+                  this.offsetY=nextOffsetY;
                   this.applyTransform();
+                  pinch.baseScale=this.scale;
+                  pinch.initialDistance=distance;
+                  pinch.originX=(centerX - this.offsetX)/this.scale;
+                  pinch.originY=(centerY - this.offsetY)/this.scale;
                 }
                 return;
               }
