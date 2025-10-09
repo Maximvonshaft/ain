@@ -28,3 +28,31 @@ function format_datetime(int $timestamp): string
 {
     return date('Y-m-d H:i', $timestamp);
 }
+
+function cdn_attributes(array $entry): string
+{
+    $integrity = $entry['integrity'] ?? '';
+    if ($integrity === '') {
+        return '';
+    }
+
+    $parts = [
+        sprintf(
+            ' integrity="%s"',
+            htmlspecialchars($integrity, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+        ),
+        sprintf(
+            ' crossorigin="%s"',
+            htmlspecialchars($entry['crossorigin'] ?? 'anonymous', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+        ),
+    ];
+
+    if (!empty($entry['referrerpolicy'])) {
+        $parts[] = sprintf(
+            ' referrerpolicy="%s"',
+            htmlspecialchars($entry['referrerpolicy'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+        );
+    }
+
+    return implode('', $parts);
+}

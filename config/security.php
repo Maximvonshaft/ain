@@ -16,8 +16,8 @@ return [
         'directives' => [
             'default-src' => "'self' cdn.jsdelivr.net",
             'img-src' => "'self' data: blob:",
-            'style-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com",
-            'font-src' => "fonts.gstatic.com",
+            'style-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net",
+            'font-src' => "cdn.jsdelivr.net",
             'script-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net",
             'base-uri' => "'self'",
             'form-action' => "'self'",
