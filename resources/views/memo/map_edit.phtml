@@ -1547,36 +1547,31 @@
           if(!evt) return;
           const rect=this.container.getBoundingClientRect();
           if(!rect) return;
-          const trackpadThreshold=60;
-          const isTrackpadLike=evt.deltaMode===0 && Math.abs(evt.deltaY)<trackpadThreshold && Math.abs(evt.deltaX)<trackpadThreshold;
-          const wantsZoom=evt.ctrlKey || evt.metaKey || (!evt.shiftKey && !evt.altKey && !isTrackpadLike);
-          if(wantsZoom){
-            evt.preventDefault();
-            const baseScale=this.scale>0?this.scale:1;
-            const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
-            const delta=evt.deltaY||0;
-            const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
-            if(Math.abs(nextScale-baseScale)<0.0001) return;
-            const anchorX=evt.clientX-rect.left;
-            const anchorY=evt.clientY-rect.top;
-            const originX=(anchorX - this.offsetX)/baseScale;
-            const originY=(anchorY - this.offsetY)/baseScale;
-            this.scale=nextScale;
-            this.offsetX=anchorX - originX*this.scale;
-            this.offsetY=anchorY - originY*this.scale;
+          const isPixelDelta=evt.deltaMode===0;
+          const hasPinchModifier=evt.ctrlKey || evt.metaKey || (typeof evt.deltaZ==='number' && Math.abs(evt.deltaZ)>0);
+          const isTrackpadScroll=isPixelDelta && !hasPinchModifier;
+          evt.preventDefault();
+          if(isTrackpadScroll){
+            const multiplier=1;
+            const deltaX=evt.deltaX||0;
+            const deltaY=evt.deltaY||0;
+            this.offsetX-=deltaX*multiplier;
+            this.offsetY-=deltaY*multiplier;
             this.applyTransform();
             return;
           }
-          evt.preventDefault();
-          let deltaX=evt.deltaX||0;
-          let deltaY=evt.deltaY||0;
-          if(evt.shiftKey && !evt.altKey){
-            deltaX+=deltaY;
-            deltaY=0;
-          }
-          const multiplier=evt.deltaMode===1?20:(evt.deltaMode===2?Math.max(rect.width,rect.height)*0.8:(isTrackpadLike?1:1.8));
-          this.offsetX-=deltaX*multiplier;
-          this.offsetY-=deltaY*multiplier;
+          const baseScale=this.scale>0?this.scale:1;
+          const anchorX=evt.clientX-rect.left;
+          const anchorY=evt.clientY-rect.top;
+          const originX=(anchorX - this.offsetX)/baseScale;
+          const originY=(anchorY - this.offsetY)/baseScale;
+          const rawDelta=(evt.deltaY!==0?evt.deltaY:(evt.deltaZ||0));
+          const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:(hasPinchModifier?0.0015:0.0025));
+          const nextScale=this.clampScale(baseScale*Math.exp(-rawDelta*intensity), rect);
+          if(Math.abs(nextScale-baseScale)<0.0001) return;
+          this.scale=nextScale;
+          this.offsetX=anchorX - originX*this.scale;
+          this.offsetY=anchorY - originY*this.scale;
           this.applyTransform();
         }
         add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
@@ -4557,6 +4552,41 @@
       const audioExts=['.mp3','.m4a','.aac','.wav','.ogg','.oga','.opus','.flac','.weba'];
       const officeExts=['.pdf','.doc','.docx','.docm','.dotx','.dotm','.xls','.xlsx','.xlsm','.xlsb','.xltx','.xltm'];
       const archiveExts=['.zip','.rar'];
+      const AUTO_SAVE_INITIAL_DELAY=800;
+      const AUTO_SAVE_MAX_DELAY=10000;
+      let autoSaveTimer=null;
+      let autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+      let saveInFlightPromise=null;
+      let saveInFlightMode='idle';
+      function cancelAutoSaveTimer(){
+        if(autoSaveTimer){
+          clearTimeout(autoSaveTimer);
+          autoSaveTimer=null;
+        }
+      }
+      async function runAutoSave(reason){
+        if(!dirty){
+          autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+          return;
+        }
+        const ok=await saveMindmap({silent:true});
+        if(!ok && dirty){
+          autoSaveBackoff=Math.min(autoSaveBackoff*2,AUTO_SAVE_MAX_DELAY);
+          scheduleAutoSave(reason,autoSaveBackoff);
+        }else{
+          autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+        }
+      }
+      function scheduleAutoSave(reason='auto', delay){
+        const wait=(typeof delay==='number' && delay>=0)?delay:autoSaveBackoff;
+        if(autoSaveTimer){
+          clearTimeout(autoSaveTimer);
+        }
+        autoSaveTimer=window.setTimeout(()=>{
+          autoSaveTimer=null;
+          runAutoSave(reason);
+        }, wait);
+      }
       function setSaveButtonState(text, disabled, state){
         if(dockSaveLabel){
           if(typeof text==='string'){ dockSaveLabel.textContent=text; }
@@ -5669,6 +5699,7 @@
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        scheduleAutoSave('attachment-upload');
         if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
       }
       function handleDroppedText(text, parent, event){
@@ -6362,7 +6393,7 @@
             setTimeout(()=>el.classList.remove('mind-node-highlight'),1000);
           }
         }
-        function handleDelete(ids){
+        async function handleDelete(ids){
           const unique=Array.from(new Set(ids.map(id=>Number(id)).filter(id=>Number.isFinite(id) && id>0)));
           if(!unique.length) return;
           let total=0;
@@ -6372,15 +6403,32 @@
           const changed=removeAttachmentsFromMind(unique);
           const metaBackup=backupAndRemoveAssetMeta(unique);
           refresh(true);
-          requestDelete(unique).then(()=>{
+          let saved=false;
+          if(changed){
+            saved=await saveMindmap({silent:true});
+            if(!saved){
+              alert('删除附件失败：保存导图时出错');
+              restoreAssetMeta(metaBackup);
+              undoMindChange();
+              refresh(true);
+              return;
+            }
+          }
+          try{
+            await requestDelete(unique);
             state.selection.clear();
             refresh(true);
-          }).catch(err=>{
+          }catch(err){
             alert(err && err.message ? err.message : '删除附件失败');
             restoreAssetMeta(metaBackup);
-            if(changed){ undoMindChange(); }
-            refresh(true);
-          });
+            if(changed){
+              const undone=undoMindChange();
+              refresh(true);
+              if(undone){ await saveMindmap({silent:true}); }
+            }else{
+              refresh(true);
+            }
+          }
         }
         function removeAttachmentsFromMind(ids){
           if(!ids || !ids.length) return false;
@@ -7211,38 +7259,74 @@
           reader.readAsText(file,'utf-8');
         });
       }
-      async function saveMindmap(){
-        commitInlineEditing();
-        const title=titleInput.value.trim()||'未命名导图';
-        const currentData=jm.get_data('node_tree');
-        if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
-        const payload=JSON.stringify(currentData);
-        const fd=new FormData();
-        fd.append('action','save_mindmap');
-        fd.append('id', String(currentMapId||0));
-        fd.append('title', title);
-        fd.append('content', payload);
-        try{
-          showSaving();
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('网络异常');
-          const json=await res.json();
-          if(!json.ok) throw new Error(json.error||'保存失败');
-          currentMapId=parseInt(json.id,10)||0;
-          document.getElementById('jsmind-container').dataset.mapId=currentMapId;
-          if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-          if(deleteMapForm){
-            const idInput=deleteMapForm.querySelector('input[name="id"]');
-            if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+      async function saveMindmap(options={}){
+        const opts=(options && typeof options==='object')?options:{};
+        const silent=!!opts.silent;
+        if(saveInFlightPromise){
+          if(!silent && saveInFlightMode==='silent' && !opts.__afterWait){
+            try{ await saveInFlightPromise; }catch(_){ }
+            const retryOptions=Object.assign({}, opts, {__afterWait:true});
+            return saveMindmap(retryOptions);
           }
-          history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
-          initialData=JSON.parse(payload);
-          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-          markSaved();
-        }catch(err){
-          alert(err.message||'保存失败');
-          markDirty();
+          return saveInFlightPromise;
         }
+        cancelAutoSaveTimer();
+        saveInFlightMode=silent?'silent':'interactive';
+        const execute=async()=>{
+          commitInlineEditing();
+          const title=titleInput.value.trim()||'未命名导图';
+          const currentData=jm.get_data('node_tree');
+          if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
+          const payload=JSON.stringify(currentData);
+          const fd=new FormData();
+          fd.append('action','save_mindmap');
+          fd.append('id', String(currentMapId||0));
+          fd.append('title', title);
+          fd.append('content', payload);
+          try{
+            if(!silent){ showSaving(); }
+            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            if(!res.ok) throw new Error('网络异常');
+            const json=await res.json();
+            if(!json.ok) throw new Error(json.error||'保存失败');
+            currentMapId=parseInt(json.id,10)||0;
+            document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+            if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+            if(deleteMapForm){
+              const idInput=deleteMapForm.querySelector('input[name="id"]');
+              if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+            }
+            history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+            initialData=JSON.parse(payload);
+            if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+            markSaved();
+            autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+            return true;
+          }catch(err){
+            if(!silent){
+              alert(err.message||'保存失败');
+            }else{
+              console.error('自动保存失败', err);
+              if(saveState){
+                saveState.textContent='自动保存失败';
+                saveState.classList.add('show','dirty');
+              }
+              setSaveButtonState('未保存',false,'dirty');
+            }
+            markDirty();
+            return false;
+          }
+        };
+        const promise=(async()=>{
+          try{
+            return await execute();
+          }finally{
+            saveInFlightPromise=null;
+            saveInFlightMode='idle';
+          }
+        })();
+        saveInFlightPromise=promise;
+        return promise;
       }
       window.addEventListener('beforeunload',e=>{
         commitInlineEditing();

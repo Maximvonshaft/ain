@@ -464,6 +464,19 @@ function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name
   return get_mindmap_asset($id) ?? ['id'=>$id,'mindmap_id'=>$map_id,'node_uid'=>$node_uid,'session_key'=>$session_key,'orig_name'=>$orig_name,'stored_name'=>$stored_name,'mime'=>$mime,'size'=>$size,'created_at'=>now()];
 }
 
+function cleanup_stale_mindmap_session_assets(int $max_age_seconds = 172800, int $batch_limit = 200): void {
+  $max_age_seconds = max(60, $max_age_seconds);
+  $batch_limit = max(1, $batch_limit);
+  $threshold = now() - $max_age_seconds;
+  $pdo = db();
+  $st = $pdo->prepare("SELECT id FROM mindmap_assets WHERE (mindmap_id IS NULL OR mindmap_id=0) AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
+  $st->execute([$threshold, $batch_limit]);
+  foreach($st->fetchAll() as $row){
+    $assetId = isset($row['id']) ? (int)$row['id'] : 0;
+    if($assetId>0){ delete_mindmap_asset($assetId); }
+  }
+}
+
 function prune_mindmap_assets(int $map_id, array $keep_ids): void {
   $pdo=db();
   $ids=array_values(array_unique(array_map('intval',$keep_ids)));
@@ -800,6 +813,14 @@ if (isset($_GET['export'])) {
 }
 
 // —— 处理 POST 动作 ——
+{
+  $nowTs=now();
+  $lastGc=(int)($_SESSION['mindmap_asset_gc_at'] ?? 0);
+  if($nowTs-$lastGc>1800){
+    cleanup_stale_mindmap_session_assets();
+    $_SESSION['mindmap_asset_gc_at']=$nowTs;
+  }
+}
 if (is_post()) {
   $pdo=db(); $action=$_POST['action'] ?? '';
   try{
