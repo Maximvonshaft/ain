@@ -21,7 +21,35 @@ header_remove('X-Powered-By');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; font-src cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+
+$cdnResources = [
+  'fonts' => [
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/cinzel@5.2.8/500.css', 'integrity' => 'sha384-7v1bWR/nP3kDOX0ewP+ZV/TdyDB1LMi6swZIHUv+/ihIN+yo/tIKCXkVJk1WaZ2b', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/cinzel@5.2.8/600.css', 'integrity' => 'sha384-QNu+JjOkpmxtvAoZEuUZ6tqGhPZLY3ygt9NB3nGm5kX3TG9gZtEi3VTRvAf65bMb', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/cinzel@5.2.8/700.css', 'integrity' => 'sha384-O/oLJBLGGldMs7HxAYRnSN50LYc4P4P3qiJbqSV358VWDpuJKiErXj9iWy8+R3LZ', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5.2.8/400.css', 'integrity' => 'sha384-xIqhvN2Z/Umq7Ox8y6t3uFHhjyQo0knjgs1wcj13JjTuHOGIaXBHO7eal9RhNMdd', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5.2.8/500.css', 'integrity' => 'sha384-V0O4X1tN0UwvdYzAEJQFmI91MWdJS28KYainePiRQIAtDyKH5cZxjVuoOPp/0v9g', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5.2.8/600.css', 'integrity' => 'sha384-zZdQWz6lweHJ9ZIJxqSYDpVJzhjcCKCxfftjlgIC/g3Ok/FynI4BfyMWG5/0mJt9', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.8/400.css', 'integrity' => 'sha384-C62fXKqqwZ9MFRLsB6RTUMQIde5FFdkxndflVMwd9/dlzqT5fZ1okVPrXregodNt', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.8/500.css', 'integrity' => 'sha384-dBYV6PZWk3vZv32AIGWsVnZ0mDANQX/56OezkEY2ajdJK3sLcvE/+D/zSgisRjwh', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.8/600.css', 'integrity' => 'sha384-sqtOrv0sKfqV0UBt7XCsR2BYkw60mUJFI4GU8938hHadWxnt54td7dRTSb5Z5EW5', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.8/700.css', 'integrity' => 'sha384-KP/YW0fs+LA7Lr1J11CHvrKs+U773BQXOSyMclL0/xjjg3H0c6lR/pC2DJdwPuZZ', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.8/500.css', 'integrity' => 'sha384-3AnTn7NCG8m/qcO50AsiUsz8gcEiswj9GyPHlwUkvYNmWPuowSqhefcCVsuY3jGj', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.8/600.css', 'integrity' => 'sha384-I5he03PyqIXz7dU+fRsdxKQgLr9XC8WYe4vBhPBGJzZFMmlTmRRcvMgTXzvFxmFZ', 'crossorigin' => 'anonymous'],
+    ['href' => 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.8/700.css', 'integrity' => 'sha384-+VJ42QNJY5J0fJiq6GZfRN9yTBORo6g6f0X3RGTQ4Uz1HYnxpbjNIqfu6oLQ5/jF', 'crossorigin' => 'anonymous'],
+  ],
+  'scripts' => [
+    'marked' => ['src' => 'https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js', 'integrity' => 'sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi', 'crossorigin' => 'anonymous'],
+    'dompurify' => ['src' => 'https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js', 'integrity' => 'sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a', 'crossorigin' => 'anonymous'],
+    'zip.js' => ['src' => 'https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.32/dist/zip.min.js', 'integrity' => 'sha384-fWYnD1jIJVL3pVW4BM6uK4qLodzNKqokRtUEAwAYPVQPb65mU4XgueXcVM4k0ZrH', 'crossorigin' => 'anonymous'],
+    'unrar.js' => ['src' => 'https://cdn.jsdelivr.net/npm/unrar.js@0.2.5/unrar.js', 'integrity' => 'sha384-jvOQWFL9oHRavzJxU2L70XQ838g4APCuQEbOZqZtPNgh2MlVerKtLmBqpbv2RbRH', 'crossorigin' => 'anonymous'],
+    'mammoth' => ['src' => 'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js', 'integrity' => 'sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz', 'crossorigin' => 'anonymous'],
+    'xlsx' => ['src' => 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', 'integrity' => 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw', 'crossorigin' => 'anonymous'],
+    'html-to-image' => ['src' => 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js', 'integrity' => 'sha384-lELZMVO0WZSKHeOrm8rKLCq9ZXjY1+2I9uL/QyDxIXSd83b3/z5xBXb1uDoFi3P/', 'crossorigin' => 'anonymous'],
+    'jspdf' => ['src' => 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'integrity' => 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk', 'crossorigin' => 'anonymous'],
+  ],
+];
 
 // —— 配置 ——
 const DB_FILE = __DIR__ . '/memo.sqlite';
