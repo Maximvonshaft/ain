@@ -1644,10 +1644,39 @@
           }
           const isTrackpadScroll=!isPinchGesture && deltaMode===0 && !isMouseLikeWheel && (absDeltaX>0 || absDeltaY>0);
           if(isTrackpadScroll){
-            const panFactor=deltaMode===1?18:(deltaMode===2?240:1);
-            this.offsetX-=evt.deltaX*panFactor;
-            this.offsetY-=evt.deltaY*panFactor;
-            this.applyTransform();
+            const panFactor=1;
+            let nextScale=this.scale;
+            let nextOffsetX=this.offsetX;
+            let nextOffsetY=this.offsetY;
+            let changed=false;
+            if(Math.abs(evt.deltaX)>0.0001){
+              nextOffsetX-=evt.deltaX*panFactor;
+              changed=true;
+            }
+            const preferZoom=!evt.shiftKey && Math.abs(evt.deltaY)>Math.max(2, Math.abs(evt.deltaX)*1.35);
+            if(preferZoom){
+              const anchorX=evt.clientX-rect.left;
+              const anchorY=evt.clientY-rect.top;
+              const originX=(anchorX - nextOffsetX)/nextScale;
+              const originY=(anchorY - nextOffsetY)/nextScale;
+              const zoomIntensity=0.0018;
+              const targetScale=this.clampScale(nextScale*Math.exp(-evt.deltaY*zoomIntensity), rect);
+              if(Math.abs(targetScale-nextScale)>0.0001){
+                nextScale=targetScale;
+                nextOffsetX=anchorX - originX*nextScale;
+                nextOffsetY=anchorY - originY*nextScale;
+                changed=true;
+              }
+            }else if(Math.abs(evt.deltaY)>0.0001){
+              nextOffsetY-=evt.deltaY*panFactor;
+              changed=true;
+            }
+            if(changed){
+              this.scale=nextScale;
+              this.offsetX=nextOffsetX;
+              this.offsetY=nextOffsetY;
+              this.applyTransform();
+            }
             return;
           }
           const dominantDelta=(absDeltaY>=absDeltaX)? (evt.deltaY||0) : (evt.deltaX||0);
