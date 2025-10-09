@@ -1832,24 +1832,73 @@
           const node=this.nodes.get(id);
           if(!node || node.isroot) return;
           const parent=node.parent;
-          parent.children=parent.children.filter(child=>child!==node);
-          if(parent.model && parent.model.children){
-            parent.model.children=parent.model.children.filter(child=>child.id!==id);
+          if(!parent) return;
+          const parentChildren=Array.isArray(parent.children)?parent.children:(parent.children=[]);
+          const insertionIndex=parentChildren.indexOf(node);
+          if(insertionIndex!==-1){ parentChildren.splice(insertionIndex,1); }
+          const promoted=Array.isArray(node.children)?[...node.children]:[];
+          if(promoted.length){
+            const insertAt=insertionIndex===-1?parentChildren.length:insertionIndex;
+            parentChildren.splice(insertAt,0,...promoted);
           }
-          const stack=[node];
-          const removedIds=new Set();
-          while(stack.length){
-            const cur=stack.pop();
-            removedIds.add(cur.id);
-            this.nodes.delete(cur.id);
-            if(cur.children && cur.children.length){ stack.push(...cur.children); }
+          const parentModelChildren=(parent.model && typeof this.ensureModelChildren==='function')
+            ? this.ensureModelChildren(parent)
+            : null;
+          let modelInsertionIndex=-1;
+          if(parentModelChildren){
+            modelInsertionIndex=parentModelChildren.findIndex(child=>child && child.id===id);
+            if(modelInsertionIndex!==-1){ parentModelChildren.splice(modelInsertionIndex,1); }
           }
-          if(removedIds.size){
-            this.pruneRelations(rel=>removedIds.has(rel.from) || removedIds.has(rel.to),{silent:true});
+          const buildModelFromNode=(target)=>{
+            const normalized=normalizeNodeData(target.data||{});
+            const model={
+              id:target.id,
+              topic:target.topic||'',
+              data:normalized,
+              children:[],
+              parentId:target.parent?target.parent.id:null,
+              direction:target.direction||'right',
+              expanded:target.expanded!==false,
+            };
+            if(target.children && target.children.length){
+              model.children=target.children.map(kid=>kid && kid.model ? kid.model : buildModelFromNode(kid)).filter(Boolean);
+            }
+            return model;
+          };
+          const updateDepths=(current, depth)=>{
+            if(!current) return;
+            current.depth=depth;
+            if(current.model){
+              current.model.depth=depth;
+              current.model.parentId=current.parent?current.parent.id:null;
+            }
+            if(current.children && current.children.length){
+              current.children.forEach(child=>updateDepths(child, depth+1));
+            }
+          };
+          if(promoted.length){
+            const modelsToInsert=[];
+            const nextDepth=(parent.depth||0)+1;
+            for(const child of promoted){
+              child.parent=parent;
+              if(!child.model){ child.model=buildModelFromNode(child); }
+              if(child.model){ child.model.parentId=parent.id; }
+              updateDepths(child, nextDepth);
+              if(parentModelChildren && child.model){ modelsToInsert.push(child.model); }
+            }
+            if(parentModelChildren && modelsToInsert.length){
+              const insertAt=modelInsertionIndex===-1?parentModelChildren.length:modelInsertionIndex;
+              parentModelChildren.splice(insertAt,0,...modelsToInsert);
+            }
           }
+          node.children=[];
+          if(node.model){ node.model.children=[]; }
+          this.nodes.delete(id);
+          if(this.selectedId===id){ this.selectedId=null; }
+          this.pruneRelations(rel=>rel.from===id || rel.to===id,{silent:true});
           this.computeLayout();
           this.render();
-          this.select_node(parent.id);
+          if(parent && parent.id){ this.select_node(parent.id); }
           this.emit(SimpleMind.event_type.update);
         }
         setupTouchGuards(){
