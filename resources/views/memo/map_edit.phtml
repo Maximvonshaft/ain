@@ -1298,6 +1298,8 @@
             document.body.appendChild(this.measureHost);
           }
           this.dragState=null;
+          this.panSuppressClick=false;
+          this.panSuppressTimeout=null;
           this.activePointers=new Map();
           this.pinchState=null;
           this.relations=[];
@@ -1314,6 +1316,23 @@
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
+        }
+        resetPanClickSuppression(){
+          if(this.panSuppressTimeout){
+            clearTimeout(this.panSuppressTimeout);
+            this.panSuppressTimeout=null;
+          }
+          this.panSuppressClick=false;
+        }
+        suppressClickAfterPan(){
+          this.panSuppressClick=true;
+          if(this.panSuppressTimeout){
+            clearTimeout(this.panSuppressTimeout);
+          }
+          this.panSuppressTimeout=setTimeout(()=>{
+            this.panSuppressClick=false;
+            this.panSuppressTimeout=null;
+          },120);
         }
         ensurePanKeyHandlers(){
           if(this.globalPanKeyHandlersAttached) return;
@@ -1410,7 +1429,8 @@
                 return;
               }
               try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
-              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+              this.resetPanClickSuppression();
+              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false};
               this.updatePointerPanState(true);
               evt.preventDefault();
               return;
@@ -1422,7 +1442,8 @@
             if(onNode && !(this.spacePanActive || isMiddle)) return;
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
             try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
-            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY};
+            this.resetPanClickSuppression();
+            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false};
             this.updatePointerPanState(true);
             evt.preventDefault();
           };
@@ -1460,6 +1481,10 @@
             if(!this.dragState || evt.pointerId!==this.dragState.pointerId) return;
             const dx=evt.clientX-this.dragState.startX;
             const dy=evt.clientY-this.dragState.startY;
+            if(!this.dragState.moved){
+              const movement=Math.max(Math.abs(dx), Math.abs(dy));
+              if(movement>2){ this.dragState.moved=true; }
+            }
             this.offsetX=this.dragState.baseX+dx;
             this.offsetY=this.dragState.baseY+dy;
             this.applyTransform();
@@ -1468,7 +1493,9 @@
             if(this.activePointers.has(evt.pointerId)){
               this.activePointers.delete(evt.pointerId);
             }
-            if(this.dragState && evt.pointerId===this.dragState.pointerId){
+            const wasDrag=this.dragState && evt.pointerId===this.dragState.pointerId;
+            const moved=wasDrag && this.dragState.moved;
+            if(wasDrag){
               this.dragState=null;
               this.updatePointerPanState(false);
             }
@@ -1477,6 +1504,7 @@
             }else{
               updatePinchBaseline();
             }
+            if(moved){ this.suppressClickAfterPan(); }
             try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
           };
           this.container.addEventListener('pointerdown',startPan);
@@ -2334,6 +2362,11 @@
           }
           if(!forMeasure){
             el.addEventListener('click',(evt)=>{
+              if(this.isPointerPanning || this.panSuppressClick){
+                evt.preventDefault();
+                evt.stopPropagation();
+                return;
+              }
               const wasSelected=!!node.selected;
               this.select_node(node.id);
               if(isCompactViewport()){
