@@ -1625,10 +1625,26 @@
           const absDeltaX=Math.abs(evt.deltaX||0);
           const absDeltaY=Math.abs(evt.deltaY||0);
           const deltaZ=typeof evt.deltaZ==='number'?evt.deltaZ:0;
+          const deltaMode=typeof evt.deltaMode==='number'?evt.deltaMode:0;
           const isPinchGesture=evt.ctrlKey || evt.metaKey || Math.abs(deltaZ)>0.0001;
-          const isTrackpadScroll=!isPinchGesture && evt.deltaMode===0 && (absDeltaX>0 || absDeltaY>0) && absDeltaX<120 && absDeltaY<120;
+          let isMouseLikeWheel=false;
+          const wheelDeltaY=typeof evt.wheelDeltaY==='number'?evt.wheelDeltaY:null;
+          if(wheelDeltaY!==null && wheelDeltaY!==0){
+            const absWheelDeltaY=Math.abs(wheelDeltaY);
+            if(absWheelDeltaY>=120){
+              const steps=Math.round(absWheelDeltaY/120);
+              const normalized=Math.abs(absWheelDeltaY-(steps*120));
+              if(steps>0 && normalized<0.0001){
+                isMouseLikeWheel=true;
+              }
+            }
+          }
+          if(!isMouseLikeWheel && (deltaMode===1 || deltaMode===2)){
+            isMouseLikeWheel=true;
+          }
+          const isTrackpadScroll=!isPinchGesture && deltaMode===0 && !isMouseLikeWheel && (absDeltaX>0 || absDeltaY>0);
           if(isTrackpadScroll){
-            const panFactor=evt.deltaMode===1?18:(evt.deltaMode===2?240:1);
+            const panFactor=deltaMode===1?18:(deltaMode===2?240:1);
             this.offsetX-=evt.deltaX*panFactor;
             this.offsetY-=evt.deltaY*panFactor;
             this.applyTransform();
