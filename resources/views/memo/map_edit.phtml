@@ -1353,6 +1353,7 @@
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
           this.setupTouchGuards();
+          this.wheelInputState={lastType:'mouse',lastTimestamp:0,pixel:false};
         }
         resetPanClickSuppression(){
           if(this.panSuppressTimeout){
@@ -1417,6 +1418,76 @@
           if(!this.container) return;
           if(this.spacePanActive){ this.container.classList.add('mind-pan-key'); }
           else{ this.container.classList.remove('mind-pan-key'); }
+        }
+        getEventTimestamp(evt){
+          if(evt && typeof evt.timeStamp==='number' && isFinite(evt.timeStamp)){ return evt.timeStamp; }
+          if(typeof performance!=='undefined' && performance && typeof performance.now==='function'){ return performance.now(); }
+          return Date.now();
+        }
+        updateWheelInputState(type,pixel,timestamp){
+          this.wheelInputState={
+            lastType:type || 'mouse',
+            lastTimestamp:typeof timestamp==='number'?timestamp:this.getEventTimestamp(null),
+            pixel:!!pixel,
+          };
+        }
+        hasFractionalPixelDelta(value){
+          if(typeof value!=='number') return false;
+          const abs=Math.abs(value);
+          if(abs<0.0001) return false;
+          const rounded=Math.round(abs);
+          return Math.abs(abs-rounded)>0.01;
+        }
+        isDiscreteWheelDelta(value){
+          if(typeof value!=='number' || !isFinite(value)) return false;
+          const abs=Math.abs(value);
+          if(abs<1) return false;
+          const remainder=abs%120;
+          return remainder<0.01 || (120-remainder)<0.01;
+        }
+        classifyWheelInput(evt,{absDeltaX=0,absDeltaY=0,isPinchGesture=false}={}){
+          const timestamp=this.getEventTimestamp(evt);
+          const deltaMode=typeof evt.deltaMode==='number'?evt.deltaMode:0;
+          const pixelMode=deltaMode===0;
+          if(isPinchGesture){
+            this.updateWheelInputState('pinch',pixelMode,timestamp);
+            return 'pinch';
+          }
+          if(deltaMode===1 || deltaMode===2){
+            this.updateWheelInputState('mouse',false,timestamp);
+            return 'mouse';
+          }
+          if(!pixelMode){
+            this.updateWheelInputState('mouse',false,timestamp);
+            return 'mouse';
+          }
+          const wheelDeltaValues=[
+            typeof evt.wheelDelta==='number'?evt.wheelDelta:null,
+            typeof evt.wheelDeltaY==='number'?evt.wheelDeltaY:null,
+            typeof evt.wheelDeltaX==='number'?evt.wheelDeltaX:null,
+          ];
+          const hasDiscreteWheelDelta=wheelDeltaValues.some(value=>this.isDiscreteWheelDelta(value));
+          const hasFractionalDelta=this.hasFractionalPixelDelta(absDeltaX) || this.hasFractionalPixelDelta(absDeltaY);
+          if(hasFractionalDelta){
+            this.updateWheelInputState('trackpad',true,timestamp);
+            return 'trackpad';
+          }
+          if(hasDiscreteWheelDelta){
+            this.updateWheelInputState('mouse',true,timestamp);
+            return 'mouse';
+          }
+          const smallDelta=Math.max(absDeltaX,absDeltaY)<0.5;
+          if(smallDelta){
+            this.updateWheelInputState('trackpad',true,timestamp);
+            return 'trackpad';
+          }
+          const previous=this.wheelInputState || null;
+          if(previous && previous.pixel && (timestamp-previous.lastTimestamp)<=300){
+            this.updateWheelInputState(previous.lastType,true,timestamp);
+            return previous.lastType;
+          }
+          this.updateWheelInputState('trackpad',true,timestamp);
+          return 'trackpad';
         }
         updatePointerPanState(active){
           this.isPointerPanning=!!active;
@@ -1621,19 +1692,19 @@
           const rect=this.container.getBoundingClientRect();
           if(!rect) return;
           evt.preventDefault();
-          const baseScale=this.scale>0?this.scale:1;
           const absDeltaX=Math.abs(evt.deltaX||0);
           const absDeltaY=Math.abs(evt.deltaY||0);
           const deltaZ=typeof evt.deltaZ==='number'?evt.deltaZ:0;
           const isPinchGesture=evt.ctrlKey || evt.metaKey || Math.abs(deltaZ)>0.0001;
-          const isTrackpadScroll=!isPinchGesture && evt.deltaMode===0 && (absDeltaX>0 || absDeltaY>0) && absDeltaX<120 && absDeltaY<120;
-          if(isTrackpadScroll){
+          const inputType=this.classifyWheelInput(evt,{absDeltaX,absDeltaY,isPinchGesture});
+          if(inputType==='trackpad'){
             const panFactor=evt.deltaMode===1?18:(evt.deltaMode===2?240:1);
             this.offsetX-=evt.deltaX*panFactor;
             this.offsetY-=evt.deltaY*panFactor;
             this.applyTransform();
             return;
           }
+          const baseScale=this.scale>0?this.scale:1;
           const dominantDelta=(absDeltaY>=absDeltaX)? (evt.deltaY||0) : (evt.deltaX||0);
           const delta=dominantDelta!==0?dominantDelta:(deltaZ!==0?deltaZ:(evt.deltaY||0));
           if(delta===0) return;
