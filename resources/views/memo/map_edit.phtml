@@ -1547,14 +1547,20 @@
           if(!evt) return;
           const rect=this.container.getBoundingClientRect();
           if(!rect) return;
-          const trackpadThreshold=60;
-          const isTrackpadLike=evt.deltaMode===0 && Math.abs(evt.deltaY)<trackpadThreshold && Math.abs(evt.deltaX)<trackpadThreshold;
-          const wantsZoom=evt.ctrlKey || evt.metaKey || (!evt.shiftKey && !evt.altKey && !isTrackpadLike);
+          const deltaMode=typeof evt.deltaMode==='number'?evt.deltaMode:0;
+          const deltaX=typeof evt.deltaX==='number'?evt.deltaX:0;
+          const deltaY=typeof evt.deltaY==='number'?evt.deltaY:0;
+          const deltaZ=typeof evt.deltaZ==='number'?evt.deltaZ:0;
+          const isTrackpad=deltaMode===0;
+          const pinchLike=isTrackpad && (evt.ctrlKey || evt.metaKey || Math.abs(deltaZ)>0.0001);
+          const modifierZoom=evt.ctrlKey || evt.metaKey;
+          const mouseWheelZoom=!isTrackpad && !evt.shiftKey && !evt.altKey && Math.abs(deltaY)>=Math.abs(deltaX);
+          const wantsZoom=pinchLike || modifierZoom || mouseWheelZoom;
           if(wantsZoom){
             evt.preventDefault();
             const baseScale=this.scale>0?this.scale:1;
-            const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
-            const delta=evt.deltaY||0;
+            const intensity=deltaMode===1?0.12:(deltaMode===2?0.35:0.0025);
+            const delta=(deltaY!==0)?deltaY:(deltaZ!==0?deltaZ:0);
             const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
             if(Math.abs(nextScale-baseScale)<0.0001) return;
             const anchorX=evt.clientX-rect.left;
@@ -1568,15 +1574,15 @@
             return;
           }
           evt.preventDefault();
-          let deltaX=evt.deltaX||0;
-          let deltaY=evt.deltaY||0;
+          let panX=deltaX;
+          let panY=deltaY;
           if(evt.shiftKey && !evt.altKey){
-            deltaX+=deltaY;
-            deltaY=0;
+            panX+=panY;
+            panY=0;
           }
-          const multiplier=evt.deltaMode===1?20:(evt.deltaMode===2?Math.max(rect.width,rect.height)*0.8:(isTrackpadLike?1:1.8));
-          this.offsetX-=deltaX*multiplier;
-          this.offsetY-=deltaY*multiplier;
+          const multiplier=deltaMode===1?20:(deltaMode===2?Math.max(rect.width,rect.height)*0.8:(isTrackpad?1:1.8));
+          this.offsetX-=panX*multiplier;
+          this.offsetY-=panY*multiplier;
           this.applyTransform();
         }
         add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
@@ -4544,6 +4550,10 @@
       let saveButtonDefault=dockSaveLabel ? (dockSaveButton?.dataset.defaultLabel || dockSaveLabel.textContent || '保存') : '保存';
       if(dockSaveButton && !dockSaveButton.dataset.defaultLabel){ dockSaveButton.dataset.defaultLabel=saveButtonDefault; }
       let dirty=false;
+      let isSavingMindmap=false;
+      const AUTO_SAVE_DELAY_MS=1200;
+      let autoSaveTimer=null;
+      let queuedAutoSaveReason=null;
       let relationMode=null;
       let relationToastTimer=null;
       let selectedRelationId=null;
@@ -4576,28 +4586,54 @@
         }
         setSaveButtonState('未保存',false,'dirty');
       }
-      function showSaving(){
+      function showSaving(options={}){
+        const auto=options.auto===true;
         if(saveState){
-          saveState.textContent='保存中...';
+          saveState.textContent=auto?'自动保存中...':'保存中...';
           saveState.classList.add('show');
           saveState.classList.remove('dirty');
         }
-        setSaveButtonState('保存中...', true,'saving');
+        setSaveButtonState(auto?'自动保存中...':'保存中...', true,auto?'auto-saving':'saving');
       }
-      function markSaved(){
+      function markSaved(options={}){
+        const auto=options.auto===true;
         dirty=false;
         if(saveState){
-          saveState.textContent='保存成功';
+          saveState.textContent=auto?'已自动保存':'保存成功';
           saveState.classList.add('show');
           saveState.classList.remove('dirty');
         }
-        setSaveButtonState('保存成功', false,'saved');
+        setSaveButtonState(auto?'自动保存完成':'保存成功', false,auto?'auto-saved':'saved');
         setTimeout(()=>{
           if(!dirty){
             if(saveState) saveState.classList.remove('show');
             setSaveButtonState(null,false,null);
           }
         },1500);
+      }
+      function requestAutoSave(reason='auto'){
+        if(!dirty) return;
+        queuedAutoSaveReason=reason;
+        if(autoSaveTimer){ clearTimeout(autoSaveTimer); }
+        autoSaveTimer=setTimeout(()=>{
+          autoSaveTimer=null;
+          triggerAutoSave(reason);
+        },AUTO_SAVE_DELAY_MS);
+      }
+      async function triggerAutoSave(reason){
+        if(!dirty) return;
+        if(isSavingMindmap){
+          queuedAutoSaveReason=reason;
+          if(!autoSaveTimer){
+            autoSaveTimer=setTimeout(()=>{
+              autoSaveTimer=null;
+              triggerAutoSave(reason);
+            },AUTO_SAVE_DELAY_MS);
+          }
+          return;
+        }
+        queuedAutoSaveReason=null;
+        await saveMindmap({auto:true, reason});
       }
       function clearRelationHighlights(){
         document.querySelectorAll('.jsmind-node.relation-source,.jsmind-node.relation-target').forEach(el=>{
@@ -5670,6 +5706,7 @@
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
         if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
+        if(uploadedEntries.length){ requestAutoSave('attachment-upload'); }
       }
       function handleDroppedText(text, parent, event){
         if(!text || !parent) return;
@@ -7211,7 +7248,19 @@
           reader.readAsText(file,'utf-8');
         });
       }
-      async function saveMindmap(){
+      async function saveMindmap(options={}){
+        const auto=options.auto===true;
+        const reason=typeof options.reason==='string' && options.reason ? options.reason : (auto?'auto':'manual');
+        if(auto && !dirty) return;
+        if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; }
+        if(isSavingMindmap){
+          if(auto){
+            queuedAutoSaveReason=reason;
+            return;
+          }
+          return;
+        }
+        isSavingMindmap=true;
         commitInlineEditing();
         const title=titleInput.value.trim()||'未命名导图';
         const currentData=jm.get_data('node_tree');
@@ -7223,7 +7272,7 @@
         fd.append('title', title);
         fd.append('content', payload);
         try{
-          showSaving();
+          showSaving({auto});
           const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
           if(!res.ok) throw new Error('网络异常');
           const json=await res.json();
@@ -7238,10 +7287,25 @@
           history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
           initialData=JSON.parse(payload);
           if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-          markSaved();
+          markSaved({auto});
         }catch(err){
-          alert(err.message||'保存失败');
-          markDirty();
+          if(auto){
+            console.error('自动保存失败', err);
+            markDirty();
+            setTimeout(()=>{ if(dirty) requestAutoSave(reason); },4000);
+          }else{
+            alert(err.message||'保存失败');
+            markDirty();
+          }
+        }finally{
+          isSavingMindmap=false;
+          if(queuedAutoSaveReason && dirty && !auto){
+            const nextReason=queuedAutoSaveReason;
+            queuedAutoSaveReason=null;
+            requestAutoSave(nextReason);
+          } else if(!dirty){
+            queuedAutoSaveReason=null;
+          }
         }
       }
       window.addEventListener('beforeunload',e=>{

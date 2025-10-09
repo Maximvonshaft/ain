@@ -27,6 +27,7 @@ header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 's
 const DB_FILE = __DIR__ . '/memo.sqlite';
 const UPLOAD_DIR = __DIR__ . '/storage/uploads';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
+const MINDMAP_SESSION_ASSET_TTL = 24 * 3600; // 未关联导图的附件最多保留 24 小时
 const ALLOWED_UPLOAD_MIME_MAP = [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
   'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
@@ -445,6 +446,30 @@ function delete_mindmap_asset(int $id): void {
   if(is_file($path)) @unlink($path);
   $pdo=db();
   $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
+}
+
+function prune_stale_mindmap_session_assets(?string $exclude_session_key = null, int $ttl_seconds = MINDMAP_SESSION_ASSET_TTL): void {
+  if($ttl_seconds<=0) return;
+  $cutoff=now()-$ttl_seconds;
+  if($cutoff<=0) return;
+  $pdo=db();
+  $batch=200;
+  $params=[$cutoff];
+  $sql="SELECT id FROM mindmap_assets WHERE session_key IS NOT NULL AND session_key<>'' AND created_at < ?";
+  if($exclude_session_key!==null && $exclude_session_key!==''){
+    $sql.=' AND session_key<>?';
+    $params[]=$exclude_session_key;
+  }
+  $sql.=' LIMIT '.$batch;
+  $st=$pdo->prepare($sql);
+  do {
+    $st->execute($params);
+    $rows=$st->fetchAll();
+    foreach($rows as $row){
+      $id=(int)($row['id'] ?? 0);
+      if($id>0){ delete_mindmap_asset($id); }
+    }
+  } while(!empty($rows) && count($rows)===$batch);
 }
 
 function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name, string $stored_name, string $mime, int $size, string $session_key): array {
@@ -1351,6 +1376,7 @@ if ($view === 'map_edit') {
     mindmap_force_right_orientation($initialDataDecoded['data']);
   }
   $sessionKey = session_id();
+  prune_stale_mindmap_session_assets($sessionKey!==''?$sessionKey:null);
   $assetPool = [];
   if ($mind['id']) {
     foreach (mindmap_assets_for_map((int)$mind['id']) as $asset) {
