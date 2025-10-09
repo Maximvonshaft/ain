@@ -133,7 +133,7 @@
       .placeholder-muted{color:var(--text-muted)}
     </style>
   </head>
-  <body data-density="comfortable">
+  <body data-density="comfortable" data-csrf="<?php echo h($memo_csrf_token ?? csrf_token()); ?>">
     <div class="scanlines" aria-hidden="true"></div>
     <div class="wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -141,6 +141,7 @@
       </div>
       <div class="card">
         <form id="new-form" onsubmit="return saveAJAX(event)">
+          <?php echo csrf_field(); ?>
           <div class="row">
             <input id="title" name="title" placeholder="标题 · Title" required>
             <select id="cat" name="category_id">
@@ -177,6 +178,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px">
           <div style="font-weight:800">流程子任务（时间轴）</div>
           <form id="add-step-form" onsubmit="return addStepAJAX(event)" style="display:flex;gap:6px;flex-wrap:wrap">
+            <?php echo csrf_field(); ?>
             <input id="new-step-title" placeholder="新增步骤 · Add step" style="flex:1;min-width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(6,25,14,.82);color:var(--text);letter-spacing:.08em">
             <button class="btn btn-primary" type="submit">添加</button>
           </form>
@@ -187,6 +189,37 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
     <script>
+      const CSRF_TOKEN=document.body.dataset.csrf||'';
+      const CSRF_FIELD_HTML=<?php echo json_encode(csrf_field()); ?>;
+      const appendCsrf=fd=>{try{if(fd instanceof FormData){if(CSRF_TOKEN && !fd.has('_csrf')){fd.append('_csrf',CSRF_TOKEN);}}else if(fd instanceof URLSearchParams){if(CSRF_TOKEN && !fd.has('_csrf')){fd.append('_csrf',CSRF_TOKEN);}}}catch(_){/* ignore */}return fd;};
+      if(window.fetch){
+        const originalFetch=window.fetch.bind(window);
+        window.fetch=(input, init={})=>{
+          init=init||{};
+          const headers=new Headers(init.headers||{});
+          if(CSRF_TOKEN){ headers.set('X-CSRF-Token', CSRF_TOKEN); }
+          init.headers=headers;
+          if(init.body instanceof FormData || init.body instanceof URLSearchParams){
+            appendCsrf(init.body);
+          }else if(typeof init.body==='string' && CSRF_TOKEN){
+            const contentType=headers.get('Content-Type')||'';
+            if(contentType.includes('application/x-www-form-urlencoded')){
+              const params=new URLSearchParams(init.body);
+              if(!params.has('_csrf')){ params.append('_csrf', CSRF_TOKEN); }
+              init.body=params.toString();
+            }
+          }
+          return originalFetch(input, init);
+        };
+      }
+      document.addEventListener('submit',ev=>{
+        const form=ev.target;
+        if(form instanceof HTMLFormElement && form.method && form.method.toLowerCase()==='post'){
+          if(!form.querySelector('input[name="_csrf"]')){
+            form.insertAdjacentHTML('afterbegin', CSRF_FIELD_HTML);
+          }
+        }
+      },{capture:true});
       (function(){
         if(window.AttachmentPreview) return;
         const readyQueue=window.__attachmentPreviewReadyCallbacks = window.__attachmentPreviewReadyCallbacks || [];
@@ -973,6 +1006,7 @@
                 <summary>编辑</summary>\
                 <div style="margin-top:6px;display:grid;gap:6px">\
                   <form onsubmit="return saveStepTitleAJAX(event, ${s.id}, this)" style="display:flex;gap:6px;flex-wrap:wrap">\
+                    ${CSRF_FIELD_HTML}\
                     <input type="hidden" name="action" value="edit_step">\
                     <input type="hidden" name="id" value="${s.id}">\
                     <input name="title" value="${safeTitle}" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">\
@@ -980,6 +1014,7 @@
                     <span class="save-tip" data-step-tip="title-${s.id}">保存成功</span>\
                   </form>\
                   <form onsubmit="return saveStepNotesAJAX(event, ${s.id})" id="form-notes-${s.id}">\
+                    ${CSRF_FIELD_HTML}\
                     <input type="hidden" name="action" value="edit_step_notes">\
                     <input type="hidden" name="id" value="${s.id}">\
                     <textarea id="md-step-${s.id}" name="notes" style="min-height:120px">${escapeHTML(s.notes||'')}</textarea>\

@@ -12,7 +12,7 @@ return [
         'include_subdomains' => false,
     ],
     'csp' => [
-        'mode' => 'report-only',
+        'mode' => 'enforce',
         'directives' => [
             'default-src' => "'self' cdn.jsdelivr.net",
             'img-src' => "'self' data: blob:",
@@ -24,4 +24,10 @@ return [
             'frame-ancestors' => "'self'",
         ],
     ],
+    'headers' => [
+        'X-Frame-Options' => 'SAMEORIGIN',
+        'Referrer-Policy' => 'strict-origin-when-cross-origin',
+        'X-Content-Type-Options' => 'nosniff',
+    ],
+    'remove_headers' => ['X-Powered-By'],
 ];

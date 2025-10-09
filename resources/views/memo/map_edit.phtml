@@ -390,7 +390,7 @@
     </style>
 
   </head>
-  <body>
+  <body data-csrf="<?php echo h($memo_csrf_token ?? csrf_token()); ?>">
     <div class="scanlines" aria-hidden="true"></div>
     <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
       <defs>
@@ -445,6 +445,7 @@
       <input id="attach-file-input" type="file" accept="image/*,video/*,audio/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-word.document.macroenabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.template,application/vnd.ms-word.template.macroenabled.12,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroenabled.12,application/vnd.ms-excel.sheet.binary.macroenabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.template,application/vnd.ms-excel.template.macroenabled.12,text/plain,text/markdown,text/csv,text/tab-separated-values,application/json,text/json" hidden>
       <?php if ($mind['id']): ?>
         <form id="delete-map-form" method="post" hidden>
+          <?php echo csrf_field(); ?>
           <input type="hidden" name="action" value="delete_mindmap">
           <input type="hidden" name="id" value="<?php echo $mind['id']; ?>">
         </form>
@@ -604,6 +605,37 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
     <script>
+      const CSRF_TOKEN=document.body.dataset.csrf||'';
+      const CSRF_FIELD_HTML=<?php echo json_encode(csrf_field()); ?>;
+      const appendCsrf=fd=>{try{if(fd instanceof FormData){if(CSRF_TOKEN && !fd.has('_csrf')){fd.append('_csrf',CSRF_TOKEN);}}else if(fd instanceof URLSearchParams){if(CSRF_TOKEN && !fd.has('_csrf')){fd.append('_csrf',CSRF_TOKEN);}}}catch(_){/* ignore */}return fd;};
+      if(window.fetch){
+        const originalFetch=window.fetch.bind(window);
+        window.fetch=(input, init={})=>{
+          init=init||{};
+          const headers=new Headers(init.headers||{});
+          if(CSRF_TOKEN){ headers.set('X-CSRF-Token', CSRF_TOKEN); }
+          init.headers=headers;
+          if(init.body instanceof FormData || init.body instanceof URLSearchParams){
+            appendCsrf(init.body);
+          }else if(typeof init.body==='string' && CSRF_TOKEN){
+            const contentType=headers.get('Content-Type')||'';
+            if(contentType.includes('application/x-www-form-urlencoded')){
+              const params=new URLSearchParams(init.body);
+              if(!params.has('_csrf')){ params.append('_csrf', CSRF_TOKEN); }
+              init.body=params.toString();
+            }
+          }
+          return originalFetch(input, init);
+        };
+      }
+      document.addEventListener('submit',ev=>{
+        const form=ev.target;
+        if(form instanceof HTMLFormElement && form.method && form.method.toLowerCase()==='post'){
+          if(!form.querySelector('input[name="_csrf"]')){
+            form.insertAdjacentHTML('afterbegin', CSRF_FIELD_HTML);
+          }
+        }
+      },{capture:true});
       (function(){
         if(window.AttachmentPreview) return;
         const readyQueue=window.__attachmentPreviewReadyCallbacks = window.__attachmentPreviewReadyCallbacks || [];

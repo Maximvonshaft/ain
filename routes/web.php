@@ -1,10 +1,11 @@
 <?php
 
 use App\Controllers\LegacyMemoController;
+use App\Middlewares\CsrfMiddleware;
 use Core\Request;
 use Core\Router;
 
-$legacy = new LegacyMemoController();
+$legacy = new LegacyMemoController($config, new CsrfMiddleware());
 
 /** @var Router $router */
 $router->get('/', function (Request $request) use ($legacy) {

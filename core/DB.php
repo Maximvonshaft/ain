@@ -7,6 +7,8 @@ use RuntimeException;
 
 class DB
 {
+    private const SCHEMA_VERSION = 3;
+
     private static ?PDO $pdo = null;
 
     public static function connect(string $path): PDO
@@ -14,18 +16,17 @@ class DB
         if (self::$pdo) {
             return self::$pdo;
         }
-        $init = !is_file($path);
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA journal_mode = WAL;');
         $pdo->exec('PRAGMA foreign_keys = ON;');
-        if ($init) {
-            self::bootstrap($pdo);
-        }
-        self::ensureMindmapTables($pdo);
+
         self::$pdo = $pdo;
+
+        self::migrate($pdo);
+
         return self::$pdo;
     }
 
@@ -37,7 +38,31 @@ class DB
         return self::$pdo;
     }
 
-    private static function bootstrap(PDO $pdo): void
+    private static function migrate(PDO $pdo): void
+    {
+        $current = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+
+        if ($current < 1) {
+            self::migrateToVersion1($pdo);
+            $current = 1;
+        }
+
+        if ($current < 2) {
+            self::migrateToVersion2($pdo);
+            $current = 2;
+        }
+
+        if ($current < 3) {
+            self::migrateToVersion3($pdo);
+            $current = 3;
+        }
+
+        if ($current !== self::SCHEMA_VERSION) {
+            $pdo->exec('PRAGMA user_version = ' . self::SCHEMA_VERSION);
+        }
+    }
+
+    private static function migrateToVersion1(PDO $pdo): void
     {
         $now = time();
         $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
@@ -81,13 +106,16 @@ class DB
         );');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
-        $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
-        foreach (["备忘录", "流程", "其他"] as $name) {
-            $stmt->execute([$name, $now]);
+        $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
+        if ($count === 0) {
+            $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
+            foreach (["备忘录", "流程", "其他"] as $name) {
+                $stmt->execute([$name, $now]);
+            }
         }
     }
 
-    private static function ensureMindmapTables(PDO $pdo): void
+    private static function migrateToVersion2(PDO $pdo): void
     {
         $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -131,5 +159,24 @@ class DB
             $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
                 ->execute(['默认导图', $defaultPayload, $now, $now]);
         }
+    }
+
+    private static function migrateToVersion3(PDO $pdo): void
+    {
+        $statement = $pdo->query('PRAGMA table_info(items)');
+        $columns = $statement ? $statement->fetchAll(PDO::FETCH_ASSOC) : [];
+        $hasPreviousColumn = false;
+        foreach ($columns as $column) {
+            if (($column['name'] ?? '') === 'previous_category_id') {
+                $hasPreviousColumn = true;
+                break;
+            }
+        }
+
+        if (!$hasPreviousColumn) {
+            $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
+        }
+
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_previous_category ON items(previous_category_id)');
     }
 }

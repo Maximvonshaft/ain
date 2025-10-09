@@ -13,21 +13,18 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 mb_internal_encoding('UTF-8');
 
-// 移除默认 X-Powered-By 头
-header_remove('X-Powered-By');
-
-// —— 安全响应头 ——
-// 注意：由于本应用使用了大量内联脚本，为确保功能正常需允许 'unsafe-inline'。
-header('X-Frame-Options: SAMEORIGIN');
-header('Referrer-Policy: strict-origin-when-cross-origin');
-header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
-
 // —— 配置 ——
-const DB_FILE = __DIR__ . '/memo.sqlite';
-const UPLOAD_DIR = __DIR__ . '/storage/uploads';
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
-const ALLOWED_UPLOAD_MIME_MAP = [
+if (!defined('DB_FILE')) {
+    define('DB_FILE', __DIR__ . '/memo.sqlite');
+}
+if (!defined('UPLOAD_DIR')) {
+    define('UPLOAD_DIR', __DIR__ . '/storage/uploads');
+}
+if (!defined('MAX_UPLOAD_BYTES')) {
+    define('MAX_UPLOAD_BYTES', 15 * 1024 * 1024); // 15MB
+}
+if (!defined('ALLOWED_UPLOAD_MIME_MAP')) {
+    define('ALLOWED_UPLOAD_MIME_MAP', [
   'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
   'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
   'application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx','application/vnd.ms-word.document.macroenabled.12'=>'docm','application/vnd.openxmlformats-officedocument.wordprocessingml.template'=>'dotx','application/vnd.ms-word.template.macroenabled.12'=>'dotm',
@@ -35,7 +32,14 @@ const ALLOWED_UPLOAD_MIME_MAP = [
   'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
   'audio/mpeg'=>'mp3','audio/mp3'=>'mp3','audio/ogg'=>'ogg','audio/opus'=>'opus','audio/wav'=>'wav','audio/x-wav'=>'wav','audio/webm'=>'weba','audio/mp4'=>'m4a','audio/aac'=>'aac','audio/flac'=>'flac',
   'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg','video/ogg'=>'ogv',
-];
+    ]);
+}
+
+$__memo_context = $GLOBALS['__memo_context'] ?? [];
+if (is_array($__memo_context) && !empty($__memo_context['csrf_token'])) {
+  $_SESSION['_csrf_token'] = (string)$__memo_context['csrf_token'];
+}
+$memo_csrf_token = csrf_token();
 date_default_timezone_set('Asia/Shanghai');
 
 // —— 思维导图默认内容 ——
@@ -124,12 +128,18 @@ function mindmap_force_right_orientation(&$node, int $depth = 0): void {
 }
 
 // —— 基础辅助函数 ——
-function h(?string $s): string { return htmlspecialchars($s ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-function now(): int { return time(); }
+if (!function_exists('h')) {
+  function h(?string $s): string { return htmlspecialchars($s ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+}
+if (!function_exists('now')) {
+  function now(): int { return time(); }
+}
 function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'; }
 function is_ajax(): bool { return !empty($_SERVER['HTTP_X_REQUESTED_WITH']); }
 function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
-function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
+if (!function_exists('bytes_h')) {
+  function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
+}
 function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
 
 if(!function_exists('array_is_list')){
@@ -186,107 +196,11 @@ function highlight_text(string $text, string $term): string {
 
 // —— 数据库 ——
 function db(): PDO {
-  static $pdo;
-  if ($pdo) return $pdo;
-  $init = !file_exists(DB_FILE);
-  $pdo = new PDO('sqlite:' . DB_FILE, null, null, [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-  ]);
-  $pdo->exec('PRAGMA journal_mode = WAL;');
-  $pdo->exec('PRAGMA foreign_keys = ON;');
-  if ($init) {
-    // 创建基础表
-    $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
-      created_at INTEGER NOT NULL
-    );');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS items(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT,
-      done INTEGER NOT NULL DEFAULT 0,
-      category_id INTEGER,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      previous_category_id INTEGER,
-      FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
-      FOREIGN KEY(previous_category_id) REFERENCES categories(id) ON DELETE SET NULL
-    );');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      item_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      notes TEXT,
-      done INTEGER NOT NULL DEFAULT 0,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
-    );');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      item_id INTEGER,
-      step_id INTEGER,
-      orig_name TEXT NOT NULL,
-      stored_name TEXT NOT NULL,
-      mime TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
-      FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE
-    );');
-    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
-    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
-    // 插入默认分类
-    $stmt=$pdo->prepare('INSERT INTO categories(name,created_at) VALUES(?,?)');
-    foreach(['备忘录','流程','其他'] as $n){ $stmt->execute([$n, now()]); }
-  }
-  $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );');
-  $pdo->exec('CREATE TABLE IF NOT EXISTS mindmap_assets(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mindmap_id INTEGER,
-    node_uid TEXT,
-    session_key TEXT,
-    orig_name TEXT NOT NULL,
-    stored_name TEXT NOT NULL,
-    mime TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
-  );');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
-  $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
-  if ($hasMap === 0) {
-    $nowTs = now();
-    $defaultPayload = default_mindmap_payload();
-    $decoded = json_decode($defaultPayload, true);
-    if (is_array($decoded) && isset($decoded['data']) && is_array($decoded['data'])) {
-      $decoded['data']['topic'] = '默认导图';
-      $defaultPayload = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-    $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
-        ->execute(['默认导图', $defaultPayload, $nowTs, $nowTs]);
-  }
-  // 创建上传目录
-  if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
-
-  $cols=$pdo->query('PRAGMA table_info(items)')->fetchAll();
-  $names=array_map(fn($col)=>$col['name']??'', $cols);
-  if(!in_array('previous_category_id',$names,true)){
-    $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
+  if (!is_dir(UPLOAD_DIR)) {
+    @mkdir(UPLOAD_DIR, 0775, true);
   }
 
-  return $pdo;
+  return \Core\DB::pdo();
 }
 
 // —— 获取分类及计数 ——
