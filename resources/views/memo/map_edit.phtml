@@ -7,8 +7,8 @@
     <meta name="color-scheme" content="dark"/>
     <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
 <?php $assetVersion = function_exists('config') ? config('app.asset_version', '1.0.0') : '1.0.0'; ?>
-<link rel="stylesheet" href="/css/common.css?v=<?= h($assetVersion); ?>">
-<link rel="stylesheet" href="/css/map.css?v=<?= h($assetVersion); ?>">
+<link rel="stylesheet" href="<?= memo_asset('css/common.css'); ?>?v=<?= h($assetVersion); ?>">
+<link rel="stylesheet" href="<?= memo_asset('css/map.css'); ?>?v=<?= h($assetVersion); ?>">
 <script>
       window.__CSRF_TOKEN__ = '<?= h(csrf_token()); ?>';
       (function () {
