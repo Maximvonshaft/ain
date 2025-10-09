@@ -117,6 +117,53 @@ function memo_allowed_upload_mime_map(): array {
   return MemoEnvironment::runtimeConfig()->allowedMimes();
 }
 
+function memo_base_path(): string {
+  static $basePath = null;
+  if ($basePath !== null) {
+    return $basePath;
+  }
+
+  $basePath = '';
+  $config = MemoEnvironment::config();
+  if ($config instanceof \Core\Config) {
+    $configured = $config->get('app.base_url');
+    if (is_string($configured) && $configured !== '') {
+      $parsed = parse_url($configured, PHP_URL_PATH);
+      if (is_string($parsed) && $parsed !== '') {
+        $basePath = '/' . trim($parsed, '/');
+      }
+    }
+  }
+
+  if ($basePath === '' || $basePath === '/') {
+    $basePath = '';
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    if (is_string($scriptName) && $scriptName !== '') {
+      $directory = str_replace('\\', '/', dirname($scriptName));
+      if ($directory !== '/' && $directory !== '.' && $directory !== '') {
+        $basePath = '/' . trim($directory, '/');
+      }
+    }
+  }
+
+  if ($basePath === '/' || $basePath === '') {
+    $basePath = '';
+  }
+
+  return $basePath;
+}
+
+function memo_asset(string $path): string {
+  $normalized = '/' . ltrim($path, '/');
+  $basePath = memo_base_path();
+
+  if ($basePath === '' || $basePath === '/') {
+    return $normalized;
+  }
+
+  return rtrim($basePath, '/') . $normalized;
+}
+
 function memo_extension_for_mime(string $mime): ?string {
   $map = memo_allowed_upload_mime_map();
   $normalized = strtolower(trim($mime));
