@@ -6,13 +6,21 @@ return [
         'cookie_samesite' => 'Lax',
         'cookie_name' => 'memo_session',
     ],
+    'headers' => [
+        'remove' => ['X-Powered-By'],
+        'set' => [
+            'X-Frame-Options' => 'SAMEORIGIN',
+            'Referrer-Policy' => 'strict-origin-when-cross-origin',
+            'X-Content-Type-Options' => 'nosniff',
+        ],
+    ],
     'hsts' => [
         'enable' => true,
         'max_age' => 31536000,
         'include_subdomains' => false,
     ],
     'csp' => [
-        'mode' => 'report-only',
+        'mode' => 'enforce',
         'directives' => [
             'default-src' => "'self' cdn.jsdelivr.net",
             'img-src' => "'self' data: blob:",

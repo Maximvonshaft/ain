@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>详情 · <?php echo h($it['title']); ?></title>
     <meta name="color-scheme" content="dark"/>
+    <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -209,6 +210,41 @@
       .attachment-preview-download{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:12px;border:1px solid rgba(201,168,106,.36);background:rgba(15,19,22,.85);color:var(--gold-400);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:transform var(--transition),box-shadow var(--transition)}
       .attachment-preview-download:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(227,198,139,.25)}
     </style>
+    <script>
+      window.__CSRF_TOKEN__ = '<?= h(csrf_token()); ?>';
+      (function () {
+        if (typeof window.fetch === 'function') {
+          const originalFetch = window.fetch;
+          window.fetch = function (input, init) {
+            init = init || {};
+            const headers = new Headers(init.headers || {});
+            if (!headers.has('X-CSRF-Token')) {
+              headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
+            }
+            init.headers = headers;
+            if (init.body instanceof FormData) {
+              if (!init.body.has('_csrf')) {
+                init.body.append('_csrf', window.__CSRF_TOKEN__);
+              }
+            }
+            return originalFetch.call(this, input, init);
+          };
+        }
+        document.addEventListener('submit', function (event) {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) {
+            return;
+          }
+          if (!form.querySelector('input[name="_csrf"]')) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = '_csrf';
+            input.value = window.__CSRF_TOKEN__;
+            form.appendChild(input);
+          }
+        }, true);
+      })();
+    </script>
 
   </head>
   <body>
@@ -217,7 +253,9 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
         <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
         <form method="post" onsubmit="return confirm('确认删除？');">
-          <input type="hidden" name="action" value="delete_item"><input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+          <?= csrf_input(); ?>
+          <input type="hidden" name="action" value="delete_item">
+          <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
           <button class="btn btn-danger">删除</button>
         </form>
       </div>
@@ -231,6 +269,7 @@
         <div class="split" style="margin-top:12px">
           <div class="editbox">
             <form method="post" id="item-form" onsubmit="return saveItemAJAX(event,this)">
+              <?= csrf_input(); ?>
               <input type="hidden" name="action" value="edit_item">
               <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
               <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:12px;margin-bottom:16px;align-items:center">
@@ -248,7 +287,7 @@
               <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
                 <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
                 <div>
-                  <input id="att-file-item" type="file" accept="image/*,video/*,audio/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-word.document.macroenabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.template,application/vnd.ms-word.template.macroenabled.12,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroenabled.12,application/vnd.ms-excel.sheet.binary.macroenabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.template,application/vnd.ms-excel.template.macroenabled.12,text/plain,text/markdown,text/csv,text/tab-separated-values,application/json,text/json" style="display:none">
+                  <input id="att-file-item" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" style="display:none">
                   <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
                   <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>
                 </div>
@@ -304,6 +343,7 @@
                   <button class="btn btn-primary btn-small attachment-preview-button" type="button" <?php echo $previewAttrs; ?>>预览</button>
                   <a class="btn btn-outline btn-small" href="<?php echo $downloadUrl; ?>" download>下载</a>
                   <form method="post">
+                    <?= csrf_input(); ?>
                     <input type="hidden" name="action" value="delete_attachment">
                     <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
                     <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
@@ -317,6 +357,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px">
           <div style="font-weight:800">流程子任务（时间轴）</div>
           <form method="post" style="display:flex;gap:6px;flex-wrap:wrap" onsubmit="return addStepForm(event)">
+            <?= csrf_input(); ?>
             <input type="hidden" name="action" value="add_step">
             <input type="hidden" name="item_id" value="<?php echo $it['id']; ?>">
             <input id="new-step-title" name="title" placeholder="新增步骤 · Add step" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(6,25,14,.82);color:var(--text);letter-spacing:.08em;flex:1;min-width:220px">
@@ -351,7 +392,7 @@
                       <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
                       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
                         <div>
-                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="image/*,video/*,audio/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-word.document.macroenabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.template,application/vnd.ms-word.template.macroenabled.12,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroenabled.12,application/vnd.ms-excel.sheet.binary.macroenabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.template,application/vnd.ms-excel.template.macroenabled.12,text/plain,text/markdown,text/csv,text/tab-separated-values,application/json,text/json" style="display:none">
+                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" style="display:none">
                           <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
                           <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>
                         </div>
@@ -375,6 +416,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
     <script>
+      const UPLOAD_ACCEPT = '<?= h(memo_upload_accept_attribute()); ?>';
       (function(){
         if(window.AttachmentPreview) return;
         const readyQueue=window.__attachmentPreviewReadyCallbacks = window.__attachmentPreviewReadyCallbacks || [];

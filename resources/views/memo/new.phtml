@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>新建备忘录</title>
     <meta name="color-scheme" content="dark"/>
+    <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -132,6 +133,41 @@
       .save-tip.show{display:inline-block}
       .placeholder-muted{color:var(--text-muted)}
     </style>
+    <script>
+      window.__CSRF_TOKEN__ = '<?= h(csrf_token()); ?>';
+      (function () {
+        if (typeof window.fetch === 'function') {
+          const originalFetch = window.fetch;
+          window.fetch = function (input, init) {
+            init = init || {};
+            const headers = new Headers(init.headers || {});
+            if (!headers.has('X-CSRF-Token')) {
+              headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
+            }
+            init.headers = headers;
+            if (init.body instanceof FormData) {
+              if (!init.body.has('_csrf')) {
+                init.body.append('_csrf', window.__CSRF_TOKEN__);
+              }
+            }
+            return originalFetch.call(this, input, init);
+          };
+        }
+        document.addEventListener('submit', function (event) {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) {
+            return;
+          }
+          if (!form.querySelector('input[name="_csrf"]')) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = '_csrf';
+            input.value = window.__CSRF_TOKEN__;
+            form.appendChild(input);
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body data-density="comfortable">
     <div class="scanlines" aria-hidden="true"></div>
@@ -141,6 +177,7 @@
       </div>
       <div class="card">
         <form id="new-form" onsubmit="return saveAJAX(event)">
+          <?= csrf_input(); ?>
           <div class="row">
             <input id="title" name="title" placeholder="标题 · Title" required>
             <select id="cat" name="category_id">
@@ -157,7 +194,7 @@
               <textarea id="md-editor" name="description" placeholder="描述 · 支持 Markdown"></textarea>
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
                 <div>
-                  <input id="att-file-item" type="file" accept="image/*,video/*,audio/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-word.document.macroenabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.template,application/vnd.ms-word.template.macroenabled.12,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroenabled.12,application/vnd.ms-excel.sheet.binary.macroenabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.template,application/vnd.ms-excel.template.macroenabled.12,text/plain,text/markdown,text/csv,text/tab-separated-values,application/json,text/json" style="display:none">
+                  <input id="att-file-item" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" style="display:none">
                   <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
                   <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>
                 </div>
@@ -837,6 +874,7 @@
       updateAttachmentPanelSummary();
 
       const state = { id: 0 };
+      const UPLOAD_ACCEPT = '<?= h(memo_upload_accept_attribute()); ?>';
       const saveTip = document.getElementById('save-tip');
       const saveButtonEl = document.querySelector('#new-form button[type="submit"]');
       const saveFeedback = createSaveFeedbackController(saveTip, saveButtonEl);
@@ -985,7 +1023,7 @@
                     <textarea id="md-step-${s.id}" name="notes" style="min-height:120px">${escapeHTML(s.notes||'')}</textarea>\
                     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">\
                       <div>\
-                        <input id="att-file-step-${s.id}" type="file" accept="image/*,video/*,audio/*,application/pdf,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-word.document.macroenabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.template,application/vnd.ms-word.template.macroenabled.12,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroenabled.12,application/vnd.ms-excel.sheet.binary.macroenabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.template,application/vnd.ms-excel.template.macroenabled.12,text/plain,text/markdown,text/csv,text/tab-separated-values,application/json,text/json" style="display:none">\
+                        <input id="att-file-step-${s.id}" type="file" accept="${UPLOAD_ACCEPT}" style="display:none">\
                         <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(${s.id})">插入附件到备注</button>\
                         <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>\
                       </div>\

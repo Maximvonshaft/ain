@@ -13,30 +13,18 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 mb_internal_encoding('UTF-8');
 
-// 移除默认 X-Powered-By 头
-header_remove('X-Powered-By');
+if (!isset($GLOBALS['_legacy_security_headers_applied'])) {
+  if (isset($GLOBALS['_legacy_config']) && $GLOBALS['_legacy_config'] instanceof \Core\Config && class_exists('App\\Support\\SecurityHeaders')) {
+    \App\Support\SecurityHeaders::apply($GLOBALS['_legacy_config']);
+  } else {
+    memo_apply_default_security_headers();
+  }
+}
 
-// —— 安全响应头 ——
-// 注意：由于本应用使用了大量内联脚本，为确保功能正常需允许 'unsafe-inline'。
-header('X-Frame-Options: SAMEORIGIN');
-header('Referrer-Policy: strict-origin-when-cross-origin');
-header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
-
-// —— 配置 ——
-const DB_FILE = __DIR__ . '/memo.sqlite';
-const UPLOAD_DIR = __DIR__ . '/storage/uploads';
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
-const ALLOWED_UPLOAD_MIME_MAP = [
-  'image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp','image/gif'=>'gif','image/svg+xml'=>'svg','image/avif'=>'avif','image/bmp'=>'bmp','image/x-icon'=>'ico',
-  'application/pdf'=>'pdf','application/zip'=>'zip','application/x-zip-compressed'=>'zip','application/x-rar-compressed'=>'rar','application/vnd.rar'=>'rar',
-  'application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx','application/vnd.ms-word.document.macroenabled.12'=>'docm','application/vnd.openxmlformats-officedocument.wordprocessingml.template'=>'dotx','application/vnd.ms-word.template.macroenabled.12'=>'dotm',
-  'application/vnd.ms-excel'=>'xls','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'=>'xlsx','application/vnd.ms-excel.sheet.macroenabled.12'=>'xlsm','application/vnd.ms-excel.sheet.binary.macroenabled.12'=>'xlsb','application/vnd.openxmlformats-officedocument.spreadsheetml.template'=>'xltx','application/vnd.ms-excel.template.macroenabled.12'=>'xltm','text/csv'=>'csv',
-  'text/plain'=>'txt','text/markdown'=>'md','text/x-markdown'=>'md','application/json'=>'json','text/json'=>'json','text/yaml'=>'yaml','application/yaml'=>'yaml','text/x-yaml'=>'yaml','text/tab-separated-values'=>'tsv','text/x-log'=>'log',
-  'audio/mpeg'=>'mp3','audio/mp3'=>'mp3','audio/ogg'=>'ogg','audio/opus'=>'opus','audio/wav'=>'wav','audio/x-wav'=>'wav','audio/webm'=>'weba','audio/mp4'=>'m4a','audio/aac'=>'aac','audio/flac'=>'flac',
-  'video/mp4'=>'mp4','video/quicktime'=>'mov','video/x-matroska'=>'mkv','video/webm'=>'webm','video/x-msvideo'=>'avi','video/mpeg'=>'mpeg','video/ogg'=>'ogv',
-];
-date_default_timezone_set('Asia/Shanghai');
+$memoConfig = memo_runtime_config();
+if (!empty($memoConfig['timezone'])) {
+  date_default_timezone_set((string)$memoConfig['timezone']);
+}
 
 // —— 思维导图默认内容 ——
 const DEFAULT_MINDMAP = [
@@ -99,6 +87,169 @@ const DEFAULT_MINDMAP = [
   ],
 ];
 
+function memo_default_allowed_mimes(): array {
+  return [
+    'image/png' => 'png',
+    'image/jpeg' => 'jpg',
+    'image/webp' => 'webp',
+    'image/gif' => 'gif',
+    'image/svg+xml' => 'svg',
+    'image/avif' => 'avif',
+    'image/bmp' => 'bmp',
+    'image/x-icon' => 'ico',
+    'application/pdf' => 'pdf',
+    'application/zip' => 'zip',
+    'application/x-zip-compressed' => 'zip',
+    'application/x-rar-compressed' => 'rar',
+    'application/vnd.rar' => 'rar',
+    'application/msword' => 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+    'application/vnd.ms-word.document.macroenabled.12' => 'docm',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.template' => 'dotx',
+    'application/vnd.ms-word.template.macroenabled.12' => 'dotm',
+    'application/vnd.ms-excel' => 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+    'application/vnd.ms-excel.sheet.macroenabled.12' => 'xlsm',
+    'application/vnd.ms-excel.sheet.binary.macroenabled.12' => 'xlsb',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.template' => 'xltx',
+    'application/vnd.ms-excel.template.macroenabled.12' => 'xltm',
+    'text/csv' => 'csv',
+    'text/plain' => 'txt',
+    'text/markdown' => 'md',
+    'text/x-markdown' => 'md',
+    'application/json' => 'json',
+    'text/json' => 'json',
+    'text/yaml' => 'yaml',
+    'application/yaml' => 'yaml',
+    'text/x-yaml' => 'yaml',
+    'text/tab-separated-values' => 'tsv',
+    'text/x-log' => 'log',
+    'audio/mpeg' => 'mp3',
+    'audio/mp3' => 'mp3',
+    'audio/ogg' => 'ogg',
+    'audio/opus' => 'opus',
+    'audio/wav' => 'wav',
+    'audio/x-wav' => 'wav',
+    'audio/webm' => 'weba',
+    'audio/mp4' => 'm4a',
+    'audio/aac' => 'aac',
+    'audio/flac' => 'flac',
+    'video/mp4' => 'mp4',
+    'video/quicktime' => 'mov',
+    'video/x-matroska' => 'mkv',
+    'video/webm' => 'webm',
+    'video/x-msvideo' => 'avi',
+    'video/mpeg' => 'mpeg',
+    'video/ogg' => 'ogv',
+  ];
+}
+
+function memo_runtime_config(): array {
+  static $config = null;
+  if ($config !== null) {
+    return $config;
+  }
+  $config = [
+    'timezone' => 'Asia/Shanghai',
+    'db_file' => __DIR__ . '/memo.sqlite',
+    'upload_dir' => __DIR__ . '/storage/uploads',
+    'max_upload_bytes' => 15 * 1024 * 1024,
+    'allowed_mimes' => memo_default_allowed_mimes(),
+  ];
+
+  if (isset($GLOBALS['_legacy_config']) && is_object($GLOBALS['_legacy_config']) && method_exists($GLOBALS['_legacy_config'], 'get')) {
+    $appConfig = $GLOBALS['_legacy_config'];
+    $timezone = $appConfig->get('app.timezone');
+    if (is_string($timezone) && $timezone !== '') {
+      $config['timezone'] = $timezone;
+    }
+    $dbPath = $appConfig->get('app.database.path');
+    if (is_string($dbPath) && $dbPath !== '') {
+      $config['db_file'] = $dbPath;
+    }
+    $uploadDir = $appConfig->get('app.uploads.path');
+    if (is_string($uploadDir) && $uploadDir !== '') {
+      $config['upload_dir'] = $uploadDir;
+    }
+    $maxBytes = $appConfig->get('app.uploads.max_bytes');
+    if (is_numeric($maxBytes)) {
+      $config['max_upload_bytes'] = (int)$maxBytes;
+    }
+    $mimes = $appConfig->get('app.uploads.allowed_mimes');
+    if (is_array($mimes) && $mimes) {
+      $config['allowed_mimes'] = $mimes;
+    }
+  }
+
+  return $config;
+}
+
+function memo_db_file(): string {
+  return (string)(memo_runtime_config()['db_file'] ?? (__DIR__ . '/memo.sqlite'));
+}
+
+function memo_upload_dir(): string {
+  return (string)(memo_runtime_config()['upload_dir'] ?? (__DIR__ . '/storage/uploads'));
+}
+
+function memo_max_upload_bytes(): int {
+  return (int)(memo_runtime_config()['max_upload_bytes'] ?? (15 * 1024 * 1024));
+}
+
+function memo_allowed_upload_mime_map(): array {
+  $map = memo_runtime_config()['allowed_mimes'] ?? memo_default_allowed_mimes();
+  return is_array($map) ? $map : memo_default_allowed_mimes();
+}
+
+function memo_extension_for_mime(string $mime): ?string {
+  $map = memo_allowed_upload_mime_map();
+  $normalized = strtolower(trim($mime));
+  return $map[$normalized] ?? null;
+}
+
+function memo_upload_accept_attribute(): string {
+  static $accept = null;
+  if ($accept !== null) {
+    return $accept;
+  }
+  $map = memo_allowed_upload_mime_map();
+  $all = array_keys($map);
+  $prefixes = ['image/*', 'video/*', 'audio/*'];
+  $acceptList = array_values(array_unique(array_merge($prefixes, $all)));
+  $accept = implode(',', $acceptList);
+  return $accept;
+}
+
+function memo_apply_default_security_headers(): void {
+  if (headers_sent()) {
+    return;
+  }
+  header_remove('X-Powered-By');
+  header('X-Frame-Options: SAMEORIGIN');
+  header('Referrer-Policy: strict-origin-when-cross-origin');
+  header('X-Content-Type-Options: nosniff');
+  header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  $GLOBALS['_legacy_security_headers_applied'] = true;
+}
+
+function csrf_token(): string {
+  if (isset($GLOBALS['_legacy_csrf_token']) && is_string($GLOBALS['_legacy_csrf_token'])) {
+    return $GLOBALS['_legacy_csrf_token'];
+  }
+  if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+  }
+  $sessionKey = '_csrf_token';
+  if (empty($_SESSION[$sessionKey]) || !is_string($_SESSION[$sessionKey])) {
+    $_SESSION[$sessionKey] = bin2hex(random_bytes(16));
+  }
+  return $_SESSION[$sessionKey];
+}
+
+function csrf_input(): string {
+  return '<input type="hidden" name="_csrf" value="' . h(csrf_token()) . '">';
+}
+
 function default_mindmap_payload(): string {
   return json_encode(DEFAULT_MINDMAP, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
@@ -124,13 +275,21 @@ function mindmap_force_right_orientation(&$node, int $depth = 0): void {
 }
 
 // —— 基础辅助函数 ——
-function h(?string $s): string { return htmlspecialchars($s ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-function now(): int { return time(); }
+if (!function_exists('h')) {
+  function h(?string $s): string { return htmlspecialchars($s ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+}
+if (!function_exists('now')) {
+  function now(): int { return time(); }
+}
 function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'; }
 function is_ajax(): bool { return !empty($_SERVER['HTTP_X_REQUESTED_WITH']); }
 function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
-function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
-function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
+if (!function_exists('bytes_h')) {
+  function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
+}
+if (!function_exists('dt')) {
+  function dt(int $ts): string { return date('Y-m-d H:i', $ts); }
+}
 
 if(!function_exists('array_is_list')){
   function array_is_list(array $array): bool {
@@ -186,64 +345,129 @@ function highlight_text(string $text, string $term): string {
 
 // —— 数据库 ——
 function db(): PDO {
+  if (class_exists('Core\\DB')) {
+    try {
+      $pdo = \Core\DB::pdo();
+    } catch (RuntimeException $e) {
+      $pdo = \Core\DB::connect(memo_db_file());
+    }
+    memo_ensure_upload_directory();
+    return $pdo;
+  }
+
   static $pdo;
-  if ($pdo) return $pdo;
-  $init = !file_exists(DB_FILE);
-  $pdo = new PDO('sqlite:' . DB_FILE, null, null, [
+  if ($pdo instanceof PDO) {
+    return $pdo;
+  }
+
+  $dbFile = memo_db_file();
+  $init = !file_exists($dbFile);
+  $pdo = new PDO('sqlite:' . $dbFile, null, null, [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA journal_mode = WAL;');
   $pdo->exec('PRAGMA foreign_keys = ON;');
-  if ($init) {
-    // 创建基础表
-    $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
-      created_at INTEGER NOT NULL
-    );');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS items(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT,
-      done INTEGER NOT NULL DEFAULT 0,
-      category_id INTEGER,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      previous_category_id INTEGER,
-      FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
-      FOREIGN KEY(previous_category_id) REFERENCES categories(id) ON DELETE SET NULL
-    );');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      item_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      notes TEXT,
-      done INTEGER NOT NULL DEFAULT 0,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
-    );');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      item_id INTEGER,
-      step_id INTEGER,
-      orig_name TEXT NOT NULL,
-      stored_name TEXT NOT NULL,
-      mime TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
-      FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE
-    );');
-    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
-    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
-    // 插入默认分类
-    $stmt=$pdo->prepare('INSERT INTO categories(name,created_at) VALUES(?,?)');
-    foreach(['备忘录','流程','其他'] as $n){ $stmt->execute([$n, now()]); }
+  memo_run_legacy_migrations($pdo, $init);
+  memo_ensure_upload_directory();
+  return $pdo;
+}
+
+function memo_run_legacy_migrations(PDO $pdo, bool $init): void {
+  $currentVersion = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+
+  if ($currentVersion < 1) {
+    memo_ensure_base_tables($pdo);
+    memo_seed_default_categories($pdo);
+    memo_set_user_version($pdo, 1);
+    $currentVersion = 1;
+  } else {
+    memo_ensure_base_tables($pdo);
   }
+
+  if ($currentVersion < 2) {
+    memo_ensure_mindmap_tables($pdo, true);
+    memo_set_user_version($pdo, 2);
+  } elseif ($init) {
+    memo_ensure_mindmap_tables($pdo, false);
+  }
+}
+
+function memo_set_user_version(PDO $pdo, int $version): void {
+  $pdo->exec('PRAGMA user_version = ' . max(0, $version));
+}
+
+function memo_ensure_base_tables(PDO $pdo): void {
+  $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    created_at INTEGER NOT NULL
+  );');
+  $pdo->exec('CREATE TABLE IF NOT EXISTS items(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    category_id INTEGER,
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    previous_category_id INTEGER,
+    FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+    FOREIGN KEY(previous_category_id) REFERENCES categories(id) ON DELETE SET NULL
+  );');
+  $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    notes TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
+  );');
+  $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER,
+    step_id INTEGER,
+    orig_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
+    FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE
+  );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+
+  $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(PDO::FETCH_ASSOC);
+  $hasColumn = false;
+  foreach ($columns as $column) {
+    if (($column['name'] ?? null) === 'previous_category_id') {
+      $hasColumn = true;
+      break;
+    }
+  }
+  if (!$hasColumn) {
+    $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
+  }
+}
+
+function memo_seed_default_categories(PDO $pdo): void {
+  $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
+  if ($count > 0) {
+    return;
+  }
+  $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
+  $now = now();
+  foreach (['备忘录', '流程', '其他'] as $name) {
+    $stmt->execute([$name, $now]);
+  }
+}
+
+function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
   $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -265,6 +489,11 @@ function db(): PDO {
   );');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
+
+  if (!$withDefault) {
+    return;
+  }
+
   $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
   if ($hasMap === 0) {
     $nowTs = now();
@@ -277,16 +506,13 @@ function db(): PDO {
     $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
         ->execute(['默认导图', $defaultPayload, $nowTs, $nowTs]);
   }
-  // 创建上传目录
-  if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
+}
 
-  $cols=$pdo->query('PRAGMA table_info(items)')->fetchAll();
-  $names=array_map(fn($col)=>$col['name']??'', $cols);
-  if(!in_array('previous_category_id',$names,true)){
-    $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
+function memo_ensure_upload_directory(): void {
+  $dir = memo_upload_dir();
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
   }
-
-  return $pdo;
 }
 
 // —— 获取分类及计数 ——
@@ -441,7 +667,7 @@ function mindmap_assets_for_session(string $session_key): array {
 function delete_mindmap_asset(int $id): void {
   $asset=get_mindmap_asset($id);
   if(!$asset) return;
-  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name'];
+  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$asset['stored_name'];
   if(is_file($path)) @unlink($path);
   $pdo=db();
   $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
@@ -556,12 +782,12 @@ function create_mindmap_asset_from_dataurl(string $data_url, string $name, ?int 
   $binary=base64_decode(strtr($m[2],' ','+'), true);
   if($binary===false) return null;
   $size=strlen($binary);
-  if($size>MAX_UPLOAD_BYTES) throw new RuntimeException('附件超过 15MB 上限，无法保存。');
-  $ext=ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
+  if($size>memo_max_upload_bytes()) throw new RuntimeException('附件超过 15MB 上限，无法保存。');
+  $ext=memo_extension_for_mime($mime);
   if(!$ext) return null;
-  if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
+  memo_ensure_upload_directory();
   $stored=bin2hex(random_bytes(8)).'.'.$ext;
-  $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored;
+  $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored;
   if(file_put_contents($dest,$binary)===false) return null;
   $safeName=$name !== '' ? $name : ('附件.'.$ext);
   return create_mindmap_asset($map_id,$node_uid,$safeName,$stored,$mime,$size,$session_key);
@@ -750,7 +976,7 @@ function json_cats(): void {
 // —— 下载附件 ——
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
   $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
-  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
+  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
   $mime=strtolower((string)$att['mime']);
   $filename=$att['orig_name'];
   $inlineTypes=['application/pdf','application/zip','application/x-zip-compressed','application/x-rar-compressed','application/vnd.rar'];
@@ -765,7 +991,7 @@ if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
 
 if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])) {
   $asset=get_mindmap_asset((int)$_GET['mindmap_asset']); if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
-  $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
+  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
   $mime=$asset['mime'];
   $filename=$asset['orig_name'];
   $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || str_starts_with($mime,'audio/') || $mime==='application/pdf';
@@ -1200,11 +1426,11 @@ if (is_post()) {
       case 'upload_attachment': {
         if(empty($_FILES['file']) || ($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new RuntimeException('上传失败');
         $kind=$_POST['target'] ?? ''; $targetId=(int)($_POST['target_id'] ?? 0); if(!in_array($kind,['item','step'],true)||$targetId<=0) throw new RuntimeException('目标无效');
-        $f=$_FILES['file']; if($f['size']>MAX_UPLOAD_BYTES) throw new RuntimeException('文件过大，最大 15MB');
+        $f=$_FILES['file']; if($f['size']>memo_max_upload_bytes()) throw new RuntimeException('文件过大，最大 15MB');
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
-        $ext = ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
+        $ext = memo_extension_for_mime($mime);
         if(!$ext) throw new RuntimeException('仅允许图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件');
-        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
+        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $orig=$f['name']; $itemIdForTouch=null;
         if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
         else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
@@ -1217,15 +1443,15 @@ if (is_post()) {
       }
       case 'upload_mindmap_asset': {
         if(empty($_FILES['file']) || ($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new RuntimeException('上传失败');
-        $f=$_FILES['file']; if($f['size']>MAX_UPLOAD_BYTES) throw new RuntimeException('文件过大，最大 15MB');
+        $f=$_FILES['file']; if($f['size']>memo_max_upload_bytes()) throw new RuntimeException('文件过大，最大 15MB');
         $mapId=(int)($_POST['map_id'] ?? 0);
         $nodeUid=trim((string)($_POST['node_id'] ?? ''));
         if($nodeUid==='') throw new RuntimeException('节点信息缺失');
         $finfo=new finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($f['tmp_name']) ?: 'application/octet-stream';
-        $ext = ALLOWED_UPLOAD_MIME_MAP[$mime] ?? null;
+        $ext = memo_extension_for_mime($mime);
         if(!$ext) throw new RuntimeException('仅允许图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件');
-        if(!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR,0775,true);
-        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=UPLOAD_DIR.DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
+        memo_ensure_upload_directory();
+        $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $asset=create_mindmap_asset($mapId>0?$mapId:null,$nodeUid,$f['name'],$stored,$mime,(int)$f['size'],session_id());
         if(is_ajax()){
           header('Content-Type: application/json'); echo json_encode([
@@ -1246,7 +1472,7 @@ if (is_post()) {
         if($id>0){
           $att=get_attachment($id);
           if($att){
-            $path=UPLOAD_DIR.DIRECTORY_SEPARATOR.$att['stored_name']; if(is_file($path)) @unlink($path);
+            $path=memo_upload_dir().DIRECTORY_SEPARATOR.$att['stored_name']; if(is_file($path)) @unlink($path);
             $pdo->prepare('DELETE FROM attachments WHERE id=?')->execute([$id]);
             $itemId=$att['item_id'] ? (int)$att['item_id'] : null;
             if(!$itemId && $att['step_id']){

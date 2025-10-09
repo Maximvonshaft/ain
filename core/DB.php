@@ -7,6 +7,8 @@ use RuntimeException;
 
 class DB
 {
+    private const SCHEMA_VERSION = 2;
+
     private static ?PDO $pdo = null;
 
     public static function connect(string $path): PDO
@@ -14,17 +16,13 @@ class DB
         if (self::$pdo) {
             return self::$pdo;
         }
-        $init = !is_file($path);
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA journal_mode = WAL;');
         $pdo->exec('PRAGMA foreign_keys = ON;');
-        if ($init) {
-            self::bootstrap($pdo);
-        }
-        self::ensureMindmapTables($pdo);
+        self::runMigrations($pdo);
         self::$pdo = $pdo;
         return self::$pdo;
     }
@@ -37,9 +35,32 @@ class DB
         return self::$pdo;
     }
 
-    private static function bootstrap(PDO $pdo): void
+    private static function runMigrations(PDO $pdo): void
     {
-        $now = time();
+        $currentVersion = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+
+        if ($currentVersion < 1) {
+            self::ensureBaseTables($pdo);
+            self::seedDefaultCategories($pdo);
+            self::setUserVersion($pdo, 1);
+            $currentVersion = 1;
+        } else {
+            self::ensureBaseTables($pdo);
+        }
+
+        if ($currentVersion < self::SCHEMA_VERSION) {
+            self::ensureMindmapSchema($pdo);
+            self::setUserVersion($pdo, self::SCHEMA_VERSION);
+        }
+    }
+
+    private static function setUserVersion(PDO $pdo, int $version): void
+    {
+        $pdo->exec('PRAGMA user_version = ' . max(0, $version));
+    }
+
+    private static function ensureBaseTables(PDO $pdo): void
+    {
         $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
@@ -54,7 +75,9 @@ class DB
             order_index INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
-            FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL
+            previous_category_id INTEGER,
+            FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+            FOREIGN KEY(previous_category_id) REFERENCES categories(id) ON DELETE SET NULL
         );');
         $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,13 +104,38 @@ class DB
         );');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+        self::ensurePreviousCategoryColumn($pdo);
+    }
+
+    private static function ensurePreviousCategoryColumn(PDO $pdo): void
+    {
+        $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(PDO::FETCH_ASSOC);
+        $hasColumn = false;
+        foreach ($columns as $column) {
+            if (($column['name'] ?? null) === 'previous_category_id') {
+                $hasColumn = true;
+                break;
+            }
+        }
+        if (!$hasColumn) {
+            $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
+        }
+    }
+
+    private static function seedDefaultCategories(PDO $pdo): void
+    {
+        $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
+        if ($count > 0) {
+            return;
+        }
         $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
+        $now = time();
         foreach (["备忘录", "流程", "其他"] as $name) {
             $stmt->execute([$name, $now]);
         }
     }
 
-    private static function ensureMindmapTables(PDO $pdo): void
+    private static function ensureMindmapSchema(PDO $pdo): void
     {
         $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
             id INTEGER PRIMARY KEY AUTOINCREMENT,

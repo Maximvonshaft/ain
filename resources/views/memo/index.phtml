@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>自适应备忘录 · 单文件</title>
 <meta name="color-scheme" content="dark"/>
+<meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -296,6 +297,41 @@
     .mindmap-header h2{font-size:18px}
   }
 </style>
+<script>
+  window.__CSRF_TOKEN__ = '<?= h(csrf_token()); ?>';
+  (function () {
+    if (typeof window.fetch === 'function') {
+      const originalFetch = window.fetch;
+      window.fetch = function (input, init) {
+        init = init || {};
+        const headers = new Headers(init.headers || {});
+        if (!headers.has('X-CSRF-Token')) {
+          headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
+        }
+        init.headers = headers;
+        if (init.body instanceof FormData) {
+          if (!init.body.has('_csrf')) {
+            init.body.append('_csrf', window.__CSRF_TOKEN__);
+          }
+        }
+        return originalFetch.call(this, input, init);
+      };
+    }
+    document.addEventListener('submit', function (event) {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) {
+        return;
+      }
+      if (!form.querySelector('input[name="_csrf"]')) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = '_csrf';
+        input.value = window.__CSRF_TOKEN__;
+        form.appendChild(input);
+      }
+    }, true);
+  })();
+</script>
 </head>
 <body>
   <div class="scanlines" aria-hidden="true"></div>
@@ -382,6 +418,7 @@
                 <div class="mindmap-card-actions">
                   <a class="btn btn-primary btn-small" href="?view=map_edit&id=<?php echo $m['id']; ?>">编辑</a>
                   <form method="post" onsubmit="return confirm('确认删除该导图？');">
+                    <?= csrf_input(); ?>
                     <input type="hidden" name="action" value="delete_mindmap">
                     <input type="hidden" name="id" value="<?php echo $m['id']; ?>">
                     <button class="btn btn-danger btn-small" type="submit">删除</button>
@@ -518,6 +555,7 @@
                 <span class="btn-label">详情</span>
               </a>
               <form method="post" class="form-delete-item" style="margin:0">
+                <?= csrf_input(); ?>
                 <input type="hidden" name="action" value="delete_item">
                 <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
                 <button class="btn btn-danger btn-small" type="submit">删除</button>
