@@ -1547,36 +1547,21 @@
           if(!evt) return;
           const rect=this.container.getBoundingClientRect();
           if(!rect) return;
-          const trackpadThreshold=60;
-          const isTrackpadLike=evt.deltaMode===0 && Math.abs(evt.deltaY)<trackpadThreshold && Math.abs(evt.deltaX)<trackpadThreshold;
-          const wantsZoom=evt.ctrlKey || evt.metaKey || (!evt.shiftKey && !evt.altKey && !isTrackpadLike);
-          if(wantsZoom){
-            evt.preventDefault();
-            const baseScale=this.scale>0?this.scale:1;
-            const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
-            const delta=evt.deltaY||0;
-            const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
-            if(Math.abs(nextScale-baseScale)<0.0001) return;
-            const anchorX=evt.clientX-rect.left;
-            const anchorY=evt.clientY-rect.top;
-            const originX=(anchorX - this.offsetX)/baseScale;
-            const originY=(anchorY - this.offsetY)/baseScale;
-            this.scale=nextScale;
-            this.offsetX=anchorX - originX*this.scale;
-            this.offsetY=anchorY - originY*this.scale;
-            this.applyTransform();
-            return;
-          }
           evt.preventDefault();
-          let deltaX=evt.deltaX||0;
-          let deltaY=evt.deltaY||0;
-          if(evt.shiftKey && !evt.altKey){
-            deltaX+=deltaY;
-            deltaY=0;
-          }
-          const multiplier=evt.deltaMode===1?20:(evt.deltaMode===2?Math.max(rect.width,rect.height)*0.8:(isTrackpadLike?1:1.8));
-          this.offsetX-=deltaX*multiplier;
-          this.offsetY-=deltaY*multiplier;
+          const baseScale=this.scale>0?this.scale:1;
+          const dominantDelta=(Math.abs(evt.deltaY||0)>=Math.abs(evt.deltaX||0))? (evt.deltaY||0) : (evt.deltaX||0);
+          const delta=dominantDelta!==0?dominantDelta:((typeof evt.deltaZ==='number' && evt.deltaZ!==0)?evt.deltaZ:evt.deltaY||0);
+          if(delta===0) return;
+          const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
+          const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
+          if(Math.abs(nextScale-baseScale)<0.0001) return;
+          const anchorX=evt.clientX-rect.left;
+          const anchorY=evt.clientY-rect.top;
+          const originX=(anchorX - this.offsetX)/baseScale;
+          const originY=(anchorY - this.offsetY)/baseScale;
+          this.scale=nextScale;
+          this.offsetX=anchorX - originX*this.scale;
+          this.offsetY=anchorY - originY*this.scale;
           this.applyTransform();
         }
         add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
@@ -4557,6 +4542,41 @@
       const audioExts=['.mp3','.m4a','.aac','.wav','.ogg','.oga','.opus','.flac','.weba'];
       const officeExts=['.pdf','.doc','.docx','.docm','.dotx','.dotm','.xls','.xlsx','.xlsm','.xlsb','.xltx','.xltm'];
       const archiveExts=['.zip','.rar'];
+      const AUTO_SAVE_INITIAL_DELAY=800;
+      const AUTO_SAVE_MAX_DELAY=10000;
+      let autoSaveTimer=null;
+      let autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+      let saveInFlightPromise=null;
+      let saveInFlightMode='idle';
+      function cancelAutoSaveTimer(){
+        if(autoSaveTimer){
+          clearTimeout(autoSaveTimer);
+          autoSaveTimer=null;
+        }
+      }
+      async function runAutoSave(reason){
+        if(!dirty){
+          autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+          return;
+        }
+        const ok=await saveMindmap({silent:true});
+        if(!ok && dirty){
+          autoSaveBackoff=Math.min(autoSaveBackoff*2,AUTO_SAVE_MAX_DELAY);
+          scheduleAutoSave(reason,autoSaveBackoff);
+        }else{
+          autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+        }
+      }
+      function scheduleAutoSave(reason='auto', delay){
+        const wait=(typeof delay==='number' && delay>=0)?delay:autoSaveBackoff;
+        if(autoSaveTimer){
+          clearTimeout(autoSaveTimer);
+        }
+        autoSaveTimer=window.setTimeout(()=>{
+          autoSaveTimer=null;
+          runAutoSave(reason);
+        }, wait);
+      }
       function setSaveButtonState(text, disabled, state){
         if(dockSaveLabel){
           if(typeof text==='string'){ dockSaveLabel.textContent=text; }
@@ -5669,6 +5689,7 @@
         markDirty();
         scheduleHandleRefresh();
         refreshInspector(jm.get_node(targetNode.id));
+        scheduleAutoSave('attachment-upload');
         if(attachmentManager && uploadedEntries.length){ attachmentManager.onFilesUploaded(uploadedEntries, targetNode); }
       }
       function handleDroppedText(text, parent, event){
@@ -5884,6 +5905,7 @@
         let loadObserver=null;
         let loadSentinel=null;
         let lastFocused=null;
+        let deleteInFlight=false;
         function ensureInit(){
           if(state.initialized) return;
           state.initialized=true;
@@ -6362,30 +6384,87 @@
             setTimeout(()=>el.classList.remove('mind-node-highlight'),1000);
           }
         }
-        function handleDelete(ids){
+        async function handleDelete(ids){
+          if(deleteInFlight) return;
           const unique=Array.from(new Set(ids.map(id=>Number(id)).filter(id=>Number.isFinite(id) && id>0)));
           if(!unique.length) return;
           let total=0;
           state.items.forEach(item=>{ if(unique.includes(item.assetId)) total+=Number(item.size)||0; });
           const sizeText=total>0?`（总计 ${formatBytesLocal(total)}）`:'';
           if(!confirm(`确定要删除 ${unique.length} 个附件${sizeText}吗？`)) return;
-          const changed=removeAttachmentsFromMind(unique);
+          const dirtyBefore=dirty;
           const metaBackup=backupAndRemoveAssetMeta(unique);
-          refresh(true);
-          requestDelete(unique).then(()=>{
+          deleteInFlight=true;
+          if(elements.deleteBtn){ elements.deleteBtn.disabled=true; }
+          let removalResult={changed:false,snapshots:[]};
+          let persisted=false;
+          try{
+            removalResult=removeAttachmentsFromMind(unique);
+            refresh(true);
+            if(removalResult.changed){
+              const saved=await saveMindmap({silent:true});
+              if(!saved){
+                throw new Error('删除失败：保存未成功，请检查网络后重试。');
+              }
+              persisted=true;
+            }
+            await requestDelete(unique);
             state.selection.clear();
             refresh(true);
-          }).catch(err=>{
-            alert(err && err.message ? err.message : '删除附件失败');
-            restoreAssetMeta(metaBackup);
-            if(changed){ undoMindChange(); }
+          }catch(err){
+            if(!persisted){
+              restoreAssetMeta(metaBackup);
+              if(removalResult.changed && Array.isArray(removalResult.snapshots) && removalResult.snapshots.length){
+                removalResult.snapshots.forEach(snapshot=>{
+                  if(!snapshot || !snapshot.nodeId) return;
+                  const node=jm && typeof jm.get_node==='function' ? jm.get_node(snapshot.nodeId) : null;
+                  if(!node) return;
+                  const data=ensureNodeDataObject(node);
+                  if(snapshot.attachments && snapshot.attachments.length){
+                    data.attachments=snapshot.attachments.map(att=>Object.assign({}, att));
+                    const baseAttachment=data.attachments[0] ? Object.assign({}, data.attachments[0]) : null;
+                    const primary=snapshot.primaryAttachment ? Object.assign({}, snapshot.primaryAttachment) : baseAttachment;
+                    if(primary){ data.attachment=primary; }
+                  }else{
+                    delete data.attachments;
+                    delete data.attachment;
+                  }
+                  node.model.data=data;
+                  node.data=data;
+                });
+                if(typeof jm.computeLayout==='function'){ jm.computeLayout(); }
+                if(typeof jm.render==='function'){ jm.render(); }
+                scheduleHandleRefresh();
+                requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
+              }
+              dirty=dirtyBefore;
+              if(dirtyBefore){
+                markDirty();
+              }else{
+                dirty=false;
+                if(saveState){
+                  saveState.textContent='已保存';
+                  saveState.classList.add('show');
+                  saveState.classList.remove('dirty');
+                  setTimeout(()=>{ if(!dirty){ saveState.classList.remove('show'); } },1500);
+                }
+                setSaveButtonState(null,false,null);
+              }
+            }else{
+              state.selection.clear();
+            }
             refresh(true);
-          });
+            alert(err && err.message ? err.message : (persisted?'附件文件清理可能未完成，请稍后刷新确认。':'删除附件失败，请稍后重试。'));
+          }finally{
+            deleteInFlight=false;
+            updateSelectionInfo();
+          }
         }
         function removeAttachmentsFromMind(ids){
-          if(!ids || !ids.length) return false;
+          if(!ids || !ids.length) return {changed:false,snapshots:[]};
           const idSet=new Set(ids);
           let changed=false;
+          const snapshots=[];
           performUndoable('delete-attachments',()=>{
             commitInlineEditing();
             jm.nodes.forEach(node=>{
@@ -6393,9 +6472,12 @@
               const data=ensureNodeDataObject(node);
               if(!Array.isArray(data.attachments) || !data.attachments.length) return;
               const before=data.attachments.length;
+              const previousList=data.attachments.map(att=>Object.assign({}, att));
+              const primaryBefore=data.attachment ? Object.assign({}, data.attachment) : (previousList.length?Object.assign({}, previousList[0]):null);
               data.attachments=data.attachments.filter(att=>!idSet.has(Number(att.assetId||att.id)));
               if(data.attachments.length!==before){
                 changed=true;
+                snapshots.push({nodeId:node.id, attachments:previousList, primaryAttachment:primaryBefore});
                 if(data.attachments.length){ data.attachment=data.attachments[0]; }
                 else { delete data.attachments; delete data.attachment; }
                 node.model.data=data;
@@ -6410,7 +6492,7 @@
             requestAnimationFrame(()=>refreshInspector(jm.get_selected_node()));
             return true;
           },{mergeKey:'delete:attachments'});
-          return changed;
+          return {changed,snapshots};
         }
         async function requestDelete(ids){
           const fd=new FormData();
@@ -7211,38 +7293,74 @@
           reader.readAsText(file,'utf-8');
         });
       }
-      async function saveMindmap(){
-        commitInlineEditing();
-        const title=titleInput.value.trim()||'未命名导图';
-        const currentData=jm.get_data('node_tree');
-        if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
-        const payload=JSON.stringify(currentData);
-        const fd=new FormData();
-        fd.append('action','save_mindmap');
-        fd.append('id', String(currentMapId||0));
-        fd.append('title', title);
-        fd.append('content', payload);
-        try{
-          showSaving();
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
-          if(!res.ok) throw new Error('网络异常');
-          const json=await res.json();
-          if(!json.ok) throw new Error(json.error||'保存失败');
-          currentMapId=parseInt(json.id,10)||0;
-          document.getElementById('jsmind-container').dataset.mapId=currentMapId;
-          if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
-          if(deleteMapForm){
-            const idInput=deleteMapForm.querySelector('input[name="id"]');
-            if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+      async function saveMindmap(options={}){
+        const opts=(options && typeof options==='object')?options:{};
+        const silent=!!opts.silent;
+        if(saveInFlightPromise){
+          if(!silent && saveInFlightMode==='silent' && !opts.__afterWait){
+            try{ await saveInFlightPromise; }catch(_){ }
+            const retryOptions=Object.assign({}, opts, {__afterWait:true});
+            return saveMindmap(retryOptions);
           }
-          history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
-          initialData=JSON.parse(payload);
-          if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
-          markSaved();
-        }catch(err){
-          alert(err.message||'保存失败');
-          markDirty();
+          return saveInFlightPromise;
         }
+        cancelAutoSaveTimer();
+        saveInFlightMode=silent?'silent':'interactive';
+        const execute=async()=>{
+          commitInlineEditing();
+          const title=titleInput.value.trim()||'未命名导图';
+          const currentData=jm.get_data('node_tree');
+          if(currentData && currentData.data){ enforceRightOrientation(currentData.data); }
+          const payload=JSON.stringify(currentData);
+          const fd=new FormData();
+          fd.append('action','save_mindmap');
+          fd.append('id', String(currentMapId||0));
+          fd.append('title', title);
+          fd.append('content', payload);
+          try{
+            if(!silent){ showSaving(); }
+            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            if(!res.ok) throw new Error('网络异常');
+            const json=await res.json();
+            if(!json.ok) throw new Error(json.error||'保存失败');
+            currentMapId=parseInt(json.id,10)||0;
+            document.getElementById('jsmind-container').dataset.mapId=currentMapId;
+            if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
+            if(deleteMapForm){
+              const idInput=deleteMapForm.querySelector('input[name="id"]');
+              if(idInput){ idInput.value=currentMapId ? String(currentMapId) : ''; }
+            }
+            history.replaceState(null,'',`?view=map_edit&id=${json.id}`);
+            initialData=JSON.parse(payload);
+            if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
+            markSaved();
+            autoSaveBackoff=AUTO_SAVE_INITIAL_DELAY;
+            return true;
+          }catch(err){
+            if(!silent){
+              alert(err.message||'保存失败');
+            }else{
+              console.error('自动保存失败', err);
+              if(saveState){
+                saveState.textContent='自动保存失败';
+                saveState.classList.add('show','dirty');
+              }
+              setSaveButtonState('未保存',false,'dirty');
+            }
+            markDirty();
+            return false;
+          }
+        };
+        const promise=(async()=>{
+          try{
+            return await execute();
+          }finally{
+            saveInFlightPromise=null;
+            saveInFlightMode='idle';
+          }
+        })();
+        saveInFlightPromise=promise;
+        return promise;
       }
       window.addEventListener('beforeunload',e=>{
         commitInlineEditing();
