@@ -1276,8 +1276,8 @@
           if(!this.container) throw new Error('Mind container not found');
           this.listeners=[];
           this.scale=1;
-          this.defaultMinScale=0.3;
-          this.defaultMaxScale=2.5;
+          this.defaultMinScale=0.25;
+          this.defaultMaxScale=3.0;
           this.minReadableScale=0.05;
           this.minScale=this.defaultMinScale;
           this.maxScale=this.defaultMaxScale;
@@ -1350,8 +1350,10 @@
           this.boundPanKeyUp=null;
           this.boundPanBlur=null;
           this.isPointerPanning=false;
+          this.boundViewShortcutHandler=null;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
+          this.setupViewShortcuts();
           this.setupTouchGuards();
         }
         resetPanClickSuppression(){
@@ -1465,11 +1467,7 @@
                 this.dragState=null;
                 return;
               }
-              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
               this.resetPanClickSuppression();
-              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false};
-              this.updatePointerPanState(true);
-              evt.preventDefault();
               return;
             }
             const button=typeof evt.button==='number'?evt.button:0;
@@ -1502,7 +1500,12 @@
                 const rect=this.container.getBoundingClientRect();
                 const centerX=((a.x+b.x)/2)-rect.left;
                 const centerY=((a.y+b.y)/2)-rect.top;
-                const nextScale=this.clampScale(pinch.baseScale * (distance / pinch.initialDistance), rect);
+                const distanceRatio=distance / pinch.initialDistance;
+                const maxStep=1.12;
+                const minStep=1/maxStep;
+                let step=distanceRatio>1?Math.min(distanceRatio,maxStep):Math.max(distanceRatio,minStep);
+                if(Math.abs(step-1)<0.0005){ step=1; }
+                const nextScale=this.clampScale(pinch.baseScale * step, rect);
                 const nextOffsetX=centerX - pinch.originX*nextScale;
                 const nextOffsetY=centerY - pinch.originY*nextScale;
                 const scaleChanged=Math.abs(nextScale-this.scale)>0.0001;
@@ -1557,10 +1560,53 @@
           this.container.addEventListener('pointerup',endPan);
           this.container.addEventListener('pointercancel',endPan);
           this.container.addEventListener('wheel',evt=>this.handleWheel(evt),{passive:false});
+          this.container.addEventListener('dblclick',evt=>{
+            if(!evt) return;
+            if(evt.target && evt.target.closest && evt.target.closest('.jsmind-node')) return;
+            evt.preventDefault();
+            this.center_root();
+          });
+        }
+        setupViewShortcuts(){
+          if(this.boundViewShortcutHandler) return;
+          this.boundViewShortcutHandler=evt=>{
+            if(!evt || this.isEditableTarget(evt.target)) return;
+            const key=evt.key;
+            if(!key) return;
+            const rect=this.container?this.container.getBoundingClientRect():null;
+            const anchorRect=(rect && rect.width>0 && rect.height>0)?rect:null;
+            const anchor=anchorRect?{x:anchorRect.width/2,y:anchorRect.height/2}:null;
+            const zoomInKeys=new Set(['+','=','Add']);
+            const zoomOutKeys=new Set(['-','_','Subtract']);
+            if(key==='1'){
+              evt.preventDefault();
+              this.zoomToFit();
+              return;
+            }
+            if(key==='2'){
+              evt.preventDefault();
+              if(!this.zoomToSelection()){
+                this.center_root();
+              }
+              return;
+            }
+            if(zoomInKeys.has(key)){
+              evt.preventDefault();
+              const targetRect=anchorRect || this.container.getBoundingClientRect();
+              this.zoom(1.08,{anchor:anchor || (targetRect?{x:targetRect.width/2,y:targetRect.height/2}:null),rect:targetRect});
+              return;
+            }
+            if(zoomOutKeys.has(key)){
+              evt.preventDefault();
+              const targetRect=anchorRect || this.container.getBoundingClientRect();
+              this.zoom(1/1.08,{anchor:anchor || (targetRect?{x:targetRect.width/2,y:targetRect.height/2}:null),rect:targetRect});
+            }
+          };
+          document.addEventListener('keydown',this.boundViewShortcutHandler);
         }
         calculateScaleBounds(rect){
-          const defaultMin=(typeof this.defaultMinScale==='number' && this.defaultMinScale>0)?this.defaultMinScale:0.3;
-          const defaultMax=(typeof this.defaultMaxScale==='number' && this.defaultMaxScale>0)?this.defaultMaxScale:2.5;
+          const defaultMin=(typeof this.defaultMinScale==='number' && this.defaultMinScale>0)?this.defaultMinScale:0.25;
+          const defaultMax=(typeof this.defaultMaxScale==='number' && this.defaultMaxScale>0)?this.defaultMaxScale:3.0;
           const readableMin=(typeof this.minReadableScale==='number' && this.minReadableScale>0)?this.minReadableScale:0.05;
           let min=defaultMin;
           const containerRect=rect || this.container.getBoundingClientRect();
@@ -1635,19 +1681,17 @@
             return;
           }
           const dominantDelta=(absDeltaY>=absDeltaX)? (evt.deltaY||0) : (evt.deltaX||0);
-          const delta=dominantDelta!==0?dominantDelta:(deltaZ!==0?deltaZ:(evt.deltaY||0));
+          let delta=dominantDelta!==0?dominantDelta:(deltaZ!==0?deltaZ:(evt.deltaY||0));
           if(delta===0) return;
-          const intensity=evt.deltaMode===1?0.12:(evt.deltaMode===2?0.35:0.0025);
-          const nextScale=this.clampScale(baseScale*Math.exp(-delta*intensity), rect);
-          if(Math.abs(nextScale-baseScale)<0.0001) return;
           const anchorX=evt.clientX-rect.left;
           const anchorY=evt.clientY-rect.top;
-          const originX=(anchorX - this.offsetX)/baseScale;
-          const originY=(anchorY - this.offsetY)/baseScale;
-          this.scale=nextScale;
-          this.offsetX=anchorX - originX*this.scale;
-          this.offsetY=anchorY - originY*this.scale;
-          this.applyTransform();
+          const magnitude=Math.min(1200, Math.abs(delta));
+          const normalized=1 - Math.exp(-magnitude/550);
+          if(normalized<=0){ return; }
+          const stepBase=1 + normalized;
+          const clampedStep=Math.min(1.12, Math.max(1.06, stepBase));
+          const zoomFactor=delta>0 ? (1/Math.max(clampedStep,1.0001)) : clampedStep;
+          this.zoom(zoomFactor,{anchor:{x:anchorX,y:anchorY},rect});
         }
         add_event_listener(fn){ if(typeof fn==='function'){ this.listeners.push(fn); } }
         emit(type){ this.listeners.forEach(fn=>{ try{ fn(type); }catch(err){ console.warn(err); } }); }
@@ -3594,11 +3638,20 @@
           this.viewport.style.transform=transform;
           this.updateEdgeButtonScale();
         }
-        zoom(step){
-          const prev=this.scale;
-          const next=this.clampScale(this.scale*step);
+        zoom(step, options={}){
+          if(typeof step!=='number' || !isFinite(step) || step<=0) return;
+          const rect=options.rect || this.container.getBoundingClientRect();
+          if(!rect || rect.width<=0 || rect.height<=0) return;
+          const prev=this.scale>0?this.scale:1;
+          const next=this.clampScale(prev*step, rect);
+          if(Math.abs(prev-next)<0.0001) return;
+          const anchor=options.anchor || {x:rect.width/2,y:rect.height/2};
+          const originX=(anchor.x - this.offsetX)/prev;
+          const originY=(anchor.y - this.offsetY)/prev;
           this.scale=next;
-          if(Math.abs(prev-this.scale)>0.001){ this.applyTransform(); }
+          this.offsetX=anchor.x - originX*this.scale;
+          this.offsetY=anchor.y - originY*this.scale;
+          this.applyTransform();
         }
         viewCommand(cmd){
           switch(cmd){
@@ -3607,10 +3660,12 @@
             case 'set_zoom': return this.set_zoom(arguments[1]);
             case 'move_to_center': return this.center_root();
             case 'center_root': return this.center_root();
-            case 'zoomIn': this.zoom(1.15); return true;
-            case 'zoom_in': this.zoom(1.15); return true;
-            case 'zoomOut': this.zoom(1/1.15); return true;
-            case 'zoom_out': this.zoom(1/1.15); return true;
+            case 'zoomIn': this.zoom(1.08); return true;
+            case 'zoom_in': this.zoom(1.08); return true;
+            case 'zoomOut': this.zoom(1/1.08); return true;
+            case 'zoom_out': this.zoom(1/1.08); return true;
+            case 'zoomToSelection': return this.zoomToSelection();
+            case 'zoom_to_selection': return this.zoomToSelection();
             default: return false;
           }
         }
@@ -3621,10 +3676,12 @@
             set_zoom:(v)=>this.set_zoom(v),
             move_to_center:()=>this.center_root(),
             center_root:()=>this.center_root(),
-            zoomIn:()=>{ this.zoom(1.15); return true; },
-            zoom_in:()=>{ this.zoom(1.15); return true; },
-            zoomOut:()=>{ this.zoom(1/1.15); return true; },
-            zoom_out:()=>{ this.zoom(1/1.15); return true; },
+            zoomIn:()=>{ this.zoom(1.08); return true; },
+            zoom_in:()=>{ this.zoom(1.08); return true; },
+            zoomOut:()=>{ this.zoom(1/1.08); return true; },
+            zoom_out:()=>{ this.zoom(1/1.08); return true; },
+            zoomToSelection:()=>this.zoomToSelection(),
+            zoom_to_selection:()=>this.zoomToSelection(),
           };
         }
         zoomToFit(){
@@ -3635,6 +3692,54 @@
           const scale=Math.min(rect.width/(this.bounds.width+padding), rect.height/(this.bounds.height+padding));
           this.scale=this.clampScale(scale, rect);
           this.center_root();
+          return true;
+        }
+        getSelectionBounds(){
+          if(!this.selectedId) return null;
+          const node=this.nodes.get(this.selectedId);
+          if(!node || !node.el) return null;
+          const width=node.el.offsetWidth || 0;
+          const height=node.el.offsetHeight || 0;
+          const margin=48;
+          const absX=Number.isFinite(node.absX)?node.absX:0;
+          const absY=Number.isFinite(node.absY)?node.absY:0;
+          const halfWidth=width/2;
+          const halfHeight=height/2;
+          const left=absX-halfWidth-margin;
+          const right=absX+halfWidth+margin;
+          const top=absY-halfHeight-margin;
+          const bottom=absY+halfHeight+margin;
+          return {
+            left,
+            right,
+            top,
+            bottom,
+            width:Math.max(1,(right-left)),
+            height:Math.max(1,(bottom-top)),
+            centerX:(left+right)/2,
+            centerY:(top+bottom)/2,
+          };
+        }
+        zoomToSelection(){
+          const selectionBounds=this.getSelectionBounds();
+          if(!selectionBounds){
+            return false;
+          }
+          const rect=this.container.getBoundingClientRect();
+          if(!rect || rect.width<=0 || rect.height<=0){
+            return false;
+          }
+          const padding=Math.max(0,(typeof this.scalePadding==='number'?this.scalePadding:0)/2);
+          const widthDenom=selectionBounds.width+padding;
+          const heightDenom=selectionBounds.height+padding;
+          const scale=Math.min(rect.width/widthDenom, rect.height/heightDenom);
+          const nextScale=this.clampScale(scale, rect);
+          const centerX=selectionBounds.centerX;
+          const centerY=selectionBounds.centerY;
+          this.scale=nextScale;
+          this.offsetX=rect.width/2 - centerX*this.scale;
+          this.offsetY=rect.height/2 - centerY*this.scale;
+          this.applyTransform();
           return true;
         }
         set_zoom(z){
