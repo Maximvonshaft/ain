@@ -5,12 +5,12 @@ declare(strict_types=1);
 use Core\Request;
 use Core\Router;
 
+/** @var \Core\Config $config */
+$config = require __DIR__ . '/../bootstrap.php';
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
-
-/** @var \Core\Config $config */
-$config = require __DIR__ . '/../bootstrap.php';
 
 $baseUrl = (string)($config->get('app.base_url', '') ?? '');
 $basePath = '';
