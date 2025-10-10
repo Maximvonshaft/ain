@@ -7,7 +7,7 @@ use RuntimeException;
 
 class DB
 {
-    private const SCHEMA_VERSION = 2;
+    private const SCHEMA_VERSION = 3;
 
     private static ?PDO $pdo = null;
 
@@ -48,8 +48,17 @@ class DB
             self::ensureBaseTables($pdo);
         }
 
-        if ($currentVersion < self::SCHEMA_VERSION) {
+        if ($currentVersion < 2) {
             self::ensureMindmapSchema($pdo);
+            self::setUserVersion($pdo, 2);
+            $currentVersion = 2;
+        } else {
+            self::ensureMindmapSchema($pdo);
+        }
+
+        self::ensureItemIndexes($pdo);
+
+        if ($currentVersion < self::SCHEMA_VERSION) {
             self::setUserVersion($pdo, self::SCHEMA_VERSION);
         }
     }
@@ -105,6 +114,7 @@ class DB
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
         self::ensurePreviousCategoryColumn($pdo);
+        self::ensureItemIndexes($pdo);
     }
 
     private static function ensurePreviousCategoryColumn(PDO $pdo): void
@@ -120,6 +130,12 @@ class DB
         if (!$hasColumn) {
             $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
         }
+    }
+
+    private static function ensureItemIndexes(PDO $pdo): void
+    {
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
     }
 
     private static function seedDefaultCategories(PDO $pdo): void
