@@ -169,8 +169,7 @@
       .mind-stage{position:relative;flex:1 1 auto;min-height:0;border-radius:28px;border:1px solid rgba(201,168,106,.24);background:linear-gradient(160deg,rgba(15,19,22,.9),rgba(10,12,14,.94));box-shadow:inset 0 0 48px rgba(0,0,0,.6),0 18px 38px rgba(0,0,0,.45);overflow:hidden}
       .mind-stage::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1px dashed rgba(201,168,106,.2);opacity:.4;pointer-events:none}
       #jsmind-container{position:absolute;inset:0;overflow:hidden;touch-action:none;background:transparent}
-      .mind-container{cursor:default}
-      .mind-container.mind-pan-key{cursor:grab}
+      .mind-container{cursor:grab}
       .mind-container.mind-pan-dragging{cursor:grabbing}
       .mind-background{position:absolute;inset:0;background:radial-gradient(circle at 18% 24%,rgba(227,198,139,.08),transparent 55%),radial-gradient(circle at 68% 12%,rgba(227,198,139,.05),transparent 60%),linear-gradient(120deg,rgba(201,168,106,.06),transparent 65%);pointer-events:none;opacity:.8}
       .mind-viewport,.mind-links{position:absolute;top:0;left:0;transform-origin:0 0}
@@ -1344,11 +1343,6 @@
           this.linkRegistry=new Map();
           this.relationRegistry=new Map();
           this.edgeHoverState=null;
-          this.spacePanActive=false;
-          this.globalPanKeyHandlersAttached=false;
-          this.boundPanKeyDown=null;
-          this.boundPanKeyUp=null;
-          this.boundPanBlur=null;
           this.isPointerPanning=false;
           this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>this.handleNodeResize(entries)):null;
           this.setupPan();
@@ -1371,16 +1365,6 @@
             this.panSuppressTimeout=null;
           },120);
         }
-        ensurePanKeyHandlers(){
-          if(this.globalPanKeyHandlersAttached) return;
-          this.boundPanKeyDown=evt=>this.handleGlobalKeyDown(evt);
-          this.boundPanKeyUp=evt=>this.handleGlobalKeyUp(evt);
-          this.boundPanBlur=()=>this.cancelSpacePan();
-          document.addEventListener('keydown',this.boundPanKeyDown,true);
-          document.addEventListener('keyup',this.boundPanKeyUp,true);
-          window.addEventListener('blur',this.boundPanBlur);
-          this.globalPanKeyHandlersAttached=true;
-        }
         isEditableTarget(target){
           if(!target) return false;
           const ElementCtor=typeof Element!=='undefined'?Element:null;
@@ -1390,34 +1374,6 @@
           if(typeof el.isContentEditable==='boolean' && el.isContentEditable) return true;
           return false;
         }
-        isSpaceKey(evt){
-          if(!evt) return false;
-          if(evt.code==='Space') return true;
-          const key=evt.key;
-          return key===' ' || key==='Spacebar';
-        }
-        handleGlobalKeyDown(evt){
-          if(!this.isSpaceKey(evt)) return;
-          if(evt.repeat) return;
-          if(this.isEditableTarget(evt.target)) return;
-          this.spacePanActive=true;
-          this.applySpacePanState();
-          evt.preventDefault();
-        }
-        handleGlobalKeyUp(evt){
-          if(!this.isSpaceKey(evt)) return;
-          this.cancelSpacePan();
-        }
-        cancelSpacePan(){
-          if(!this.spacePanActive) return;
-          this.spacePanActive=false;
-          this.applySpacePanState();
-        }
-        applySpacePanState(){
-          if(!this.container) return;
-          if(this.spacePanActive){ this.container.classList.add('mind-pan-key'); }
-          else{ this.container.classList.remove('mind-pan-key'); }
-        }
         updatePointerPanState(active){
           this.isPointerPanning=!!active;
           if(!this.container) return;
@@ -1425,7 +1381,6 @@
           else{ this.container.classList.remove('mind-pan-dragging'); }
         }
         setupPan(){
-          this.ensurePanKeyHandlers();
           const updatePinchBaseline=()=>{
             if(this.activePointers.size<2){ this.pinchState=null; return; }
             const pointers=Array.from(this.activePointers.values());
@@ -1461,13 +1416,13 @@
                 updatePinchBaseline();
                 return;
               }
-              if(onNode && !this.spacePanActive){
+              if(this.isEditableTarget(evt.target)){
                 this.dragState=null;
                 return;
               }
               try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
               this.resetPanClickSuppression();
-              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false};
+              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false,onNode};
               this.updatePointerPanState(true);
               evt.preventDefault();
               return;
@@ -1476,13 +1431,13 @@
             const isPrimary=button===0;
             const isMiddle=button===1;
             if(!isPrimary && !isMiddle) return;
-            if(onNode && !(this.spacePanActive || isMiddle)) return;
+            if(isPrimary && this.isEditableTarget(evt.target)) return;
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
             try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
             this.resetPanClickSuppression();
-            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false};
+            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false,onNode};
             this.updatePointerPanState(true);
-            evt.preventDefault();
+            if(isMiddle){ evt.preventDefault(); }
           };
           const movePan=(evt)=>{
             if(!this.activePointers.has(evt.pointerId)) return;
@@ -1528,7 +1483,15 @@
             const dy=evt.clientY-this.dragState.startY;
             if(!this.dragState.moved){
               const movement=Math.max(Math.abs(dx), Math.abs(dy));
-              if(movement>2){ this.dragState.moved=true; }
+              if(movement>2){
+                this.dragState.moved=true;
+                if(this.dragState.onNode){ evt.stopPropagation(); }
+                if(!isTouch){ evt.preventDefault(); }
+              }
+            }
+            if(this.dragState.moved){
+              if(this.dragState.onNode){ evt.stopPropagation(); }
+              if(!isTouch){ evt.preventDefault(); }
             }
             this.offsetX=this.dragState.baseX+dx;
             this.offsetY=this.dragState.baseY+dy;
@@ -1540,7 +1503,9 @@
             }
             const wasDrag=this.dragState && evt.pointerId===this.dragState.pointerId;
             const moved=wasDrag && this.dragState.moved;
+            const endedOnNode=moved && wasDrag && this.dragState && this.dragState.onNode;
             if(wasDrag){
+              if(endedOnNode){ evt.stopPropagation(); }
               this.dragState=null;
               this.updatePointerPanState(false);
             }
@@ -1631,12 +1596,14 @@
           const absDeltaX=Math.abs(deltaX);
           const absDeltaY=Math.abs(deltaY);
           const maxDelta=Math.max(absDeltaX,absDeltaY);
-          const wheelDeltaRaw=typeof evt.wheelDelta==='number'?evt.wheelDelta:(typeof evt.wheelDeltaY==='number'?evt.wheelDeltaY:0);
+          const wheelDeltaRaw=typeof evt.wheelDeltaY==='number'?evt.wheelDeltaY:(typeof evt.wheelDelta==='number'?evt.wheelDelta:0);
           const absWheelDelta=Math.abs(wheelDeltaRaw);
           const hasFractionalDelta=(absDeltaX>0 && Math.abs(absDeltaX-Math.round(absDeltaX))>0.001) || (absDeltaY>0 && Math.abs(absDeltaY-Math.round(absDeltaY))>0.001);
           if(hasFractionalDelta) return true;
           if(absWheelDelta>0 && absWheelDelta<120) return true;
-          if(maxDelta<60) return true;
+          if(absWheelDelta>0 && absWheelDelta%120!==0) return true;
+          if(absWheelDelta===0 && maxDelta>0 && maxDelta<=720) return true;
+          if(maxDelta<=80 && (absWheelDelta===0 || absWheelDelta<120)) return true;
           return false;
         }
         handleWheel(evt){
