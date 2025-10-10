@@ -21,4 +21,12 @@ return [
             ],
         ),
     ],
+    'imports' => [
+        'max_bytes' => 1024 * 1024,
+        'mime_types' => [
+            'application/json',
+            'text/json',
+            'text/plain',
+        ],
+    ],
 ];

@@ -9,6 +9,23 @@
 
 declare(strict_types=1);
 
+$environmentLoaded = class_exists(\App\Memo\Legacy\Environment::class, false);
+$environmentBootstrapped = false;
+if ($environmentLoaded) {
+  $environmentBootstrapped = \App\Memo\Legacy\Environment::config() instanceof \Core\Config;
+}
+
+if (!$environmentLoaded || !$environmentBootstrapped) {
+  $bootstrapPath = __DIR__ . '/bootstrap.php';
+  if (is_file($bootstrapPath)) {
+    $config = require $bootstrapPath;
+    if ($config instanceof \Core\Config) {
+      $runtimeConfig = \App\Memo\Config\RuntimeConfig::fromConfig($config, __DIR__);
+      \App\Memo\Legacy\Environment::bootstrap($config, '', $runtimeConfig);
+    }
+  }
+}
+
 use App\Memo\Config\AllowedMimes;
 use App\Memo\Legacy\Environment as MemoEnvironment;
 use App\Support\SessionConfigurator;
@@ -125,8 +142,16 @@ function memo_max_upload_bytes(): int {
   return MemoEnvironment::runtimeConfig()->maxUploadBytes();
 }
 
+function memo_max_import_bytes(): int {
+  return MemoEnvironment::runtimeConfig()->maxImportBytes();
+}
+
 function memo_allowed_upload_mime_map(): array {
   return MemoEnvironment::runtimeConfig()->allowedMimes();
+}
+
+function memo_allowed_import_mimes(): array {
+  return MemoEnvironment::runtimeConfig()->importMimes();
 }
 
 function memo_extension_for_mime(string $mime): ?string {
@@ -217,7 +242,13 @@ function is_ajax(): bool {
 
   return strcasecmp(trim($value), 'XMLHttpRequest') === 0;
 }
-function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
+function redirect(string $url = ''): void {
+  $target = $url !== '' ? $url : (string)(strtok((string)($_SERVER['REQUEST_URI'] ?? '/'), '?') ?: '/');
+  $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+  $status = $method === 'POST' ? 303 : 302;
+  header('Location: ' . $target, true, $status);
+  exit;
+}
 if (!function_exists('bytes_h')) {
   function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
 }
@@ -279,185 +310,26 @@ function highlight_text(string $text, string $term): string {
 
 // —— 数据库 ——
 function db(): PDO {
-  if (class_exists('Core\\DB')) {
-    try {
-      $pdo = \Core\DB::pdo();
-    } catch (RuntimeException $e) {
-      $pdo = \Core\DB::connect(memo_db_file());
+  if (!class_exists('Core\\DB')) {
+    $dbClassPath = __DIR__ . '/core/DB.php';
+    if (is_file($dbClassPath)) {
+      require_once $dbClassPath;
     }
-    memo_ensure_upload_directory();
-    return $pdo;
   }
 
-  static $pdo;
-  if ($pdo instanceof PDO) {
-    return $pdo;
+  if (!class_exists('Core\\DB')) {
+    throw new RuntimeException('数据库驱动不可用');
   }
 
-  $dbFile = memo_db_file();
-  $init = !file_exists($dbFile);
-  $pdo = new PDO('sqlite:' . $dbFile, null, null, [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-  ]);
-  $pdo->exec('PRAGMA journal_mode = WAL;');
-  $pdo->exec('PRAGMA foreign_keys = ON;');
-  memo_run_legacy_migrations($pdo, $init);
+  try {
+    $pdo = \Core\DB::pdo();
+  } catch (RuntimeException $e) {
+    $pdo = \Core\DB::connect(memo_db_file());
+  }
+
   memo_ensure_upload_directory();
+
   return $pdo;
-}
-
-function memo_run_legacy_migrations(PDO $pdo, bool $init): void {
-  $currentVersion = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
-
-  if ($currentVersion < 1) {
-    memo_ensure_base_tables($pdo);
-    memo_seed_default_categories($pdo);
-    memo_set_user_version($pdo, 1);
-    $currentVersion = 1;
-  } else {
-    memo_ensure_base_tables($pdo);
-  }
-
-  if ($currentVersion < 2) {
-    memo_ensure_mindmap_tables($pdo, true);
-    memo_set_user_version($pdo, 2);
-    $currentVersion = 2;
-  } elseif ($init) {
-    memo_ensure_mindmap_tables($pdo, false);
-  } else {
-    memo_ensure_mindmap_tables($pdo, false);
-  }
-
-  memo_ensure_item_indexes($pdo);
-
-  if ($currentVersion < 3) {
-    memo_set_user_version($pdo, 3);
-  }
-}
-
-function memo_set_user_version(PDO $pdo, int $version): void {
-  $pdo->exec('PRAGMA user_version = ' . max(0, $version));
-}
-
-function memo_ensure_base_tables(PDO $pdo): void {
-  $pdo->exec('CREATE TABLE IF NOT EXISTS categories(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    created_at INTEGER NOT NULL
-  );');
-  $pdo->exec('CREATE TABLE IF NOT EXISTS items(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT,
-    done INTEGER NOT NULL DEFAULT 0,
-    category_id INTEGER,
-    order_index INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    previous_category_id INTEGER,
-    FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
-    FOREIGN KEY(previous_category_id) REFERENCES categories(id) ON DELETE SET NULL
-  );');
-  $pdo->exec('CREATE TABLE IF NOT EXISTS steps(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    item_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    notes TEXT,
-    done INTEGER NOT NULL DEFAULT 0,
-    order_index INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
-  );');
-  $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    item_id INTEGER,
-    step_id INTEGER,
-    orig_name TEXT NOT NULL,
-    stored_name TEXT NOT NULL,
-    mime TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
-    FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE
-  );');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index, id)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
-
-  $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(PDO::FETCH_ASSOC);
-  $hasColumn = false;
-  foreach ($columns as $column) {
-    if (($column['name'] ?? null) === 'previous_category_id') {
-      $hasColumn = true;
-      break;
-    }
-  }
-  if (!$hasColumn) {
-    $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
-  }
-
-  memo_ensure_item_indexes($pdo);
-}
-
-function memo_ensure_item_indexes(PDO $pdo): void {
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
-}
-
-function memo_seed_default_categories(PDO $pdo): void {
-  $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
-  if ($count > 0) {
-    return;
-  }
-  $stmt = $pdo->prepare('INSERT INTO categories(name, created_at) VALUES(?,?)');
-  $now = now();
-  foreach (['备忘录', '流程', '其他'] as $name) {
-    $stmt->execute([$name, $now]);
-  }
-}
-
-function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
-  $pdo->exec('CREATE TABLE IF NOT EXISTS mindmaps(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );');
-  $pdo->exec('CREATE TABLE IF NOT EXISTS mindmap_assets(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mindmap_id INTEGER,
-    node_uid TEXT,
-    session_key TEXT,
-    orig_name TEXT NOT NULL,
-    stored_name TEXT NOT NULL,
-    mime TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
-  );');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
-
-  if (!$withDefault) {
-    return;
-  }
-
-  $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
-  if ($hasMap === 0) {
-    $nowTs = now();
-    $defaultPayload = default_mindmap_payload();
-    $decoded = json_decode($defaultPayload, true);
-    if (is_array($decoded) && isset($decoded['data']) && is_array($decoded['data'])) {
-      $decoded['data']['topic'] = '默认导图';
-      $defaultPayload = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-    $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
-        ->execute(['默认导图', $defaultPayload, $nowTs, $nowTs]);
-  }
 }
 
 function memo_ensure_upload_directory(): void {
@@ -480,21 +352,62 @@ function memo_ensure_upload_directory(): void {
 function get_categories(): array {
   $pdo=db();
   ensure_done_category();
-  $cats=$pdo->query('SELECT id,name FROM categories ORDER BY name COLLATE NOCASE')->fetchAll();
-  $map=[]; foreach($cats as $c) $map[$c['id']] = 0;
-  $rows=$pdo->query('SELECT category_id, COUNT(*) AS c FROM items GROUP BY category_id')->fetchAll();
-  foreach($rows as $r){ $cid=$r['category_id']; if($cid!==null&&isset($map[$cid])) $map[$cid]=(int)$r['c']; }
-  $statsRow=$pdo->query('SELECT
+
+  $sql = <<<'SQL'
+WITH stats AS (
+  SELECT
     (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
     (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized,
     (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
-  ')->fetch() ?: [];
-  $stats=[
-    'active_total'=>(int)($statsRow['active_total'] ?? 0),
-    'active_uncategorized'=>(int)($statsRow['active_uncategorized'] ?? 0),
-    'mindmap_total'=>(int)($statsRow['mindmap_total'] ?? 0),
+), category_counts AS (
+  SELECT c.id, c.name, COUNT(i.id) AS item_count
+  FROM categories AS c
+  LEFT JOIN items AS i ON i.category_id = c.id
+  GROUP BY c.id, c.name
+)
+SELECT
+  category_counts.id AS id,
+  category_counts.name AS name,
+  COALESCE(category_counts.item_count, 0) AS item_count,
+  stats.active_total AS active_total,
+  stats.active_uncategorized AS active_uncategorized,
+  stats.mindmap_total AS mindmap_total
+FROM category_counts
+CROSS JOIN stats
+ORDER BY name COLLATE NOCASE
+SQL;
+
+  $rows = $pdo->query($sql)->fetchAll();
+
+  $categories = [];
+  $counts = [];
+  $stats = [
+    'active_total' => 0,
+    'active_uncategorized' => 0,
+    'mindmap_total' => 0,
   ];
-  return [$cats,$map,$stats];
+
+  foreach ($rows as $row) {
+    $id = (int)($row['id'] ?? 0);
+    $name = (string)($row['name'] ?? '');
+    if ($id <= 0 || $name === '') {
+      continue;
+    }
+
+    $categories[] = ['id' => $id, 'name' => $name];
+    $counts[$id] = (int)($row['item_count'] ?? 0);
+
+    $stats['active_total'] = (int)($row['active_total'] ?? 0);
+    $stats['active_uncategorized'] = (int)($row['active_uncategorized'] ?? 0);
+    $stats['mindmap_total'] = (int)($row['mindmap_total'] ?? 0);
+  }
+
+  if ($rows === []) {
+    $statsRow = $pdo->query('SELECT 0 AS active_total, 0 AS active_uncategorized, (SELECT COUNT(*) FROM mindmaps) AS mindmap_total')->fetch() ?: [];
+    $stats['mindmap_total'] = (int)($statsRow['mindmap_total'] ?? 0);
+  }
+
+  return [$categories,$counts,$stats];
 }
 
 function ensure_done_category(): int {
@@ -601,6 +514,32 @@ function attachments_for_items(array $item_ids): array {
     $group[$iid][]=$row;
   }
   return $group;
+}
+
+function memo_remove_attachment_files(array $attachments): void {
+  foreach($attachments as $attachment){
+    if(!is_array($attachment)){
+      continue;
+    }
+    $storedName=isset($attachment['stored_name']) ? (string)$attachment['stored_name'] : '';
+    if($storedName===''){
+      continue;
+    }
+    $path=memo_upload_dir().DIRECTORY_SEPARATOR.$storedName;
+    if(is_file($path)){
+      @unlink($path);
+    }
+  }
+}
+
+function memo_cleanup_undo_payload(mixed $payload): void {
+  if(!is_array($payload)){
+    return;
+  }
+  $attachments=$payload['attachments'] ?? [];
+  if(is_array($attachments) && $attachments){
+    memo_remove_attachment_files($attachments);
+  }
 }
 
 function get_mindmap_asset(int $id): ?array {
@@ -1033,7 +972,28 @@ if (is_post()) {
         if(empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK){
           throw new RuntimeException('请选择要导入的 JSON 文件');
         }
-        $raw=file_get_contents($_FILES['file']['tmp_name']);
+        $file=$_FILES['file'];
+        $tmpPath=(string)($file['tmp_name'] ?? '');
+        if($tmpPath===''){
+          throw new RuntimeException('上传文件无效');
+        }
+        $maxBytes=memo_max_import_bytes();
+        $reportedSize=isset($file['size']) ? (int)$file['size'] : 0;
+        if($reportedSize > 0 && $reportedSize > $maxBytes){
+          throw new RuntimeException('导入文件过大，最大 '.bytes_h($maxBytes));
+        }
+        $actualSize=@filesize($tmpPath);
+        if($actualSize !== false && $actualSize > $maxBytes){
+          throw new RuntimeException('导入文件过大，最大 '.bytes_h($maxBytes));
+        }
+        $mimeDetector=new finfo(FILEINFO_MIME_TYPE);
+        $detectedMime=$mimeDetector->file($tmpPath) ?: (is_string($file['type'] ?? null) ? (string)$file['type'] : '');
+        $detectedMime=strtolower(trim((string)$detectedMime));
+        $allowedMimes=memo_allowed_import_mimes();
+        if($allowedMimes && $detectedMime!=='' && !in_array($detectedMime,$allowedMimes,true)){
+          throw new RuntimeException('仅允许导入 JSON 文件');
+        }
+        $raw=file_get_contents($tmpPath);
         if($raw===false) throw new RuntimeException('无法读取导入文件');
         $decoded=json_decode($raw,true);
         if($decoded===null && json_last_error() !== JSON_ERROR_NONE){
@@ -1232,6 +1192,7 @@ if (is_post()) {
         }
         foreach($_SESSION['undo_deleted'] as $key=>$payload){
           if(!is_array($payload) || ($payload['expires'] ?? 0) < now()){
+            memo_cleanup_undo_payload($payload);
             unset($_SESSION['undo_deleted'][$key]);
           }
         }
@@ -1263,6 +1224,7 @@ if (is_post()) {
         }
         $payload=$stack[$token];
         if(($payload['expires'] ?? 0) < now()){
+          memo_cleanup_undo_payload($payload);
           unset($_SESSION['undo_deleted'][$token]);
           throw new RuntimeException('撤销请求已过期');
         }

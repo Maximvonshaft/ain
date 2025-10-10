@@ -15,7 +15,7 @@ final class RuntimeConfig
 
     public static function fromConfig(Config $config, string $projectRoot): self
     {
-        $defaultMimes = AllowedMimes::defaults();
+        $defaultMimes = self::normalizeMimeMap(AllowedMimes::defaults());
 
         $defaults = [
             'timezone' => 'Asia/Shanghai',
@@ -23,6 +23,8 @@ final class RuntimeConfig
             'upload_dir' => rtrim($projectRoot, '/\\') . '/storage/uploads',
             'max_upload_bytes' => 15 * 1024 * 1024,
             'allowed_mimes' => $defaultMimes,
+            'max_import_bytes' => 1024 * 1024,
+            'import_mimes' => self::normalizeImportMimes(['application/json', 'text/json', 'text/plain']),
         ];
 
         $timezone = $config->get('app.timezone');
@@ -42,12 +44,30 @@ final class RuntimeConfig
 
         $maxBytes = $config->get('app.uploads.max_bytes');
         if (is_numeric($maxBytes)) {
-            $defaults['max_upload_bytes'] = (int) $maxBytes;
+            $defaults['max_upload_bytes'] = max(1, (int) $maxBytes);
         }
 
         $mimes = $config->get('app.uploads.allowed_mimes');
         if (is_array($mimes) && $mimes) {
-            $defaults['allowed_mimes'] = array_merge($defaultMimes, $mimes);
+            $defaults['allowed_mimes'] = self::normalizeMimeMap(array_merge($defaultMimes, $mimes));
+        } else {
+            $defaults['allowed_mimes'] = $defaultMimes;
+        }
+
+        $importSettings = $config->get('app.imports');
+        if (is_array($importSettings)) {
+            $importMax = $importSettings['max_bytes'] ?? null;
+            if (is_numeric($importMax)) {
+                $defaults['max_import_bytes'] = max(1, (int) $importMax);
+            }
+
+            $importMimes = $importSettings['mime_types'] ?? null;
+            if (is_array($importMimes)) {
+                $normalized = self::normalizeImportMimes($importMimes);
+                if ($normalized !== []) {
+                    $defaults['import_mimes'] = $normalized;
+                }
+            }
         }
 
         return new self($defaults);
@@ -81,6 +101,13 @@ final class RuntimeConfig
         return (int) ($this->settings['max_upload_bytes'] ?? (15 * 1024 * 1024));
     }
 
+    public function maxImportBytes(): int
+    {
+        $value = (int) ($this->settings['max_import_bytes'] ?? (1024 * 1024));
+
+        return $value > 0 ? $value : (1024 * 1024);
+    }
+
     /**
      * @return array<string, string>
      */
@@ -88,9 +115,83 @@ final class RuntimeConfig
     {
         $mimes = $this->settings['allowed_mimes'] ?? [];
         if (!is_array($mimes) || $mimes === []) {
-            return AllowedMimes::defaults();
+            return self::normalizeMimeMap(AllowedMimes::defaults());
         }
 
-        return $mimes;
+        return self::normalizeMimeMap($mimes);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function importMimes(): array
+    {
+        $mimes = $this->settings['import_mimes'] ?? [];
+        if (!is_array($mimes) || $mimes === []) {
+            return self::normalizeImportMimes(['application/json', 'text/json', 'text/plain']);
+        }
+
+        $normalized = self::normalizeImportMimes($mimes);
+
+        return $normalized === []
+            ? self::normalizeImportMimes(['application/json', 'text/json', 'text/plain'])
+            : $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $map
+     * @return array<string, string>
+     */
+    private static function normalizeMimeMap(array $map): array
+    {
+        $normalized = [];
+
+        foreach ($map as $mime => $extension) {
+            if (!is_string($mime)) {
+                continue;
+            }
+
+            $key = strtolower(trim($mime));
+            if ($key === '') {
+                continue;
+            }
+
+            $value = null;
+            if (is_string($extension)) {
+                $value = strtolower(ltrim(trim($extension), '.'));
+            }
+
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $mimes
+     * @return array<int, string>
+     */
+    private static function normalizeImportMimes(array $mimes): array
+    {
+        $normalized = [];
+
+        foreach ($mimes as $mime) {
+            if (!is_string($mime)) {
+                continue;
+            }
+
+            $value = strtolower(trim($mime));
+            if ($value === '') {
+                continue;
+            }
+
+            $normalized[$value] = true;
+        }
+
+        return array_keys($normalized);
     }
 }
