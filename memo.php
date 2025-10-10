@@ -358,6 +358,7 @@ function memo_ensure_base_tables(PDO $pdo): void {
   );');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+  memo_ensure_item_indexes($pdo);
 
   $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(PDO::FETCH_ASSOC);
   $hasColumn = false;
@@ -370,6 +371,12 @@ function memo_ensure_base_tables(PDO $pdo): void {
   if (!$hasColumn) {
     $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
   }
+}
+
+function memo_ensure_item_indexes(PDO $pdo): void {
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, order_index, updated_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_category ON items(done, category_id)');
 }
 
 function memo_seed_default_categories(PDO $pdo): void {
