@@ -9,7 +9,7 @@ final class AllowedMimes
      */
     public static function defaults(): array
     {
-        return [
+        return self::normalize([
             'image/png' => 'png',
             'image/jpeg' => 'jpg',
             'image/webp' => 'webp',
@@ -62,6 +62,30 @@ final class AllowedMimes
             'video/x-msvideo' => 'avi',
             'video/mpeg' => 'mpeg',
             'video/ogg' => 'ogv',
-        ];
+        ]);
+    }
+
+    /**
+     * @param array<string, string> $map
+     * @return array<string, string>
+     */
+    public static function normalize(array $map): array
+    {
+        $normalized = [];
+        foreach ($map as $mime => $extension) {
+            if (!is_string($mime) || $mime === '') {
+                continue;
+            }
+            if (!is_string($extension) || $extension === '') {
+                continue;
+            }
+            $key = strtolower(trim($mime));
+            if ($key === '') {
+                continue;
+            }
+            $normalized[$key] = trim((string) $extension);
+        }
+
+        return $normalized;
     }
 }

@@ -17,7 +17,8 @@ final class Environment
         self::$config = $config;
         self::$csrfToken = $csrfToken;
         self::$runtimeConfig = $runtimeConfig;
-        self::$securityHeadersApplied = false;
+        $applied = $GLOBALS['_legacy_security_headers_applied'] ?? false;
+        self::$securityHeadersApplied = is_bool($applied) ? $applied : (bool) $applied;
     }
 
     public static function config(): ?Config
@@ -47,5 +48,6 @@ final class Environment
     public static function markSecurityHeadersApplied(): void
     {
         self::$securityHeadersApplied = true;
+        $GLOBALS['_legacy_security_headers_applied'] = true;
     }
 }
