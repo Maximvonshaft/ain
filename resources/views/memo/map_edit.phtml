@@ -1402,9 +1402,12 @@
           const startPan=(evt)=>{
             if(!evt) return;
             this.clearEdgeHover();
-            const isTouch=evt.pointerType==='touch';
-            const onNode=!!(evt.target && evt.target.closest && evt.target.closest('.jsmind-node'));
-            if(isTouch){
+            const pointerType=evt.pointerType||'mouse';
+            const isTouchLike=pointerType==='touch' || pointerType==='pen';
+            const nodeEl=evt.target && evt.target.closest ? evt.target.closest('.jsmind-node') : null;
+            const nodeId=nodeEl ? nodeEl.getAttribute('nodeid') : null;
+            const onNode=!!nodeId;
+            if(isTouchLike){
               this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
               if(this.activePointers.size>=2){
                 evt.preventDefault();
@@ -1420,11 +1423,16 @@
                 this.dragState=null;
                 return;
               }
-              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
               this.resetPanClickSuppression();
-              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false,onNode};
-              this.updatePointerPanState(true);
-              evt.preventDefault();
+              const allowPan=!onNode;
+              this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false,onNode,nodeId,pointerType,allowPan};
+              if(allowPan){
+                try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+                this.updatePointerPanState(true);
+                evt.preventDefault();
+              }else{
+                this.updatePointerPanState(false);
+              }
               return;
             }
             const button=typeof evt.button==='number'?evt.button:0;
@@ -1432,17 +1440,25 @@
             const isMiddle=button===1;
             if(!isPrimary && !isMiddle) return;
             if(isPrimary && this.isEditableTarget(evt.target)) return;
+            const allowPan=!onNode || isMiddle;
             this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
-            try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+            if(allowPan){
+              try{ this.container.setPointerCapture(evt.pointerId); }catch(_){ }
+            }
             this.resetPanClickSuppression();
-            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false,onNode};
-            this.updatePointerPanState(true);
-            if(isMiddle){ evt.preventDefault(); }
+            this.dragState={pointerId:evt.pointerId,startX:evt.clientX,startY:evt.clientY,baseX:this.offsetX,baseY:this.offsetY,moved:false,onNode,nodeId,pointerType,button,allowPan};
+            if(allowPan){
+              this.updatePointerPanState(true);
+              if(isMiddle){ evt.preventDefault(); }
+            }else{
+              this.updatePointerPanState(false);
+            }
           };
           const movePan=(evt)=>{
             if(!this.activePointers.has(evt.pointerId)) return;
-            const isTouch=evt.pointerType==='touch';
-            if(isTouch){
+            const pointerType=evt.pointerType||'mouse';
+            const isTouchLike=pointerType==='touch' || pointerType==='pen';
+            if(isTouchLike){
               this.activePointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY});
               if(this.activePointers.size>=2){
                 evt.preventDefault();
@@ -1474,7 +1490,7 @@
                 }
                 return;
               }
-              if(this.dragState && this.dragState.pointerId===evt.pointerId){
+              if(this.dragState && this.dragState.pointerId===evt.pointerId && this.dragState.allowPan){
                 evt.preventDefault();
               }
             }
@@ -1485,13 +1501,18 @@
               const movement=Math.max(Math.abs(dx), Math.abs(dy));
               if(movement>2){
                 this.dragState.moved=true;
-                if(this.dragState.onNode){ evt.stopPropagation(); }
-                if(!isTouch){ evt.preventDefault(); }
+                if(this.dragState.allowPan){
+                  if(this.dragState.onNode){ evt.stopPropagation(); }
+                  if(!isTouchLike){ evt.preventDefault(); }
+                }
               }
+            }
+            if(!this.dragState.allowPan){
+              return;
             }
             if(this.dragState.moved){
               if(this.dragState.onNode){ evt.stopPropagation(); }
-              if(!isTouch){ evt.preventDefault(); }
+              if(!isTouchLike){ evt.preventDefault(); }
             }
             this.offsetX=this.dragState.baseX+dx;
             this.offsetY=this.dragState.baseY+dy;
@@ -1501,20 +1522,29 @@
             if(this.activePointers.has(evt.pointerId)){
               this.activePointers.delete(evt.pointerId);
             }
-            const wasDrag=this.dragState && evt.pointerId===this.dragState.pointerId;
-            const moved=wasDrag && this.dragState.moved;
-            const endedOnNode=moved && wasDrag && this.dragState && this.dragState.onNode;
-            if(wasDrag){
-              if(endedOnNode){ evt.stopPropagation(); }
+            const state=(this.dragState && evt.pointerId===this.dragState.pointerId) ? this.dragState : null;
+            const moved=!!(state && state.moved);
+            const endedOnNode=!!(state && state.onNode && moved);
+            if(state){
+              if(state.allowPan && endedOnNode){ evt.stopPropagation(); }
+              if(state.allowPan){ this.updatePointerPanState(false); }
+              if(!state.allowPan && !state.moved && state.nodeId){
+                const pointerKind=state.pointerType || (evt.pointerType||'mouse');
+                const isMouse=pointerKind==='mouse';
+                const isPrimaryButton=state.button==null || state.button===0;
+                if(!isMouse || isPrimaryButton){
+                  const node=this.get_node(state.nodeId);
+                  if(node){ this.select_node(node.id); }
+                }
+              }
               this.dragState=null;
-              this.updatePointerPanState(false);
             }
             if(this.activePointers.size<2){
               this.pinchState=null;
             }else{
               updatePinchBaseline();
             }
-            if(moved){ this.suppressClickAfterPan(); }
+            if(state && state.allowPan && moved){ this.suppressClickAfterPan(); }
             try{ this.container.releasePointerCapture(evt.pointerId); }catch(_){ }
           };
           this.container.addEventListener('pointerdown',startPan);
