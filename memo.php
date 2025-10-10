@@ -144,7 +144,7 @@ function memo_apply_default_security_headers(): void {
   header('X-Frame-Options: SAMEORIGIN');
   header('Referrer-Policy: strict-origin-when-cross-origin');
   header('X-Content-Type-Options: nosniff');
-  header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; font-src fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; font-src 'self' data:; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
   MemoEnvironment::markSecurityHeadersApplied();
 }
 
@@ -365,6 +365,8 @@ function memo_ensure_base_tables(PDO $pdo): void {
     FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
     FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE
   );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index, id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
 
@@ -597,11 +599,28 @@ function mindmap_assets_for_session(string $session_key): array {
   return $st->fetchAll();
 }
 
-function delete_mindmap_asset(int $id): void {
-  $asset=get_mindmap_asset($id);
+function mindmap_assets_by_ids(array $ids): array {
+  $ids=array_values(array_unique(array_filter(array_map('intval',$ids),fn($v)=>$v>0)));
+  if(!$ids){ return []; }
+  $pdo=db();
+  $placeholders=implode(',',array_fill(0,count($ids),'?'));
+  $st=$pdo->prepare("SELECT * FROM mindmap_assets WHERE id IN ($placeholders)");
+  $st->execute($ids);
+  $map=[];
+  foreach($st->fetchAll() as $row){
+    if(isset($row['id'])){ $map[(int)$row['id']]=$row; }
+  }
+  return $map;
+}
+
+function delete_mindmap_asset(int $id, ?array $asset = null): void {
+  $asset=$asset ?? get_mindmap_asset($id);
   if(!$asset) return;
-  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$asset['stored_name'];
-  if(is_file($path)) @unlink($path);
+  $storedName=(string)($asset['stored_name'] ?? '');
+  if($storedName!==''){
+    $path=memo_upload_dir().DIRECTORY_SEPARATOR.$storedName;
+    if(is_file($path)) @unlink($path);
+  }
   $pdo=db();
   $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
 }
@@ -628,11 +647,11 @@ function cleanup_stale_mindmap_session_assets(int $max_age_seconds = 172800, int
   $batch_limit = max(1, $batch_limit);
   $threshold = now() - $max_age_seconds;
   $pdo = db();
-  $st = $pdo->prepare("SELECT id FROM mindmap_assets WHERE (mindmap_id IS NULL OR mindmap_id=0) AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
+  $st = $pdo->prepare("SELECT id, stored_name FROM mindmap_assets WHERE (mindmap_id IS NULL OR mindmap_id=0) AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
   $st->execute([$threshold, $batch_limit]);
   foreach($st->fetchAll() as $row){
     $assetId = isset($row['id']) ? (int)$row['id'] : 0;
-    if($assetId>0){ delete_mindmap_asset($assetId); }
+    if($assetId>0){ delete_mindmap_asset($assetId,$row); }
   }
 }
 
@@ -643,12 +662,12 @@ function prune_mindmap_assets(int $map_id, array $keep_ids): void {
   $params=$ids;
   array_unshift($params,$map_id);
   $sql=$ids?
-    "SELECT id FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
-    "SELECT id FROM mindmap_assets WHERE mindmap_id=?";
+    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
+    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=?";
   $st=$pdo->prepare($sql);
   $st->execute($params);
   $rows=$st->fetchAll();
-  foreach($rows as $row){ delete_mindmap_asset((int)$row['id']); }
+  foreach($rows as $row){ delete_mindmap_asset((int)$row['id'],$row); }
 }
 
 // —— 思维导图 ——
@@ -684,7 +703,7 @@ function update_mindmap(int $id, string $title, string $content): array {
 function delete_mindmap(int $id): void {
   $pdo=db();
   $assets=mindmap_assets_for_map($id);
-  foreach($assets as $asset){ delete_mindmap_asset((int)$asset['id']); }
+  foreach($assets as $asset){ delete_mindmap_asset((int)$asset['id'],$asset); }
   $pdo->prepare('DELETE FROM mindmaps WHERE id=?')->execute([$id]);
 }
 
@@ -880,11 +899,11 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
     $params=$ids;
     array_unshift($params,$session_key);
     $sql=$ids?
-      "SELECT id FROM mindmap_assets WHERE session_key=? AND id NOT IN ($placeholders)" :
-      "SELECT id FROM mindmap_assets WHERE session_key=?";
+      "SELECT id, stored_name FROM mindmap_assets WHERE session_key=? AND id NOT IN ($placeholders)" :
+      "SELECT id, stored_name FROM mindmap_assets WHERE session_key=?";
     $st=$pdo->prepare($sql);
     $st->execute($params);
-    foreach($st->fetchAll() as $row){ delete_mindmap_asset((int)$row['id']); }
+    foreach($st->fetchAll() as $row){ delete_mindmap_asset((int)$row['id'],$row); }
   }
 }
 
@@ -1435,9 +1454,11 @@ if (is_post()) {
         }
         $ids=array_values(array_unique(array_filter($ids,fn($v)=>$v>0)));
         $deleted=0;
+        $assetMap=$ids?mindmap_assets_by_ids($ids):[];
         foreach($ids as $assetId){
-          delete_mindmap_asset($assetId);
-          $deleted++;
+          $asset=$assetMap[$assetId] ?? null;
+          delete_mindmap_asset($assetId,$asset);
+          if($asset){ $deleted++; }
         }
         if(is_ajax()){
           header('Content-Type: application/json');
@@ -1572,6 +1593,20 @@ $cat=$_GET['cat'] ?? 'all';
 $q=trim((string)($_GET['q'] ?? ''));
 $mindmap_total = (int)($stats['mindmap_total'] ?? 0);
 $isMindmapCategory = $cat === 'mindmaps';
+$page=isset($_GET['page']) && ctype_digit((string)$_GET['page']) ? max(1,(int)$_GET['page']) : 1;
+$pageSize=20;
+$pagination=[
+  'page'=>$page,
+  'per_page'=>$pageSize,
+  'total'=>0,
+  'pages'=>1,
+  'has_prev'=>false,
+  'has_next'=>false,
+  'prev_page'=>null,
+  'next_page'=>null,
+  'from'=>0,
+  'to'=>0,
+];
 $items=[];
 $mindmapsAll=[];
 if($isMindmapCategory){
@@ -1587,10 +1622,44 @@ if($isMindmapCategory){
   }
   if($cat!=='all' && ctype_digit((string)$cat)){ $where[]='category_id = :cat'; $params[':cat']=(int)$cat; }
   if($q!==''){ $where[]='(title LIKE :q OR description LIKE :q)'; $params[':q']='%'.$q.'%'; }
+  $countSql='SELECT COUNT(*) FROM items';
+  if($where) $countSql.=' WHERE '.implode(' AND ',$where);
+  $stCount=$pdo->prepare($countSql);
+  $stCount->execute($params);
+  $totalRows=(int)$stCount->fetchColumn();
+  $totalPages=$totalRows>0 ? (int)ceil($totalRows/$pageSize) : 1;
+  if($totalPages<1){ $totalPages=1; }
+  if($totalRows===0){
+    $page=1;
+    $offset=0;
+  } else {
+    if($page>$totalPages){ $page=$totalPages; }
+    $offset=($page-1)*$pageSize;
+  }
   $sql='SELECT * FROM items';
   if($where) $sql.=' WHERE '.implode(' AND ',$where);
-  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC';
-  $st=$pdo->prepare($sql); $st->execute($params); $items=$st->fetchAll();
+  $sql.=' ORDER BY order_index ASC, updated_at DESC, id DESC LIMIT :limit OFFSET :offset';
+  $st=$pdo->prepare($sql);
+  foreach($params as $key=>$value){
+    $type=is_int($value)?\PDO::PARAM_INT:\PDO::PARAM_STR;
+    $st->bindValue($key,$value,$type);
+  }
+  $st->bindValue(':limit',$pageSize,\PDO::PARAM_INT);
+  $st->bindValue(':offset',$offset,\PDO::PARAM_INT);
+  $st->execute();
+  $items=$st->fetchAll();
+  $pagination=[
+    'page'=>$page,
+    'per_page'=>$pageSize,
+    'total'=>$totalRows,
+    'pages'=>$totalRows>0 ? $totalPages : 1,
+    'has_prev'=>$page>1,
+    'has_next'=>$totalRows>0 && $page<$totalPages,
+    'prev_page'=>$page>1 ? $page-1 : null,
+    'next_page'=>$totalRows>0 && $page<$totalPages ? $page+1 : null,
+    'from'=>$totalRows>0 ? $offset+1 : 0,
+    'to'=>$totalRows>0 ? min($offset+count($items),$totalRows) : 0,
+  ];
 }
 $all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];

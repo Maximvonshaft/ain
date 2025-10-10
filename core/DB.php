@@ -111,6 +111,8 @@ class DB
             FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
             FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE
         );');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_order ON steps(item_id, order_index, id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
         self::ensurePreviousCategoryColumn($pdo);
