@@ -4,6 +4,7 @@ namespace App\Middlewares;
 
 use Core\Request;
 use RuntimeException;
+use Throwable;
 
 class CsrfMiddleware
 {
@@ -13,20 +14,56 @@ class CsrfMiddleware
 
     public function token(Request $request): string
     {
-        $session =& $_SESSION;
-        if (!isset($session[$this->sessionKey])) {
-            $session[$this->sessionKey] = bin2hex(random_bytes(16));
+        $session = &$this->session($request);
+        $token = $session[$this->sessionKey] ?? null;
+        if (!is_string($token) || $token === '') {
+            try {
+                $session[$this->sessionKey] = bin2hex(random_bytes(16));
+            } catch (Throwable $exception) {
+                throw new RuntimeException('Unable to generate CSRF token', 0, $exception);
+            }
+            $token = $session[$this->sessionKey];
         }
-        return $session[$this->sessionKey];
+
+        return $token;
     }
 
     public function verify(Request $request): void
     {
-        $session =& $_SESSION;
+        $session = &$this->session($request);
         $expected = $session[$this->sessionKey] ?? null;
-        $provided = $request->input('_csrf') ?? $request->server('HTTP_X_CSRF_TOKEN');
-        if (!$expected || !$provided || !hash_equals((string)$expected, (string)$provided)) {
+        $provided = $this->providedToken($request);
+
+        if (!is_string($expected) || $expected === '' || $provided === null) {
             throw new RuntimeException('CSRF validation failed');
         }
+
+        if (!hash_equals($expected, $provided)) {
+            throw new RuntimeException('CSRF validation failed');
+        }
+    }
+
+    private function &session(Request $request): array
+    {
+        $session =& $request->sessionRef();
+        return $session;
+    }
+
+    private function providedToken(Request $request): ?string
+    {
+        $token = $request->input('_csrf');
+        if (is_string($token) && $token !== '') {
+            return $token;
+        }
+
+        $header = $request->server('HTTP_X_CSRF_TOKEN');
+        if (is_string($header)) {
+            $trimmed = trim($header);
+            if ($trimmed !== '') {
+                return $trimmed;
+            }
+        }
+
+        return null;
     }
 }

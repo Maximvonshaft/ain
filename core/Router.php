@@ -26,18 +26,86 @@ class Router
         $method = $request->method();
         $normalized = $this->normalize($request->path());
 
-        if (!empty($this->routes[$method])) {
-            foreach ($this->routes[$method] as $route => $handler) {
-                $params = $this->match($route, $normalized);
-                if ($params !== null) {
-                    return $handler($request, ...$params);
+        $resolved = $this->resolve($method, $normalized);
+        if ($resolved !== null) {
+            [$handler, $params] = $resolved;
+            return $handler($request, ...$params);
+        }
+
+        if ($method === 'HEAD') {
+            $resolved = $this->resolve('GET', $normalized);
+            if ($resolved !== null) {
+                [$handler, $params] = $resolved;
+                $level = ob_get_level();
+                ob_start();
+                try {
+                    $result = $handler($request, ...$params);
+                } finally {
+                    while (ob_get_level() > $level) {
+                        ob_end_clean();
+                    }
                 }
+
+                return $result;
             }
+        }
+
+        $allowed = $this->allowedMethodsFor($normalized);
+        if ($allowed !== []) {
+            http_response_code(405);
+            header('Allow: ' . implode(', ', $allowed));
+            echo 'Method Not Allowed';
+            return null;
         }
 
         http_response_code(404);
         echo 'Not Found';
         return null;
+    }
+
+    /**
+     * @return array{0: callable, 1: array}|null
+     */
+    private function resolve(string $method, string $normalized): ?array
+    {
+        if (empty($this->routes[$method])) {
+            return null;
+        }
+
+        foreach ($this->routes[$method] as $route => $handler) {
+            $params = $this->match($route, $normalized);
+            if ($params !== null) {
+                return [$handler, $params];
+            }
+        }
+
+        return null;
+    }
+
+    private function allowedMethodsFor(string $normalized): array
+    {
+        $allowed = [];
+        foreach ($this->routes as $method => $handlers) {
+            foreach ($handlers as $route => $handler) {
+                if ($this->match($route, $normalized) !== null) {
+                    $allowed[] = $method;
+                    break;
+                }
+            }
+        }
+
+        if ($allowed === []) {
+            return [];
+        }
+
+        $allowed = array_values(array_unique($allowed));
+        if (in_array('GET', $allowed, true) && !in_array('HEAD', $allowed, true)) {
+            $allowed[] = 'HEAD';
+        }
+
+        sort($allowed);
+
+        return $allowed;
     }
 
     private function normalize(string $path): string
