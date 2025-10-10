@@ -45,10 +45,16 @@ function testRouter(Assert $assert): void
 {
     $router = new Router();
     $handlerCalls = [];
+    $fileCalls = [];
 
     $router->get('/notes', function (Request $request) use (&$handlerCalls) {
         $handlerCalls[] = $request->method();
         return 'handled';
+    });
+
+    $router->get('/files/{name}.json', function (Request $request, string $name) use (&$fileCalls) {
+        $fileCalls[] = $name;
+        return 'file:' . $name;
     });
 
     $session = [];
@@ -88,6 +94,25 @@ function testRouter(Assert $assert): void
     $buffer = capture(fn () => $router->dispatch($requestMissing));
     $assert->same('Not Found', $buffer->output, 'Missing routes should respond with 404 body');
     $assert->same(404, http_response_code(), 'Missing routes should set HTTP 404 status');
+
+    http_response_code(200);
+    $session = [];
+    $requestFile = new Request([], [], [
+        'REQUEST_METHOD' => 'GET',
+        'REQUEST_URI' => '/files/report.json',
+    ], [], [], $session);
+    $assert->same('file:report', $router->dispatch($requestFile), 'Dynamic routes should capture parameters');
+    $assert->same(['report'], $fileCalls, 'Dynamic route handler should receive captured parameter');
+
+    http_response_code(200);
+    $session = [];
+    $requestMismatch = new Request([], [], [
+        'REQUEST_METHOD' => 'GET',
+        'REQUEST_URI' => '/files/reportXjson',
+    ], [], [], $session);
+    $buffer = capture(fn () => $router->dispatch($requestMismatch));
+    $assert->same('Not Found', $buffer->output, 'Literal segments after parameters must match exactly');
+    $assert->same(404, http_response_code(), 'Literal mismatch should produce 404 status');
 }
 
 function testCsrfMiddleware(Assert $assert): void
