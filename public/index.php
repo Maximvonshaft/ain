@@ -2,15 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Support\SessionConfigurator;
 use Core\Request;
 use Core\Router;
+
+/** @var \Core\Config $config */
+$config = require __DIR__ . '/../bootstrap.php';
+
+SessionConfigurator::configure($config);
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
-
-/** @var \Core\Config $config */
-$config = require __DIR__ . '/../bootstrap.php';
 
 $baseUrl = (string)($config->get('app.base_url', '') ?? '');
 $basePath = '';

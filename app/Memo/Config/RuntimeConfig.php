@@ -15,12 +15,14 @@ final class RuntimeConfig
 
     public static function fromConfig(Config $config, string $projectRoot): self
     {
+        $defaultMimes = AllowedMimes::defaults();
+
         $defaults = [
             'timezone' => 'Asia/Shanghai',
             'db_file' => rtrim($projectRoot, '/\\') . '/memo.sqlite',
             'upload_dir' => rtrim($projectRoot, '/\\') . '/storage/uploads',
             'max_upload_bytes' => 15 * 1024 * 1024,
-            'allowed_mimes' => AllowedMimes::defaults(),
+            'allowed_mimes' => $defaultMimes,
         ];
 
         $timezone = $config->get('app.timezone');
@@ -45,7 +47,7 @@ final class RuntimeConfig
 
         $mimes = $config->get('app.uploads.allowed_mimes');
         if (is_array($mimes) && $mimes) {
-            $defaults['allowed_mimes'] = $mimes;
+            $defaults['allowed_mimes'] = array_merge($defaultMimes, $mimes);
         }
 
         return new self($defaults);
