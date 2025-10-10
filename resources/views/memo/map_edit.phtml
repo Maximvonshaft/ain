@@ -288,12 +288,6 @@
       .node-popover .popover-actions button.accent{background:linear-gradient(135deg,rgba(201,168,106,.24),rgba(170,140,84,.28));color:var(--bg-void)}
       .node-popover .popover-actions button:hover{border-color:rgba(227,198,139,.6)}
       .node-popover.disabled{pointer-events:none;opacity:.6}
-      .node-context-menu{position:fixed;z-index:150;min-width:180px;padding:12px;margin:0;list-style:none;border-radius:18px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.96),rgba(12,16,18,.92));box-shadow:0 22px 48px rgba(0,0,0,.6);display:grid;gap:8px}
-      .node-context-menu[hidden]{display:none!important}
-      .node-context-menu button{padding:10px 12px;border-radius:12px;border:1px solid rgba(201,168,106,.28);background:rgba(21,26,30,.78);color:var(--text-strong);font:600 13px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
-      .node-context-menu button:hover{border-color:rgba(201,168,106,.6);background:rgba(201,168,106,.12);color:var(--gold-400)}
-      .node-context-menu[data-mode="sheet"]{left:50%!important;bottom:0!important;top:auto!important;transform:translateX(-50%);width:calc(100% - 24px);max-width:none;border-radius:20px 20px 0 0;padding:16px 16px 28px;gap:12px}
-      .node-context-menu[data-mode="sheet"] button{width:100%}
       .relation-context-menu{position:fixed;z-index:160;min-width:160px;padding:10px;margin:0;border-radius:16px;border:1px solid rgba(75,195,209,.32);background:rgba(10,16,20,.94);box-shadow:0 18px 38px rgba(0,0,0,.55);display:grid;gap:8px}
       .relation-context-menu[hidden]{display:none!important}
       .relation-context-menu button{padding:8px 12px;border-radius:12px;border:1px solid rgba(75,195,209,.28);background:rgba(12,18,24,.88);color:rgba(191,242,255,.92);font:600 12px/1 'Inter','Noto Sans SC',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background-color var(--transition)}
@@ -578,9 +572,6 @@
         <button type="button" class="accent" data-pop-save>完成</button>
       </div>
       </form>
-    </div>
-    <div class="node-context-menu" id="node-context-menu" hidden>
-      <button type="button" data-menu-action="edit">编辑属性</button>
     </div>
     <div class="relation-context-menu" id="relation-context-menu" hidden>
       <button type="button" data-relation-menu-action="delete">删除连接</button>
@@ -2476,7 +2467,7 @@
                 lastTapInfo={id:node.id,time:now};
               }
             });
-            el.addEventListener('dblclick',()=>{ this.showNodeDetails(node); });
+            el.addEventListener('dblclick',(evt)=>{ evt.preventDefault(); evt.stopPropagation(); this.showNodeDetails(node); });
           }
           return el;
         }
@@ -4307,7 +4298,6 @@
       const nodePopover=document.getElementById('node-popover');
       const sheetHandle=nodePopover ? nodePopover.querySelector('.sheet-handle') : null;
       const popoverHeader=nodePopover ? nodePopover.querySelector('header') : null;
-      const nodeContextMenu=document.getElementById('node-context-menu');
       const settingsLayer=document.getElementById('mind-settings');
       const gridToggle=document.getElementById('setting-grid');
       let exportOverlayHideTimer=null;
@@ -4665,7 +4655,6 @@
       let selectedRelationId=null;
       let relationBlankClickTs=0;
       let nodeClipboardTemplate=null;
-      let contextMenuState=null;
       const ATTACH_MAX_BYTES=15*1024*1024;
       const imageExts=['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg','.avif','.heic','.heif'];
       const textExts=['.txt','.md','.markdown','.csv','.json','.yaml','.yml','.log','.tsv'];
@@ -5116,14 +5105,6 @@
       updatePopoverMode();
       if(popoverMedia.addEventListener) popoverMedia.addEventListener('change',()=>updatePopoverMode());
       else if(popoverMedia.addListener) popoverMedia.addListener(()=>updatePopoverMode());
-      function isContextMenuOpen(){ return !!(nodeContextMenu && !nodeContextMenu.hidden); }
-      function closeNodeContextMenu(){
-        if(!nodeContextMenu) return;
-        nodeContextMenu.hidden=true;
-        nodeContextMenu.removeAttribute('style');
-        nodeContextMenu.removeAttribute('data-mode');
-        contextMenuState=null;
-      }
       function isRelationContextMenuOpen(){ return !!(relationContextMenu && !relationContextMenu.hidden); }
       function openRelationContextMenu(relation, anchorEvent){
         if(!relationContextMenu || !relation) return;
@@ -5147,39 +5128,7 @@
         });
       }
       function closeAllContextMenus(){
-        closeNodeContextMenu();
         closeRelationContextMenu();
-      }
-      function openNodeContextMenu(node, anchor){
-        if(!nodeContextMenu || !node) return;
-        closeRelationContextMenu();
-        try{ jm.select_node(node.id); }catch(_){ }
-        contextMenuState={nodeId:node.id};
-        nodeContextMenu.hidden=false;
-        const mode=popoverMedia.matches ? 'sheet' : 'menu';
-        nodeContextMenu.dataset.mode=mode;
-        if(mode==='sheet'){
-          nodeContextMenu.style.left='';
-          nodeContextMenu.style.top='';
-          return;
-        }
-        nodeContextMenu.style.left='';
-        nodeContextMenu.style.top='';
-        requestAnimationFrame(()=>{
-          const rect=nodeContextMenu.getBoundingClientRect();
-          const margin=12;
-          const fallback=node.el ? node.el.getBoundingClientRect() : null;
-          const baseX=anchor && typeof anchor.x==='number' ? anchor.x : (fallback ? fallback.right : window.innerWidth/2);
-          const baseY=anchor && typeof anchor.y==='number' ? anchor.y : (fallback ? fallback.top : window.innerHeight/2);
-          let left=baseX - rect.width/2;
-          let top=baseY;
-          if(left < margin) left=margin;
-          if(left + rect.width > window.innerWidth - margin){ left = window.innerWidth - rect.width - margin; }
-          if(top < margin) top=margin;
-          if(top + rect.height > window.innerHeight - margin){ top = window.innerHeight - rect.height - margin; }
-          nodeContextMenu.style.left=`${Math.round(left)}px`;
-          nodeContextMenu.style.top=`${Math.round(top)}px`;
-        });
       }
       function isPopoverOpen(){ return popoverOpen; }
       function openInspectorPopover(node){
@@ -5281,7 +5230,7 @@
             return;
           }
           if(popoverOpen){ closeInspectorPopover(); }
-          if(isContextMenuOpen() || isRelationContextMenuOpen()){ closeAllContextMenus(); }
+          if(isRelationContextMenuOpen()){ closeAllContextMenus(); }
         }
       });
       document.addEventListener('keydown',e=>{
@@ -5296,22 +5245,8 @@
       document.addEventListener('pointerdown',e=>{
         cancelRelationLongPressState();
         const target=e.target;
-        if(nodeContextMenu && !nodeContextMenu.hidden && !nodeContextMenu.contains(target)){ closeNodeContextMenu(); }
         if(relationContextMenu && !relationContextMenu.hidden && !relationContextMenu.contains(target)){ closeRelationContextMenu(); }
       });
-      if(nodeContextMenu){
-        nodeContextMenu.addEventListener('click',e=>{
-          const btn=e.target.closest('button[data-menu-action]');
-          if(!btn) return;
-          const action=btn.dataset.menuAction;
-          if(action==='edit'){
-            const nodeId=contextMenuState?.nodeId;
-            const node=nodeId ? jm.get_node(nodeId) : ensureNode();
-            closeNodeContextMenu();
-            if(node){ openInspectorPopover(node); }
-          }
-        });
-      }
       if(relationContextMenu){
         relationContextMenu.addEventListener('click',e=>{
           const btn=e.target.closest('[data-relation-menu-action]');
@@ -5320,7 +5255,6 @@
           if(action==='delete'){ deleteSelectedRelation(); }
         });
       }
-      window.addEventListener('resize',closeNodeContextMenu);
       window.addEventListener('resize',closeRelationContextMenu);
       const cancelLongPressState=()=>{
         if(longPressState && longPressState.timer){ clearTimeout(longPressState.timer); }
@@ -5383,14 +5317,7 @@
           const node=jm.get_node(nodeId);
           if(node){ handleRelationNodeClick(node); }
         });
-        jmContainer.addEventListener('contextmenu',e=>{
-          const nodeEl=e.target.closest('.jsmind-node');
-          if(!nodeEl) return;
-          e.preventDefault();
-          cancelLongPressState();
-          const node=jm.get_node(nodeEl.getAttribute('nodeid'));
-          if(node){ openNodeContextMenu(node,{x:e.clientX,y:e.clientY}); }
-        });
+        jmContainer.addEventListener('contextmenu',()=>{ cancelLongPressState(); });
       }
       function refreshInspector(node){
         inspectorSyncing=true;
@@ -6934,7 +6861,7 @@
       if(titleInput){ titleInput.addEventListener('input', markDirty); }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
-          if((isContextMenuOpen() || isRelationContextMenuOpen()) && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
+          if(isRelationContextMenuOpen() && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
             closeAllContextMenus();
           }
           if(type===jsMind.event_type.select){
