@@ -305,8 +305,17 @@ function memo_run_legacy_migrations(PDO $pdo, bool $init): void {
   if ($currentVersion < 2) {
     memo_ensure_mindmap_tables($pdo, true);
     memo_set_user_version($pdo, 2);
+    $currentVersion = 2;
   } elseif ($init) {
     memo_ensure_mindmap_tables($pdo, false);
+  } else {
+    memo_ensure_mindmap_tables($pdo, false);
+  }
+
+  memo_ensure_item_indexes($pdo);
+
+  if ($currentVersion < 3) {
+    memo_set_user_version($pdo, 3);
   }
 }
 
@@ -370,6 +379,13 @@ function memo_ensure_base_tables(PDO $pdo): void {
   if (!$hasColumn) {
     $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
   }
+
+  memo_ensure_item_indexes($pdo);
+}
+
+function memo_ensure_item_indexes(PDO $pdo): void {
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
 }
 
 function memo_seed_default_categories(PDO $pdo): void {
