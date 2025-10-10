@@ -11,13 +11,17 @@ final class Environment
     private static ?RuntimeConfig $runtimeConfig = null;
     private static ?string $csrfToken = null;
     private static bool $securityHeadersApplied = false;
+    private static string $basePath = '';
+    private static string $baseUrl = '';
 
-    public static function bootstrap(Config $config, string $csrfToken, RuntimeConfig $runtimeConfig): void
+    public static function bootstrap(Config $config, string $csrfToken, RuntimeConfig $runtimeConfig, string $basePath = '', string $baseUrl = ''): void
     {
         self::$config = $config;
         self::$csrfToken = $csrfToken;
         self::$runtimeConfig = $runtimeConfig;
         self::$securityHeadersApplied = false;
+        self::$basePath = $basePath;
+        self::$baseUrl = $baseUrl;
     }
 
     public static function config(): ?Config
@@ -47,5 +51,15 @@ final class Environment
     public static function markSecurityHeadersApplied(): void
     {
         self::$securityHeadersApplied = true;
+    }
+
+    public static function basePath(): string
+    {
+        return self::$basePath;
+    }
+
+    public static function baseUrl(): string
+    {
+        return self::$baseUrl;
     }
 }

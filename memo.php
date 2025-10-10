@@ -136,6 +136,55 @@ function memo_upload_accept_attribute(): string {
   return $accept;
 }
 
+function memo_base_path(): string {
+  return MemoEnvironment::basePath();
+}
+
+function memo_base_url(): string {
+  $baseUrl = MemoEnvironment::baseUrl();
+  if ($baseUrl !== '') {
+    return $baseUrl;
+  }
+
+  $basePath = memo_base_path();
+  if ($basePath === '') {
+    return '';
+  }
+
+  return $basePath;
+}
+
+function memo_public_url(string $path = ''): string {
+  $normalized = '';
+  if ($path === '' || $path === '/') {
+    $normalized = '/';
+  } else {
+    $normalized = '/' . ltrim($path, '/');
+  }
+
+  $basePath = memo_base_path();
+  if ($basePath === '') {
+    return $normalized;
+  }
+
+  if ($normalized === '/' || $normalized === '') {
+    return $basePath . '/';
+  }
+
+  return $basePath . $normalized;
+}
+
+function memo_asset(string $path): string {
+  $relative = ltrim($path, '/');
+  $url = '/assets/' . $relative;
+  $basePath = memo_base_path();
+  if ($basePath !== '') {
+    return $basePath . $url;
+  }
+
+  return $url;
+}
+
 function memo_apply_default_security_headers(): void {
   if (headers_sent()) {
     return;

@@ -6,10 +6,13 @@
 <title>自适应备忘录 · 单文件</title>
 <meta name="color-scheme" content="dark"/>
 <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
-<link rel="stylesheet" href="/assets/css/common.css?v=20240101"/>
-<link rel="stylesheet" href="/assets/css/memo-index.css?v=20240101"/>
+<base href="<?= h(memo_public_url('/')); ?>"/>
+<link rel="stylesheet" href="<?= h(memo_asset('css/common.css?v=20240101')); ?>"/>
+<link rel="stylesheet" href="<?= h(memo_asset('css/memo-index.css?v=20240101')); ?>"/>
 <script>
   window.__CSRF_TOKEN__ = '<?= h(csrf_token()); ?>';
+  window.__BASE_PATH__ = '<?= h(memo_base_path()); ?>';
+  window.__BASE_URL__ = '<?= h(memo_base_url()); ?>';
   (function () {
     if (typeof window.fetch === 'function') {
       const originalFetch = window.fetch;
