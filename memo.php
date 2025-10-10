@@ -9,6 +9,23 @@
 
 declare(strict_types=1);
 
+$environmentLoaded = class_exists(\App\Memo\Legacy\Environment::class, false);
+$environmentBootstrapped = false;
+if ($environmentLoaded) {
+  $environmentBootstrapped = \App\Memo\Legacy\Environment::config() instanceof \Core\Config;
+}
+
+if (!$environmentLoaded || !$environmentBootstrapped) {
+  $bootstrapPath = __DIR__ . '/bootstrap.php';
+  if (is_file($bootstrapPath)) {
+    $config = require $bootstrapPath;
+    if ($config instanceof \Core\Config) {
+      $runtimeConfig = \App\Memo\Config\RuntimeConfig::fromConfig($config, __DIR__);
+      \App\Memo\Legacy\Environment::bootstrap($config, '', $runtimeConfig);
+    }
+  }
+}
+
 use App\Memo\Config\AllowedMimes;
 use App\Memo\Legacy\Environment as MemoEnvironment;
 use App\Support\SessionConfigurator;
