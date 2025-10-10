@@ -11,13 +11,15 @@ final class Environment
     private static ?RuntimeConfig $runtimeConfig = null;
     private static ?string $csrfToken = null;
     private static bool $securityHeadersApplied = false;
+    private static string $basePath = '';
 
-    public static function bootstrap(Config $config, string $csrfToken, RuntimeConfig $runtimeConfig): void
+    public static function bootstrap(Config $config, string $csrfToken, RuntimeConfig $runtimeConfig, string $basePath = ''): void
     {
         self::$config = $config;
         self::$csrfToken = $csrfToken;
         self::$runtimeConfig = $runtimeConfig;
         self::$securityHeadersApplied = false;
+        self::$basePath = self::normalizeBasePath($basePath);
     }
 
     public static function config(): ?Config
@@ -47,5 +49,31 @@ final class Environment
     public static function markSecurityHeadersApplied(): void
     {
         self::$securityHeadersApplied = true;
+    }
+
+    public static function basePath(): string
+    {
+        return self::$basePath;
+    }
+
+    private static function normalizeBasePath(string $basePath): string
+    {
+        if ($basePath === '' || $basePath === '/') {
+            return '';
+        }
+
+        $trimmed = trim($basePath);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $parsed = parse_url($trimmed, PHP_URL_PATH);
+        if (is_string($parsed) && $parsed !== '') {
+            $trimmed = $parsed;
+        }
+
+        $normalized = '/' . trim($trimmed, '/');
+
+        return $normalized === '/' ? '' : $normalized;
     }
 }

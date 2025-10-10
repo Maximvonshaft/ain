@@ -6,8 +6,8 @@
     <title>思维导图编辑器 · <?php echo h($mind['title']); ?></title>
     <meta name="color-scheme" content="dark"/>
     <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
-<link rel="stylesheet" href="/assets/css/common.css?v=20240101"/>
-<link rel="stylesheet" href="/assets/css/memo-map.css?v=20240101"/>
+<link rel="stylesheet" href="<?= h(memo_asset('assets/css/common.css')); ?>?v=20240101"/>
+<link rel="stylesheet" href="<?= h(memo_asset('assets/css/memo-map.css')); ?>?v=20240101"/>
     <script>
       window.__CSRF_TOKEN__ = '<?= h(csrf_token()); ?>';
       (function () {
