@@ -4,7 +4,15 @@ namespace Core;
 
 class Router
 {
-    private array $routes = [];
+    /**
+     * @var array<string, array<string, callable>>
+     */
+    private array $staticRoutes = [];
+
+    /**
+     * @var array<string, array<string, callable>>
+     */
+    private array $dynamicRoutes = [];
 
     /**
      * @var array<string, array{0: string, 1: array<int, string>}|null>
@@ -24,11 +32,19 @@ class Router
     private function addRoute(string $method, string $path, callable $handler): void
     {
         $normalized = $this->normalize($path);
-        $this->routes[$method][$normalized] = $handler;
 
         if (!array_key_exists($normalized, $this->compiledRoutes)) {
             $this->compiledRoutes[$normalized] = $this->compileRoute($normalized);
         }
+
+        $compiled = $this->compiledRoutes[$normalized] ?? null;
+
+        if ($compiled === null) {
+            $this->staticRoutes[$method][$normalized] = $handler;
+            return;
+        }
+
+        $this->dynamicRoutes[$method][$normalized] = $handler;
     }
 
     public function dispatch(Request $request): mixed
@@ -78,11 +94,15 @@ class Router
      */
     private function resolve(string $method, string $normalized): ?array
     {
-        if (empty($this->routes[$method])) {
+        if (isset($this->staticRoutes[$method][$normalized])) {
+            return [$this->staticRoutes[$method][$normalized], []];
+        }
+
+        if (empty($this->dynamicRoutes[$method])) {
             return null;
         }
 
-        foreach ($this->routes[$method] as $route => $handler) {
+        foreach ($this->dynamicRoutes[$method] as $route => $handler) {
             $params = $this->match($route, $normalized);
             if ($params !== null) {
                 return [$handler, $params];
@@ -95,7 +115,13 @@ class Router
     private function allowedMethodsFor(string $normalized): array
     {
         $allowed = [];
-        foreach ($this->routes as $method => $handlers) {
+        foreach ($this->staticRoutes as $method => $routes) {
+            if (isset($routes[$normalized])) {
+                $allowed[] = $method;
+            }
+        }
+
+        foreach ($this->dynamicRoutes as $method => $handlers) {
             foreach ($handlers as $route => $handler) {
                 if ($this->match($route, $normalized) !== null) {
                     $allowed[] = $method;
