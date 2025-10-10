@@ -27,7 +27,11 @@ final class MemoController
             $this->csrf->verify($request);
         } catch (RuntimeException $exception) {
             http_response_code(419);
-            echo 'CSRF validation failed';
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => 0,
+                'error' => 'CSRF validation failed',
+            ], JSON_UNESCAPED_UNICODE);
             return;
         }
 

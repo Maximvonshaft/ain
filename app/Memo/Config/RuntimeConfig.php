@@ -15,13 +15,14 @@ final class RuntimeConfig
 
     public static function fromConfig(Config $config, string $projectRoot): self
     {
-        $defaultMimes = AllowedMimes::defaults();
+        $defaultMimes = AllowedMimes::normalize(AllowedMimes::defaults());
 
         $defaults = [
             'timezone' => 'Asia/Shanghai',
             'db_file' => rtrim($projectRoot, '/\\') . '/memo.sqlite',
             'upload_dir' => rtrim($projectRoot, '/\\') . '/storage/uploads',
             'max_upload_bytes' => 15 * 1024 * 1024,
+            'max_import_bytes' => 2 * 1024 * 1024,
             'allowed_mimes' => $defaultMimes,
         ];
 
@@ -45,9 +46,14 @@ final class RuntimeConfig
             $defaults['max_upload_bytes'] = (int) $maxBytes;
         }
 
+        $importMax = $config->get('app.import.max_bytes');
+        if (is_numeric($importMax)) {
+            $defaults['max_import_bytes'] = max(0, (int) $importMax);
+        }
+
         $mimes = $config->get('app.uploads.allowed_mimes');
         if (is_array($mimes) && $mimes) {
-            $defaults['allowed_mimes'] = array_merge($defaultMimes, $mimes);
+            $defaults['allowed_mimes'] = array_merge($defaultMimes, AllowedMimes::normalize($mimes));
         }
 
         return new self($defaults);
@@ -81,6 +87,11 @@ final class RuntimeConfig
         return (int) ($this->settings['max_upload_bytes'] ?? (15 * 1024 * 1024));
     }
 
+    public function maxImportBytes(): int
+    {
+        return max(0, (int) ($this->settings['max_import_bytes'] ?? (2 * 1024 * 1024)));
+    }
+
     /**
      * @return array<string, string>
      */
@@ -91,6 +102,6 @@ final class RuntimeConfig
             return AllowedMimes::defaults();
         }
 
-        return $mimes;
+        return AllowedMimes::normalize($mimes);
     }
 }

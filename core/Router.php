@@ -5,6 +5,10 @@ namespace Core;
 class Router
 {
     private array $routes = [];
+    /**
+     * @var array<string, array<string, callable>>
+     */
+    private array $staticRoutes = [];
 
     /**
      * @var array<string, array{0: string, 1: array<int, string>}|null>
@@ -28,6 +32,12 @@ class Router
 
         if (!array_key_exists($normalized, $this->compiledRoutes)) {
             $this->compiledRoutes[$normalized] = $this->compileRoute($normalized);
+        }
+
+        if (($this->compiledRoutes[$normalized] ?? null) === null) {
+            $this->staticRoutes[$method][$normalized] = $handler;
+        } elseif (isset($this->staticRoutes[$method][$normalized])) {
+            unset($this->staticRoutes[$method][$normalized]);
         }
     }
 
@@ -78,6 +88,10 @@ class Router
      */
     private function resolve(string $method, string $normalized): ?array
     {
+        if (isset($this->staticRoutes[$method][$normalized])) {
+            return [$this->staticRoutes[$method][$normalized], []];
+        }
+
         if (empty($this->routes[$method])) {
             return null;
         }
