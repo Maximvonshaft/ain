@@ -136,6 +136,23 @@ function memo_upload_accept_attribute(): string {
   return $accept;
 }
 
+function memo_base_path(): string {
+  $basePath = MemoEnvironment::basePath();
+  if ($basePath === '' || $basePath === '/') {
+    return '';
+  }
+  return $basePath;
+}
+
+function memo_asset(string $path): string {
+  $normalized = '/' . ltrim($path, '/');
+  $basePath = memo_base_path();
+  if ($basePath === '') {
+    return $normalized;
+  }
+  return $basePath . $normalized;
+}
+
 function memo_apply_default_security_headers(): void {
   if (headers_sent()) {
     return;
