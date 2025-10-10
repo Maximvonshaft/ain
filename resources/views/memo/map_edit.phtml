@@ -397,6 +397,9 @@
           window.fetch = function (input, init) {
             init = init || {};
             const headers = new Headers(init.headers || {});
+            if (!headers.has('X-Requested-With')) {
+              headers.set('X-Requested-With', 'XMLHttpRequest');
+            }
             if (!headers.has('X-CSRF-Token')) {
               headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
             }
@@ -4024,7 +4027,7 @@
         fd.append('map_id', String(currentMapId||0));
         fd.append('node_id', nodeId);
         fd.append('file', file);
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         if(!res.ok) throw new Error('网络异常');
         const json=await res.json();
         if(!json.ok) throw new Error(json.error||'上传失败');
@@ -6660,7 +6663,7 @@
           const fd=new FormData();
           fd.append('action','delete_mindmap_assets');
           fd.append('ids',JSON.stringify(ids));
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('网络异常，删除失败');
           const json=await res.json();
           if(!json.ok) throw new Error(json.error||'删除失败');
@@ -7481,7 +7484,7 @@
           fd.append('content', payload);
           try{
             if(!silent){ showSaving(); }
-            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
             if(!res.ok) throw new Error('网络异常');
             const json=await res.json();
             if(!json.ok) throw new Error(json.error||'保存失败');
