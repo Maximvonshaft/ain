@@ -11,10 +11,22 @@ declare(strict_types=1);
 
 use App\Memo\Config\AllowedMimes;
 use App\Memo\Legacy\Environment as MemoEnvironment;
+use App\Support\SessionConfigurator;
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
+function memo_start_session(): void {
+  if (session_status() === PHP_SESSION_ACTIVE) {
+    return;
+  }
+
+  $config = MemoEnvironment::config();
+  if ($config instanceof \Core\Config) {
+    SessionConfigurator::configure($config);
+  }
+
+  session_start();
 }
+
+memo_start_session();
 mb_internal_encoding('UTF-8');
 
 if (!MemoEnvironment::securityHeadersApplied()) {
@@ -153,9 +165,7 @@ function csrf_token(): string {
   if (is_string($token) && $token !== '') {
     return $token;
   }
-  if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-  }
+  memo_start_session();
   $sessionKey = '_csrf_token';
   if (empty($_SESSION[$sessionKey]) || !is_string($_SESSION[$sessionKey])) {
     $_SESSION[$sessionKey] = bin2hex(random_bytes(16));
@@ -199,7 +209,14 @@ if (!function_exists('now')) {
   function now(): int { return time(); }
 }
 function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'; }
-function is_ajax(): bool { return !empty($_SERVER['HTTP_X_REQUESTED_WITH']); }
+function is_ajax(): bool {
+  $value = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? null;
+  if (!is_string($value)) {
+    return false;
+  }
+
+  return strcasecmp(trim($value), 'XMLHttpRequest') === 0;
+}
 function redirect(string $url = ''): void { header('Location: '. ($url ?: strtok($_SERVER['REQUEST_URI'], '?'))); exit; }
 if (!function_exists('bytes_h')) {
   function bytes_h(int $b): string { $u=['B','KB','MB','GB'];$i=0;$v=(float)$b;while($v>=1024&&$i<count($u)-1){$v/=1024;$i++;}return sprintf(($v>=10||$i===0)?'%.0f %s':'%.1f %s',$v,$u[$i]); }
@@ -446,7 +463,16 @@ function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
 function memo_ensure_upload_directory(): void {
   $dir = memo_upload_dir();
   if (!is_dir($dir)) {
-    @mkdir($dir, 0775, true);
+    error_clear_last();
+    if (!@mkdir($dir, 0775, true) && !is_dir($dir)) {
+      $error = error_get_last();
+      $reason = '';
+      if (is_array($error) && isset($error['message']) && $error['message'] !== '') {
+        $reason = ': ' . $error['message'];
+      }
+
+      throw new RuntimeException(sprintf('无法创建上传目录 "%s"%s', $dir, $reason));
+    }
   }
 }
 

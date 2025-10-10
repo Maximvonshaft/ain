@@ -217,6 +217,9 @@
           window.fetch = function (input, init) {
             init = init || {};
             const headers = new Headers(init.headers || {});
+            if (!headers.has('X-Requested-With')) {
+              headers.set('X-Requested-With', 'XMLHttpRequest');
+            }
             if (!headers.has('X-CSRF-Token')) {
               headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
             }
@@ -1159,7 +1162,7 @@
         const feedback=mainFeedback ?? createSaveFeedbackController(fallbackTip, fallbackBtn);
         feedback.saving();
         try{
-          const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res = await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('保存失败');
           feedback.success();
         }catch(err){
@@ -1175,7 +1178,7 @@
         itemFileInput.addEventListener('change', async (e)=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id','<?php echo $it['id']; ?>'); fd.append('file', f);
-          const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+          const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
           insertTextAtCursor(editorEl, j.markdown+"\n");
           renderEditorPreview();
@@ -1197,7 +1200,7 @@
         const titleValue=titleInput ? titleInput.value.trim() : '';
         feedback.saving();
         try{
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('保存失败');
           const json=await res.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
@@ -1219,7 +1222,7 @@
         const feedback=getStepFeedback(stepId,'notes');
         feedback.saving();
         try{
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('保存失败');
           const json=await res.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
@@ -1241,7 +1244,7 @@
         );
         feedback.saving('删除中...','⏳ 删除中...');
         try{
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('删除失败');
           const json=await res.json().catch(()=>({ok:1}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'删除失败'); }
@@ -1257,7 +1260,7 @@
       async function toggleStep(stepId, done){
         const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done?1:0);
         try{
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(res.ok){ const card=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(card){ card.classList.toggle('done', !!done); } }
         }catch(_){ }
         return false;
@@ -1268,7 +1271,7 @@
         input.onchange = async (e)=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
-          const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+          const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
           if(!j.ok){ alert(j.error||'上传失败'); return; }
           const textarea=document.getElementById('md-step-'+stepId);
           if(textarea){
@@ -1297,7 +1300,7 @@
       }
       function addStepForm(ev){
         ev.preventDefault(); const f=ev.target; const fd=new FormData(f);
-        fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}).then(()=>location.reload());
+        fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}}).then(()=>location.reload());
         return false;
       }
       (function(){ // DnD steps
@@ -1315,7 +1318,7 @@
           e.preventDefault(); if(!dragging) return; dragging=null;
           const ids=[...box.querySelectorAll('.tl-item[draggable]')].map(x=>x.dataset.id).join(',');
           const fd=new FormData(); fd.append('action','reorder_steps'); fd.append('item_id', box.dataset.item); fd.append('order', ids);
-          fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         });
       })();
       <?php foreach ($steps as $s): $notes = json_encode((string)($s['notes'] ?? ''), JSON_UNESCAPED_UNICODE); ?>
