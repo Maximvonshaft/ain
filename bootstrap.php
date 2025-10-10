@@ -42,8 +42,17 @@ if (!is_string($dbPath)) {
 DB::connect($dbPath);
 
 $uploadDir = $config->get('app.uploads.path');
-if (is_string($uploadDir) && !is_dir($uploadDir)) {
-    @mkdir($uploadDir, 0775, true);
+if (is_string($uploadDir) && $uploadDir !== '' && !is_dir($uploadDir)) {
+    error_clear_last();
+    if (!@mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+        $error = error_get_last();
+        $reason = '';
+        if (is_array($error) && isset($error['message']) && $error['message'] !== '') {
+            $reason = ': ' . $error['message'];
+        }
+
+        throw new \RuntimeException(sprintf('Failed to create upload directory "%s"%s', $uploadDir, $reason));
+    }
 }
 
 return $config;

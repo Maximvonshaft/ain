@@ -140,6 +140,9 @@
           window.fetch = function (input, init) {
             init = init || {};
             const headers = new Headers(init.headers || {});
+            if (!headers.has('X-Requested-With')) {
+              headers.set('X-Requested-With', 'XMLHttpRequest');
+            }
             if (!headers.has('X-CSRF-Token')) {
               headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
             }
@@ -956,7 +959,7 @@
         }
       });
       (async function bootstrap(){
-        const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'fetch'},body:new URLSearchParams([['action','create_draft']])});
+        const res=await fetch(location.href,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:new URLSearchParams([['action','create_draft']])});
         const j=await res.json(); state.id=j.id; $('#timeline').dataset.item=String(state.id);
       })();
       async function saveAJAX(ev){
@@ -969,7 +972,7 @@
         fd.append('description', editorEl ? editorEl.value : '');
         saveFeedback.saving();
         try{
-          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!r.ok) throw new Error('保存失败');
           saveFeedback.success();
         }catch(err){
@@ -982,7 +985,7 @@
       $('#att-file-item').addEventListener('change', async (e)=>{
         const f=e.target.files[0]; if(!f) return;
         const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','item'); fd.append('target_id', String(state.id)); fd.append('file', f);
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         const j=await res.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
         insertTextAtCursor(editorEl, j.markdown+"\n"); renderMD();
         addAttachmentEntry({id:j.id,url:j.url,mime:j.mime,name:f.name,size:j.size});
@@ -1045,7 +1048,7 @@
         ev.preventDefault();
         const title=$('#new-step-title').value.trim(); if(!title) return false;
         const fd=new FormData(); fd.append('action','add_step'); fd.append('item_id', String(state.id)); fd.append('title', title);
-        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         const j=await r.json(); if(j.ok){ $('#new-step-title').value=''; $('#timeline').insertAdjacentHTML('beforeend', stepNodeHTML(j.step)); }
         return false;
       }
@@ -1062,7 +1065,7 @@
         const titleValue=titleInput ? titleInput.value.trim() : '';
         feedback.saving();
         try{
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('保存失败');
           const json=await res.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
@@ -1084,7 +1087,7 @@
         const feedback=getStepFeedback(stepId,'notes');
         feedback.saving();
         try{
-          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!r.ok) throw new Error('保存失败');
           const json=await r.json().catch(()=>({}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'保存失败'); }
@@ -1106,7 +1109,7 @@
         );
         feedback.saving('删除中...','⏳ 删除中...');
         try{
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('删除失败');
           const json=await res.json().catch(()=>({ok:1}));
           if(json && (json.ok===0 || json.ok==='0' || json.ok===false)){ throw new Error(json.error||'删除失败'); }
@@ -1121,7 +1124,7 @@
       }
       async function toggleStep(stepId, done){
         const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done?1:0);
-        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         if(r.ok){ const el=document.querySelector(`.tl-item[data-id="${stepId}"]`); if(el){ el.classList.toggle('done', !!done); } }
       }
       window.insertAttachmentToStep = async function(stepId){
@@ -1130,7 +1133,7 @@
         inp.onchange=async e=>{
           const f=e.target.files[0]; if(!f) return;
           const fd=new FormData(); fd.append('action','upload_attachment'); fd.append('target','step'); fd.append('target_id', String(stepId)); fd.append('file', f);
-          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           const j=await r.json(); if(!j.ok){ alert(j.error||'上传失败'); return; }
           const textarea=document.getElementById('md-step-'+stepId);
           if(textarea){
@@ -1168,7 +1171,7 @@
           e.preventDefault(); if(!dragging) return; dragging=null;
           const ids=$$('.tl-item[draggable]').map(x=>x.dataset.id).join(','); if(!ids) return;
           const fd=new FormData(); fd.append('action','reorder_steps'); fd.append('item_id', box.dataset.item); fd.append('order', ids);
-          fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         });
       })();
     </script>

@@ -310,6 +310,9 @@
       window.fetch = function (input, init) {
         init = init || {};
         const headers = new Headers(init.headers || {});
+        if (!headers.has('X-Requested-With')) {
+          headers.set('X-Requested-With', 'XMLHttpRequest');
+        }
         if (!headers.has('X-CSRF-Token')) {
           headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
         }
@@ -732,7 +735,7 @@ window.addEventListener('keydown',e=>{
     fd.append('id', String(id||0));
     fd.append('title', title || '未命名导图');
     fd.append('content', JSON.stringify(data));
-    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
     if(!res.ok) throw new Error('网络异常');
     const json=await res.json();
     if(!json.ok) throw new Error(json.error||'保存失败');
@@ -935,7 +938,7 @@ async function undoDelete(token){
   if(!token) return;
   const fd=new FormData(); fd.append('action','undo_delete_item'); fd.append('token', token);
   try{
-    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
     const data=await res.json().catch(()=>null);
     if(!res.ok || !data || !data.ok){ throw new Error((data && data.error) ? data.error : `撤销失败（${res.status}）`); }
     window.location.reload();
@@ -953,7 +956,7 @@ async function handleDeleteForm(form){
   const card=form.closest('article.item');
   const title=card ? (card.dataset.title || '备忘录') : '备忘录';
   try{
-    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+    const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
     const data=await res.json().catch(()=>null);
     if(!res.ok || !data || !data.ok){
       const msg=(data && data.error) ? data.error : `删除失败（${res.status}）`;
@@ -1080,7 +1083,7 @@ function moveCard(id, direction){
 function sendOrder(){
   const ids=$$('article.item').map(x=>x.dataset.id).join(',');
   const fd=new FormData(); fd.append('action','reorder_items'); fd.append('order', ids);
-  fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+  fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
 }
 const catModal = document.getElementById('cat-modal');
 document.getElementById('btn-cat-mgr').onclick = openCatModal;
@@ -1104,14 +1107,14 @@ function renderCatRowsFromDOM(){ fetchCats().then(({cats,counts,total,mindmap_to
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
 async function fetchCats(){
   const fd=new FormData(); fd.append('action','ping_cats');
-  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
   if(!j.ok) throw new Error('加载分类失败'); return j;
 }
 async function addCat(ev){
   ev.preventDefault();
   const name=document.getElementById('new-cat-name').value.trim(); if(!name) return false;
   const fd=new FormData(); fd.append('action','add_category'); fd.append('name', name);
-  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
   if(j.ok){ document.getElementById('new-cat-name').value=''; renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total); }
   return false;
 }
@@ -1119,14 +1122,14 @@ async function saveCat(ev, id){
   ev.preventDefault();
   const name=new FormData(ev.target).get('name');
   const fd=new FormData(); fd.append('action','edit_category'); fd.append('id', id); fd.append('name', name);
-  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
   if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total); }
   return false;
 }
 async function delCat(id, name){
   if(!confirm(`确认删除分类【${name}】？该分类下条目将移入“其他”。`)) return false;
   const fd=new FormData(); fd.append('action','delete_category'); fd.append('id', id);
-  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+  const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
   if(j.ok){ renderCatRows(j.cats,j.counts); refreshSidebarCats(j.cats,j.counts,j.total,j.mindmap_total); }
   return false;
 }
@@ -1163,7 +1166,7 @@ if(itemsContainer){
       const id=card.dataset.id; const done=t.checked?1:0;
       const fd=new FormData(); fd.append('action','toggle_done'); fd.append('id', id); fd.append('done', done);
       try{
-        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
         if(j && j.ok){
           const newCategoryId=(j.category_id===null || typeof j.category_id==='undefined') ? '' : String(j.category_id);
           card.dataset.categoryId=newCategoryId;
@@ -1193,7 +1196,7 @@ if(itemsContainer){
       const done=t.checked?1:0;
       const fd=new FormData(); fd.append('action','toggle_step'); fd.append('id', stepId); fd.append('done', done);
       try{
-        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})).json();
+        const j=await (await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
         if(j && j.ok){
           row.classList.toggle('done', !!done);
           const card=row.closest('article.item'); const badge=card && card.querySelector('.js-updated');

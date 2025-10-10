@@ -77,7 +77,7 @@
       a{color:inherit;text-decoration:none}
       .mind-shell{position:relative;min-height:100vh;min-height:100dvh;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden}
       @media (max-width:900px){.mind-shell{padding:0}}
-      .mind-info-bar{position:absolute;top:calc(var(--safe-top) + 28px);left:calc(var(--safe-left) + 28px);display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:20px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:260px;max-width:min(460px,calc(100% - 56px));pointer-events:auto;z-index:20;overflow:visible;max-height:320px;transition:max-height var(--t-fast) var(--ease),padding var(--t-fast) var(--ease),gap var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
+      .mind-info-bar{position:absolute;top:calc(var(--safe-top) + 28px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:16px 22px;border-radius:22px;border:1px solid rgba(201,168,106,.32);background:linear-gradient(180deg,rgba(21,26,30,.92),rgba(12,16,18,.88));box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 28px rgba(227,198,139,.14) inset;backdrop-filter:blur(16px);min-width:280px;max-width:min(640px,calc(100% - 56px));pointer-events:auto;z-index:20;overflow:visible;max-height:320px;transition:max-height var(--t-fast) var(--ease),padding var(--t-fast) var(--ease),gap var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
       .mind-info-bar[data-collapsed="true"]{max-height:20px;padding:0 12px;gap:0;min-width:auto;width:auto;border-radius:14px;border-color:rgba(201,168,106,.2);background:rgba(15,19,22,.82);box-shadow:0 12px 28px rgba(0,0,0,.45);overflow:hidden}
       .mind-info-content{display:flex;flex-direction:column;gap:12px;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);transform-origin:top}
       .mind-info-bar[data-collapsed="true"] .mind-info-content{opacity:0;transform:translateY(-6px);pointer-events:none}
@@ -86,7 +86,7 @@
       .mind-info-handle:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5)}
       .mind-info-handle:focus-visible{outline:3px solid rgba(75,195,209,.35);outline-offset:2px}
       .mind-info-bar[data-collapsed="true"] .mind-info-handle{margin-bottom:0}
-      .mind-info-row{display:flex;align-items:center;gap:12px}
+      .mind-info-row{display:flex;align-items:center;justify-content:center;gap:14px}
       .map-io{position:relative;flex:0 0 auto}
       .map-io-button{padding:10px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.36);background:rgba(201,168,106,.12);color:var(--gold-400);font:600 12px/1 var(--font-sans);letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .map-io-button:hover{background:rgba(201,168,106,.2);border-color:rgba(227,198,139,.5)}
@@ -140,15 +140,16 @@
       .attachment-preview-download:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(227,198,139,.25)}
       .map-back{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.08);font:600 12px/1 var(--font-sans);letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);transition:background var(--transition),border-color var(--transition),transform var(--transition)}
       .map-back:hover{border-color:rgba(227,198,139,.6);background:rgba(201,168,106,.16);transform:translateY(-1px)}
-      .mind-info-row .map-title-input{flex:1;min-width:0}
+      .mind-info-row .map-title-input{flex:0 1 auto;min-width:240px}
       .map-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font:600 11px/1.4 var(--font-sans);letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
       .map-meta span{white-space:nowrap}
       .map-delete-btn{margin-left:auto;padding:6px 12px;border-radius:12px;border:1px solid rgba(209,75,75,.52);background:rgba(209,75,75,.12);color:#F6D6D6;font:600 11px/1 var(--font-sans);letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color var(--transition),background var(--transition)}
       .map-delete-btn:hover{border-color:rgba(209,75,75,.72);background:rgba(209,75,75,.18)}
       .map-delete-btn:focus-visible{outline:3px solid rgba(209,75,75,.35);outline-offset:2px}
       .map-delete-btn[disabled]{opacity:.5;cursor:not-allowed}
-      .map-title-input{width:100%;padding:12px 16px;border-radius:16px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 17px/1.35 var(--font-serif);letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
+      .map-title-input{width:auto;padding:12px 18px;border-radius:18px;border:1px solid rgba(201,168,106,.34);background:rgba(12,16,18,.78);color:var(--text-strong);font:600 17px/1.35 var(--font-serif);letter-spacing:.08em;transition:border-color var(--transition),box-shadow var(--transition)}
       .map-title-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px rgba(227,198,139,.18)}
+      .map-title-sizer{position:absolute;left:-9999px;top:-9999px;visibility:hidden;white-space:pre;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;pointer-events:none}
       .save-state{margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid rgba(201,168,106,.32);background:rgba(201,168,106,.12);font:600 11px/1 var(--font-sans);letter-spacing:.16em;text-transform:uppercase;color:var(--gold-400);opacity:0;transform:translateY(-6px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
       .save-state.show{opacity:1;transform:translateY(0)}
       .save-state.dirty{color:var(--accent-crimson);border-color:rgba(209,75,75,.45);background:rgba(209,75,75,.12)}
@@ -158,9 +159,9 @@
         .mind-info-handle{width:32px;height:20px;margin-bottom:2px}
         .mind-info-content{align-items:center}
         .mind-info-row{gap:8px;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-        .mind-info-row .map-title-input{text-align:center;max-width:260px;margin:0 auto}
+        .mind-info-row .map-title-input{text-align:center;max-width:260px;margin:0 auto;width:100%}
         .map-back{padding:5px 9px;font-size:11px}
-        .map-title-input{padding:8px 12px;font-size:15px}
+        .map-title-input{padding:8px 12px;font-size:15px;border-radius:16px}
         .save-state{font-size:10px;padding:4px 10px}
         .map-meta{font-size:10px;gap:8px;letter-spacing:.12em;justify-content:space-between}
         .map-meta span{flex:1 1 auto;min-width:0}
@@ -397,6 +398,9 @@
           window.fetch = function (input, init) {
             init = init || {};
             const headers = new Headers(init.headers || {});
+            if (!headers.has('X-Requested-With')) {
+              headers.set('X-Requested-With', 'XMLHttpRequest');
+            }
             if (!headers.has('X-CSRF-Token')) {
               headers.set('X-CSRF-Token', window.__CSRF_TOKEN__);
             }
@@ -4024,7 +4028,7 @@
         fd.append('map_id', String(currentMapId||0));
         fd.append('node_id', nodeId);
         fd.append('file', file);
-        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+        const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
         if(!res.ok) throw new Error('网络异常');
         const json=await res.json();
         if(!json.ok) throw new Error(json.error||'上传失败');
@@ -4344,6 +4348,67 @@
       let exportOverlayHideTimer=null;
       if(mapDeleteButton){ mapDeleteButton.disabled=!currentMapId; }
       let infoBarCollapsed=false;
+      const titleWidthMedia=window.matchMedia('(max-width: 720px)');
+      let titleSizer=null;
+      let titleResizeScheduled=false;
+      function ensureTitleSizer(){
+        if(titleSizer || !titleInput) return;
+        titleSizer=document.createElement('span');
+        titleSizer.className='map-title-sizer';
+        document.body.appendChild(titleSizer);
+      }
+      function calculateTitleWidth(){
+        if(!titleInput) return 0;
+        ensureTitleSizer();
+        if(!titleSizer) return 0;
+        const computed=getComputedStyle(titleInput);
+        titleSizer.style.font=computed.font;
+        titleSizer.style.letterSpacing=computed.letterSpacing;
+        titleSizer.style.textTransform=computed.textTransform;
+        const rawValue=titleInput.value || titleInput.placeholder || '';
+        titleSizer.textContent=rawValue || '';
+        const paddingLeft=parseFloat(computed.paddingLeft)||0;
+        const paddingRight=parseFloat(computed.paddingRight)||0;
+        const borderLeft=parseFloat(computed.borderLeftWidth)||0;
+        const borderRight=parseFloat(computed.borderRightWidth)||0;
+        const baseWidth=Math.ceil(titleSizer.getBoundingClientRect().width);
+        const buffer=12;
+        const width=baseWidth + paddingLeft + paddingRight + borderLeft + borderRight + buffer;
+        const minWidth=240;
+        const maxWidth=540;
+        return Math.max(minWidth, Math.min(maxWidth, width));
+      }
+      function applyTitleInputWidth(){
+        if(!titleInput) return;
+        if(infoBarCollapsed || (titleWidthMedia && titleWidthMedia.matches)){
+          titleInput.style.width='';
+          return;
+        }
+        const nextWidth=calculateTitleWidth();
+        if(nextWidth>0){
+          titleInput.style.width=`${Math.round(nextWidth)}px`;
+        }
+      }
+      function scheduleTitleWidth(){
+        if(titleResizeScheduled) return;
+        titleResizeScheduled=true;
+        requestAnimationFrame(()=>{
+          titleResizeScheduled=false;
+          applyTitleInputWidth();
+        });
+      }
+      const handleTitleMediaChange=()=>scheduleTitleWidth();
+      if(titleWidthMedia){
+        if(typeof titleWidthMedia.addEventListener==='function'){
+          titleWidthMedia.addEventListener('change', handleTitleMediaChange);
+        }else if(typeof titleWidthMedia.addListener==='function'){
+          titleWidthMedia.addListener(handleTitleMediaChange);
+        }
+      }
+      window.addEventListener('resize', scheduleTitleWidth, {passive:true});
+      if(document.fonts && document.fonts.ready){
+        document.fonts.ready.then(()=>scheduleTitleWidth()).catch(()=>{});
+      }
       function applyInfoBarState(){
         if(!mindInfoBar) return;
         mindInfoBar.dataset.collapsed=infoBarCollapsed?'true':'false';
@@ -4357,6 +4422,7 @@
         if(mindInfoContent){
           mindInfoContent.setAttribute('aria-hidden', infoBarCollapsed?'true':'false');
         }
+        scheduleTitleWidth();
       }
       function collapseInfoBar(force=false){
         if(!mindInfoBar || infoBarCollapsed) return;
@@ -6660,7 +6726,7 @@
           const fd=new FormData();
           fd.append('action','delete_mindmap_assets');
           fd.append('ids',JSON.stringify(ids));
-          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
           if(!res.ok) throw new Error('网络异常，删除失败');
           const json=await res.json();
           if(!json.ok) throw new Error(json.error||'删除失败');
@@ -6962,7 +7028,13 @@
           handleDroppedText(text, parent, e);
         }
       });
-      if(titleInput){ titleInput.addEventListener('input', markDirty); }
+      if(titleInput){
+        titleInput.addEventListener('input',()=>{
+          markDirty();
+          scheduleTitleWidth();
+        });
+        scheduleTitleWidth();
+      }
       if(window.jsMind && jsMind.event_type){
         jm.add_event_listener(type=>{
           if((isContextMenuOpen() || isRelationContextMenuOpen()) && (type===jsMind.event_type.select || type===jsMind.event_type.refresh || type===jsMind.event_type.show)){
@@ -7419,7 +7491,10 @@
           const metaName=cloned?.meta && typeof cloned.meta.name==='string' ? cloned.meta.name.trim() : '';
           const topicName=cloned?.data && typeof cloned.data.topic==='string' ? cloned.data.topic.trim() : '';
           const nextTitle=metaName || topicName || titleInput.value;
-          if(nextTitle){ titleInput.value=nextTitle; }
+          if(nextTitle){
+            titleInput.value=nextTitle;
+            scheduleTitleWidth();
+          }
         }
         markDirty();
         scheduleHandleRefresh();
@@ -7481,7 +7556,7 @@
           fd.append('content', payload);
           try{
             if(!silent){ showSaving(); }
-            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}});
+            const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
             if(!res.ok) throw new Error('网络异常');
             const json=await res.json();
             if(!json.ok) throw new Error(json.error||'保存失败');

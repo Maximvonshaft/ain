@@ -62,7 +62,12 @@ class Request
 
     public function ajax(): bool
     {
-        return !empty($this->server['HTTP_X_REQUESTED_WITH']);
+        $value = $this->server['HTTP_X_REQUESTED_WITH'] ?? null;
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return strcasecmp(trim($value), 'XMLHttpRequest') === 0;
     }
 
     public function session(): array
