@@ -6,9 +6,9 @@
     <title>思维导图编辑器 · <?php echo h($mind['title']); ?></title>
     <meta name="color-scheme" content="dark"/>
     <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
-    <link rel="stylesheet" href="/assets/css/memo-common.css"/>
-<link rel="stylesheet" href="/assets/css/memo-map-edit.css"/>
-    <script src="/assets/js/csrf.js" defer></script>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-map-edit.css'); ?>"/>
+    <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
 
   </head>
   <body>
@@ -232,6 +232,6 @@
         initialAssetMeta: <?= json_encode($mindmapAssetsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
       });
     </script>
-    <script src="/assets/js/memo-map-edit.js" defer></script>
+    <script src="<?= memo_asset_url('assets/js/memo-map-edit.js'); ?>" defer></script>
   </body>
   </html>

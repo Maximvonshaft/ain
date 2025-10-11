@@ -26,6 +26,26 @@ function memo_start_session(): void {
   session_start();
 }
 
+function memo_base_path(): string {
+  $basePath = MemoEnvironment::basePath();
+  if ($basePath === '/' || $basePath === '') {
+    return '';
+  }
+
+  return $basePath;
+}
+
+function memo_asset_url(string $path): string {
+  $normalized = '/' . ltrim($path, '/');
+  $basePath = memo_base_path();
+
+  if ($basePath === '') {
+    return $normalized;
+  }
+
+  return $basePath . $normalized;
+}
+
 memo_start_session();
 mb_internal_encoding('UTF-8');
 

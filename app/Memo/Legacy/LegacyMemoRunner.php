@@ -18,7 +18,7 @@ final class LegacyMemoRunner
     public function handle(Request $request, string $csrfToken): void
     {
         $runtimeConfig = RuntimeConfig::fromConfig($this->config, $this->projectRoot);
-        Environment::bootstrap($this->config, $csrfToken, $runtimeConfig);
+        Environment::bootstrap($this->config, $csrfToken, $runtimeConfig, $request->basePath());
 
         require $this->projectRoot . '/memo.php';
     }

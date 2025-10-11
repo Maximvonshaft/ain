@@ -6,9 +6,9 @@
 <title>自适应备忘录 · 单文件</title>
 <meta name="color-scheme" content="dark"/>
 <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
-<link rel="stylesheet" href="/assets/css/memo-common.css"/>
-<link rel="stylesheet" href="/assets/css/memo-index.css"/>
-<script src="/assets/js/csrf.js" defer></script>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-index.css'); ?>"/>
+<script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
 </head>
 <body>
   <div class="scanlines" aria-hidden="true"></div>
@@ -305,6 +305,6 @@
   </div>
 </div>
 <script>window.memoIndexConfig = Object.assign({}, window.memoIndexConfig, {currentCategoryFilter: <?php echo json_encode((string)$cat); ?>});</script>
-<script src="/assets/js/memo-index.js" defer></script>
+<script src="<?= memo_asset_url('assets/js/memo-index.js'); ?>" defer></script>
 </body>
 </html>

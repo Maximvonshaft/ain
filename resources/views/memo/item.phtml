@@ -6,9 +6,9 @@
     <title>详情 · <?php echo h($it['title']); ?></title>
     <meta name="color-scheme" content="dark"/>
     <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
-    <link rel="stylesheet" href="/assets/css/memo-common.css"/>
-<link rel="stylesheet" href="/assets/css/memo-item.css"/>
-    <script src="/assets/js/csrf.js" defer></script>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-item.css'); ?>"/>
+    <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
 
   </head>
   <body>
@@ -185,6 +185,6 @@
         itemId: <?= (int)$it['id']; ?>
       });
     </script>
-    <script src="/assets/js/memo-item.js" defer></script>
+    <script src="<?= memo_asset_url('assets/js/memo-item.js'); ?>" defer></script>
   </body>
   </html>
