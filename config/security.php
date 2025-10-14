@@ -22,11 +22,12 @@ return [
     'csp' => [
         'mode' => 'enforce',
         'directives' => [
-            'default-src' => "'self' cdn.jsdelivr.net",
+            'default-src' => "'self' cdn.jsdelivr.net https://cdnjs.cloudflare.com",
             'img-src' => "'self' data: blob:",
-            'style-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net",
-            'font-src' => "'self' data:",
-            'script-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net",
+            'style-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com",
+            'font-src' => "'self' data: https://fonts.gstatic.com",
+            'script-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+            'connect-src' => "'self' https://fonts.gstatic.com",
             'base-uri' => "'self'",
             'form-action' => "'self'",
             'frame-ancestors' => "'self'",

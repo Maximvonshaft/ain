@@ -176,7 +176,7 @@ function memo_apply_default_security_headers(): void {
   header('X-Frame-Options: SAMEORIGIN');
   header('Referrer-Policy: strict-origin-when-cross-origin');
   header('X-Content-Type-Options: nosniff');
-  header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; font-src 'self' data:; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net https://cdnjs.cloudflare.com; connect-src 'self' https://fonts.gstatic.com; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
   MemoEnvironment::markSecurityHeadersApplied();
 }
 
