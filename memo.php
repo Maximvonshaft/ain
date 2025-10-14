@@ -133,6 +133,21 @@ function memo_runtime_config(): array {
   return MemoEnvironment::runtimeConfig()->all();
 }
 
+function memo_template_mode(): string {
+  static $mode = null;
+  if ($mode !== null) {
+    return $mode;
+  }
+
+  try {
+    $mode = MemoEnvironment::runtimeConfig()->templateMode();
+  } catch (Throwable) {
+    $mode = 'default';
+  }
+
+  return $mode === 'MAX' ? 'MAX' : 'default';
+}
+
 function memo_db_file(): string {
   return MemoEnvironment::runtimeConfig()->dbFile();
 }
@@ -507,12 +522,20 @@ function get_categories(): array {
   $statsRow=$pdo->query('SELECT
     (SELECT COUNT(*) FROM items WHERE done = 0) AS active_total,
     (SELECT COUNT(*) FROM items WHERE done = 0 AND category_id IS NULL) AS active_uncategorized,
-    (SELECT COUNT(*) FROM mindmaps) AS mindmap_total
+    (SELECT COUNT(*) FROM items) AS total_items,
+    (SELECT COUNT(*) FROM items WHERE done = 1) AS completed_total,
+    (SELECT MAX(updated_at) FROM items) AS latest_item_updated,
+    (SELECT COUNT(*) FROM mindmaps) AS mindmap_total,
+    (SELECT MAX(updated_at) FROM mindmaps) AS latest_mindmap_updated
   ')->fetch() ?: [];
   $stats=[
     'active_total'=>(int)($statsRow['active_total'] ?? 0),
     'active_uncategorized'=>(int)($statsRow['active_uncategorized'] ?? 0),
+    'total_items'=>(int)($statsRow['total_items'] ?? 0),
+    'completed_total'=>(int)($statsRow['completed_total'] ?? max(0, (int)($statsRow['total_items'] ?? 0) - (int)($statsRow['active_total'] ?? 0))),
+    'latest_item_updated'=>(int)($statsRow['latest_item_updated'] ?? 0),
     'mindmap_total'=>(int)($statsRow['mindmap_total'] ?? 0),
+    'latest_mindmap_updated'=>(int)($statsRow['latest_mindmap_updated'] ?? 0),
   ];
   return [$cats,$map,$stats];
 }

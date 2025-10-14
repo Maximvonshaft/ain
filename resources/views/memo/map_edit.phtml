@@ -1,3 +1,4 @@
+<?php $templateMode = memo_template_mode(); ?>
   <!doctype html>
   <html lang="zh-Hans">
   <head>
@@ -7,12 +8,24 @@
     <meta name="color-scheme" content="dark"/>
     <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
     <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <?php if ($templateMode === 'MAX'): ?>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/max/css/memo-max-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/max/css/memo-max-map-edit.css'); ?>"/>
+    <?php else: ?>
     <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-map-edit.css'); ?>"/>
+    <?php endif; ?>
     <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
 
   </head>
-  <body>
+  <body class="<?= $templateMode === 'MAX' ? 'template-max' : ''; ?>">
+    <?php if ($templateMode === 'MAX'): ?>
+    <div class="max-scanlines" aria-hidden="true"></div>
+    <?php else: ?>
     <div class="scanlines" aria-hidden="true"></div>
+    <?php endif; ?>
     <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
       <defs>
         <linearGradient id="mindGoldTrace" x1="0" y1="0" x2="1" y2="0">
