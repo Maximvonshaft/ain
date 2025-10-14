@@ -23,11 +23,11 @@ return [
         'mode' => 'enforce',
         'directives' => [
             'default-src' => "'self' cdn.jsdelivr.net https://cdnjs.cloudflare.com",
-            'img-src' => "'self' data: blob:",
+            'img-src' => "'self' data: blob: https://tile.openstreetmap.org https://*.basemaps.cartocdn.com",
             'style-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com",
             'font-src' => "'self' data: https://fonts.gstatic.com",
             'script-src' => "'self' 'unsafe-inline' cdn.jsdelivr.net https://cdnjs.cloudflare.com",
-            'connect-src' => "'self' https://fonts.gstatic.com",
+            'connect-src' => "'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.basemaps.cartocdn.com",
             'base-uri' => "'self'",
             'form-action' => "'self'",
             'frame-ancestors' => "'self'",
