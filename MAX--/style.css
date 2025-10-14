@@ -2646,6 +2646,10 @@ body::after {
   filter: saturate(0.75);
 }
 
+.map-viewport .leaflet-tile {
+  filter: brightness(0.58) contrast(1.28) saturate(0.82);
+}
+
 .map-overlay {
   position: absolute;
   inset: 0;

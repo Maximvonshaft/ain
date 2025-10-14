@@ -882,37 +882,12 @@
       maxZoom: 8,
     }).setView([20, 0], 2);
 
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {
-        maxZoom: 19,
-        minZoom: 2,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-          '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-      },
-    ).addTo(map);
-
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png",
-      {
-        maxZoom: 18,
-        opacity: 0.25,
-        attribution:
-          'Linework by <a href="http://stamen.com">Stamen Design</a> under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>',
-      },
-    ).addTo(map);
-
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png",
-      {
-        maxZoom: 20,
-        attribution:
-          'Labels by <a href="http://stamen.com">Stamen Design</a> ' +
-          'under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>.' +
-          ' Data © <a href="http://openstreetmap.org">OpenStreetMap</a>',
-      },
-    ).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      minZoom: 2,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
 
     const focusMarkerIcon = L.divIcon({
       className: "active-location-marker",
