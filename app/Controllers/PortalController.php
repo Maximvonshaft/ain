@@ -30,15 +30,14 @@ final class PortalController
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return array<int, array{id:int,title:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}>
      */
     private function loadTodoItems(PDO $pdo, string $memoUrl): array
     {
         $stmt = $pdo->prepare(
-            'SELECT items.id, items.title, items.done, items.updated_at, categories.name AS category_name
+            'SELECT items.id, items.title, items.done, items.updated_at
             FROM items
-            LEFT JOIN categories ON categories.id = items.category_id
-            ORDER BY items.done ASC, items.order_index ASC, items.updated_at DESC, items.id DESC
+            ORDER BY items.updated_at DESC, items.id DESC
             LIMIT 4'
         );
         $stmt->execute();
@@ -50,28 +49,17 @@ final class PortalController
         $result = [];
         foreach ($items as $row) {
             $done = (int)($row['done'] ?? 0) === 1;
-            $metaParts = [];
-            if (!$done) {
-                $categoryName = is_string($row['category_name'] ?? null) ? trim($row['category_name']) : '';
-                if ($categoryName !== '') {
-                    $metaParts[] = $categoryName;
-                }
-            } else {
-                $metaParts[] = '已完成';
-            }
-
             $updatedAt = isset($row['updated_at']) ? (int)$row['updated_at'] : null;
-            if ($updatedAt) {
-                $metaParts[] = '更新 ' . format_datetime($updatedAt);
-            }
-
-            $meta = implode(' · ', $metaParts);
+            $updatedLabel = $updatedAt ? '最近修改 ' . format_datetime($updatedAt) : '';
+            $updatedIso = $updatedAt ? date('c', $updatedAt) : '';
 
             $result[] = [
                 'id' => (int)($row['id'] ?? 0),
                 'title' => (string)($row['title'] ?? '未命名任务'),
                 'done' => $done,
-                'meta' => $meta,
+                'updated_at' => $updatedAt,
+                'updated_label' => $updatedLabel,
+                'updated_iso' => $updatedIso,
                 'url' => $memoUrl . '?view=item&id=' . ((int)($row['id'] ?? 0)),
             ];
         }
@@ -102,9 +90,10 @@ final class PortalController
         $result = [];
         foreach ($rows as $index => $row) {
             $statusMeta = $statusCycle[$index % count($statusCycle)];
-            $summary = $this->summariseMindmap($row['content'] ?? null);
+            $summaryData = $this->summariseMindmap($row['content'] ?? null);
             $updatedAt = isset($row['updated_at']) ? (int)$row['updated_at'] : null;
-            $meta = $updatedAt ? '更新 ' . format_datetime($updatedAt) : '暂无更新记录';
+            $updatedLabel = $updatedAt ? '最近修改 ' . format_datetime($updatedAt) : '';
+            $updatedIso = $updatedAt ? date('c', $updatedAt) : '';
 
             $result[] = [
                 'id' => (int)($row['id'] ?? 0),
@@ -112,8 +101,12 @@ final class PortalController
                 'status' => $statusMeta['status'],
                 'status_label' => $statusMeta['label'],
                 'preview' => $statusMeta['preview'],
-                'summary' => $summary,
-                'meta' => $meta,
+                'summary' => $summaryData['summary'],
+                'nodes' => $summaryData['nodes'],
+                'node_count' => $summaryData['node_count'],
+                'updated_at' => $updatedAt,
+                'updated_label' => $updatedLabel,
+                'updated_iso' => $updatedIso,
                 'url' => $memoUrl . '?view=map_edit&id=' . ((int)($row['id'] ?? 0)),
             ];
         }
@@ -121,20 +114,35 @@ final class PortalController
         return $result;
     }
 
-    private function summariseMindmap(?string $payload): string
+    /**
+     * @return array{summary:string,nodes:array<int,string>,node_count:int}
+     */
+    private function summariseMindmap(?string $payload): array
     {
         if (!is_string($payload) || $payload === '') {
-            return '';
+            return [
+                'summary' => '',
+                'nodes' => [],
+                'node_count' => 0,
+            ];
         }
 
         $decoded = json_decode($payload, true);
         if (!is_array($decoded)) {
-            return '';
+            return [
+                'summary' => '',
+                'nodes' => [],
+                'node_count' => 0,
+            ];
         }
 
         $data = $decoded['data'] ?? null;
         if (!is_array($data)) {
-            return '';
+            return [
+                'summary' => '',
+                'nodes' => [],
+                'node_count' => 0,
+            ];
         }
 
         $topic = trim((string)($data['topic'] ?? ''));
@@ -153,7 +161,7 @@ final class PortalController
                 continue;
             }
             $childTopics[] = $childTopic;
-            if (count($childTopics) >= 2) {
+            if (count($childTopics) >= 3) {
                 break;
             }
         }
@@ -174,7 +182,11 @@ final class PortalController
             $summary = '节点 ' . $nodeCount;
         }
 
-        return $summary;
+        return [
+            'summary' => $summary,
+            'nodes' => $childTopics,
+            'node_count' => $nodeCount,
+        ];
     }
 
     /**

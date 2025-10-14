@@ -1,7 +1,7 @@
 <?php
 /**
- * @var array<int, array<string, mixed>> $todoItems
- * @var array<int, array<string, mixed>> $mindmaps
+ * @var array<int, array{id:int,title:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $todoItems
+ * @var array<int, array{id:int,title:string,status:string,status_label:string,preview:string,summary:string,nodes:array<int,string>,node_count:int,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $mindmaps
  * @var callable(string):string $asset
  * @var string $memoUrl
  * @var string $mindmapUrl
@@ -238,14 +238,18 @@
               <ul class="todo-list">
                 <?php if ($todoItems !== []): ?>
                   <?php foreach ($todoItems as $item): ?>
-                    <li>
+                    <li class="todo-entry">
                       <span class="todo-indicator<?= $item['done'] ? ' done' : ''; ?>"></span>
-                      <a class="todo-text" href="<?= view_escape($item['url']); ?>">
-                        <?= view_escape($item['title']); ?>
-                      </a>
-                      <?php if ($item['meta'] !== ''): ?>
-                        <span class="todo-meta"><?= view_escape($item['meta']); ?></span>
-                      <?php endif; ?>
+                      <div class="todo-content">
+                        <a class="todo-text" href="<?= view_escape($item['url']); ?>">
+                          <?= view_escape($item['title']); ?>
+                        </a>
+                        <?php if ($item['updated_label'] !== ''): ?>
+                          <time class="todo-timestamp"<?php if ($item['updated_iso'] !== ''): ?> datetime="<?= view_escape($item['updated_iso']); ?>"<?php endif; ?>>
+                            <?= view_escape($item['updated_label']); ?>
+                          </time>
+                        <?php endif; ?>
+                      </div>
                     </li>
                   <?php endforeach; ?>
                 <?php else: ?>
@@ -311,11 +315,26 @@
                       </header>
                       <a class="map-card-body" href="<?= view_escape($map['url']); ?>">
                         <div class="map-preview <?= view_escape($map['preview']); ?>"></div>
-                        <?php if ($map['summary'] !== ''): ?>
+                        <?php if ($map['nodes'] !== []): ?>
+                          <ul class="map-card-nodes">
+                            <?php foreach ($map['nodes'] as $node): ?>
+                              <li class="map-card-node"><?= view_escape($node); ?></li>
+                            <?php endforeach; ?>
+                          </ul>
+                        <?php elseif ($map['summary'] !== ''): ?>
                           <div class="map-card-summary"><?= view_escape($map['summary']); ?></div>
                         <?php endif; ?>
                       </a>
-                      <footer class="map-card-meta"><?= view_escape($map['meta']); ?></footer>
+                      <footer class="map-card-meta">
+                        <?php if ($map['updated_label'] !== ''): ?>
+                          <time class="map-card-timestamp"<?php if ($map['updated_iso'] !== ''): ?> datetime="<?= view_escape($map['updated_iso']); ?>"<?php endif; ?>>
+                            <?= view_escape($map['updated_label']); ?>
+                          </time>
+                        <?php endif; ?>
+                        <?php if ($map['node_count'] > 0): ?>
+                          <span class="map-card-count">节点 <?= view_escape((string)$map['node_count']); ?></span>
+                        <?php endif; ?>
+                      </footer>
                     </article>
                   <?php endforeach; ?>
                 <?php else: ?>
