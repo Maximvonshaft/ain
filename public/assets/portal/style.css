@@ -2793,6 +2793,14 @@ body::after {
   filter: saturate(0.75);
 }
 
+.map-screen .map-viewport .map-tile-layer {
+  transition: filter 0.6s ease;
+}
+
+.map-screen .map-viewport .map-tile-layer--osm {
+  filter: grayscale(1) brightness(0.4) contrast(1.35) saturate(0.75);
+}
+
 .map-overlay {
   position: absolute;
   inset: 0;

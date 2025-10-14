@@ -882,37 +882,78 @@
       maxZoom: 8,
     }).setView([20, 0], 2);
 
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    const tileSources = [
       {
-        maxZoom: 19,
-        minZoom: 2,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-          '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+        id: "carto-dark-all",
+        name: "CARTO Dark Matter",
+        url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        options: {
+          maxZoom: 19,
+          minZoom: 2,
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+            '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+          className: "map-tile-layer map-tile-layer--carto",
+          crossOrigin: true,
+        },
       },
-    ).addTo(map);
+      {
+        id: "openstreetmap-standard",
+        name: "OpenStreetMap",
+        url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        options: {
+          maxZoom: 19,
+          minZoom: 2,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          className: "map-tile-layer map-tile-layer--osm",
+          crossOrigin: true,
+        },
+      },
+    ];
 
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png",
-      {
-        maxZoom: 18,
-        opacity: 0.25,
-        attribution:
-          'Linework by <a href="http://stamen.com">Stamen Design</a> under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>',
-      },
-    ).addTo(map);
+    const setMapSourceAttribute = (sourceId) => {
+      if (mapScreen) {
+        mapScreen.dataset.mapSource = sourceId;
+      }
+    };
 
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png",
-      {
-        maxZoom: 20,
-        attribution:
-          'Labels by <a href="http://stamen.com">Stamen Design</a> ' +
-          'under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>.' +
-          ' Data © <a href="http://openstreetmap.org">OpenStreetMap</a>',
-      },
-    ).addTo(map);
+    const addTileLayerWithFallback = (index = 0) => {
+      const candidate = tileSources[index];
+      if (!candidate) {
+        setMapSourceAttribute("unavailable");
+        return null;
+      }
+
+      const layer = L.tileLayer(candidate.url, candidate.options);
+      let hasLoaded = false;
+
+      const handleLoad = () => {
+        hasLoaded = true;
+        setMapSourceAttribute(candidate.id);
+        layer.off("tileerror", handleError);
+      };
+
+      const handleError = () => {
+        if (hasLoaded) {
+          return;
+        }
+        layer.off("load", handleLoad);
+        layer.off("tileerror", handleError);
+        map.removeLayer(layer);
+        window.setTimeout(() => {
+          console.warn(`Map tiles for "${candidate.name}" failed. Trying fallback source.`);
+          addTileLayerWithFallback(index + 1);
+        }, 0);
+      };
+
+      layer.once("load", handleLoad);
+      layer.on("tileerror", handleError);
+      layer.addTo(map);
+
+      return layer;
+    };
+
+    addTileLayerWithFallback();
 
     const focusMarkerIcon = L.divIcon({
       className: "active-location-marker",
