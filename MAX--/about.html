@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>张鹏龙（Maxim Von.Shaft）- 简历</title>
+  <style>
+    :root{
+      --bg: #0d0f12;
+      --card: #12151a;
+      --muted: #aeb4bd;
+      --text: #e8ecf1;
+      --accent: #5aa7ff;
+      --chip: #1b2130;
+      --border: #233044;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";line-height:1.55}
+    .wrap{max-width:960px;margin:40px auto;padding:0 20px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+    header{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+    h1{margin:0;font-size:34px;letter-spacing:.3px}
+    .subtitle{margin-top:6px;color:var(--muted)}
+    .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    .chip{background:var(--chip);border:1px solid var(--border);padding:6px 10px;border-radius:999px;color:#cfe0ff}
+    .tag{display:inline-block;background:#0f1625;border:1px solid var(--border);color:#b7c6dd;border-radius:12px;padding:4px 10px;margin:4px 6px 0 0;font-size:13px}
+    .tags{margin-top:8px}
+    .grid{display:grid;gap:18px}
+    .cols-2{grid-template-columns:1fr 1fr}
+    section{margin-top:26px}
+    h2{font-size:18px;margin:0 0 12px 0;color:#d7e3ff;letter-spacing:.4px}
+    p{margin:0 0 12px 0}
+    ul{margin:8px 0 0 20px}
+    li{margin:4px 0}
+    .kv{display:flex;align-items:center;justify-content:space-between;border:1px dashed var(--border);padding:8px 10px;border-radius:10px;margin-bottom:8px}
+    .muted{color:var(--muted)}
+    time{white-space:nowrap}
+    .role{font-weight:600}
+    .company{color:#cfe0ff}
+    .loc{color:#9fb2cc}
+    .divider{height:1px;background:var(--border);margin:18px 0;border-radius:1px}
+    .stars{letter-spacing:2px;color:#88a7ff}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    .logo{display:inline-block;width:40px;height:40px;background:#233044;border-radius:6px;margin-left:8px}
+    .photo{width:135px;height:185px;border-radius:50%;background:#233044}
+    .timeline{margin-top:12px;padding-left:12px;border-left:2px solid var(--border)}
+    .timeline-item{margin-bottom:10px;color:var(--muted)}
+    @media (max-width:800px){
+      header{grid-template-columns:1fr}
+      .cols-2{grid-template-columns:1fr}
+    }
+ :root{
+    --bar-bg:#111;           /* 深色背景更百搭 */
+    --bar-fg:#fff;
+    --bar-accent:#ff7a00;   /* 轻橙点缀（可改） */
+    --bar-shadow:0 6px 18px rgba(0,0,0,.12);
+    --btn-radius:12px;
+    --btn-gap:10px;
+    --btn-padding:.6rem .9rem;
+    --z-sticky:9999;
+  }
+  .topbar{
+    position:sticky; top:0; left:0; right:0; z-index:var(--z-sticky);
+    background:var(--bar-bg); color:var(--bar-fg);
+    display:flex; gap:12px; align-items:center; justify-content:flex-end;
+    padding:.6rem .9rem; box-shadow:var(--bar-shadow);
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .topbar .brand-dot{
+    margin-right:auto; width:.6rem; height:.6rem; border-radius:999px;
+    background:linear-gradient(135deg, var(--bar-accent), #ffb36b);
+    box-shadow:0 0 0 3px rgba(255,122,0,.2);
+  }
+  .tb-btn{
+    position:relative;
+    background:#1a1a1a; color:var(--bar-fg);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:var(--btn-radius);
+    padding:var(--btn-padding);
+    display:inline-flex; align-items:center; gap:.5rem; cursor:pointer;
+    transition:.2s ease;
+  }
+  .tb-btn:hover{ border-color:rgba(255,255,255,.18); transform:translateY(-1px); }
+  .tb-caret{ opacity:.8; font-size:.85em; }
+  .tb-menu{
+    position:absolute; right:0; top:calc(100% + 6px); min-width:200px;
+    background:#1a1a1a; border:1px solid rgba(255,255,255,.12);
+    border-radius:12px; box-shadow:var(--bar-shadow);
+    display:none; overflow:hidden;
+  }
+  .tb-menu.open{ display:block; }
+  .tb-item{ display:flex; padding:.7rem .9rem; gap:.5rem; align-items:center;
+    border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; }
+  .tb-item:last-child{ border-bottom:none; }
+  .tb-item:hover{ background:#232323; }
+  .tb-kbd{ margin-left:auto; opacity:.6; font-size:.8em; }
+  .tb-sep{ height:1px; background:rgba(255,255,255,.08); }
+  /* 响应式：按钮换行时保持间距 */
+  @media (max-width:680px){
+    .topbar{ flex-wrap:wrap; justify-content:flex-start; gap:8px; }
+    .topbar .brand-dot{ order:-1; }
+    .tb-menu{ left:0; right:auto; min-width:auto; max-width:min(260px, calc(100vw - 40px)); width:max-content; }
+  }
+  </style>
+</head>
+<body><div class="topbar" role="navigation" aria-label="Page quick actions">
+  <div class="brand-dot" aria-hidden="true"></div>
+
+  <!-- 按钮 1：下载 PDF -->
+  <button class="tb-btn" data-menu="menu-pdf" aria-haspopup="true" aria-expanded="false">
+    <span>下载 PDF</span><span class="tb-caret">▾</span>
+    <div id="menu-pdf" class="tb-menu" role="menu" aria-label="Download PDF">
+      <div class="tb-item" role="menuitem" onclick="downloadPdf('zh')">中文版（PDF）<span class="tb-kbd">Z</span></div>
+      <div class="tb-item" role="menuitem" onclick="downloadPdf('en')">English (PDF)<span class="tb-kbd">E</span></div>
+    </div>
+  </button>
+
+  <!-- 按钮 2：语言 / 翻译 -->
+  <button class="tb-btn" data-menu="menu-i18n" aria-haspopup="true" aria-expanded="false">
+    <span>语言 / languages</span><span class="tb-caret">▾</span>
+    <div id="menu-i18n" class="tb-menu" role="menu" aria-label="Translate">
+      <div class="tb-item" role="menuitem" onclick="restoreOriginal()">恢复原文（中文）</div>
+      <div class="tb-item" role="menuitem" onclick="translateWithGoogle('en')">English（Google translator）</div>
+      <div class="tb-sep"></div>
+      <div class="tb-item" role="menuitem" onclick="openAiTranslateModal()">使用 AI 翻译当前页（可选）</div>
+    </div>
+  </button>
+
+  <!-- 按钮 3：更多 -->
+  <button class="tb-btn" data-menu="menu-more" aria-haspopup="true" aria-expanded="false">
+    <span>更多</span><span class="tb-caret">▾</span>
+    <div id="menu-more" class="tb-menu" role="menu" aria-label="More">
+      <div class="tb-item" role="menuitem" onclick="clearAiCache()">清除翻译缓存</div>
+      <div class="tb-item" role="menuitem" onclick="location.reload()">刷新页面</div>
+    </div>
+  </button>
+</div>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div>
+          <h1>张鹏龙 <small class="muted">（MAXIM VON.SHAFT）</small></h1>
+          <div class="subtitle">大区经理｜物流与客户服务专家</div>
+          <div class="meta">
+            <span class="chip">📍 菲律宾三宝颜</span>
+            <span class="chip">📞 +63&nbsp;953&nbsp;138&nbsp;7819</span>
+            <span class="chip">📧 <a href="mailto:bojackhorseman@88.com">bojackhorseman@88.com</a></span>
+            <span class="chip">年龄 24</span>
+            <span class="chip">生日 2000-09-14</span>
+          </div>
+        </div>
+     <img src="/assets/img/avatar.jpg" class="photo">
+      </header>
+
+      <section>
+        <h2>个人简介</h2>
+        <p>作为一名物流行业的大区经理，我专注于棉兰老岛地区的物流优化与客户服务管理。负责覆盖 Zamboanga Peninsula 及 Basilan 等关键区域的末端配送网络，管理超 1000 名快递员与 30 余站点主管，成功提升妥投率超 10%。曾在马尼拉地区（NCR4 Makati、NCR13 Taguig、NCR8 Pasig，2024 年 12 月至 2025 年 5 月）主导揽收业务，优化流程并推动 Shopee 与 Shein 合作重启。拥有 Trip.com 客服领班及苹果 B2B 方案顾问经验，擅长 KPI 驱动管理、团队激励及跨部门协作，致力于通过数据分析与创新技术提升物流效率。</p>
+      </section>
+
+      <section>
+        <h2>核心能力 Highlights</h2>
+        <div class="grid cols-2">
+          <div>
+            <p><strong>学习与适应能力 · Learning & Adaptability</strong></p>
+            <ul>
+              <li>快速跨行业上手（B2B 顾问 → 客服管理 → 区域物流），在短周期内形成可复制的方法论与流程。</li>
+            </ul>
+
+            <p><strong>自我驱动 · Results Orientation</strong></p>
+            <ul>
+              <li>以 KPI 为牵引推进项目落地：妥投率提升 10%+、区域扭亏为盈、积压件降低 20%+。</li>
+            </ul>
+
+            <p><strong>领导力 · People Leadership</strong></p>
+            <ul>
+              <li>管理 1000+ 快递员与 30+ 站点主管 3 个片区经理，分层授权与辅导，稳定一线与中层绩效。</li>
+            </ul>
+
+            <p><strong>客户导向 · Customer Centricity</strong></p>
+            <ul>
+              <li>建立一线闭环客诉机制与培训/SMS 模板，客诉率下降 15%，体验可量化提升。</li>
+            </ul>
+          </div>
+          <div>
+            <p><strong>数据与流程 · Data & Process</strong></p>
+            <ul>
+              <li>重写末端流程、路径/站点布局；Validation 整合 FBI + 人工复核，地址准确率 95%+。</li>
+            </ul>
+
+            <p><strong>技术应用 · Tech Enablement</strong></p>
+            <ul>
+              <li>引入实时监控、电子围栏与追踪，提高准时率并降低延误风险。</li>
+            </ul>
+
+            <p><strong>跨协同 · Cross-Functional</strong></p>
+            <ul>
+              <li>与电商平台/清关/客服/技术多方协作，推动 Shopee 与 Shein 合作重启与流程优化。</li>
+            </ul>
+
+            <p><strong>风控与质量 · Risk & Quality</strong></p>
+            <ul>
+              <li>以 Validation 与地址治理为抓手，减少错配/滞留，形成稳定交付与合规标准。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>语言能力</h2>
+        <div class="grid cols-2">
+          <div class="kv"><span>中文（母语）</span><span class="stars">★★★★★</span></div>
+          <div class="kv"><span>英文（母语水平）</span><span class="stars">★★★★★</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>技能评级</h2>
+        <div class="grid cols-2">
+          <div class="kv"><span>项目管理</span><span class="stars">★★★★☆</span></div>
+          <div class="kv"><span>数据分析</span><span class="stars">★★★★☆</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>工作经历</h2>
+        <div class="divider"></div>
+        <article>
+          <div class="role">大区经理 <span class="company">｜ FlashExpress</span><img src="/assets/img/flashexpress.png" class="logo"> <small class="muted">（工作语言：英文）</small></div>
+          <div class="muted"><time>2025 年 5 月</time> – <time>至今</time> · <span class="loc">棉兰老岛</span></div>
+          <ul>
+            <li>区域运营经理（末端配送 – 南部片区）：负责以 Zamboanga City、Pagadian City、Dipolog City 为核心的大片区域的最后一公里配送运营全盘统筹，直接管理 1000+ 快递员、3 位片区经理及 30+ 站点主管。</li>
+            <li>战略规划与网络设计：主导配送网络架构、配送线路优化、电子围栏（设计与运维）、仓库与站点选址布局、运力布局，确保覆盖全面与高效运行。</li>
+            <li>运营管理与流程优化：统筹末端配送全流程（配送逻辑、派件模式、退件处理、滞控件管理），通过线路动态优化与电子围栏监控提升效率与合规。</li>
+            <li>运力招聘与人才梯队建设：带领 TA 团队主导快递员招聘与运力补充；负责片区经理、站点主管、仓管及快递员的人才选拔、培养与梯队迭代，完善组织能力。</li>
+            <li>绩效与组织发展：建立多层级绩效考核与晋升机制，推动人员成长，确保组织结构与业务发展相匹配。</li>
+            <li>质量与合规：监控 SLA、妥投率、客户满意度等核心指标，推动滞控率下降、配送时效提升，并确保电子围栏范围内配送合规。</li>
+            <li>成本与资源管控：统筹人力、车辆、仓储资源配置，实现成本最优与运力效率最大化。</li>
+            <li>跨部门与外部协同：对接总部与区域站点，协调第三方承运商（3PL），保障末端配送网络稳定高效运行。</li>
+          </ul>
+          <div class="timeline">
+            <div class="timeline-item">2025 年 5 月 – 至今：大区经理</div>
+          </div>
+        </article>
+
+        <div class="divider"></div>
+        <article>
+          <div class="role">揽收运营主管 / 国内培训及商务工签手续 <span class="company">｜ FlashExpress</span>   <img src="/assets/img/flashexpress.png" class="logo"> <small class="muted">（工作语言：英文）</small></div>
+          <div class="muted"><time>2024 年 6 月</time> – <time>2024 年 11 月</time> · <span class="loc">北京（培训，商务签事宜）</span></div>
+          <ul>
+            <li>负责 Makati、Taguig、Pasig 地区末端揽收业务。</li>
+            <li>快速按揽收运营经理制定支援计划，揽收流程，大幅度增加揽收效率和减少滞留件。</li>
+            <li>实施电子围栏与实时跟踪系统，提升揽收效率。</li>
+          </ul>
+          <div class="timeline">
+            <div class="timeline-item">2024 年 12 月 – 2025 年 5 月：揽收运营主管</div>
+            <div class="timeline-item">2025 年 5 月 – 2025 年 8 月：大区经理</div>
+          </div>
+        </article>
+
+        <div class="divider"></div>
+        <article>
+          <div class="role">客服夜班领班 – 新产品组 (TL Team Leader) <span class="company">｜ Trip.com</span><img src="/assets/img/trip_com.png" class="logo"> <small class="muted">（工作语言：英文）</small></div>
+          <div class="muted"><time>2023 年 1 月</time> – <time>2024 年 5 月</time> · <span class="loc">上海</span></div>
+          <ul>
+            <li>夜班客服团队管理与跨部门协作，负责排班与人力调度，基于进线量与节假日进行预测与调整。</li>
+            <li>灵活应对大促（如迪士尼大促），保障高峰期服务稳定。</li>
+            <li>协同流程团队，基于客户实际需求与典型案例，沉淀并优化 SOP，提升标准化与响应效率。</li>
+            <li>与 QC 高频协作，解决一线员工日常问题，搭建客服—QC—产品的沟通桥梁，推动产品与体验改进。</li>
+            <li>KPI 导向的团队管理（常用指标）：接线率/服务水平（SL）、平均应答速度（ASA）、平均处理时长（AHT）、首次解决率（FCR）、客户满意度（CSAT）、质量监控得分（QA Score）。</li>
+          </ul>
+          <div class="tags">
+            <span class="tag">海外租车</span>
+            <span class="tag">海外火车</span>
+            <span class="tag">海外门票活动</span>
+            <span class="tag">海外邮轮</span>
+            <span class="tag">海外接送机</span>
+            <span class="tag">海外定制游</span>
+          </div>
+        </article>
+
+        <div class="divider"></div>
+        <article>
+          <div class="role">企业商务代表（B2B 方案顾问） <span class="company">｜ 苹果（上海）贸易有限公司</span><img src="/assets/img/apple.png" class="logo"></div>
+          <div class="muted"><time>2021 年 6 月</time> – <time>2022 年 3 月</time> · <span class="loc">上海</span></div>
+          <ul>
+            <li>作为苹果企业商务代表，负责推广 Apple 生态周边及增强企业服务化感情方面，协助客户规划业务流程。</li>
+            <li>系统安全基于 CRM，强调苹果在生产端及系统整合上的优势。</li>
+            <li>负责监督和支持加盟商，涵盖营销、售后及苹果标准化门店装修。</li>
+            <li>全面掌握苹果产品应用场景，确保能够为企业客户提供专业咨询。</li>
+          </ul>
+          <div class="tags">
+            <span class="tag">季节性合同</span>
+          </div>
+        </article>
+      </section>
+
+      <section>
+        <h2>教育背景</h2>
+        <p><strong>计算机应用学士学位</strong> — 郑州工商学院（2018 – 2021） <img src="/assets/img/university.png" class="logo"></p>
+      </section>
+
+    </div>
+  </div>
+<script>
+  /* ============= 配置区 ============= */
+  const PDF_ZH_URL = 'resume_CN.pdf'; // ← 改成“中文版简历/报告”的实际链接
+  const PDF_EN_URL = 'resume_EN.pdf'; // ← 改成“英文版简历/报告”的实际链接
+
+  // 可选：如需启用“页内 AI 翻译”，你可以在此填入你自己的反代/后端接口地址（更安全）
+  // 示例：const AI_PROXY_ENDPOINT = '/api/translate'; // 由你服务器转发到 OpenAI/其他模型
+  const AI_PROXY_ENDPOINT = null; // 不配置则提示使用 Google 翻译或本地 key
+
+  // ========= 菜单开合（保持页面样式一致）=========
+  (function initMenus(){
+    const buttons = document.querySelectorAll('.tb-btn[data-menu]');
+    document.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.tb-btn[data-menu]');
+      buttons.forEach(b=>{
+        const mid = b.getAttribute('data-menu');
+        const menu = document.getElementById(mid);
+        const active = b===btn;
+        menu?.classList.toggle('open', active && !menu.classList.contains('open'));
+        b.setAttribute('aria-expanded', active && !menu?.classList.contains('open') ? 'true' : 'false');
+      });
+      if(!btn){ // 点击空白处关闭
+        document.querySelectorAll('.tb-menu.open').forEach(m=>m.classList.remove('open'));
+      }
+    });
+  })();
+
+  // ========= 下载 PDF =========
+  function downloadPdf(lang){
+    const url = lang === 'en' ? PDF_EN_URL : PDF_ZH_URL;
+    if(!url || url.includes('YOUR_')){
+      alert('请先在代码中设置正确的 PDF 链接（PDF_ZH_URL / PDF_EN_URL）。');
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  }
+
+  // ========= Google Translate 英译当前页（最稳妥、免配置）=========
+  function translateWithGoogle(target='en'){
+    // 进入 Google Translate 的“网页翻译”模式（保留布局，几乎不改你页内样式）
+    const u = encodeURIComponent(location.href);
+    const url = `https://translate.google.com/translate?sl=auto&tl=${target}&u=${u}`;
+    window.open(url, '_blank', 'noopener'); // 新开标签，避免污染原页
+  }
+
+  // ========= 恢复原文 =========
+  function restoreOriginal(){
+    // 原页就是中文，直接回到当前页或刷新即可
+    location.href = location.href.split('#')[0];
+  }
+
+  // ========= 简易 AI 翻译（可选）=========
+  // 说明：
+  // 1) 默认不启用。若你配置了后端 AI 代理（AI_PROXY_ENDPOINT），可安全调用模型翻译并将结果写回 DOM。
+  // 2) 简化策略：仅翻译主文区域（<main>、article、.content），避免导航/代码块被误翻。
+  // 3) 结果会缓存到 localStorage，重复访问更快。
+  async function openAiTranslateModal(){
+    const ok = confirm(
+      '可选功能：页内 AI 翻译。\n\n' +
+      (AI_PROXY_ENDPOINT
+        ? '检测到已配置后端代理，将调用后端进行安全翻译。\n点击“确定”开始。'
+        : '当前未配置后端代理。\n\n如果你非常确定要在前端加入个人 API Key（不推荐！有泄露风险），' +
+          '请点“确定”，我们会弹窗让你临时输入 Key，仅保存在本地会话。'
+      )
+    );
+    if(!ok) return;
+    if(AI_PROXY_ENDPOINT){
+      translatePageViaProxy();
+    }else{
+      const key = prompt('请输入你的 OpenAI API Key（仅本地会话使用，刷新失效）：');
+      if(!key){ alert('已取消。'); return; }
+      translatePageViaOpenAI(key);
+    }
+  }
+
+  function pickMainTextNodes(){
+    const scopes = document.querySelectorAll('main, article, .content, .container, .page, .section');
+    const root = scopes.length ? scopes[0] : document.body;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n)=>{
+        const t = (n.nodeValue||'').trim();
+        if(!t) return NodeFilter.FILTER_REJECT;
+        // 过滤明显不该翻的文本
+        if(n.parentElement){
+          const tag = n.parentElement.tagName.toLowerCase();
+          if(['script','style','code','pre','kbd','samp'].includes(tag)) return NodeFilter.FILTER_REJECT;
+          if(n.parentElement.closest('.topbar')) return NodeFilter.FILTER_REJECT;
+        }
+        // 只翻中文（简单判定）
+        if(!/[\u4e00-\u9fff]/.test(t)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes=[]; let cur;
+    while(cur=walker.nextNode()){ nodes.push(cur); }
+    return nodes;
+  }
+
+  function hash(s){ // 简易 hash 用作缓存 key
+    let h=0; for(let i=0;i<s.length;i++){ h=((h<<5)-h)+s.charCodeAt(i); h|=0; } return 'h'+h;
+  }
+
+  async function translatePageViaProxy(){
+    const nodes = pickMainTextNodes();
+    if(!nodes.length){ alert('没有可翻译的正文节点。'); return; }
+    const chunks = nodes.map(n=>n.nodeValue.trim());
+    const payload = { target_lang:'en', texts: chunks };
+    try{
+      const r = await fetch(AI_PROXY_ENDPOINT, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      if(!r.ok) throw new Error('代理返回异常');
+      const data = await r.json(); // 期望 {translations: ["...","..."]}
+      if(!data.translations || data.translations.length!==chunks.length) throw new Error('返回条数不匹配');
+      nodes.forEach((n,i)=>{
+        const orig = n.nodeValue;
+        n.parentElement?.setAttribute('data-orig', orig);
+        n.nodeValue = data.translations[i];
+        try{ localStorage.setItem(hash(orig), data.translations[i]); }catch(_){}
+      });
+      alert('已完成 AI 翻译（代理）。');
+    }catch(err){
+      console.error(err);
+      alert('AI 代理翻译失败：'+err.message);
+    }
+  }
+
+  async function translatePageViaOpenAI(apiKey){
+    const nodes = pickMainTextNodes();
+    if(!nodes.length){ alert('没有可翻译的正文节点。'); return; }
+
+    // 告诫：仅示范（在前端暴露 key 有风险）
+    const translateOne = async (text) => {
+      // 先查缓存
+      const k = hash(text);
+      const cached = localStorage.getItem(k);
+      if(cached) return cached;
+      // 分段防超长
+      const prompt = `Translate the following Chinese text to concise, natural English. Keep formatting and numbers intact:\n\n${text}`;
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+apiKey },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages:[{role:'user', content: prompt}],
+          temperature:0.2
+        })
+      });
+      if(!r.ok) throw new Error('OpenAI API error');
+      const j = await r.json();
+      const out = j.choices?.[0]?.message?.content?.trim() || '';
+      try{ localStorage.setItem(k, out); }catch(_){}
+      return out;
+    };
+
+    // 串行以防并发限流
+    for(let i=0;i<nodes.length;i++){
+      const n = nodes[i];
+      const orig = n.nodeValue.trim();
+      try{
+        const en = await translateOne(orig);
+        n.parentElement?.setAttribute('data-orig', orig);
+        n.nodeValue = en || orig;
+      }catch(e){
+        console.warn('翻译失败，保留原文', e);
+      }
+    }
+    alert('已完成 AI 翻译（本地 key）。');
+  }
+
+  function clearAiCache(){
+    if(confirm('清空本地翻译缓存？')){
+      localStorage.clear();
+      alert('已清空缓存。');
+    }
+  }
+
+  // 快捷键（Z/E 下载，G 英译）
+  document.addEventListener('keydown', (e)=>{
+    if(e.target && /input|textarea/.test(e.target.tagName.toLowerCase())) return;
+    if(e.key.toLowerCase()==='z') downloadPdf('zh');
+    if(e.key.toLowerCase()==='e') downloadPdf('en');
+    if(e.key.toLowerCase()==='g') translateWithGoogle('en');
+  });
+</script>
+</body>
+</html>
