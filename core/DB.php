@@ -117,6 +117,7 @@ class DB
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
         self::ensurePreviousCategoryColumn($pdo);
         self::ensureItemIndexes($pdo);
+        self::ensureSettingsTable($pdo);
     }
 
     private static function ensurePreviousCategoryColumn(PDO $pdo): void
@@ -138,6 +139,17 @@ class DB
     {
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
+    }
+
+    private static function ensureSettingsTable(PDO $pdo): void
+    {
+        $pdo->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS settings(
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+SQL);
     }
 
     private static function seedDefaultCategories(PDO $pdo): void

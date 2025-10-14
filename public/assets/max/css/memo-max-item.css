@@ -1,0 +1,62 @@
+body.template-max .wrap.max-wrap .title {
+  font-size: 1.4rem;
+  letter-spacing: 0.06em;
+  color: #f5faff;
+}
+
+body.template-max .wrap.max-wrap .meta {
+  color: rgba(188, 214, 255, 0.75);
+  letter-spacing: 0.05em;
+}
+
+body.template-max .wrap.max-wrap .editbox,
+body.template-max .wrap.max-wrap .viewer {
+  background: rgba(8, 14, 26, 0.82);
+  border-radius: 18px;
+  border: 1px solid rgba(120, 186, 255, 0.22);
+  padding: 18px;
+  box-shadow: inset 0 1px 0 rgba(158, 212, 255, 0.12);
+}
+
+body.template-max .wrap.max-wrap textarea,
+body.template-max .wrap.max-wrap .md-preview {
+  background: rgba(6, 10, 18, 0.86);
+  border-radius: 14px;
+  border: 1px solid rgba(120, 186, 255, 0.25);
+}
+
+body.template-max .wrap.max-wrap .steps,
+body.template-max .wrap.max-wrap .attachments {
+  background: rgba(6, 10, 18, 0.86);
+  border-radius: 18px;
+  border: 1px solid rgba(118, 186, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(158, 212, 255, 0.1);
+}
+
+body.template-max .wrap.max-wrap .steps h2,
+body.template-max .wrap.max-wrap .attachments h2 {
+  font-family: 'Orbitron', 'Roboto Mono', monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  color: rgba(168, 212, 255, 0.8);
+}
+
+body.template-max .wrap.max-wrap .step-row,
+body.template-max .wrap.max-wrap .attachment-row {
+  border-color: rgba(118, 186, 255, 0.18);
+}
+
+body.template-max .wrap.max-wrap .step-row.done {
+  background: rgba(34, 96, 64, 0.35);
+  border-color: rgba(122, 216, 172, 0.45);
+}
+
+body.template-max .wrap.max-wrap pre {
+  background: rgba(6, 10, 18, 0.86);
+  border-radius: 14px;
+  border: 1px solid rgba(118, 186, 255, 0.22);
+}
+
+body.template-max .wrap.max-wrap .att-meta {
+  color: rgba(164, 200, 255, 0.68);
+}

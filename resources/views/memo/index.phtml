@@ -1,24 +1,81 @@
+<?php
+$templateMode = memo_template_mode();
+$statsTotal = (int)($stats['total_items'] ?? 0);
+$statsActive = (int)($stats['active_total'] ?? 0);
+$statsCompleted = (int)($stats['completed_total'] ?? max(0, $statsTotal - $statsActive));
+$latestMemoTs = (int)($stats['latest_item_updated'] ?? 0);
+$latestMindmapTs = (int)($stats['latest_mindmap_updated'] ?? 0);
+$latestActivityTs = max($latestMemoTs, $latestMindmapTs);
+$latestActivity = $latestActivityTs ? dt($latestActivityTs) : '暂无更新';
+$latestMemoDisplay = $latestMemoTs ? dt($latestMemoTs) : '暂无备忘更新';
+$latestMindmapDisplay = $latestMindmapTs ? dt($latestMindmapTs) : '暂无导图更新';
+?>
 <!doctype html>
 <html lang="zh-Hans">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>自适应备忘录 · 单文件</title>
+<title><?= $templateMode === 'MAX' ? 'Coldline Intelligence Terminal · Memo' : '自适应备忘录 · 单文件'; ?></title>
 <meta name="color-scheme" content="dark"/>
 <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
 <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+<?php if ($templateMode === 'MAX'): ?>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/max/css/memo-max-common.css'); ?>"/>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/max/css/memo-max-index.css'); ?>"/>
+<?php else: ?>
 <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-index.css'); ?>"/>
+<?php endif; ?>
 <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
 </head>
-<body>
-  <div class="scanlines" aria-hidden="true"></div>
-  <div class="app">
-  <aside class="sidebar" role="region" aria-label="侧边栏导航">
+<body class="<?= $templateMode === 'MAX' ? 'template-max' : ''; ?>">
+  <?php if ($templateMode === 'MAX'): ?>
+    <div class="max-scanlines" aria-hidden="true"></div>
+  <?php else: ?>
+    <div class="scanlines" aria-hidden="true"></div>
+  <?php endif; ?>
+  <div class="app <?= $templateMode === 'MAX' ? 'max-app' : ''; ?>">
+  <aside class="sidebar <?= $templateMode === 'MAX' ? 'max-sidebar' : ''; ?>" role="region" aria-label="侧边栏导航">
+    <?php if ($templateMode === 'MAX'): ?>
+    <div class="max-identity-card">
+      <header class="max-identity-header">
+        <span class="max-identity-badge">TERMINAL ONLINE</span>
+        <span class="max-identity-code">MEMO NODE</span>
+      </header>
+      <div class="max-identity-body">
+        <div class="max-avatar" aria-hidden="true">
+          <img src="<?= memo_asset_url('assets/max/media/avatar-placeholder.svg'); ?>" alt="终端头像占位图" loading="lazy"/>
+          <span class="max-avatar-noise" aria-hidden="true"></span>
+        </div>
+        <dl class="max-identity-meta">
+          <div>
+            <dt>ACTIVE MEMOS</dt>
+            <dd><?= $statsActive; ?></dd>
+          </div>
+          <div>
+            <dt>COMPLETED</dt>
+            <dd><?= $statsCompleted; ?></dd>
+          </div>
+          <div>
+            <dt>MINDMAPS</dt>
+            <dd><?= $mindmap_total; ?></dd>
+          </div>
+          <div>
+            <dt>LAST ACTIVITY</dt>
+            <dd><?= h($latestActivity); ?></dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+    <?php else: ?>
     <div class="brand">
       <div class="logo" aria-hidden="true"></div>
       <h1>自适应备忘录 · Memo</h1>
     </div>
-    <div class="controls">
+    <?php endif; ?>
+    <div class="controls <?= $templateMode === 'MAX' ? 'max-controls' : ''; ?>">
       <div class="dropdown" id="new-entry-dropdown">
         <button class="btn btn-primary dropdown-toggle" id="btn-new-menu" type="button" aria-haspopup="true" aria-expanded="false">＋ 新建</button>
         <div class="dropdown-menu" id="new-menu" role="menu" aria-labelledby="btn-new-menu" data-open="false">
@@ -28,8 +85,8 @@
       </div>
       <button class="btn btn-outline" id="btn-cat-mgr">分类管理</button>
     </div>
-    <div class="section-title">分类 · Categories</div>
-    <div class="cat-list" id="cat-list">
+    <div class="section-title <?= $templateMode === 'MAX' ? 'max-section-title' : ''; ?>"><?= $templateMode === 'MAX' ? '作战分类 · Channels' : '分类 · Categories'; ?></div>
+    <div class="cat-list <?= $templateMode === 'MAX' ? 'max-cat-list' : ''; ?>" id="cat-list">
       <a class="cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
         <span class="name">全部 · All</span><span class="count"><?php echo $all_total; ?></span>
       </a>
@@ -44,19 +101,55 @@
         <span class="count"><?php echo $mindmap_total; ?></span>
       </a>
     </div>
+    <?php if ($templateMode === 'MAX'): ?>
+    <div class="max-footer">
+      <div class="max-footer-grid">
+        <span>✅ 勾选完成刻印</span>
+        <span>↔ / ↑↓ 调整序列</span>
+        <span>🕒 最近备忘：<?= h($latestMemoDisplay); ?></span>
+        <span>🧠 最近导图：<?= h($latestMindmapDisplay); ?></span>
+      </div>
+      <div class="max-footer-note">⤓ 支持 JSON / CSV 快速同步</div>
+    </div>
+    <?php else: ?>
     <div class="footer">
       <div>✅ 勾选完成</div>
       <div>↔ 左右按钮调整顺序（桌面）</div>
       <div>↑↓ 按钮调整顺序（移动端）</div>
       <div>⤓ 导入 / 导出 JSON / CSV</div>
     </div>
+    <?php endif; ?>
   </aside>
-  <main class="main">
+  <main class="main <?= $templateMode === 'MAX' ? 'max-main' : ''; ?>">
     <?php if (!empty($_SESSION['flash'])): ?>
-      <div class="err flash-message"><?php echo h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
+      <div class="<?= $templateMode === 'MAX' ? 'alert alert-error' : 'err'; ?> flash-message"><?php echo h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
+    <?php endif; ?>
+    <?php if ($templateMode === 'MAX'): ?>
+      <section class="max-digest" aria-label="终端概览">
+        <div class="max-digest-card">
+          <span class="max-digest-label">ACTIVE MEMOS</span>
+          <strong><?= $statsActive; ?></strong>
+          <p>当前正在推进的备忘条目。</p>
+        </div>
+        <div class="max-digest-card">
+          <span class="max-digest-label">COMPLETED</span>
+          <strong><?= $statsCompleted; ?></strong>
+          <p>已完成的任务封存统计。</p>
+        </div>
+        <div class="max-digest-card">
+          <span class="max-digest-label">LAST MEMO UPDATE</span>
+          <strong><?= h($latestMemoDisplay); ?></strong>
+          <p>最近一次备忘内容编辑时间。</p>
+        </div>
+        <div class="max-digest-card">
+          <span class="max-digest-label">LAST MAP UPDATE</span>
+          <strong><?= h($latestMindmapDisplay); ?></strong>
+          <p>最近一次导图内容同步时间。</p>
+        </div>
+      </section>
     <?php endif; ?>
     <?php if ($isMindmapCategory): ?>
-      <section class="mindmap-view" aria-label="思维导图库">
+      <section class="mindmap-view <?= $templateMode === 'MAX' ? 'max-panel' : ''; ?>" aria-label="思维导图库">
         <div class="mindmap-header">
           <div>
             <h2>思维导图库</h2>
@@ -138,7 +231,8 @@
         'updated_at'=>$m['updated_at'],
       ], $mindmapsAll), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
     <?php else: ?>
-      <div class="toolbar">
+      <?php if ($templateMode === 'MAX'): ?><section class="max-panel" aria-label="作战备忘面板"><?php endif; ?>
+      <div class="toolbar <?= $templateMode === 'MAX' ? 'max-toolbar' : ''; ?>">
         <form class="search" method="get" style="flex:1">
           <input type="hidden" name="cat" value="<?php echo h((string)$cat); ?>">
           <input name="q" value="<?php echo h($q); ?>" placeholder="搜索标题/内容 · Search"/>
@@ -158,43 +252,20 @@
       <?php
         $pageTotal=(int)($pagination['total'] ?? 0);
         $renderPagination=function() use ($pagination,$cat,$q,$pageTotal){
-          if($pageTotal<=0){ return ''; }
-          $buildPageUrl=function(int $targetPage) use ($cat,$q){
-            $params=['cat'=>(string)$cat];
-            if($q!==''){ $params['q']=$q; }
-            if($targetPage>1){ $params['page']=$targetPage; }
-            return '?' . http_build_query($params);
-          };
-          $page=max(1,(int)($pagination['page'] ?? 1));
-          $pages=max(1,(int)($pagination['pages'] ?? 1));
-          $from=max(0,(int)($pagination['from'] ?? 0));
-          $to=max(0,(int)($pagination['to'] ?? 0));
-          $hasPrev=!empty($pagination['has_prev']) && !empty($pagination['prev_page']);
-          $hasNext=!empty($pagination['has_next']) && !empty($pagination['next_page']);
-          ob_start();
-          ?>
-          <nav class="pagination" aria-label="分页导航">
-            <div class="page-info">第 <?php echo $page; ?> / <?php echo $pages; ?> 页 · 显示 <?php echo $from; ?>-<?php echo $to; ?> / <?php echo $pageTotal; ?> 条</div>
-            <div class="page-links" role="group" aria-label="分页按钮">
-              <?php if ($hasPrev): ?>
-                <a class="page-btn" href="<?php echo h($buildPageUrl((int)$pagination['prev_page'])); ?>" rel="prev">上一页</a>
-              <?php else: ?>
-                <span class="page-btn disabled" aria-disabled="true">上一页</span>
-              <?php endif; ?>
-              <?php if ($hasNext): ?>
-                <a class="page-btn" href="<?php echo h($buildPageUrl((int)$pagination['next_page'])); ?>" rel="next">下一页</a>
-              <?php else: ?>
-                <span class="page-btn disabled" aria-disabled="true">下一页</span>
-              <?php endif; ?>
-            </div>
-          </nav>
-          <?php
-          return ob_get_clean();
+          if ($pageTotal <= 0) { return ''; }
+          $pages=(int)($pagination['pages'] ?? 1);
+          $page=(int)($pagination['page'] ?? 1);
+          $html='<nav class="pagination" aria-label="分页">';
+          if(!empty($pagination['has_prev'])){
+            $html.='<a class="page" href="?cat='.urlencode((string)$cat).'&q='.urlencode($q).'&page='.(int)$pagination['prev_page'].'">上一页</a>';
+          }
+          $html.='<span class="page-info">第 '.$page.' / '.$pages.' 页</span>';
+          if(!empty($pagination['has_next'])){
+            $html.='<a class="page" href="?cat='.urlencode((string)$cat).'&q='.urlencode($q).'&page='.(int)$pagination['next_page'].'">下一页</a>';
+          }
+          return $html.'</nav>';
         };
       ?>
-      <?php if ($pageTotal > 0): ?>
-        <?php echo $renderPagination(); ?>
-      <?php endif; ?>
       <div class="items" id="items">
         <?php if (!$items): ?>
           <div class="item item-empty">没有条目 · No items</div>
@@ -284,9 +355,10 @@
       <?php if ($pageTotal > 0): ?>
         <?php echo $renderPagination(); ?>
       <?php endif; ?>
-      <div class="shortcuts">
+      <div class="shortcuts <?= $templateMode === 'MAX' ? 'max-shortcuts' : ''; ?>">
         快捷键：<span class="kbd">/</span> 聚焦搜索。
       </div>
+      <?php if ($templateMode === 'MAX'): ?></section><?php endif; ?>
     <?php endif; ?>
   </main>
 </div>

@@ -3,6 +3,8 @@
 namespace App\Memo\Config;
 
 use Core\Config;
+use Core\DB;
+use PDOException;
 
 final class RuntimeConfig
 {
@@ -23,6 +25,7 @@ final class RuntimeConfig
             'upload_dir' => rtrim($projectRoot, '/\\') . '/storage/uploads',
             'max_upload_bytes' => 15 * 1024 * 1024,
             'allowed_mimes' => $defaultMimes,
+            'template_mode' => 'default',
         ];
 
         $timezone = $config->get('app.timezone');
@@ -49,6 +52,15 @@ final class RuntimeConfig
         if (is_array($mimes) && $mimes) {
             $defaults['allowed_mimes'] = array_merge($defaultMimes, $mimes);
         }
+
+        $templateMode = self::loadTemplateModeFromDatabase();
+        if ($templateMode === null) {
+            $templateMode = self::normalizeTemplateMode($config->get('template.mode'))
+                ?? self::normalizeTemplateMode($config->get('settings.template_mode'))
+                ?? 'default';
+        }
+
+        $defaults['template_mode'] = $templateMode;
 
         return new self($defaults);
     }
@@ -92,5 +104,48 @@ final class RuntimeConfig
         }
 
         return $mimes;
+    }
+
+    public function templateMode(): string
+    {
+        $mode = $this->settings['template_mode'] ?? 'default';
+        if (!is_string($mode)) {
+            return 'default';
+        }
+
+        return $mode === 'MAX' ? 'MAX' : 'default';
+    }
+
+    private static function normalizeTemplateMode(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+        return match ($normalized) {
+            'max' => 'MAX',
+            'default', '' => 'default',
+            default => null,
+        };
+    }
+
+    private static function loadTemplateModeFromDatabase(): ?string
+    {
+        try {
+            $pdo = DB::pdo();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        try {
+            $stmt = $pdo->prepare('SELECT value FROM settings WHERE key = :key LIMIT 1');
+            $stmt->execute([':key' => 'template_mode']);
+            $value = $stmt->fetchColumn();
+        } catch (PDOException) {
+            return null;
+        }
+
+        return self::normalizeTemplateMode($value);
     }
 }

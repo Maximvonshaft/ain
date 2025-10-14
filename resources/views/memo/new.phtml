@@ -1,3 +1,4 @@
+<?php $templateMode = memo_template_mode(); ?>
   <!doctype html>
   <html lang="zh-Hans">
   <head>
@@ -7,12 +8,24 @@
     <meta name="color-scheme" content="dark"/>
     <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
     <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <?php if ($templateMode === 'MAX'): ?>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/max/css/memo-max-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/max/css/memo-max-new.css'); ?>"/>
+    <?php else: ?>
     <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-new.css'); ?>"/>
+    <?php endif; ?>
     <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
   </head>
-  <body data-density="comfortable">
+  <body data-density="comfortable" class="<?= $templateMode === 'MAX' ? 'template-max' : ''; ?>">
+    <?php if ($templateMode === 'MAX'): ?>
+    <div class="max-scanlines" aria-hidden="true"></div>
+    <?php else: ?>
     <div class="scanlines" aria-hidden="true"></div>
-    <div class="wrap">
+    <?php endif; ?>
+    <div class="wrap <?= $templateMode === 'MAX' ? 'max-wrap' : ''; ?>">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
       </div>
