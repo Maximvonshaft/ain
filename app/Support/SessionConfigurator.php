@@ -22,7 +22,7 @@ final class SessionConfigurator
         $cookieParams = session_get_cookie_params();
 
         if (array_key_exists('cookie_secure', $session)) {
-            $cookieParams['secure'] = (bool) $session['cookie_secure'];
+            $cookieParams['secure'] = self::resolveCookieSecure($session['cookie_secure']);
         }
 
         if (array_key_exists('cookie_httponly', $session)) {
@@ -53,5 +53,29 @@ final class SessionConfigurator
         if (isset($session['cookie_name']) && is_string($session['cookie_name']) && $session['cookie_name'] !== '') {
             session_name($session['cookie_name']);
         }
+    }
+
+    private static function resolveCookieSecure(mixed $value): bool
+    {
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+            if ($normalized === 'auto') {
+                return HttpSchemeDetector::isHttps($_SERVER);
+            }
+
+            if (in_array($normalized, ['1', 'true', 'on', 'yes'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'off', 'no'], true)) {
+                return false;
+            }
+        }
+
+        if ($value === null) {
+            return false;
+        }
+
+        return (bool) $value;
     }
 }

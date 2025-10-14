@@ -1,7 +1,7 @@
 <?php
 return [
     'session' => [
-        'cookie_secure' => true,
+        'cookie_secure' => (($value = getenv('SESSION_COOKIE_SECURE')) !== false) ? $value : 'auto',
         'cookie_httponly' => true,
         'cookie_samesite' => 'Lax',
         'cookie_name' => 'memo_session',
