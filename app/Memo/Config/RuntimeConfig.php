@@ -23,6 +23,7 @@ final class RuntimeConfig
             'upload_dir' => rtrim($projectRoot, '/\\') . '/storage/uploads',
             'max_upload_bytes' => 15 * 1024 * 1024,
             'allowed_mimes' => $defaultMimes,
+            'template_mode' => 'default',
         ];
 
         $timezone = $config->get('app.timezone');
@@ -48,6 +49,11 @@ final class RuntimeConfig
         $mimes = $config->get('app.uploads.allowed_mimes');
         if (is_array($mimes) && $mimes) {
             $defaults['allowed_mimes'] = array_merge($defaultMimes, $mimes);
+        }
+
+        $templateMode = $config->get('template.mode');
+        if (is_string($templateMode) && $templateMode !== '') {
+            $defaults['template_mode'] = $templateMode;
         }
 
         return new self($defaults);
@@ -92,5 +98,17 @@ final class RuntimeConfig
         }
 
         return $mimes;
+    }
+
+    public function templateMode(): string
+    {
+        $mode = $this->settings['template_mode'] ?? 'default';
+        if (!is_string($mode) || $mode === '') {
+            return 'default';
+        }
+
+        $normalized = strtoupper($mode);
+
+        return $normalized === 'MAX' ? 'MAX' : 'default';
     }
 }

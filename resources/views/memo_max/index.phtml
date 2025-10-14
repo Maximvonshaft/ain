@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>自适应备忘录 · MAX 控制台</title>
+<meta name="color-scheme" content="dark"/>
+<meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/max/style.css'); ?>"/>
+<link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-max-common.css'); ?>"/>
+<script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
+</head>
+<body class="memo-max">
+  <div class="memo-max__scanlines" aria-hidden="true"></div>
+  <div class="terminal-layout memo-max__layout">
+  <aside class="sidebar sidebar-left memo-max__sidebar" role="region" aria-label="侧边栏导航">
+    <section class="identity-card memo-max__identity" aria-labelledby="identity-heading">
+      <header class="section-heading" id="identity-heading">MEMO OPS TERMINAL</header>
+      <div class="profile-frame">
+        <div class="profile-avatar" aria-hidden="true">
+          <img class="profile-avatar-image" src="<?= memo_asset_url('assets/max/assets/avatar-placeholder.svg'); ?>" alt="系统图标">
+          <span class="avatar-noise"></span>
+          <span class="avatar-scan"></span>
+          <span class="avatar-core"></span>
+        </div>
+        <dl class="profile-meta">
+          <div>
+            <dt>MODE</dt>
+            <dd>MAX</dd>
+          </div>
+          <div>
+            <dt>MEMOS</dt>
+            <dd><?= $all_total; ?></dd>
+          </div>
+          <div>
+            <dt>MINDMAPS</dt>
+            <dd><?= $mindmap_total; ?></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+    <section class="mission-console memo-max__mission" aria-labelledby="mission-heading">
+      <header class="section-heading" id="mission-heading">快速命令</header>
+      <div class="mission-actions">
+        <div class="dropdown memo-max__new-menu" id="new-entry-dropdown">
+          <button class="btn btn-primary dropdown-toggle" id="btn-new-menu" type="button" aria-haspopup="true" aria-expanded="false">＋ 新建</button>
+          <div class="dropdown-menu" id="new-menu" role="menu" aria-labelledby="btn-new-menu" data-open="false">
+            <a href="?view=new" role="menuitem">新建备忘录</a>
+            <a href="?view=map_edit" role="menuitem">新建导图</a>
+          </div>
+        </div>
+        <button class="btn btn-outline memo-max__cat-btn" id="btn-cat-mgr">分类管理</button>
+      </div>
+    </section>
+    <section class="memo-max__channels" aria-labelledby="channel-heading">
+      <header class="section-heading" id="channel-heading">分类态势</header>
+      <div class="channel-list memo-max__cat-list" id="cat-list">
+        <a class="channel-entry cat <?php echo ($cat==='all'?'active':''); ?>" href="?cat=all&q=<?php echo urlencode($q); ?>">
+          <span class="channel-dot" aria-hidden="true"></span>
+          <span class="channel-label">全部</span>
+          <span class="channel-time"><?php echo $all_total; ?></span>
+        </a>
+        <?php foreach ($cats as $c): ?>
+        <a class="channel-entry cat <?php echo ($cat===(string)$c['id']?'active':''); ?>" data-id="<?php echo $c['id']; ?>" href="?cat=<?php echo $c['id']; ?>&q=<?php echo urlencode($q); ?>">
+          <span class="channel-dot" aria-hidden="true"></span>
+          <span class="channel-label"><?php echo h($c['name']); ?></span>
+          <span class="channel-time"><?php echo (int)($counts[$c['id']] ?? 0); ?></span>
+        </a>
+        <?php endforeach; ?>
+        <a class="channel-entry cat <?php echo ($cat==='mindmaps'?'active':''); ?>" data-id="mindmaps" href="?cat=mindmaps&q=<?php echo urlencode($q); ?>">
+          <span class="channel-dot" aria-hidden="true"></span>
+          <span class="channel-label">思维导图</span>
+          <span class="channel-time"><?php echo $mindmap_total; ?></span>
+        </a>
+      </div>
+    </section>
+    <footer class="memo-max__sidebar-footer">
+      <p>✅ 勾选完成 · ↔/↑↓ 调整排序</p>
+      <p>⤓ JSON/CSV 导入导出</p>
+    </footer>
+  </aside>
+  <main class="memo-max__main" role="main">
+    <?php if (!empty($_SESSION['flash'])): ?>
+      <div class="err flash-message memo-max__flash"><?php echo h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
+    <?php endif; ?>
+    <?php if ($isMindmapCategory): ?>
+      <section class="mindmap-view memo-max__panel" aria-label="思维导图库">
+        <header class="memo-max__panel-header">
+          <div>
+            <h2>思维导图库</h2>
+            <div class="mindmap-header-meta">集中管理所有导图，支持多版本协作、导入导出与快速检索。</div>
+          </div>
+          <div class="mindmap-actions memo-max__actions">
+            <button class="btn btn-outline btn-small" type="button" id="btn-import-map">导入导图</button>
+            <button class="btn btn-outline btn-small" type="button" id="btn-export-maps">导出全部</button>
+            <a class="btn btn-primary btn-small" href="?view=map_edit">＋ 新建导图</a>
+          </div>
+        </header>
+        <div class="mindmap-search memo-max__search" role="search">
+          <span aria-hidden="true">🔍</span>
+          <input id="mindmap-search" placeholder="搜索标题或大纲关键字" value="<?php echo h($q); ?>" autocomplete="off">
+        </div>
+        <?php if (!$mindmapsAll): ?>
+          <div class="mindmap-empty memo-max__empty">
+            <strong>暂时还没有导图。</strong><br>点击右上角「新建导图」开始构建第一个思维导图。
+          </div>
+        <?php else: ?>
+          <div class="mindmap-empty mindmap-empty-filter memo-max__empty" id="mindmap-empty-filter" style="display:none;">
+            <strong>未找到匹配的导图。</strong><br>尝试修改搜索关键字或清除筛选。
+          </div>
+          <div class="mindmap-grid memo-max__mind-grid" id="mindmap-grid">
+            <?php foreach ($mindmapsAll as $m): $outlineDisplay = (string)($m['outline'] ?? ''); ?>
+              <article class="mindmap-card memo-max__mind-card" data-title="<?php echo h($m['title']); ?>" data-outline="<?php echo h(str_replace("\n",' ',$outlineDisplay)); ?>">
+                <div>
+                  <h3><?php echo h($m['title']); ?></h3>
+                  <div class="mindmap-card-meta">更新：<?php echo dt((int)$m['updated_at']); ?> · 创建：<?php echo dt((int)$m['created_at']); ?></div>
+                </div>
+                <?php if ($outlineDisplay !== ''): ?>
+                  <pre><?php echo h($outlineDisplay); ?></pre>
+                <?php else: ?>
+                  <pre>（暂无内容）</pre>
+                <?php endif; ?>
+                <div class="mindmap-card-actions memo-max__actions">
+                  <a class="btn btn-primary btn-small" href="?view=map_edit&id=<?php echo $m['id']; ?>">编辑</a>
+                  <form method="post" onsubmit="return confirm('确认删除该导图？');">
+                    <?= csrf_input(); ?>
+                    <input type="hidden" name="action" value="delete_mindmap">
+                    <input type="hidden" name="id" value="<?php echo $m['id']; ?>">
+                    <button class="btn btn-danger btn-small" type="submit">删除</button>
+                  </form>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </section>
+      <input id="mind-import-file" type="file" accept="application/json" hidden>
+      <div class="mindmap-import-backdrop" id="map-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+        <div class="mindmap-import-panel memo-max__panel">
+          <h2 id="import-modal-title">导入导图</h2>
+          <p>选择导入方式以处理文件：<strong id="import-file-name">未选择文件</strong></p>
+          <div class="mode-buttons memo-max__actions">
+            <button type="button" data-mode="replace" data-requires-target="true">覆盖现有导图</button>
+            <button type="button" data-mode="append" data-requires-target="true">导入为根节点</button>
+            <button type="button" data-mode="new">导入为新导图</button>
+          </div>
+          <label for="import-target-select">目标导图（覆盖/追加时选择）
+            <select id="import-target-select">
+              <option value="">请选择</option>
+              <?php foreach ($mindmapsAll as $m): ?>
+                <option value="<?= $m['id']; ?>"><?= h($m['title']); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <p class="import-tip">导入文件将自动调整为向右展开结构。如需插入到特定节点，可在编辑界面使用导入功能。</p>
+          <div class="actions memo-max__actions">
+            <button type="button" data-action="cancel">取消</button>
+          </div>
+        </div>
+      </div>
+      <script type="application/json" id="mind-maps-data"><?php echo json_encode(array_map(fn($m)=>[
+        'id'=>$m['id'],
+        'title'=>$m['title'],
+        'content'=>$m['content'],
+        'created_at'=>$m['created_at'],
+        'updated_at'=>$m['updated_at'],
+      ], $mindmapsAll), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?></script>
+    <?php else: ?>
+      <div class="toolbar memo-max__toolbar">
+        <form class="search" method="get" style="flex:1">
+          <input type="hidden" name="cat" value="<?php echo h((string)$cat); ?>">
+          <input name="q" value="<?php echo h($q); ?>" placeholder="搜索标题/内容 · Search"/>
+          <button>搜索</button>
+        </form>
+        <div class="actions-row memo-max__actions">
+          <div class="density-toggle" role="group" aria-label="显示密度">
+            <button class="btn btn-ghost btn-small density-option" type="button" data-density="comfortable">舒适</button>
+            <button class="btn btn-ghost btn-small density-option" type="button" data-density="compact">紧凑</button>
+          </div>
+          <button class="btn btn-outline btn-small" type="button" id="btn-import-items">导入 JSON</button>
+          <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=json">导出 JSON</a>
+          <a class="btn btn-outline btn-small" href="?cat=<?php echo h((string)$cat); ?>&q=<?php echo urlencode($q); ?>&export=csv">导出 CSV</a>
+        </div>
+      </div>
+      <input id="memo-import-input" type="file" accept="application/json" hidden>
+      <?php
+        $pageTotal=(int)($pagination['total'] ?? 0);
+        $renderPagination=function() use ($pagination,$cat,$q,$pageTotal){
+          if($pageTotal<=0){ return ''; }
+          $buildPageUrl=function(int $targetPage) use ($cat,$q){
+            $params=['cat'=>(string)$cat];
+            if($q!==''){ $params['q']=$q; }
+            if($targetPage>1){ $params['page']=$targetPage; }
+            return '?' . http_build_query($params);
+          };
+          $page=max(1,(int)($pagination['page'] ?? 1));
+          $pages=max(1,(int)($pagination['pages'] ?? 1));
+          $from=max(0,(int)($pagination['from'] ?? 0));
+          $to=max(0,(int)($pagination['to'] ?? 0));
+          $hasPrev=!empty($pagination['has_prev']) && !empty($pagination['prev_page']);
+          $hasNext=!empty($pagination['has_next']) && !empty($pagination['next_page']);
+          ob_start();
+          ?>
+          <nav class="pagination memo-max__pagination" aria-label="分页导航">
+            <div class="page-info">第 <?php echo $page; ?> / <?php echo $pages; ?> 页 · 显示 <?php echo $from; ?>-<?php echo $to; ?> / <?php echo $pageTotal; ?> 条</div>
+            <div class="page-links" role="group" aria-label="分页按钮">
+              <?php if ($hasPrev): ?>
+                <a class="page-btn" href="<?php echo h($buildPageUrl((int)$pagination['prev_page'])); ?>" rel="prev">上一页</a>
+              <?php else: ?>
+                <span class="page-btn disabled" aria-disabled="true">上一页</span>
+              <?php endif; ?>
+              <?php if ($hasNext): ?>
+                <a class="page-btn" href="<?php echo h($buildPageUrl((int)$pagination['next_page'])); ?>" rel="next">下一页</a>
+              <?php else: ?>
+                <span class="page-btn disabled" aria-disabled="true">下一页</span>
+              <?php endif; ?>
+            </div>
+          </nav>
+          <?php
+          return ob_get_clean();
+        };
+      ?>
+      <?php if ($pageTotal > 0): ?>
+        <?php echo $renderPagination(); ?>
+      <?php endif; ?>
+      <div class="items memo-max__items" id="items">
+        <?php if (!$items): ?>
+          <div class="item item-empty memo-max__empty">没有条目 · No items</div>
+        <?php endif; ?>
+        <?php
+          $itemIds=array_map(fn($it)=>(int)$it['id'],$items);
+          $stepsTimeMap=$itemIds ? get_steps_by_time_grouped($itemIds) : [];
+          $attachmentsMap=$itemIds ? attachments_for_items($itemIds) : [];
+        ?>
+        <?php foreach ($items as $it): ?>
+          <?php
+            $itemId=(int)$it['id'];
+            $steps_time=$stepsTimeMap[$itemId] ?? [];
+            $attachments=$attachmentsMap[$itemId] ?? [];
+            $titlePlain=(string)$it['title'];
+            $titleHtml = $q!=='' ? highlight_text($titlePlain, $q) : h($titlePlain);
+            $descRaw = (string)$it['description'];
+            $descHtml = $descRaw!=='' ? nl2br($q!=='' ? highlight_text($descRaw, $q) : h($descRaw)) : '';
+            $catLabel = $it['category_id'] ? ($categoryNames[(int)$it['category_id']] ?? '未分类') : '未分类';
+          ?>
+          <article class="item memo-max__item <?php echo $it['done']?'done':''; ?>" data-id="<?php echo $it['id']; ?>" data-category-id="<?php echo $it['category_id']!==null?(int)$it['category_id']:''; ?>" data-title="<?php echo h($titlePlain); ?>" data-updated="<?php echo dt((int)$it['updated_at']); ?>">
+            <div class="item-head memo-max__item-head">
+              <form method="post" class="form-toggle-item" onsubmit="return false">
+                <input type="hidden" name="action" value="toggle_done">
+                <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+                <input type="checkbox" class="item-toggle" <?php echo $it['done']?'checked':''; ?> title="完成">
+              </form>
+              <div class="memo-max__item-body">
+                <div class="item-title memo-max__item-title"><?php echo $titleHtml; ?></div>
+                <?php if ($descHtml!==''): ?>
+                  <div class="item-desc memo-max__item-desc"><?php echo $descHtml; ?></div>
+                <?php endif; ?>
+                <?php if ($steps_time): ?>
+                <div class="tinyline memo-max__timeline" aria-label="时间轴">
+                  <?php foreach($steps_time as $s): ?>
+                    <div class="tlrow <?php echo $s['done']?'done':''; ?>">
+                      <span class="dot"></span>
+                      <form method="post" class="form-toggle-step" onsubmit="return false">
+                        <input type="hidden" name="action" value="toggle_step">
+                        <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                        <input type="checkbox" class="step-toggle" <?php echo $s['done']?'checked':''; ?> title="完成">
+                      </form>
+                      <span class="step-title"><?php echo h($s['title']); ?></span>
+                      <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <div class="meta meta-inline item-meta memo-max__item-meta" aria-label="分类与更新时间">
+                  <div class="meta-left">
+                    <span class="badge"><?php echo h($catLabel); ?></span>
+                    <?php if(!empty($attachments)): ?>
+                      <span class="badge attachment-badge">📎 <?php echo count($attachments); ?></span>
+                    <?php endif; ?>
+                  </div>
+                  <div class="meta-right">
+                    <span class="item-time js-updated">更新 <?php echo dt((int)$it['updated_at']); ?></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="item-actions memo-max__item-actions">
+              <span class="tip status-tip"><?php echo $it['done'] ? '已刻印完成' : '待刻录'; ?></span>
+              <span class="tip note-tip">↔ 按钮调整排序</span>
+              <div class="move-controls desktop">
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'left')">← 左移</button>
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'right')">→ 右移</button>
+              </div>
+              <div class="move-controls mobile">
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'up')">↑ 上移</button>
+                <button class="btn btn-ghost btn-small" onclick="moveCard(<?php echo $it['id']; ?>,'down')">↓ 下移</button>
+              </div>
+              <a class="btn btn-ghost btn-small btn-detail" href="?view=item&id=<?php echo $it['id']; ?>">
+                <span class="btn-icon" aria-hidden="true">✦</span>
+                <span class="btn-label">详情</span>
+              </a>
+              <form method="post" class="form-delete-item" style="margin:0">
+                <?= csrf_input(); ?>
+                <input type="hidden" name="action" value="delete_item">
+                <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+                <button class="btn btn-danger btn-small" type="submit">删除</button>
+              </form>
+            </div>
+          </article>
+        <?php endforeach; ?>
+      </div>
+      <?php if ($pageTotal > 0): ?>
+        <?php echo $renderPagination(); ?>
+      <?php endif; ?>
+      <div class="shortcuts memo-max__shortcuts">
+        快捷键：<span class="kbd">/</span> 聚焦搜索。
+      </div>
+    <?php endif; ?>
+  </main>
+</div>
+<div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+<div id="cat-modal" class="modal-backdrop">
+  <div class="modal-panel memo-max__panel">
+    <div class="modal-header memo-max__panel-header">
+      <div class="modal-title">分类管理</div>
+      <button class="btn btn-outline btn-small" onclick="closeCatModal()">关闭</button>
+    </div>
+    <div id="cat-rows" class="modal-list"></div>
+    <form onsubmit="return addCat(event)" class="modal-form">
+      <input type="text" id="new-cat-name" class="modal-input" placeholder="新增分类名" required>
+      <button class="btn btn-primary">新增</button>
+    </form>
+  </div>
+</div>
+<script>window.memoIndexConfig = Object.assign({}, window.memoIndexConfig, {currentCategoryFilter: <?php echo json_encode((string)$cat); ?>});</script>
+<script src="<?= memo_asset_url('assets/js/memo-index.js'); ?>" defer></script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>详情 · <?php echo h($it['title']); ?> · MAX 模式</title>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-item.css'); ?>"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/max/style.css'); ?>"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-max-common.css'); ?>"/>
+  <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
+</head>
+<body class="memo-max">
+  <div class="memo-max__scanlines" aria-hidden="true"></div>
+  <main class="memo-max__detail" role="main">
+    <header class="memo-max__detail-header">
+      <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
+      <form method="post" onsubmit="return confirm('确认删除？');">
+        <?= csrf_input(); ?>
+        <input type="hidden" name="action" value="delete_item">
+        <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+        <button class="btn btn-danger">删除</button>
+      </form>
+    </header>
+    <section class="memo-max__panel memo-max__detail-card <?php echo $doneView; ?>">
+      <header class="memo-max__panel-header">
+        <div>
+          <h1 class="memo-max__detail-title"><?php echo $it['done']?'✅ ':''; echo h($it['title']); ?></h1>
+          <div class="memo-max__detail-meta">分类：<?php echo h($it['cat_name'] ?? '未分类'); ?> · 创建：<?php echo dt((int)$it['created_at']); ?> · 更新：<?php echo dt((int)$it['updated_at']); ?></div>
+        </div>
+      </header>
+      <div class="memo-max__detail-content">
+        <div class="memo-max__detail-editor">
+          <form method="post" id="item-form" onsubmit="return saveItemAJAX(event,this)">
+            <?= csrf_input(); ?>
+            <input type="hidden" name="action" value="edit_item">
+            <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+            <div class="memo-max__detail-form-row">
+              <input name="title" value="<?php echo h($it['title']); ?>" required>
+              <select name="category_id">
+                <option value="">未分类 · Unassigned</option>
+                <?php foreach ($cats as $c): ?>
+                  <option value="<?php echo $c['id']; ?>" <?php echo ($it['category_id']==$c['id']?'selected':''); ?>><?php echo h($c['name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+              <div class="memo-max__detail-actions">
+                <button class="btn btn-primary" type="submit">保存</button><span id="save-tip" class="save-tip">保存成功</span>
+              </div>
+            </div>
+            <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
+            <div class="memo-max__detail-upload">
+              <input id="att-file-item" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" hidden>
+              <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
+              <span class="att-meta">图片、音视频、PDF、Office、压缩包或文本 ≤ 15MB</span>
+            </div>
+          </form>
+        </div>
+        <?php
+          $attachmentCount=count($itemAtts);
+          $attachmentTotalSize=0;
+          foreach($itemAtts as $attMeta){ $attachmentTotalSize+=(int)($attMeta['size'] ?? 0); }
+          $attachmentSummaryText=$attachmentCount
+            ? ('共 '.$attachmentCount.' 个附件'.($attachmentTotalSize>0 ? ' · 总计 '.bytes_h($attachmentTotalSize) : ''))
+            : '暂无附件';
+        ?>
+        <aside class="memo-max__detail-attachments attachment-panel">
+          <div class="attachment-panel-header">
+            <div class="attachment-panel-title">附件列表</div>
+            <div class="attachment-panel-meta" id="attachment-summary"><?php echo h($attachmentSummaryText); ?></div>
+          </div>
+          <div class="attachment-empty" id="attachment-empty" <?php echo $attachmentCount ? 'hidden' : ''; ?>>暂无附件。上传后将在此管理与预览。</div>
+          <div class="attachment-list" id="attachment-list">
+            <?php if ($itemAtts): foreach ($itemAtts as $a):
+              $mime=(string)$a['mime'];
+              $ext=strtolower(pathinfo((string)$a['orig_name'], PATHINFO_EXTENSION));
+              $isImg=str_starts_with($mime,'image/');
+              $isVideo=str_starts_with($mime,'video/');
+              $isAudio=str_starts_with($mime,'audio/');
+              $isPdf=$mime==='application/pdf' || $ext==='pdf';
+              $isZip=str_contains($mime,'zip') || $ext==='zip';
+              $isRar=str_contains($mime,'rar') || $ext==='rar';
+              $isWord=in_array($ext,['docx','docm','doc','dotx','dotm'],true) || str_contains($mime,'word');
+              $isExcel=in_array($ext,['xlsx','xls','xlsm','xlsb','csv','xltx','xltm','tsv'],true) || str_contains($mime,'spreadsheet');
+              $icon=$isImg?'🖼':($isVideo?'🎬':($isAudio?'🎧':($isPdf?'📄':($isExcel?'📊':($isWord?'📝':($isZip?'🗜':($isRar?'📦':'📎')))))));
+              $downloadUrl='?download='.$a['id'];
+              $sizeBytes=(int)$a['size'];
+              $sizeLabel=$sizeBytes>0?bytes_h($sizeBytes):'';
+              $detailParts=[];
+              if($sizeLabel!=='') $detailParts[]=$sizeLabel;
+              if($mime!=='') $detailParts[]=$mime;
+              $detailText=$detailParts?implode(' · ',$detailParts):'—';
+              $previewAttrs='data-attachment-preview="true" data-url="'.h($downloadUrl).'" data-name="'.h($a['orig_name']).'" data-mime="'.h($mime).'"';
+              if($sizeBytes>0){ $previewAttrs.=' data-size="'.$sizeBytes.'"'; }
+            ?>
+            <div class="attachment-row" data-attachment-id="<?php echo $a['id']; ?>" data-size="<?php echo $sizeBytes; ?>" data-mime="<?php echo h($mime); ?>">
+              <div class="attachment-main">
+                <span class="attachment-icon"><?php echo $icon; ?></span>
+                <div class="attachment-info">
+                  <div class="attachment-name"><?php echo h($a['orig_name']); ?></div>
+                  <div class="attachment-detail"><?php echo h($detailText); ?></div>
+                </div>
+              </div>
+              <div class="attachment-actions">
+                <button class="btn btn-primary btn-small attachment-preview-button" type="button" <?php echo $previewAttrs; ?>>预览</button>
+                <a class="btn btn-outline btn-small" href="<?php echo $downloadUrl; ?>" download>下载</a>
+                <form method="post">
+                  <?= csrf_input(); ?>
+                  <input type="hidden" name="action" value="delete_attachment">
+                  <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
+                  <button class="btn btn-danger btn-small" type="submit">删除</button>
+                </form>
+              </div>
+            </div>
+            <?php endforeach; endif; ?>
+          </div>
+        </aside>
+      </div>
+      <section class="memo-max__panel memo-max__timeline-section">
+        <header class="memo-max__panel-header">
+          <div>
+            <h2>流程子任务 · 时间轴</h2>
+            <p class="memo-max__detail-meta">快速追踪阶段进度，可插入备注与附件。</p>
+          </div>
+          <form method="post" class="memo-max__timeline-form" onsubmit="return addStepForm(event)">
+            <?= csrf_input(); ?>
+            <input type="hidden" name="action" value="add_step">
+            <input type="hidden" name="item_id" value="<?php echo $it['id']; ?>">
+            <input id="new-step-title" name="title" placeholder="新增步骤 · Add step" required>
+            <button class="btn btn-primary">添加</button>
+          </form>
+        </header>
+        <div class="timeline" id="timeline" data-item="<?php echo $it['id']; ?>">
+          <?php foreach ($steps as $s): ?>
+            <div class="tl-item <?php echo $s['done']?'done':''; ?>" draggable="true" data-id="<?php echo $s['id']; ?>">
+              <span class="tl-dot"></span>
+              <div class="tl-head">
+                <span class="drag">⬍</span>
+                <label>
+                  <input type="checkbox" <?php echo $s['done']?'checked':''; ?> onchange="toggleStep(<?php echo $s['id']; ?>, this.checked)" title="完成">
+                </label>
+                <div class="tl-title">
+                  <span class="js-step-title"><?php echo h($s['title']); ?></span> <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
+                </div>
+                <details>
+                  <summary>编辑</summary>
+                  <div class="memo-max__timeline-edit">
+                    <form method="post" onsubmit="return saveStepTitleAJAX(event, <?php echo $s['id']; ?>, this)">
+                      <input type="hidden" name="action" value="edit_step">
+                      <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                      <input name="title" value="<?php echo h($s['title']); ?>">
+                      <button class="btn btn-outline" data-step-button="title-<?php echo $s['id']; ?>">保存标题</button>
+                      <span class="save-tip" data-step-tip="title-<?php echo $s['id']; ?>">保存成功</span>
+                    </form>
+                    <form method="post" onsubmit="return saveStepNotesAJAX(event, <?php echo $s['id']; ?>)" id="form-notes-<?php echo $s['id']; ?>">
+                      <input type="hidden" name="action" value="edit_step_notes">
+                      <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                      <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
+                      <div class="memo-max__timeline-note-actions">
+                        <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" hidden>
+                        <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
+                        <button class="btn btn-primary" type="submit" data-step-button="notes-<?php echo $s['id']; ?>">保存备注</button>
+                        <span class="save-tip" data-step-tip="notes-<?php echo $s['id']; ?>">保存成功</span>
+                      </div>
+                    </form>
+                    <form method="post" onsubmit="return deleteStepAJAX(event, <?php echo $s['id']; ?>)">
+                      <input type="hidden" name="action" value="delete_step">
+                      <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                      <button class="btn btn-danger">删除步骤</button>
+                    </form>
+                  </div>
+                </details>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+  <script src="<?= memo_asset_url('assets/js/memo-item.js'); ?>" defer></script>
+</body>
+</html>

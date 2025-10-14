@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="280" viewBox="0 0 240 280">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1d21" />
+      <stop offset="100%" stop-color="#090b0d" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="rgba(255,59,59,0.55)" />
+      <stop offset="60%" stop-color="rgba(255,59,59,0.15)" />
+      <stop offset="100%" stop-color="rgba(10,12,14,0)" />
+    </radialGradient>
+    <clipPath id="frame">
+      <rect x="16" y="16" width="208" height="248" rx="18" ry="18" />
+    </clipPath>
+  </defs>
+  <rect width="240" height="280" fill="url(#bg)" />
+  <g clip-path="url(#frame)">
+    <rect x="16" y="16" width="208" height="248" fill="url(#bg)" />
+    <rect x="16" y="16" width="208" height="248" fill="url(#glow)" />
+    <g stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none">
+      <circle cx="120" cy="120" r="46" />
+      <path d="M62 218c18-32 41-48 58-48s40 16 58 48" />
+    </g>
+    <text x="120" y="118" text-anchor="middle" fill="rgba(255,255,255,0.36)" font-family="'Roboto Mono', monospace" font-size="18" letter-spacing="4">
+      YOUR
+    </text>
+    <text x="120" y="144" text-anchor="middle" fill="rgba(255,255,255,0.36)" font-family="'Roboto Mono', monospace" font-size="18" letter-spacing="4">
+      IMAGE
+    </text>
+  </g>
+  <rect x="16" y="16" width="208" height="248" rx="18" ry="18" fill="none" stroke="rgba(255,59,59,0.4)" stroke-width="2" />
+</svg>
