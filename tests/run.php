@@ -38,6 +38,7 @@ $assert = new Assert();
 
 testRouter($assert);
 testCsrfMiddleware($assert);
+testRequestBasePathDetection($assert);
 
 echo 'OK (' . $assert->count() . " assertions)\n";
 
@@ -155,6 +156,40 @@ function testCsrfMiddleware(Assert $assert): void
         $thrown = true;
     }
     $assert->true($thrown, 'Invalid token should trigger RuntimeException');
+}
+
+function testRequestBasePathDetection(Assert $assert): void
+{
+    $session = [];
+    $request = new Request([], [], [
+        'REQUEST_METHOD' => 'GET',
+        'REQUEST_URI' => '/app/memo',
+        'SCRIPT_NAME' => '/app/index.php',
+    ], [], [], $session);
+
+    $assert->same('/app', $request->basePath(), 'SCRIPT_NAME should define base path when present');
+    $assert->same('/memo', $request->path(), 'Request path should strip base path correctly');
+
+    $session = [];
+    $requestWithPhpSelf = new Request([], [], [
+        'REQUEST_METHOD' => 'GET',
+        'REQUEST_URI' => '/alias/memo',
+        'SCRIPT_NAME' => '/index.php',
+        'PHP_SELF' => '/alias/index.php',
+    ], [], [], $session);
+
+    $assert->same('/alias', $requestWithPhpSelf->basePath(), 'PHP_SELF should be used when SCRIPT_NAME lacks prefix');
+    $assert->same('/memo', $requestWithPhpSelf->path(), 'Path should use detected base path from PHP_SELF');
+
+    $session = [];
+    $requestWithForwarded = new Request([], [], [
+        'REQUEST_METHOD' => 'GET',
+        'REQUEST_URI' => '/memo',
+        'HTTP_X_FORWARDED_PREFIX' => '/tenant',
+    ], [], [], $session);
+
+    $assert->same('/tenant', $requestWithForwarded->basePath(), 'Forwarded prefix header should set base path');
+    $assert->same('/memo', $requestWithForwarded->path(), 'Forwarded prefix should not affect normalized path');
 }
 
 /**

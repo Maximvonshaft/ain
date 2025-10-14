@@ -139,12 +139,95 @@ class Request
 
     private function detectBasePath(array $server): string
     {
-        $scriptName = $server['SCRIPT_NAME'] ?? '';
-        if ($scriptName === '') {
+        $forwarded = $this->normalizeForwardedPrefix($server['HTTP_X_FORWARDED_PREFIX'] ?? null);
+        if ($forwarded !== '') {
+            return $forwarded;
+        }
+
+        $prefixCandidates = [
+            $server['BASE_URI'] ?? null,
+            $server['CONTEXT_PREFIX'] ?? null,
+        ];
+
+        foreach ($prefixCandidates as $candidate) {
+            $normalized = $this->normalizePrefixCandidate($candidate);
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        $scriptCandidates = [
+            $server['SCRIPT_NAME'] ?? null,
+            $server['PHP_SELF'] ?? null,
+            $server['ORIG_SCRIPT_NAME'] ?? null,
+        ];
+
+        foreach ($scriptCandidates as $candidate) {
+            $normalized = $this->normalizeScriptCandidate($candidate);
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        return '';
+    }
+
+    private function normalizeForwardedPrefix(mixed $value): string
+    {
+        if (!is_string($value)) {
             return '';
         }
 
-        $directory = str_replace('\\', '/', dirname($scriptName));
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $parts = array_map(static fn (string $part): string => trim($part), explode(',', $trimmed));
+        $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
+        if ($parts === []) {
+            return '';
+        }
+
+        return $this->normalizePrefixCandidate($parts[0]);
+    }
+
+    private function normalizePrefixCandidate(mixed $value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '' || $trimmed === '/') {
+            return '';
+        }
+
+        $path = parse_url($trimmed, PHP_URL_PATH);
+        if (!is_string($path) || $path === '' || $path === '/') {
+            return '';
+        }
+
+        return '/' . trim($path, '/');
+    }
+
+    private function normalizeScriptCandidate(mixed $value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $path = parse_url($trimmed, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            return '';
+        }
+
+        $directory = str_replace('\\', '/', dirname($path));
         if ($directory === '/' || $directory === '.' || $directory === '') {
             return '';
         }
