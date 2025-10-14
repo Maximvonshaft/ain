@@ -15,8 +15,21 @@
       }
       init.headers=headers;
       const body=init.body;
-      if(token && body instanceof FormData && !body.has('_csrf')){
-        body.append('_csrf',token);
+      if(token && body instanceof FormData){
+        let shouldAppend=true;
+        if(typeof body.has==='function'){
+          shouldAppend=!body.has('_csrf');
+        }else if(typeof body.entries==='function'){
+          for(const [key] of body.entries()){
+            if(key==='_csrf'){
+              shouldAppend=false;
+              break;
+            }
+          }
+        }
+        if(shouldAppend){
+          body.append('_csrf',token);
+        }
       }
       return originalFetch.call(this,input,init);
     };
