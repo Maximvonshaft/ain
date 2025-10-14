@@ -168,6 +168,29 @@ function memo_upload_accept_attribute(): string {
   return $accept;
 }
 
+function memo_template_mode(): string {
+  static $mode = null;
+  if ($mode !== null) {
+    return $mode;
+  }
+
+  $mode = MemoEnvironment::runtimeConfig()->templateMode();
+
+  return $mode;
+}
+
+function memo_view_path(string $view): string {
+  $base = __DIR__ . '/resources/views/';
+  if (memo_template_mode() === 'MAX') {
+    $candidate = $base . 'memo_max/' . $view . '.phtml';
+    if (is_file($candidate)) {
+      return $candidate;
+    }
+  }
+
+  return $base . 'memo/' . $view . '.phtml';
+}
+
 function memo_apply_default_security_headers(): void {
   if (headers_sent()) {
     return;
@@ -1553,7 +1576,7 @@ $view = $_GET['view'] ?? '';
 // 新建页面
 if ($view === 'new') {
   [$cats,$_counts]=get_categories();
-  require __DIR__ . '/resources/views/memo/new.phtml';
+  require memo_view_path('new');
   exit;
 }
 
@@ -1562,7 +1585,7 @@ if ($view === 'item' && isset($_GET['id']) && ctype_digit((string)$_GET['id'])) 
   $it=get_item((int)$_GET['id']); if(!$it){ http_response_code(404); echo 'Not Found'; exit; }
   $steps=get_steps((int)$it['id']); $itemAtts=attachments_for_item((int)$it['id']); [$cats,$_counts]=get_categories();
   $doneView = $it['done'] ? 'done-view' : '';
-  require __DIR__ . '/resources/views/memo/item.phtml';
+  require memo_view_path('item');
   exit;
 }
 
@@ -1625,7 +1648,7 @@ if ($view === 'map_edit') {
       'url' => '?mindmap_asset=' . $id,
     ];
   }, $assetPool));
-  require __DIR__ . '/resources/views/memo/map_edit.phtml';
+  require memo_view_path('map_edit');
   exit;
 }
 
@@ -1710,5 +1733,5 @@ if($isMindmapCategory){
 $all_total = (int)($stats['active_total'] ?? 0);
 $categoryNames=[];
 foreach($cats as $c){ $categoryNames[(int)$c['id']]=$c['name']; }
-require __DIR__ . '/resources/views/memo/index.phtml';
+require memo_view_path('index');
 exit;

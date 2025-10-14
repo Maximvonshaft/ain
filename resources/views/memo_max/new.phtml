@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>新建备忘录 · MAX 模式</title>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-new.css'); ?>"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/max/style.css'); ?>"/>
+  <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-max-common.css'); ?>"/>
+  <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
+</head>
+<body class="memo-max">
+  <div class="memo-max__scanlines" aria-hidden="true"></div>
+  <main class="memo-max__detail" role="main">
+    <header class="memo-max__detail-header">
+      <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
+    </header>
+    <section class="memo-max__panel memo-max__detail-card">
+      <header class="memo-max__panel-header">
+        <div>
+          <h1 class="memo-max__detail-title">新建备忘录</h1>
+          <p class="memo-max__detail-meta">MAX 模板下的快速录入面板，支持 Markdown 与附件。</p>
+        </div>
+      </header>
+      <form method="post" onsubmit="return createItemForm(event)" class="memo-max__detail-editor">
+        <?= csrf_input(); ?>
+        <input type="hidden" name="action" value="create_item">
+        <div class="memo-max__detail-form-row">
+          <input name="title" placeholder="标题 · Title" required>
+          <select name="category_id">
+            <option value="">未分类 · Unassigned</option>
+            <?php foreach ($cats as $c): ?>
+              <option value="<?php echo $c['id']; ?>"><?php echo h($c['name']); ?></option>
+            <?php endforeach; ?>
+          </select>
+          <div class="memo-max__detail-actions">
+            <button class="btn btn-primary" type="submit">创建</button>
+          </div>
+        </div>
+        <textarea id="md-editor" name="description" placeholder="内容支持 Markdown，亦可插入任务步骤与附件。"></textarea>
+        <div class="memo-max__detail-upload">
+          <input id="att-file-item" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" hidden>
+          <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件</button>
+          <span class="att-meta">支持图片、音视频、PDF、Office、压缩包或文本 ≤ 15MB</span>
+        </div>
+      </form>
+      <section class="memo-max__panel memo-max__timeline-section">
+        <header class="memo-max__panel-header">
+          <div>
+            <h2>预设子任务</h2>
+            <p class="memo-max__detail-meta">在保存之前先勾勒初始步骤，建立执行节奏。</p>
+          </div>
+          <form method="post" class="memo-max__timeline-form" onsubmit="return addStepTemplate(event)">
+            <input id="new-step-title" name="title" placeholder="新增步骤" required>
+            <button class="btn btn-outline" type="submit">添加</button>
+          </form>
+        </header>
+        <div class="timeline" id="timeline"></div>
+      </section>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+  <script src="<?= memo_asset_url('assets/js/memo-new.js'); ?>" defer></script>
+</body>
+</html>
