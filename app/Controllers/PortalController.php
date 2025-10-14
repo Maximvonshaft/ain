@@ -20,7 +20,7 @@ final class PortalController
             return $prefix . $normalized;
         };
 
-        $memoUrl = $prefix . '/memo';
+        $memoUrl = $prefix . '/memo.php';
         $mindmapUrl = $memoUrl . '?cat=mindmaps';
 
         $todoItems = $this->loadTodoItems($pdo, $memoUrl);
