@@ -272,10 +272,7 @@
   const runDecryptionSequence = async () => {
     const timings = getDecryptionTimings();
     const totalDuration =
-      timings.static +
-      timings.terminal +
-      timings.converge +
-      timings.complete;
+      timings.static + timings.terminal + timings.converge + timings.complete;
     if (!decryptionSequence) {
       await wait(totalDuration);
       return;
@@ -882,37 +879,84 @@
       maxZoom: 8,
     }).setView([20, 0], 2);
 
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {
-        maxZoom: 19,
-        minZoom: 2,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-          '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-      },
-    ).addTo(map);
+    const mapViewportClassList = mapElement.classList;
 
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png",
-      {
-        maxZoom: 18,
-        opacity: 0.25,
-        attribution:
-          'Linework by <a href="http://stamen.com">Stamen Design</a> under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>',
-      },
-    ).addTo(map);
+    const applyMapTheme = (theme) => {
+      if (!mapViewportClassList) {
+        return;
+      }
+      if (theme === "light") {
+        mapViewportClassList.add("map-viewport--fallback-light");
+      } else {
+        mapViewportClassList.remove("map-viewport--fallback-light");
+      }
+    };
 
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png",
+    const baseTileSources = [
       {
-        maxZoom: 20,
-        attribution:
-          'Labels by <a href="http://stamen.com">Stamen Design</a> ' +
-          'under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>.' +
-          ' Data © <a href="http://openstreetmap.org">OpenStreetMap</a>',
+        name: "Carto Dark",
+        theme: "dark",
+        url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        options: {
+          maxZoom: 19,
+          minZoom: 2,
+          subdomains: "abcd",
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+            '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+        },
       },
-    ).addTo(map);
+      {
+        name: "OpenStreetMap",
+        theme: "light",
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        options: {
+          maxZoom: 19,
+          minZoom: 2,
+          attribution:
+            'Map data © <a href="https://www.openstreetmap.org">OpenStreetMap</a> contributors',
+        },
+      },
+    ];
+
+    let activeBaseLayer = null;
+    let activeBaseIndex = -1;
+
+    const activateBaseLayer = (index) => {
+      const source = baseTileSources[index];
+      if (!source) {
+        return;
+      }
+
+      if (activeBaseLayer) {
+        activeBaseLayer.remove();
+        activeBaseLayer = null;
+      }
+
+      activeBaseIndex = index;
+      applyMapTheme(source.theme);
+      mapElement.dataset.tileSource = source.name;
+
+      const layer = L.tileLayer(source.url, source.options).addTo(map);
+
+      layer.on("tileerror", () => {
+        const nextIndex = activeBaseIndex + 1;
+        if (nextIndex >= baseTileSources.length) {
+          return;
+        }
+        console.warn(
+          "Map tile source failed, switching to fallback",
+          baseTileSources[activeBaseIndex]?.name,
+          "→",
+          baseTileSources[nextIndex]?.name,
+        );
+        activateBaseLayer(nextIndex);
+      });
+
+      activeBaseLayer = layer;
+    };
+
+    activateBaseLayer(0);
 
     const focusMarkerIcon = L.divIcon({
       className: "active-location-marker",
