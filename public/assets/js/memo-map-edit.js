@@ -3694,7 +3694,7 @@
       const importCancelButton=importModal ? importModal.querySelector('[data-import-cancel]') : null;
       const relationToast=document.getElementById('mind-relation-toast');
       const relationContextMenu=document.getElementById('relation-context-menu');
-      let pendingImportPayload=null;
+      let pendingImportEntries=[];
       let pendingImportFileName='';
       const foldAllMenuItem=null;
       const nodePopover=document.getElementById('node-popover');
@@ -6237,7 +6237,7 @@
             e.preventDefault();
             const mode=btn.dataset.importMode;
             if(!mode){ return; }
-            if(!pendingImportPayload){ closeImportModeDialog(); return; }
+            if(!pendingImportEntries.length){ closeImportModeDialog(); return; }
             handleImportModeSelection(mode);
           });
         });
@@ -6744,42 +6744,216 @@
           if(shouldAnimate){ hideExportOverlay(); }
         }
       }
-      function openImportModeDialog(fileName, data){
-        pendingImportPayload=data;
+      function resolveImportTitle(payload,fallback){
+        const fallbackTitle=typeof fallback==='string'?fallback.trim():'';
+        if(fallbackTitle) return fallbackTitle;
+        const metaName=typeof payload?.meta?.name==='string'?payload.meta.name.trim():'';
+        if(metaName) return metaName;
+        const topicName=typeof payload?.data?.topic==='string'?payload.data.topic.trim():'';
+        if(topicName) return topicName;
+        return '未命名导图';
+      }
+      function tryParseMindmapPayload(raw){
+        if(typeof raw==='string'){
+          try{ return JSON.parse(raw); }
+          catch(_){ return null; }
+        }
+        if(raw && typeof raw==='object'){ return raw; }
+        return null;
+      }
+      function deriveImportTitle(payload,preferred){
+        const preferredTitle=typeof preferred==='string'?preferred.trim():'';
+        if(preferredTitle) return preferredTitle;
+        const metaName=typeof payload?.meta?.name==='string'?payload.meta.name.trim():'';
+        if(metaName) return metaName;
+        const topicName=typeof payload?.data?.topic==='string'?payload.data.topic.trim():'';
+        if(topicName) return topicName;
+        return '';
+      }
+      function normalizeImportPayload(json){
+        if(!json){ throw new Error('文件格式不兼容'); }
+        const entries=[];
+        const register=(payload,titleHint,index)=>{
+          if(!payload || typeof payload!=='object' || !payload.data){ return; }
+          const cloned=JSON.parse(JSON.stringify(payload));
+          const title=deriveImportTitle(cloned,titleHint);
+          const finalTitle=(title && title.trim()) || (typeof index==='number'?`导图 ${index+1}`:'未命名导图');
+          if(finalTitle){
+            if(!cloned.meta || typeof cloned.meta!=='object'){
+              cloned.meta={ name: finalTitle };
+            }else if(typeof cloned.meta.name!=='string' || !cloned.meta.name.trim()){
+              cloned.meta={...cloned.meta, name: finalTitle};
+            }
+          }
+          entries.push({ payload:cloned, title:finalTitle });
+        };
+        const handleArray=list=>{
+          list.forEach((item,index)=>{
+            const source=item && typeof item==='object' && Object.prototype.hasOwnProperty.call(item,'content') ? item.content : item;
+            const payload=tryParseMindmapPayload(source);
+            if(payload && payload.data){
+              const titleHint=item && typeof item==='object' && typeof item.title==='string'?item.title:'';
+              register(payload,titleHint,index);
+            }
+          });
+        };
+        if(Array.isArray(json)){
+          handleArray(json);
+        }else if(typeof json==='string'){
+          const payload=tryParseMindmapPayload(json);
+          register(payload,'',0);
+        }else if(typeof json==='object'){
+          if(Array.isArray(json.mindmaps)){ handleArray(json.mindmaps); }
+          if(Array.isArray(json.maps)){ handleArray(json.maps); }
+          if(Array.isArray(json.items)){ handleArray(json.items); }
+          if(Object.prototype.hasOwnProperty.call(json,'content')){
+            const payload=tryParseMindmapPayload(json.content);
+            if(payload && payload.data){
+              register(payload, typeof json.title==='string'?json.title:'', entries.length);
+            }
+          }
+          if(json.data){
+            register(json, typeof json.title==='string'?json.title:'', entries.length);
+          }
+        }
+        if(!entries.length){ throw new Error('文件中未找到可导入的导图内容'); }
+        return entries;
+      }
+      function summarizeImportEntries(entries,fileName){
+        if(!Array.isArray(entries) || !entries.length) return fileName || '导图文件';
+        if(entries.length===1){
+          const title=entries[0] && typeof entries[0].title==='string'?entries[0].title.trim():'';
+          return title ? `${fileName || '导图文件'} · ${title}` : (fileName || '导图文件');
+        }
+        return `${fileName || '导图文件'} · ${entries.length} 份导图`;
+      }
+      function cloneImportEntry(entry){
+        if(!entry || !entry.payload) return null;
+        try{ return JSON.parse(JSON.stringify(entry.payload)); }
+        catch(_){ return null; }
+      }
+      function promptImportEntry(entries,message){
+        if(!Array.isArray(entries) || !entries.length) return null;
+        if(entries.length===1) return entries[0];
+        const options=entries.map((entry,idx)=>{
+          const title=typeof entry.title==='string' && entry.title.trim()?entry.title.trim():`导图 ${idx+1}`;
+          return `${idx+1}. ${title}`;
+        }).join('\n');
+        const hint=message && message.trim()?message.trim():`检测到 ${entries.length} 份导图，请输入要导入的序号：`;
+        const answer=window.prompt(`${hint}\n${options}`, '1');
+        if(answer===null) return null;
+        const parsed=Number.parseInt(answer.trim(),10);
+        if(Number.isInteger(parsed) && parsed>=1 && parsed<=entries.length){
+          return entries[parsed-1];
+        }
+        alert('未选择有效的导图序号');
+        return null;
+      }
+      async function importEntriesAsNewMindmaps(entries){
+        if(!Array.isArray(entries) || !entries.length){ throw new Error('导入内容为空'); }
+        let count=0;
+        for(const entry of entries){
+          const payload=cloneImportEntry(entry);
+          if(!payload || !payload.data){ throw new Error('导图数据缺失'); }
+          enforceRightOrientation(payload.data);
+          const title=resolveImportTitle(payload, entry && entry.title ? entry.title : '');
+          const fd=new FormData();
+          fd.append('action','save_mindmap');
+          fd.append('id','0');
+          fd.append('title', title || '未命名导图');
+          fd.append('content', JSON.stringify(payload));
+          const res=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
+          if(!res.ok) throw new Error('网络异常');
+          const json=await res.json().catch(()=>null);
+          if(!json || !json.ok){ throw new Error(json && json.error ? json.error : '保存失败'); }
+          count++;
+        }
+        return count;
+      }
+      function openImportModeDialog(fileName, entries){
+        pendingImportEntries=Array.isArray(entries)?entries.map(entry=>({
+          payload:cloneImportEntry(entry),
+          title:entry && typeof entry.title==='string'?entry.title:''
+        })).filter(item=>item && item.payload && item.payload.data):[];
         pendingImportFileName=fileName || '导图文件';
-        if(importModalName){ importModalName.textContent=pendingImportFileName; }
+        if(importModalName){ importModalName.textContent=summarizeImportEntries(pendingImportEntries,pendingImportFileName); }
         if(importModal){ importModal.dataset.open='true'; }
       }
       function closeImportModeDialog(){
-        pendingImportPayload=null;
+        pendingImportEntries=[];
         pendingImportFileName='';
         if(importModal){ importModal.dataset.open='false'; }
       }
-      function handleImportModeSelection(mode){
-        if(!pendingImportPayload) return;
-        const payload=JSON.parse(JSON.stringify(pendingImportPayload));
+      async function handleImportModeSelection(mode){
+        if(!pendingImportEntries.length) return;
+        const entries=pendingImportEntries;
         try{
           commitInlineEditing();
           if(mapDeleteButton && mode!=='new-map'){ mapDeleteButton.disabled=!currentMapId; }
+          let successMessage=null;
           switch(mode){
-            case 'replace':
+            case 'replace':{
+              const chosen=promptImportEntry(entries,'请选择要覆盖当前导图的导图序号：');
+              if(!chosen) return;
+              const payload=cloneImportEntry(chosen);
+              if(!payload || !payload.data){ throw new Error('导图数据缺失'); }
+              enforceRightOrientation(payload.data);
               jm.show(payload);
               initialData=JSON.parse(JSON.stringify(payload));
               if(initialData && initialData.data){ enforceRightOrientation(initialData.data); }
               markDirty();
+              successMessage='导入成功';
               break;
-            case 'append-node':
-              importJsonAsSubtree(payload);
+            }
+            case 'append-node':{
+              const chosen=promptImportEntry(entries,'请选择要作为根节点导入的导图序号：');
+              if(!chosen) return;
+              importJsonAsSubtree(cloneImportEntry(chosen));
+              successMessage='导入成功';
               break;
-            case 'new-map':
-              importJsonAsNewMap(payload);
+            }
+            case 'new-map':{
+              if(entries.length>1){
+                const options=entries.map((entry,idx)=>{
+                  const title=typeof entry.title==='string' && entry.title.trim()?entry.title.trim():`导图 ${idx+1}`;
+                  return `${idx+1}. ${title}`;
+                }).join('\n');
+                const answer=window.prompt(`检测到 ${entries.length} 份导图。输入 all 导入全部为新导图，或输入要加载的导图序号：\n${options}`, 'all');
+                if(answer===null) return;
+                if(answer.trim().toLowerCase()==='all'){
+                  const imported=await importEntriesAsNewMindmaps(entries);
+                  closeImportModeDialog();
+                  alert(`已导入 ${imported} 份导图，请在导图列表中查看。`);
+                  window.location.href='?cat=mindmaps';
+                  return;
+                }
+                const parsed=Number.parseInt(answer.trim(),10);
+                if(!Number.isInteger(parsed) || parsed<1 || parsed>entries.length){
+                  alert('未选择有效的导图序号');
+                  return;
+                }
+                const entry=entries[parsed-1];
+                const payload=cloneImportEntry(entry);
+                if(!payload || !payload.data){ throw new Error('导图数据缺失'); }
+                enforceRightOrientation(payload.data);
+                importJsonAsNewMap(payload);
+                successMessage='导入成功';
+              }else{
+                const payload=cloneImportEntry(entries[0]);
+                if(!payload || !payload.data){ throw new Error('导图数据缺失'); }
+                enforceRightOrientation(payload.data);
+                importJsonAsNewMap(payload);
+                successMessage='导入成功';
+              }
               break;
+            }
             default:
-              break;
+              return;
           }
+          if(successMessage){ alert(successMessage); }
           closeImportModeDialog();
         }catch(err){
-          alert(err.message || '导入失败');
+          alert(err && err.message ? err.message : '导入失败');
         }
       }
       function triggerImport(){
@@ -6864,23 +7038,21 @@
           reader.onload=evt=>{
             try{
               const json=JSON.parse(evt.target.result);
-              if(!json || !json.data){ alert('文件格式不兼容'); return; }
-              enforceRightOrientation(json.data);
+              const entries=normalizeImportPayload(json);
               closeImportModeDialog();
-              pendingImportPayload=json;
               pendingImportFileName=file.name;
-              openImportModeDialog(file.name, json);
+              openImportModeDialog(file.name, entries);
             }catch(err){
-              pendingImportPayload=null;
+              pendingImportEntries=[];
               pendingImportFileName='';
-              alert('无法解析 JSON：'+err.message);
-            }
-            finally{
+              const message=err instanceof SyntaxError ? '无法解析 JSON：文件语法错误' : (err && err.message ? err.message : '无法解析 JSON');
+              alert(message);
+            }finally{
               importInput.value='';
             }
           };
           reader.onerror=()=>{
-            pendingImportPayload=null;
+            pendingImportEntries=[];
             pendingImportFileName='';
             alert('读取文件失败');
             importInput.value='';
