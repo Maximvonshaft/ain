@@ -12,11 +12,20 @@
     return { lat, lon };
   })();
 
-  const directiveForm = document.querySelector(".note-form");
-  const directiveInput = directiveForm
-    ? directiveForm.querySelector("input[name='note']")
+  const directiveForm = document.querySelector("[data-directive-form]");
+  const directiveLog = document.querySelector("[data-directive-log]");
+  const directiveNicknameInput = directiveForm
+    ? directiveForm.querySelector("input[name='nickname']")
     : null;
-  const directiveLog = document.querySelector(".directive-log");
+  const directiveMessageInput = directiveForm
+    ? directiveForm.querySelector("input[name='message']")
+    : null;
+  const directiveStatus = directiveForm
+    ? directiveForm.querySelector("[data-directive-status]")
+    : null;
+  const directiveTokenInput = directiveForm
+    ? directiveForm.querySelector("input[name='_csrf']")
+    : null;
 
   const channelList = document.querySelector(".channel-list");
   const channelEntries = channelList
@@ -717,45 +726,25 @@
     coordinateElements.lon.textContent = formatCoordinate(lon, "lon");
   };
 
-  const directiveTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  });
-
-  const directiveChannels = ["ALPHA", "BRAVO", "CHARLIE", "DELTA"];
-  const directivePriorities = ["high", "medium", "low"];
-  let directiveChannelIndex = 0;
-  let directivePriorityIndex = 0;
-
-  const nextDirectiveChannel = () => {
-    const channel =
-      directiveChannels[directiveChannelIndex % directiveChannels.length];
-    directiveChannelIndex += 1;
-    return channel;
+  const directivePriorityLabels = {
+    high: "高",
+    medium: "中",
+    low: "低",
   };
 
-  const nextDirectivePriority = () => {
+  const createDirectiveEntry = (entry, animate) => {
+    if (!directiveLog) return null;
     const priority =
-      directivePriorities[directivePriorityIndex % directivePriorities.length];
-    directivePriorityIndex += 1;
-    return priority;
-  };
+      typeof entry?.priority === "string" && entry.priority
+        ? entry.priority
+        : "medium";
 
-  const appendDirectiveLog = (message) => {
-    if (!directiveLog) return;
-    const entry = document.createElement("li");
-    entry.className = "directive-entry is-new";
-
-    const timestamp = document.createElement("span");
-    timestamp.className = "directive-time";
-    timestamp.textContent = directiveTimeFormatter.format(new Date());
-
-    const channelLabel = nextDirectiveChannel();
-
-    const priority = nextDirectivePriority();
-    entry.setAttribute("data-priority", priority);
+    const listItem = document.createElement("li");
+    listItem.className = "directive-entry";
+    listItem.dataset.priority = priority;
+    if (animate) {
+      listItem.classList.add("is-new");
+    }
 
     const content = document.createElement("span");
     content.className = "directive-content";
@@ -769,49 +758,130 @@
 
     const directiveMessage = document.createElement("span");
     directiveMessage.className = "directive-message";
-    directiveMessage.textContent = message;
+    directiveMessage.textContent =
+      typeof entry?.message === "string" ? entry.message : "";
+
+    const meta = document.createElement("span");
+    meta.className = "directive-meta";
 
     const directiveAuthor = document.createElement("span");
     directiveAuthor.className = "directive-author";
-    directiveAuthor.setAttribute("aria-label", "Channel");
-    directiveAuthor.textContent = channelLabel;
+    directiveAuthor.setAttribute("aria-label", "昵称");
+    directiveAuthor.textContent =
+      typeof entry?.nickname === "string" ? entry.nickname : "";
 
     const divider = document.createElement("span");
     divider.className = "directive-divider";
     divider.setAttribute("aria-hidden", "true");
     divider.textContent = "—";
 
-    const meta = document.createElement("span");
-    meta.className = "directive-meta";
-    meta.append(directiveAuthor, divider, timestamp);
+    const timestamp = document.createElement("time");
+    timestamp.className = "directive-time";
+    if (typeof entry?.time_iso === "string" && entry.time_iso) {
+      timestamp.dateTime = entry.time_iso;
+    }
+    timestamp.textContent =
+      typeof entry?.time_label === "string" ? entry.time_label : "";
 
+    meta.append(directiveAuthor, divider, timestamp);
     text.append(directiveMessage, meta);
 
     const hiddenPriority = document.createElement("span");
     hiddenPriority.className = "visually-hidden";
-    hiddenPriority.textContent = `Priority ${priority}`;
+    const priorityLabel =
+      directivePriorityLabels[priority] || directivePriorityLabels.medium;
+    hiddenPriority.textContent = `优先级 ${priorityLabel}`;
 
     content.append(priorityDot, text, hiddenPriority);
-    entry.append(content);
-    directiveLog.prepend(entry);
+    listItem.append(content);
 
-    window.setTimeout(() => {
-      entry.classList.remove("is-new");
-    }, 700);
+    if (animate) {
+      window.setTimeout(() => {
+        listItem.classList.remove("is-new");
+      }, 700);
+    }
+
+    return listItem;
   };
 
-  if (directiveForm && directiveInput && directiveLog) {
-    directiveForm.addEventListener("submit", (event) => {
+  const prependDirectiveEntry = (entry, animate = false) => {
+    if (!directiveLog) return;
+    const node = createDirectiveEntry(entry, animate);
+    if (!node) return;
+    directiveLog.prepend(node);
+    const entries = directiveLog.querySelectorAll(".directive-entry");
+    if (entries.length > 6) {
+      entries[entries.length - 1].remove();
+    }
+  };
+
+  if (
+    directiveForm &&
+    directiveLog &&
+    directiveNicknameInput &&
+    directiveMessageInput &&
+    typeof directiveForm.action === "string"
+  ) {
+    directiveForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const value = directiveInput.value.trim();
-      if (!value) return;
-      appendDirectiveLog(value.toUpperCase());
-      directiveInput.value = "";
-      directiveInput.classList.remove("is-commit");
-      window.requestAnimationFrame(() => {
-        directiveInput.classList.add("is-commit");
-      });
-      directiveInput.focus();
+      const nickname = directiveNicknameInput.value.trim();
+      const message = directiveMessageInput.value.trim();
+      if (!nickname || !message) {
+        if (directiveStatus) {
+          directiveStatus.textContent = "请输入昵称和留言";
+        }
+        directiveMessageInput.focus();
+        return;
+      }
+
+      const formData = new FormData(directiveForm);
+      if (directiveTokenInput && !formData.has("_csrf")) {
+        formData.append("_csrf", directiveTokenInput.value);
+      }
+
+      try {
+        if (directiveStatus) {
+          directiveStatus.textContent = "正在提交…";
+        }
+        const response = await fetch(directiveForm.action, {
+          method: "POST",
+          body: formData,
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        const payload = await response
+          .json()
+          .catch(() => ({ ok: false }));
+        if (!response.ok || !payload?.ok) {
+          const errorMessage =
+            payload?.error && typeof payload.error === "string"
+              ? payload.error
+              : "提交失败，请稍后重试";
+          throw new Error(errorMessage);
+        }
+
+        prependDirectiveEntry(payload.entry, true);
+        directiveMessageInput.value = "";
+        directiveMessageInput.classList.remove("is-commit");
+        window.requestAnimationFrame(() => {
+          directiveMessageInput.classList.add("is-commit");
+        });
+        if (directiveStatus) {
+          directiveStatus.textContent = "已记录";
+          window.setTimeout(() => {
+            if (directiveStatus.textContent === "已记录") {
+              directiveStatus.textContent = "";
+            }
+          }, 2000);
+        }
+        directiveMessageInput.focus();
+      } catch (error) {
+        if (directiveStatus) {
+          directiveStatus.textContent =
+            error instanceof Error
+              ? error.message
+              : "提交失败，请稍后重试";
+        }
+      }
     });
   }
 

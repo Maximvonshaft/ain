@@ -7,7 +7,7 @@ use RuntimeException;
 
 class DB
 {
-    private const SCHEMA_VERSION = 3;
+    private const SCHEMA_VERSION = 4;
 
     private static ?PDO $pdo = null;
 
@@ -57,6 +57,8 @@ class DB
         }
 
         self::ensureItemIndexes($pdo);
+        self::ensureFileRegistry($pdo);
+        self::ensureDirectiveLog($pdo);
 
         if ($currentVersion < self::SCHEMA_VERSION) {
             self::setUserVersion($pdo, self::SCHEMA_VERSION);
@@ -197,5 +199,69 @@ class DB
             $pdo->prepare('INSERT INTO mindmaps(title, content, created_at, updated_at) VALUES(?,?,?,?)')
                 ->execute(['默认导图', $defaultPayload, $now, $now]);
         }
+    }
+
+    private static function ensureFileRegistry(PDO $pdo): void
+    {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS files(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            item_id INTEGER,
+            step_id INTEGER,
+            mindmap_id INTEGER,
+            node_uid TEXT,
+            session_key TEXT,
+            orig_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL,
+            mime TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
+            FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE,
+            FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
+        );');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_item ON files(item_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_step ON files(step_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_mindmap ON files(mindmap_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_session ON files(session_key)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_kind_created ON files(kind, created_at DESC, id DESC)');
+
+        $count = (int)$pdo->query('SELECT COUNT(*) FROM files')->fetchColumn();
+        if ($count > 0) {
+            return;
+        }
+
+        if (self::tableExists($pdo, 'attachments')) {
+            $pdo->exec(
+                "INSERT INTO files(kind, item_id, step_id, orig_name, stored_name, mime, size, created_at)
+                 SELECT 'memo', item_id, step_id, orig_name, stored_name, mime, size, created_at FROM attachments"
+            );
+        }
+
+        if (self::tableExists($pdo, 'mindmap_assets')) {
+            $pdo->exec(
+                "INSERT INTO files(kind, mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at)
+                 SELECT 'mindmap', mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at FROM mindmap_assets"
+            );
+        }
+    }
+
+    private static function ensureDirectiveLog(PDO $pdo): void
+    {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS directives(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nickname TEXT NOT NULL,
+            message TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_directives_created ON directives(created_at DESC, id DESC)');
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare('SELECT name FROM sqlite_master WHERE type = "table" AND name = ? LIMIT 1');
+        $stmt->execute([$table]);
+        return (bool)$stmt->fetchColumn();
     }
 }

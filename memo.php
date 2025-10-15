@@ -352,9 +352,11 @@ function memo_run_legacy_migrations(PDO $pdo, bool $init): void {
   }
 
   memo_ensure_item_indexes($pdo);
+  memo_ensure_file_tables($pdo);
+  memo_ensure_directive_tables($pdo);
 
-  if ($currentVersion < 3) {
-    memo_set_user_version($pdo, 3);
+  if ($currentVersion < 4) {
+    memo_set_user_version($pdo, 4);
   }
 }
 
@@ -482,6 +484,67 @@ function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
   }
 }
 
+function memo_table_exists(PDO $pdo, string $table): bool {
+  $stmt = $pdo->prepare('SELECT name FROM sqlite_master WHERE type = "table" AND name = ? LIMIT 1');
+  $stmt->execute([$table]);
+  return (bool)$stmt->fetchColumn();
+}
+
+function memo_ensure_file_tables(PDO $pdo): void {
+  $pdo->exec('CREATE TABLE IF NOT EXISTS files(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    item_id INTEGER,
+    step_id INTEGER,
+    mindmap_id INTEGER,
+    node_uid TEXT,
+    session_key TEXT,
+    orig_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE,
+    FOREIGN KEY(step_id) REFERENCES steps(id) ON DELETE CASCADE,
+    FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
+  );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_item ON files(item_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_step ON files(step_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_mindmap ON files(mindmap_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_session ON files(session_key)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_files_kind_created ON files(kind, created_at DESC, id DESC)');
+
+  $count = (int)$pdo->query('SELECT COUNT(*) FROM files')->fetchColumn();
+  if ($count > 0) {
+    return;
+  }
+
+  if (memo_table_exists($pdo, 'attachments')) {
+    $pdo->exec(
+      "INSERT INTO files(kind, item_id, step_id, orig_name, stored_name, mime, size, created_at)
+       SELECT 'memo', item_id, step_id, orig_name, stored_name, mime, size, created_at FROM attachments"
+    );
+  }
+
+  if (memo_table_exists($pdo, 'mindmap_assets')) {
+    $pdo->exec(
+      "INSERT INTO files(kind, mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at)
+       SELECT 'mindmap', mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at FROM mindmap_assets"
+    );
+  }
+}
+
+function memo_ensure_directive_tables(PDO $pdo): void {
+  $pdo->exec('CREATE TABLE IF NOT EXISTS directives(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nickname TEXT NOT NULL,
+    message TEXT NOT NULL,
+    priority TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_directives_created ON directives(created_at DESC, id DESC)');
+}
+
 function memo_ensure_upload_directory(): void {
   $dir = memo_upload_dir();
   if (!is_dir($dir)) {
@@ -601,12 +664,24 @@ function get_step_counts(array $item_ids): array {
   return $counts;
 }
 
+function get_file_entry(int $id): ?array {
+  $pdo=db();
+  $st=$pdo->prepare('SELECT * FROM files WHERE id=? LIMIT 1');
+  $st->execute([$id]);
+  return $st->fetch() ?: null;
+}
+
 function get_attachment(int $id): ?array {
-  $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE id=? LIMIT 1'); $st->execute([$id]); return $st->fetch() ?: null;
+  $row=get_file_entry($id);
+  if(!$row || ($row['kind'] ?? '')!=='memo'){ return null; }
+  return $row;
 }
 
 function attachments_for_item(int $item_id): array {
-  $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
+  $pdo=db();
+  $st=$pdo->prepare('SELECT * FROM files WHERE kind="memo" AND item_id=? ORDER BY id DESC');
+  $st->execute([$item_id]);
+  return $st->fetchAll();
 }
 
 function attachments_for_items(array $item_ids): array {
@@ -614,7 +689,7 @@ function attachments_for_items(array $item_ids): array {
   if(!$ids){ return []; }
   $pdo=db();
   $placeholders=implode(',', array_fill(0,count($ids),'?'));
-  $st=$pdo->prepare("SELECT * FROM attachments WHERE item_id IN ($placeholders) ORDER BY item_id ASC, id DESC");
+  $st=$pdo->prepare("SELECT * FROM files WHERE kind='memo' AND item_id IN ($placeholders) ORDER BY item_id ASC, id DESC");
   $st->execute($ids);
   $group=[];
   foreach($st->fetchAll() as $row){
@@ -626,15 +701,14 @@ function attachments_for_items(array $item_ids): array {
 }
 
 function get_mindmap_asset(int $id): ?array {
-  $pdo=db();
-  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE id=? LIMIT 1');
-  $st->execute([$id]);
-  return $st->fetch() ?: null;
+  $row=get_file_entry($id);
+  if(!$row || ($row['kind'] ?? '')!=='mindmap'){ return null; }
+  return $row;
 }
 
 function mindmap_assets_for_map(int $map_id): array {
   $pdo=db();
-  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE mindmap_id=?');
+  $st=$pdo->prepare('SELECT * FROM files WHERE kind="mindmap" AND mindmap_id=? ORDER BY id DESC');
   $st->execute([$map_id]);
   return $st->fetchAll();
 }
@@ -642,7 +716,7 @@ function mindmap_assets_for_map(int $map_id): array {
 function mindmap_assets_for_session(string $session_key): array {
   if($session_key==='') return [];
   $pdo=db();
-  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE session_key=?');
+  $st=$pdo->prepare('SELECT * FROM files WHERE kind="mindmap" AND session_key=? ORDER BY id DESC');
   $st->execute([$session_key]);
   return $st->fetchAll();
 }
@@ -652,7 +726,7 @@ function mindmap_assets_by_ids(array $ids): array {
   if(!$ids){ return []; }
   $pdo=db();
   $placeholders=implode(',',array_fill(0,count($ids),'?'));
-  $st=$pdo->prepare("SELECT * FROM mindmap_assets WHERE id IN ($placeholders)");
+  $st=$pdo->prepare("SELECT * FROM files WHERE kind='mindmap' AND id IN ($placeholders)");
   $st->execute($ids);
   $map=[];
   foreach($st->fetchAll() as $row){
@@ -670,13 +744,14 @@ function delete_mindmap_asset(int $id, ?array $asset = null): void {
     if(is_file($path)) @unlink($path);
   }
   $pdo=db();
-  $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
+  $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$id]);
 }
 
 function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name, string $stored_name, string $mime, int $size, string $session_key): array {
   $pdo=db();
-  $pdo->prepare('INSERT INTO mindmap_assets(mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)')
+  $pdo->prepare('INSERT INTO files(kind,mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
     ->execute([
+      'mindmap',
       $map_id>0?$map_id:null,
       $node_uid,
       $map_id>0?null:$session_key,
@@ -695,7 +770,7 @@ function cleanup_stale_mindmap_session_assets(int $max_age_seconds = 172800, int
   $batch_limit = max(1, $batch_limit);
   $threshold = now() - $max_age_seconds;
   $pdo = db();
-  $st = $pdo->prepare("SELECT id, stored_name FROM mindmap_assets WHERE (mindmap_id IS NULL OR mindmap_id=0) AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
+  $st = $pdo->prepare("SELECT id, stored_name FROM files WHERE kind='mindmap' AND (mindmap_id IS NULL OR mindmap_id=0) AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
   $st->execute([$threshold, $batch_limit]);
   foreach($st->fetchAll() as $row){
     $assetId = isset($row['id']) ? (int)$row['id'] : 0;
@@ -705,17 +780,59 @@ function cleanup_stale_mindmap_session_assets(int $max_age_seconds = 172800, int
 
 function prune_mindmap_assets(int $map_id, array $keep_ids): void {
   $pdo=db();
-  $ids=array_values(array_unique(array_map('intval',$keep_ids)));
-  $placeholders=$ids?implode(',',array_fill(0,count($ids),'?')):'';
-  $params=$ids;
-  array_unshift($params,$map_id);
-  $sql=$ids?
-    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
-    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=?";
+  $ids=array_values(array_unique(array_filter(array_map('intval',$keep_ids),fn($v)=>$v>0)));
+  $params=[$map_id];
+  if($ids){
+    $placeholders=implode(',',array_fill(0,count($ids),'?'));
+    $params=array_merge($params,$ids);
+    $sql="SELECT id, stored_name FROM files WHERE kind='mindmap' AND mindmap_id=? AND id NOT IN ($placeholders)";
+  } else {
+    $sql="SELECT id, stored_name FROM files WHERE kind='mindmap' AND mindmap_id=?";
+  }
   $st=$pdo->prepare($sql);
   $st->execute($params);
-  $rows=$st->fetchAll();
-  foreach($rows as $row){ delete_mindmap_asset((int)$row['id'],$row); }
+  foreach($st->fetchAll() as $row){ delete_mindmap_asset((int)$row['id'],$row); }
+}
+
+function memo_file_should_inline(string $mime): bool {
+  $lower=strtolower($mime);
+  if($lower==='') return false;
+  if(str_starts_with($lower,'image/') || str_starts_with($lower,'video/') || str_starts_with($lower,'audio/')){
+    return true;
+  }
+  return in_array($lower,[
+    'application/pdf',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/x-rar-compressed',
+    'application/vnd.rar'
+  ], true);
+}
+
+function memo_send_file_response(array $file): void {
+  $stored=(string)($file['stored_name'] ?? '');
+  if($stored===''){
+    http_response_code(404);
+    echo 'Not Found';
+    exit;
+  }
+  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$stored;
+  if(!is_file($path)){
+    http_response_code(404);
+    echo 'File Missing';
+    exit;
+  }
+  $mime=trim((string)($file['mime'] ?? ''));
+  if($mime===''){ $mime='application/octet-stream'; }
+  $filename=(string)($file['orig_name'] ?? ('file-'.$file['id'] ?? 'attachment'));
+  $size=max(0,(int)($file['size'] ?? 0));
+  $inline=memo_file_should_inline($mime);
+  header('Content-Length: '.$size);
+  header('X-Content-Type-Options: nosniff');
+  header('Content-Type: '.$mime);
+  header('Content-Disposition: '.($inline?'inline':'attachment').'; filename="'.rawurlencode($filename).'"');
+  readfile($path);
+  exit;
 }
 
 // —— 思维导图 ——
@@ -937,7 +1054,7 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
     $aid=(int)$asset_id;
     if($aid<=0) continue;
     $keep_ids[]=$aid;
-    $pdo->prepare('UPDATE mindmap_assets SET mindmap_id=?, node_uid=?, session_key=NULL WHERE id=?')
+    $pdo->prepare("UPDATE files SET mindmap_id=?, node_uid=?, session_key=NULL WHERE id=? AND kind='mindmap'")
       ->execute([$map_id,$node_uid,$aid]);
   }
   prune_mindmap_assets($map_id,$keep_ids);
@@ -947,8 +1064,8 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
     $params=$ids;
     array_unshift($params,$session_key);
     $sql=$ids?
-      "SELECT id, stored_name FROM mindmap_assets WHERE session_key=? AND id NOT IN ($placeholders)" :
-      "SELECT id, stored_name FROM mindmap_assets WHERE session_key=?";
+      "SELECT id, stored_name FROM files WHERE kind='mindmap' AND session_key=? AND id NOT IN ($placeholders)" :
+      "SELECT id, stored_name FROM files WHERE kind='mindmap' AND session_key=?";
     $st=$pdo->prepare($sql);
     $st->execute($params);
     foreach($st->fetchAll() as $row){ delete_mindmap_asset((int)$row['id'],$row); }
@@ -974,31 +1091,22 @@ function json_cats(): void {
 }
 
 // —— 下载附件 ——
+if (isset($_GET['file']) && ctype_digit((string)$_GET['file'])) {
+  $file=get_file_entry((int)$_GET['file']);
+  if(!$file){ http_response_code(404); echo 'Not Found'; exit; }
+  memo_send_file_response($file);
+}
+
 if (isset($_GET['download']) && ctype_digit((string)$_GET['download'])) {
-  $att=get_attachment((int)$_GET['download']); if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
-  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$att['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=strtolower((string)$att['mime']);
-  $filename=$att['orig_name'];
-  $inlineTypes=['application/pdf','application/zip','application/x-zip-compressed','application/x-rar-compressed','application/vnd.rar'];
-  $isInline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || str_starts_with($mime,'audio/') || in_array($mime,$inlineTypes,true);
-  $contentType=$att['mime']!=='' ? $att['mime'] : 'application/octet-stream';
-  header('Content-Length: '.$att['size']);
-  header('X-Content-Type-Options: nosniff');
-  header('Content-Type: '.$contentType);
-  header('Content-Disposition: '.($isInline?'inline':'attachment').'; filename="'.rawurlencode($filename).'"');
-  readfile($path); exit;
+  $att=get_attachment((int)$_GET['download']);
+  if(!$att){ http_response_code(404); echo 'Not Found'; exit; }
+  memo_send_file_response($att);
 }
 
 if (isset($_GET['mindmap_asset']) && ctype_digit((string)$_GET['mindmap_asset'])) {
-  $asset=get_mindmap_asset((int)$_GET['mindmap_asset']); if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
-  $path=memo_upload_dir().DIRECTORY_SEPARATOR.$asset['stored_name']; if(!is_file($path)){ http_response_code(404); echo 'File Missing'; exit; }
-  $mime=$asset['mime'];
-  $filename=$asset['orig_name'];
-  $inline=str_starts_with($mime,'image/') || str_starts_with($mime,'video/') || str_starts_with($mime,'audio/') || $mime==='application/pdf';
-  header('Content-Length: '.$asset['size']); header('Content-Type: '.$mime); header('X-Content-Type-Options: nosniff');
-  if($inline){ header('Content-Disposition: inline; filename="'.rawurlencode($filename).'"'); }
-  else { header('Content-Disposition: attachment; filename="'.rawurlencode($filename).'"'); }
-  readfile($path); exit;
+  $asset=get_mindmap_asset((int)$_GET['mindmap_asset']);
+  if(!$asset){ http_response_code(404); echo 'Not Found'; exit; }
+  memo_send_file_response($asset);
 }
 
 // —— 导出数据（JSON/CSV） ——
@@ -1323,10 +1431,11 @@ if (is_post()) {
             }
           }
           if($attachmentsData){
-            $insertAttachment=$pdo->prepare('INSERT INTO attachments(id,item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)');
+            $insertAttachment=$pdo->prepare("INSERT INTO files(id,kind,item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?,?)");
             foreach($attachmentsData as $att){
               $insertAttachment->execute([
                 (int)$att['id'],
+                'memo',
                 $att['item_id'] !== null ? (int)$att['item_id'] : null,
                 $att['step_id'] !== null ? (int)$att['step_id'] : null,
                 $att['orig_name'],
@@ -1432,8 +1541,8 @@ if (is_post()) {
         if(!$ext) throw new RuntimeException('仅允许图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件');
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $orig=$f['name']; $itemIdForTouch=null;
-        if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
-        else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
+        if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare("INSERT INTO files(kind,item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)")->execute(['memo',$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
+        else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare("INSERT INTO files(kind,item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)")->execute(['memo',$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
         if(is_ajax()){
           $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';
@@ -1473,7 +1582,7 @@ if (is_post()) {
           $att=get_attachment($id);
           if($att){
             $path=memo_upload_dir().DIRECTORY_SEPARATOR.$att['stored_name']; if(is_file($path)) @unlink($path);
-            $pdo->prepare('DELETE FROM attachments WHERE id=?')->execute([$id]);
+            $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$id]);
             $itemId=$att['item_id'] ? (int)$att['item_id'] : null;
             if(!$itemId && $att['step_id']){
               $st=$pdo->prepare('SELECT item_id FROM steps WHERE id=? LIMIT 1');
