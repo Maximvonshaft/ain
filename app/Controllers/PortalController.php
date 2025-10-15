@@ -2,22 +2,15 @@
 
 namespace App\Controllers;
 
-use App\Middlewares\CsrfMiddleware;
 use Core\DB;
 use Core\Request;
 use PDO;
-use RuntimeException;
-use Throwable;
 
 use function bytes_h;
 use function format_datetime;
 
 final class PortalController
 {
-    public function __construct(private CsrfMiddleware $csrf)
-    {
-    }
-
     public function index(Request $request): void
     {
         $pdo = DB::pdo();
@@ -36,56 +29,12 @@ final class PortalController
         $todoItems = $this->loadTodoItems($pdo, $memoUrl);
         $mindmaps = $this->loadMindmaps($pdo, $memoUrl);
         $recentFiles = $this->loadRecentAssets($pdo, $memoUrl);
-        $directives = $this->loadDirectives($pdo);
-        $csrfToken = $this->csrf->token($request);
-        $directivesPostUrl = $prefix . '/directives';
 
         require __DIR__ . '/../../resources/views/portal/index.phtml';
     }
 
-    public function storeDirective(Request $request): void
-    {
-        $pdo = DB::pdo();
-
-        try {
-            $this->csrf->verify($request);
-        } catch (RuntimeException $e) {
-            $this->respondJson(['ok' => 0, 'message' => '会话已过期，请刷新后重试'], 419);
-        }
-
-        $nickname = trim((string)$request->input('nickname', ''));
-        $messageInput = $request->input('message', $request->input('note', ''));
-        $message = trim((string)$messageInput);
-
-        if ($nickname === '' || $message === '') {
-            $this->respondJson(['ok' => 0, 'message' => '昵称和留言均不能为空'], 422);
-        }
-
-        $nickname = mb_substr($nickname, 0, 40);
-        $message = mb_substr($message, 0, 240);
-
-        $createdAt = time();
-
-        try {
-            $stmt = $pdo->prepare('INSERT INTO portal_directives(nickname, message, created_at) VALUES(?,?,?)');
-            $stmt->execute([$nickname, $message, $createdAt]);
-        } catch (Throwable) {
-            $this->respondJson(['ok' => 0, 'message' => '保存留言失败，请稍后再试'], 500);
-        }
-
-        $id = (int)$pdo->lastInsertId();
-        $payload = $this->formatDirectiveRow([
-            'id' => $id,
-            'nickname' => $nickname,
-            'message' => $message,
-            'created_at' => $createdAt,
-        ]);
-
-        $this->respondJson(['ok' => 1, 'directive' => $payload], 201);
-    }
-
     /**
-     * @return array<int, array{id:int,title:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}>
+     * @return array<int, array{id:int,title:string,title_full:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}>
      */
     private function loadTodoItems(PDO $pdo, string $memoUrl): array
     {
@@ -107,10 +56,16 @@ final class PortalController
             $updatedAt = isset($row['updated_at']) ? (int)$row['updated_at'] : null;
             $updatedLabel = $updatedAt ? '最近修改 ' . format_datetime($updatedAt) : '';
             $updatedIso = $updatedAt ? date('c', $updatedAt) : '';
+            $titleRaw = (string)($row['title'] ?? '未命名任务');
+            if (trim($titleRaw) === '') {
+                $titleRaw = '未命名任务';
+            }
+            $titleDisplay = $this->truncateLabel($titleRaw, 32);
 
             $result[] = [
                 'id' => (int)($row['id'] ?? 0),
-                'title' => (string)($row['title'] ?? '未命名任务'),
+                'title' => $titleDisplay,
+                'title_full' => $titleRaw,
                 'done' => $done,
                 'updated_at' => $updatedAt,
                 'updated_label' => $updatedLabel,
@@ -149,10 +104,16 @@ final class PortalController
             $updatedAt = isset($row['updated_at']) ? (int)$row['updated_at'] : null;
             $updatedLabel = $updatedAt ? '最近修改 ' . format_datetime($updatedAt) : '';
             $updatedIso = $updatedAt ? date('c', $updatedAt) : '';
+            $titleRaw = trim((string)($row['title'] ?? ''));
+            if ($titleRaw === '') {
+                $titleRaw = '未命名导图';
+            }
+            $titleDisplay = $this->truncateLabel($titleRaw, 26);
 
             $result[] = [
                 'id' => (int)($row['id'] ?? 0),
-                'title' => (string)($row['title'] ?? '未命名导图'),
+                'title' => $titleDisplay,
+                'title_full' => $titleRaw,
                 'status' => $statusMeta['status'],
                 'status_label' => $statusMeta['label'],
                 'summary' => $summaryData['summary'],
@@ -233,7 +194,9 @@ final class PortalController
                 if ($mapTitle === '') {
                     $mapTitle = '未命名导图';
                 }
-                $ownerLabel = '导图 · ' . $mapTitle;
+                $mapTitleDisplay = $this->truncateLabel($mapTitle, 26);
+                $ownerLabel = '导图 · ' . $mapTitleDisplay;
+                $ownerLabelFull = '导图 · ' . $mapTitle;
                 if ($mapId > 0) {
                     $ownerUrl = $memoUrl . '?view=map_edit&id=' . $mapId;
                 }
@@ -244,99 +207,71 @@ final class PortalController
                 if ($title === '') {
                     $title = '未命名条目';
                 }
+                $titleDisplay = $this->truncateLabel($title, 26);
                 if ($context === 'memo:step') {
-                    $ownerLabel = '步骤 · ' . $title;
+                    $ownerLabel = '步骤 · ' . $titleDisplay;
+                    $ownerLabelFull = '步骤 · ' . $title;
                 } else {
-                    $ownerLabel = '备忘录 · ' . $title;
+                    $ownerLabel = '备忘录 · ' . $titleDisplay;
+                    $ownerLabelFull = '备忘录 · ' . $title;
                 }
                 if ($resolvedItemId > 0) {
                     $ownerUrl = $memoUrl . '?view=item&id=' . $resolvedItemId;
                 }
             }
 
+            if (!isset($ownerLabelFull)) {
+                $ownerLabelFull = $ownerLabel;
+            }
+
+            $displayName = $this->truncateLabel($fileName, 30);
+
             $result[] = [
                 'id' => $id,
-                'name' => $fileName,
+                'name' => $displayName,
+                'name_full' => $fileName,
                 'context' => $context,
                 'context_label' => $contextLabel,
                 'owner_label' => $ownerLabel,
+                'owner_label_full' => $ownerLabelFull,
                 'owner_url' => $ownerUrl,
                 'size_label' => $sizeLabel,
                 'created_label' => $createdLabel,
                 'created_iso' => $createdIso,
                 'download_url' => $memoUrl . '?download=' . $id,
             ];
+
+            unset($ownerLabelFull);
         }
 
         return $result;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function loadDirectives(PDO $pdo): array
+    private function truncateLabel(string $label, int $maxLength): string
     {
-        $stmt = $pdo->query(
-            'SELECT id, nickname, message, created_at FROM portal_directives ORDER BY created_at DESC, id DESC LIMIT 12'
-        );
-        $rows = $stmt ? $stmt->fetchAll() : [];
-        if (!$rows) {
-            return [];
+        $clean = trim($label);
+        if ($clean === '') {
+            return '';
         }
 
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = $this->formatDirectiveRow($row);
+        if (mb_strlen($clean) <= $maxLength) {
+            return $clean;
         }
 
-        return $result;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
-     */
-    private function formatDirectiveRow(array $row): array
-    {
-        $id = (int)($row['id'] ?? 0);
-        $nickname = trim((string)($row['nickname'] ?? ''));
-        if ($nickname === '') {
-            $nickname = '匿名特工';
-        }
-        $message = trim((string)($row['message'] ?? ''));
-        $createdAt = isset($row['created_at']) ? (int)$row['created_at'] : time();
-        if ($createdAt <= 0) {
-            $createdAt = time();
+        $ellipsis = '...';
+        $available = $maxLength - mb_strlen($ellipsis);
+        if ($available <= 0) {
+            return mb_substr($clean, 0, $maxLength);
         }
 
-        return [
-            'id' => $id,
-            'nickname' => $nickname,
-            'message' => $message,
-            'created_at' => $createdAt,
-            'created_label' => date('H:i:s', $createdAt),
-            'created_iso' => date('c', $createdAt),
-            'priority' => $this->determineDirectivePriority($id),
-        ];
-    }
+        $front = (int)ceil($available / 2);
+        $back = $available - $front;
 
-    private function determineDirectivePriority(int $id): string
-    {
-        $cycle = ['high', 'medium', 'low'];
-        $count = count($cycle);
-        if ($count === 0) {
-            return 'medium';
+        if ($back <= 0) {
+            return mb_substr($clean, 0, $available) . $ellipsis;
         }
-        $index = $id % $count;
-        return $cycle[$index];
-    }
 
-    private function respondJson(array $payload, int $status = 200): void
-    {
-        http_response_code($status);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
-        exit;
+        return mb_substr($clean, 0, $front) . $ellipsis . mb_substr($clean, -$back);
     }
 
     /**

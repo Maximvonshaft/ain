@@ -1,16 +1,13 @@
 <?php
 /**
- * @var array<int, array{id:int,title:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $todoItems
- * @var array<int, array{id:int,title:string,status:string,status_label:string,summary:string,nodes:array<int,string>,node_count:int,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $mindmaps
- * @var array<int, array<string, mixed>> $recentFiles
- * @var array<int, array<string, mixed>> $directives
+ * @var array<int, array{id:int,title:string,title_full:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $todoItems
+ * @var array<int, array{id:int,title:string,title_full:string,status:string,status_label:string,summary:string,nodes:array<int,string>,node_count:int,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $mindmaps
+ * @var array<int, array{id:int,name:string,name_full:string,context:string,context_label:string,owner_label:string,owner_label_full:string,owner_url:string,size_label:string,created_label:string,created_iso:string,download_url:string}> $recentFiles
  * @var callable(string):string $asset
  * @var string $memoUrl
  * @var string $mindmapUrl
  * @var string $basePath
- * @var string $csrfToken
- * @var string $directivesPostUrl
- */
+*/
 ?>
 <!doctype html>
 <html lang="zh">
@@ -245,7 +242,11 @@
                     <li class="todo-entry">
                       <span class="todo-indicator<?= $item['done'] ? ' done' : ''; ?>"></span>
                       <div class="todo-content">
-                        <a class="todo-text" href="<?= view_escape($item['url']); ?>">
+                        <a
+                          class="todo-text"
+                          href="<?= view_escape($item['url']); ?>"
+                          title="<?= view_escape($item['title_full'] ?? $item['title']); ?>"
+                        >
                           <?= view_escape($item['title']); ?>
                         </a>
                         <?php if ($item['updated_label'] !== ''): ?>
@@ -288,16 +289,30 @@
                         rel="noopener"
                       >
                         <span class="file-entry-code"><?= view_escape((string)$file['context_label']); ?></span>
-                        <span class="file-entry-name"><?= view_escape((string)$file['name']); ?></span>
+                        <span
+                          class="file-entry-name"
+                          title="<?= view_escape((string)($file['name_full'] ?? $file['name'])); ?>"
+                        >
+                          <?= view_escape((string)$file['name']); ?>
+                        </span>
                       </a>
                       <div class="file-entry-meta">
                         <?php if (($file['owner_label'] ?? '') !== ''): ?>
                           <?php if (($file['owner_url'] ?? '') !== ''): ?>
-                            <a class="file-entry-source" href="<?= view_escape($file['owner_url']); ?>">
+                            <a
+                              class="file-entry-source"
+                              href="<?= view_escape($file['owner_url']); ?>"
+                              title="<?= view_escape((string)($file['owner_label_full'] ?? $file['owner_label'])); ?>"
+                            >
                               <?= view_escape((string)$file['owner_label']); ?>
                             </a>
                           <?php else: ?>
-                            <span class="file-entry-source"><?= view_escape((string)$file['owner_label']); ?></span>
+                            <span
+                              class="file-entry-source"
+                              title="<?= view_escape((string)($file['owner_label_full'] ?? $file['owner_label'])); ?>"
+                            >
+                              <?= view_escape((string)$file['owner_label']); ?>
+                            </span>
                           <?php endif; ?>
                         <?php endif; ?>
                         <?php if (($file['size_label'] ?? '') !== ''): ?>
@@ -337,7 +352,12 @@
                   <?php foreach ($mindmaps as $map): ?>
                     <article class="map-card" data-status="<?= view_escape($map['status']); ?>">
                       <header class="map-card-header">
-                        <span class="map-card-title"><?= view_escape($map['title']); ?></span>
+                        <span
+                          class="map-card-title"
+                          title="<?= view_escape($map['title_full'] ?? $map['title']); ?>"
+                        >
+                          <?= view_escape($map['title']); ?>
+                        </span>
                         <span class="map-card-status"><?= view_escape($map['status_label']); ?></span>
                       </header>
                       <a class="map-card-body" href="<?= view_escape($map['url']); ?>">
@@ -437,75 +457,6 @@
             <span class="encrypted-file__glare" aria-hidden="true"></span>
           </div>
         </section>
-        <section class="directive-block" aria-labelledby="directive-heading">
-          <header class="section-heading" id="directive-heading">
-            DIRECTIVES
-          </header>
-          <ul class="directive-log">
-            <?php if ($directives !== []): ?>
-              <?php foreach ($directives as $directive): ?>
-                <li class="directive-entry" data-priority="<?= view_escape((string)$directive['priority']); ?>">
-                  <span class="directive-content">
-                    <span class="directive-priority <?= view_escape((string)$directive['priority']); ?>" aria-hidden="true"></span>
-                    <span class="directive-text">
-                      <span class="directive-message"><?= view_escape((string)$directive['message']); ?></span>
-                      <span class="directive-meta">
-                        <span class="directive-author" aria-label="Author"><?= view_escape((string)$directive['nickname']); ?></span>
-                        <span class="directive-divider" aria-hidden="true">—</span>
-                        <time class="directive-time"<?php if (($directive['created_iso'] ?? '') !== ''): ?> datetime="<?= view_escape((string)$directive['created_iso']); ?>"<?php endif; ?>>
-                          <?= view_escape((string)$directive['created_label']); ?>
-                        </time>
-                      </span>
-                    </span>
-                    <span class="visually-hidden">Priority <?= view_escape(strtoupper((string)$directive['priority'])); ?></span>
-                  </span>
-                </li>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <li class="directive-entry directive-entry--empty" data-priority="medium">
-                <span class="directive-content">
-                  <span class="directive-priority medium" aria-hidden="true"></span>
-                  <span class="directive-text">
-                    <span class="directive-message">暂无留言，成为第一位发言者。</span>
-                  </span>
-                </span>
-              </li>
-            <?php endif; ?>
-          </ul>
-          <form
-            class="note-form"
-            autocomplete="off"
-            method="post"
-            action="<?= view_escape($directivesPostUrl); ?>"
-            data-endpoint="<?= view_escape($directivesPostUrl); ?>"
-          >
-            <input type="hidden" name="_csrf" value="<?= view_escape($csrfToken); ?>" />
-            <div class="note-form-fields">
-              <label class="visually-hidden" for="note-nickname">留言昵称</label>
-              <input
-                id="note-nickname"
-                name="nickname"
-                type="text"
-                maxlength="40"
-                placeholder=">> 输入昵称"
-                aria-label="留言昵称"
-                required
-              />
-              <label class="visually-hidden" for="note-input">留言内容</label>
-              <input
-                id="note-input"
-                name="message"
-                type="text"
-                maxlength="240"
-                placeholder=">> 输入留言并按回车发送"
-                aria-label="输入新留言"
-                required
-              />
-            </div>
-            <p class="note-form-feedback" data-feedback role="status" aria-live="polite"></p>
-          </form>
-        </section>
-
         <section class="queue-card" aria-labelledby="queue-heading">
           <header class="section-heading" id="queue-heading">QUEUE</header>
           <ol class="queue-list">
