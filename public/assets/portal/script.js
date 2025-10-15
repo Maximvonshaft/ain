@@ -12,24 +12,6 @@
     return { lat, lon };
   })();
 
-  const directiveForm = document.querySelector(".note-form");
-  const directiveMessageInput = directiveForm
-    ? directiveForm.querySelector("input[name='message']")
-    : null;
-  const directiveNicknameInput = directiveForm
-    ? directiveForm.querySelector("input[name='nickname']")
-    : null;
-  const directiveTokenInput = directiveForm
-    ? directiveForm.querySelector("input[name='_csrf']")
-    : null;
-  const directiveFeedback = directiveForm
-    ? directiveForm.querySelector("[data-feedback]")
-    : null;
-  const directiveEndpoint = directiveForm
-    ? directiveForm.dataset.endpoint || directiveForm.getAttribute("action") || ""
-    : "";
-  const directiveLog = document.querySelector(".directive-log");
-
   const channelList = document.querySelector(".channel-list");
   const channelEntries = channelList
     ? Array.from(channelList.querySelectorAll(".channel-entry"))
@@ -729,162 +711,6 @@
     coordinateElements.lon.textContent = formatCoordinate(lon, "lon");
   };
 
-  const directiveTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  });
-
-  const setDirectiveFeedback = (message, state = "info") => {
-    if (!directiveFeedback) return;
-    directiveFeedback.textContent = message || "";
-    directiveFeedback.dataset.state = state;
-  };
-
-  const appendDirectiveLog = (entry = {}, highlight = true) => {
-    if (!directiveLog) return null;
-    const priority =
-      typeof entry.priority === "string" && entry.priority
-        ? entry.priority
-        : "medium";
-    const listItem = document.createElement("li");
-    listItem.className = "directive-entry";
-    listItem.dataset.priority = priority;
-    if (highlight) {
-      listItem.classList.add("is-new");
-    }
-
-    const content = document.createElement("span");
-    content.className = "directive-content";
-
-    const priorityDot = document.createElement("span");
-    priorityDot.className = `directive-priority ${priority}`;
-    priorityDot.setAttribute("aria-hidden", "true");
-
-    const text = document.createElement("span");
-    text.className = "directive-text";
-
-    const directiveMessage = document.createElement("span");
-    directiveMessage.className = "directive-message";
-    directiveMessage.textContent = entry.message || "";
-
-    const meta = document.createElement("span");
-    meta.className = "directive-meta";
-
-    const author = document.createElement("span");
-    author.className = "directive-author";
-    author.setAttribute("aria-label", "Author");
-    author.textContent = entry.nickname || "";
-
-    const divider = document.createElement("span");
-    divider.className = "directive-divider";
-    divider.setAttribute("aria-hidden", "true");
-    divider.textContent = "—";
-
-    const time = document.createElement("time");
-    time.className = "directive-time";
-    const timestamp =
-      typeof entry.created_at === "number" && entry.created_at > 0
-        ? entry.created_at * 1000
-        : Date.now();
-    const formattedLabel =
-      entry.created_label || directiveTimeFormatter.format(new Date(timestamp));
-    time.textContent = formattedLabel;
-    if (entry.created_iso) {
-      time.dateTime = entry.created_iso;
-    } else {
-      time.dateTime = new Date(timestamp).toISOString();
-    }
-
-    meta.append(author, divider, time);
-    text.append(directiveMessage, meta);
-
-    const hiddenPriority = document.createElement("span");
-    hiddenPriority.className = "visually-hidden";
-    hiddenPriority.textContent = `Priority ${priority.toUpperCase()}`;
-
-    content.append(priorityDot, text, hiddenPriority);
-    listItem.append(content);
-    directiveLog.prepend(listItem);
-
-    if (highlight) {
-      window.setTimeout(() => {
-        listItem.classList.remove("is-new");
-      }, 700);
-    }
-
-    return listItem;
-  };
-
-  if (
-    directiveForm &&
-    directiveMessageInput &&
-    directiveNicknameInput &&
-    directiveTokenInput &&
-    directiveLog
-  ) {
-    directiveForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const nickname = directiveNicknameInput.value.trim();
-      const message = directiveMessageInput.value.trim();
-      if (!nickname || !message) {
-        setDirectiveFeedback("请填写昵称和留言内容", "error");
-        return;
-      }
-      if (!directiveEndpoint) {
-        setDirectiveFeedback("提交地址缺失", "error");
-        return;
-      }
-
-      const params = new URLSearchParams();
-      params.set("nickname", nickname);
-      params.set("message", message);
-      params.set("_csrf", directiveTokenInput.value || "");
-
-      directiveForm.classList.add("is-submitting");
-      directiveMessageInput.disabled = true;
-      directiveNicknameInput.disabled = true;
-      setDirectiveFeedback("正在提交…", "info");
-
-      try {
-        const response = await fetch(directiveEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            Accept: "application/json",
-          },
-          body: params.toString(),
-        });
-
-        const contentType = response.headers.get("content-type") || "";
-        const isJson = contentType.includes("application/json");
-        const payload = isJson ? await response.json() : null;
-
-        if (!response.ok || !payload?.ok) {
-          const feedback = payload?.message || "留言提交失败，请稍后再试";
-          setDirectiveFeedback(feedback, "error");
-          return;
-        }
-
-        appendDirectiveLog(payload.directive || {}, true);
-        setDirectiveFeedback("留言已记录", "success");
-        directiveMessageInput.value = "";
-        window.requestAnimationFrame(() => {
-          directiveMessageInput.classList.add("is-commit");
-        });
-      } catch (error) {
-        setDirectiveFeedback("网络异常，请稍后再试", "error");
-      } finally {
-        directiveForm.classList.remove("is-submitting");
-        directiveMessageInput.disabled = false;
-        directiveNicknameInput.disabled = false;
-        directiveMessageInput.focus();
-      }
-    });
-  }
-
   const channelFormatterCache = new Map();
   const getChannelFormatter = (timezone) => {
     if (!timezone) return null;
@@ -931,260 +757,224 @@
     scrambleTrack.style.setProperty("--scramble-duration", `${duration}s`);
   }
 
-  const initializeMap = () => {
-    const mapElement = document.getElementById("map");
-    if (!mapElement || typeof L === "undefined") {
+  const mapOverlay = document.querySelector(".map-overlay");
+  const networkNodes = [
+    {
+      id: "albania",
+      label: "ALBANIA",
+      coords: [41.1533, 20.1683],
+    },
+    {
+      id: "switzerland",
+      label: "SWITZERLAND",
+      coords: [46.8182, 8.2275],
+    },
+    {
+      id: "beijing",
+      label: "BEIJING",
+      coords: [39.9042, 116.4074],
+    },
+    {
+      id: "shanghai",
+      label: "SHANGHAI",
+      coords: [31.2304, 121.4737],
+    },
+    {
+      id: "dubai",
+      label: "DUBAI",
+      coords: [25.2048, 55.2708],
+    },
+    {
+      id: "huludao",
+      label: "HULUDAO",
+      coords: [40.709, 120.8377],
+    },
+    {
+      id: "philippines",
+      label: "PHILIPPINES",
+      coords: [12.8797, 121.774],
+    },
+    {
+      id: "zhengzhou",
+      label: "ZHENGZHOU",
+      coords: [34.7466, 113.6254],
+    },
+    {
+      id: "pingdingshan",
+      label: "PINGDINGSHAN",
+      coords: [33.7665, 113.1927],
+    },
+  ];
+
+  const projectCoordinates = (coords) => {
+    if (!Array.isArray(coords) || coords.length < 2) {
+      return null;
+    }
+    const [lat, lon] = coords;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return null;
+    }
+    const x = ((lon + 180) / 360) * 100;
+    const y = ((90 - lat) / 180) * 100;
+    return {
+      x: clamp(x, 0, 100),
+      y: clamp(y, 0, 100),
+    };
+  };
+
+  const markers = new Map();
+  let activeNodeIndex = -1;
+  let rotationTimerId = null;
+  let targetingTimerId = null;
+  const rotationInterval = 7000;
+
+  const setOverlayLabel = (label) => {
+    if (!mapOverlay) return;
+    mapOverlay.setAttribute("data-active-label", label || "");
+  };
+
+  const triggerTargetingPulse = () => {
+    if (!mapScreen) return;
+    mapScreen.classList.add("is-targeting");
+    if (targetingTimerId) {
+      window.clearTimeout(targetingTimerId);
+    }
+    targetingTimerId = window.setTimeout(() => {
+      mapScreen.classList.remove("is-targeting");
+    }, 900);
+  };
+
+  const resetRotation = () => {
+    if (rotationTimerId) {
+      window.clearInterval(rotationTimerId);
+      rotationTimerId = null;
+    }
+  };
+
+  const startRotation = () => {
+    if (!networkNodes.length) {
+      return;
+    }
+    resetRotation();
+    rotationTimerId = window.setInterval(() => {
+      const nextIndex = (activeNodeIndex + 1) % networkNodes.length;
+      setActiveNode(nextIndex);
+    }, rotationInterval);
+  };
+
+  const setActiveNode = (index, { manual = false } = {}) => {
+    if (!networkNodes.length) {
+      resetCoordinateDisplay();
+      setOverlayLabel("");
       return;
     }
 
-    const worldBounds = [
-      [-90, -180],
-      [90, 180],
-    ];
+    const boundedIndex = ((index % networkNodes.length) + networkNodes.length) % networkNodes.length;
+    if (boundedIndex === activeNodeIndex && !manual) {
+      return;
+    }
 
-    const map = L.map(mapElement, {
-      worldCopyJump: false,
-      zoomControl: false,
-      attributionControl: false,
-      maxBoundsViscosity: 0.8,
-      maxBounds: worldBounds,
-      minZoom: 2,
-      maxZoom: 8,
-    }).setView([20, 0], 2);
-
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {
-        maxZoom: 19,
-        minZoom: 2,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-          '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-      },
-    ).addTo(map);
-
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png",
-      {
-        maxZoom: 18,
-        opacity: 0.25,
-        attribution:
-          'Linework by <a href="http://stamen.com">Stamen Design</a> under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>',
-      },
-    ).addTo(map);
-
-    L.tileLayer(
-      "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png",
-      {
-        maxZoom: 20,
-        attribution:
-          'Labels by <a href="http://stamen.com">Stamen Design</a> ' +
-          'under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>.' +
-          ' Data © <a href="http://openstreetmap.org">OpenStreetMap</a>',
-      },
-    ).addTo(map);
-
-    const focusMarkerIcon = L.divIcon({
-      className: "active-location-marker",
-      html: `
-        <span class="marker-star" aria-hidden="true">★</span>
-      `,
-      iconSize: [44, 44],
-      iconAnchor: [22, 22],
-      tooltipAnchor: [0, -24],
-    });
-
-    const focusMarker = L.marker([0, 0], {
-      icon: focusMarkerIcon,
-      interactive: false,
-    });
-
-    const normaliseCoords = (coords) => {
-      if (!coords) return null;
-      if (Array.isArray(coords) && coords.length >= 2) {
-        const [lat, lon] = coords;
-        if (Number.isFinite(lat) && Number.isFinite(lon)) {
-          return [lat, lon];
-        }
-        return null;
+    const previousNode = activeNodeIndex >= 0 ? networkNodes[activeNodeIndex] : null;
+    if (previousNode) {
+      const previousMarker = markers.get(resolveNodeKey(previousNode, activeNodeIndex));
+      if (previousMarker) {
+        previousMarker.classList.remove("is-active");
+        previousMarker.setAttribute("aria-pressed", "false");
       }
-      if (typeof coords.lat === "number" && typeof coords.lng === "number") {
-        return [coords.lat, coords.lng];
-      }
-      if (typeof coords.lat === "number" && typeof coords.lon === "number") {
-        return [coords.lat, coords.lon];
-      }
+    }
+
+    activeNodeIndex = boundedIndex;
+    const node = networkNodes[boundedIndex];
+    const marker = markers.get(resolveNodeKey(node, boundedIndex));
+    if (marker) {
+      marker.classList.add("is-active");
+      marker.setAttribute("aria-pressed", "true");
+    }
+
+    updateCoordinateDisplay(node.coords);
+    setOverlayLabel(node.label || "");
+    triggerTargetingPulse();
+
+    if (manual) {
+      startRotation();
+    }
+  };
+
+  const resolveNodeKey = (node, index) => {
+    if (node && typeof node.id === "string" && node.id.trim() !== "") {
+      return node.id;
+    }
+    return `node-${index}`;
+  };
+
+  const createMarkerElement = (node, index) => {
+    const position = projectCoordinates(node.coords);
+    if (!position) {
       return null;
+    }
+
+    const marker = document.createElement("button");
+    marker.type = "button";
+    marker.className = "network-marker";
+    marker.style.left = `${position.x}%`;
+    marker.style.top = `${position.y}%`;
+    const nodeKey = resolveNodeKey(node, index);
+    marker.dataset.nodeId = nodeKey;
+    marker.setAttribute("aria-label", `${node.label ?? "Network node"} node`);
+    marker.setAttribute("aria-pressed", "false");
+    marker.title = node.label || "";
+
+    const activate = () => {
+      setActiveNode(index, { manual: true });
     };
 
-    const ensureMarkerVisible = (coords) => {
-      if (!coords) return;
-      if (!map.hasLayer(focusMarker)) {
-        focusMarker.addTo(map);
+    marker.addEventListener("click", activate);
+    marker.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activate();
       }
-      focusMarker.setLatLng(coords);
-    };
+    });
 
-    const pointToLocation = (coords, { shouldFly = false, zoom } = {}) => {
-      const target = normaliseCoords(coords);
-      if (!target) {
-        resetCoordinateDisplay();
+    return marker;
+  };
+
+  const buildNetworkLayer = (container) => {
+    markers.clear();
+    networkNodes.forEach((node, index) => {
+      const marker = createMarkerElement(node, index);
+      if (!marker) {
         return;
       }
-      ensureMarkerVisible(target);
-      if (shouldFly) {
-        map.flyTo(target, zoom ?? Math.max(map.getZoom(), 4.5), {
-          duration: 0.8,
-        });
-      }
-      updateCoordinateDisplay(target);
-    };
-
-    const networkNodes = [
-      {
-        id: "albania",
-        label: "ALBANIA",
-        coords: [41.1533, 20.1683],
-        pulseDelay: 0,
-      },
-      {
-        id: "switzerland",
-        label: "SWITZERLAND",
-        coords: [46.8182, 8.2275],
-        pulseDelay: 0.6,
-      },
-      {
-        id: "beijing",
-        label: "BEIJING",
-        coords: [39.9042, 116.4074],
-        pulseDelay: 1.2,
-      },
-      {
-        id: "shanghai",
-        label: "SHANGHAI",
-        coords: [31.2304, 121.4737],
-        pulseDelay: 1.8,
-      },
-      {
-        id: "dubai",
-        label: "DUBAI",
-        coords: [25.2048, 55.2708],
-        pulseDelay: 2.4,
-        zoom: 6,
-      },
-      {
-        id: "huludao",
-        label: "HULUDAO",
-        coords: [40.709, 120.8377],
-        pulseDelay: 3,
-      },
-      {
-        id: "philippines",
-        label: "PHILIPPINES",
-        coords: [12.8797, 121.774],
-        pulseDelay: 3.6,
-      },
-      {
-        id: "zhengzhou",
-        label: "ZHENGZHOU",
-        coords: [34.7466, 113.6254],
-        pulseDelay: 4.2,
-      },
-      {
-        id: "pingdingshan",
-        label: "PINGDINGSHAN",
-        coords: [33.7665, 113.1927],
-        pulseDelay: 4.8,
-      },
-    ];
-
-    const nodeIcon = (delay = 0) =>
-      L.divIcon({
-        className: "network-pin",
-        html: `
-          <span class="pin-tail"></span>
-          <span class="pin-core"></span>
-          <span class="pin-pulse" style="animation-delay: ${delay}s"></span>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 26],
-        tooltipAnchor: [0, -22],
-      });
-
-    networkNodes.forEach((node) => {
-      const marker = L.marker(node.coords, { icon: nodeIcon(node.pulseDelay) })
-        .addTo(map)
-        .bindTooltip(node.label, {
-          direction: "top",
-          offset: [0, -24],
-          className: "network-tooltip",
-        });
-
-      marker.on("click", () => {
-        pointToLocation(node.coords, { shouldFly: true, zoom: node.zoom ?? 5 });
-      });
-    });
-
-    const updateCoordinatesFromMap = () => {
-      const center = map.getCenter();
-      const target = normaliseCoords(center);
-      if (!target) {
-        resetCoordinateDisplay();
-        return;
-      }
-      ensureMarkerVisible(target);
-      updateCoordinateDisplay(target);
-    };
-
-    map.whenReady(() => {
-      updateCoordinatesFromMap();
-    });
-
-    map.on("move", updateCoordinatesFromMap);
-    map.on("moveend", updateCoordinatesFromMap);
-    map.on("zoomend", updateCoordinatesFromMap);
-
-    map.on("click", (event) => {
-      pointToLocation(event.latlng);
-    });
-
-    let moveVisualTimeoutId = null;
-
-    map.on("movestart", () => {
-      if (moveVisualTimeoutId) {
-        window.clearTimeout(moveVisualTimeoutId);
-        moveVisualTimeoutId = null;
-      }
-      if (mapScreen) {
-        mapScreen.classList.add("is-moving");
-      }
-    });
-
-    map.on("moveend", () => {
-      if (moveVisualTimeoutId) {
-        window.clearTimeout(moveVisualTimeoutId);
-      }
-      moveVisualTimeoutId = window.setTimeout(() => {
-        if (mapScreen) {
-          mapScreen.classList.remove("is-moving");
-        }
-      }, 240);
-    });
-
-    map.on("unload", () => {
-      if (moveVisualTimeoutId) {
-        window.clearTimeout(moveVisualTimeoutId);
-        moveVisualTimeoutId = null;
-      }
-      if (mapScreen) {
-        mapScreen.classList.remove("is-moving");
-      }
+      container.append(marker);
+      markers.set(resolveNodeKey(node, index), marker);
     });
   };
 
+  const initializeNetworkDisplay = () => {
+    const mapElement = document.getElementById("map");
+    if (!mapElement) {
+      return;
+    }
+
+    mapElement.textContent = "";
+    setOverlayLabel("");
+    const layer = document.createElement("div");
+    layer.className = "map-network-layer";
+    mapElement.append(layer);
+    buildNetworkLayer(layer);
+
+    if (networkNodes.length) {
+      setActiveNode(0);
+      startRotation();
+    } else {
+      resetCoordinateDisplay();
+    }
+  };
+
   if (document.readyState === "complete") {
-    initializeMap();
+    initializeNetworkDisplay();
   } else {
-    window.addEventListener("load", initializeMap, { once: true });
+    window.addEventListener("load", initializeNetworkDisplay, { once: true });
   }
 })();

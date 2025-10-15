@@ -2,22 +2,15 @@
 
 namespace App\Controllers;
 
-use App\Middlewares\CsrfMiddleware;
 use Core\DB;
 use Core\Request;
 use PDO;
-use RuntimeException;
-use Throwable;
 
 use function bytes_h;
 use function format_datetime;
 
 final class PortalController
 {
-    public function __construct(private CsrfMiddleware $csrf)
-    {
-    }
-
     public function index(Request $request): void
     {
         $pdo = DB::pdo();
@@ -36,52 +29,7 @@ final class PortalController
         $todoItems = $this->loadTodoItems($pdo, $memoUrl);
         $mindmaps = $this->loadMindmaps($pdo, $memoUrl);
         $recentFiles = $this->loadRecentAssets($pdo, $memoUrl);
-        $directives = $this->loadDirectives($pdo);
-        $csrfToken = $this->csrf->token($request);
-        $directivesPostUrl = $prefix . '/directives';
-
         require __DIR__ . '/../../resources/views/portal/index.phtml';
-    }
-
-    public function storeDirective(Request $request): void
-    {
-        $pdo = DB::pdo();
-
-        try {
-            $this->csrf->verify($request);
-        } catch (RuntimeException $e) {
-            $this->respondJson(['ok' => 0, 'message' => '会话已过期，请刷新后重试'], 419);
-        }
-
-        $nickname = trim((string)$request->input('nickname', ''));
-        $messageInput = $request->input('message', $request->input('note', ''));
-        $message = trim((string)$messageInput);
-
-        if ($nickname === '' || $message === '') {
-            $this->respondJson(['ok' => 0, 'message' => '昵称和留言均不能为空'], 422);
-        }
-
-        $nickname = mb_substr($nickname, 0, 40);
-        $message = mb_substr($message, 0, 240);
-
-        $createdAt = time();
-
-        try {
-            $stmt = $pdo->prepare('INSERT INTO portal_directives(nickname, message, created_at) VALUES(?,?,?)');
-            $stmt->execute([$nickname, $message, $createdAt]);
-        } catch (Throwable) {
-            $this->respondJson(['ok' => 0, 'message' => '保存留言失败，请稍后再试'], 500);
-        }
-
-        $id = (int)$pdo->lastInsertId();
-        $payload = $this->formatDirectiveRow([
-            'id' => $id,
-            'nickname' => $nickname,
-            'message' => $message,
-            'created_at' => $createdAt,
-        ]);
-
-        $this->respondJson(['ok' => 1, 'directive' => $payload], 201);
     }
 
     /**
@@ -93,7 +41,7 @@ final class PortalController
             'SELECT items.id, items.title, items.done, items.updated_at
             FROM items
             ORDER BY items.updated_at DESC, items.id DESC
-            LIMIT 4'
+            LIMIT 5'
         );
         $stmt->execute();
         $items = $stmt->fetchAll();
@@ -128,7 +76,7 @@ final class PortalController
     private function loadMindmaps(PDO $pdo, string $memoUrl): array
     {
         $stmt = $pdo->query(
-            'SELECT id, title, content, updated_at FROM mindmaps ORDER BY updated_at DESC, id DESC LIMIT 4'
+            'SELECT id, title, content, updated_at FROM mindmaps ORDER BY updated_at DESC, id DESC LIMIT 5'
         );
         $rows = $stmt ? $stmt->fetchAll() : [];
         if (!$rows) {
@@ -186,7 +134,7 @@ final class PortalController
              LEFT JOIN mindmaps AS m ON m.id = a.mindmap_id
              WHERE a.context IN ("memo:item", "memo:step", "mindmap:node")
              ORDER BY a.created_at DESC, a.id DESC
-             LIMIT 6'
+             LIMIT 5'
         );
         $stmt->execute();
         $rows = $stmt->fetchAll() ?: [];
@@ -269,74 +217,6 @@ final class PortalController
         }
 
         return $result;
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function loadDirectives(PDO $pdo): array
-    {
-        $stmt = $pdo->query(
-            'SELECT id, nickname, message, created_at FROM portal_directives ORDER BY created_at DESC, id DESC LIMIT 12'
-        );
-        $rows = $stmt ? $stmt->fetchAll() : [];
-        if (!$rows) {
-            return [];
-        }
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = $this->formatDirectiveRow($row);
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
-     */
-    private function formatDirectiveRow(array $row): array
-    {
-        $id = (int)($row['id'] ?? 0);
-        $nickname = trim((string)($row['nickname'] ?? ''));
-        if ($nickname === '') {
-            $nickname = '匿名特工';
-        }
-        $message = trim((string)($row['message'] ?? ''));
-        $createdAt = isset($row['created_at']) ? (int)$row['created_at'] : time();
-        if ($createdAt <= 0) {
-            $createdAt = time();
-        }
-
-        return [
-            'id' => $id,
-            'nickname' => $nickname,
-            'message' => $message,
-            'created_at' => $createdAt,
-            'created_label' => date('H:i:s', $createdAt),
-            'created_iso' => date('c', $createdAt),
-            'priority' => $this->determineDirectivePriority($id),
-        ];
-    }
-
-    private function determineDirectivePriority(int $id): string
-    {
-        $cycle = ['high', 'medium', 'low'];
-        $count = count($cycle);
-        if ($count === 0) {
-            return 'medium';
-        }
-        $index = $id % $count;
-        return $cycle[$index];
-    }
-
-    private function respondJson(array $payload, int $status = 200): void
-    {
-        http_response_code($status);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
-        exit;
     }
 
     /**
