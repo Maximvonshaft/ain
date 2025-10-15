@@ -1000,6 +1000,7 @@
         label: "DUBAI",
         coords: [25.2048, 55.2708],
         pulseDelay: 2.4,
+        zoom: 6,
       },
       {
         id: "huludao",

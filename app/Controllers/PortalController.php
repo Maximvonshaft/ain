@@ -81,10 +81,10 @@ final class PortalController
         }
 
         $statusCycle = [
-            ['status' => 'active', 'label' => 'ACTIVE', 'preview' => 'polar'],
-            ['status' => 'standby', 'label' => 'STANDBY', 'preview' => 'desert'],
-            ['status' => 'deploy', 'label' => 'DEPLOY', 'preview' => 'coast'],
-            ['status' => 'archive', 'label' => 'ARCHIVE', 'preview' => 'urban'],
+            ['status' => 'active', 'label' => 'ACTIVE'],
+            ['status' => 'standby', 'label' => 'STANDBY'],
+            ['status' => 'deploy', 'label' => 'DEPLOY'],
+            ['status' => 'archive', 'label' => 'ARCHIVE'],
         ];
 
         $result = [];
@@ -100,7 +100,6 @@ final class PortalController
                 'title' => (string)($row['title'] ?? '未命名导图'),
                 'status' => $statusMeta['status'],
                 'status_label' => $statusMeta['label'],
-                'preview' => $statusMeta['preview'],
                 'summary' => $summaryData['summary'],
                 'nodes' => $summaryData['nodes'],
                 'node_count' => $summaryData['node_count'],
