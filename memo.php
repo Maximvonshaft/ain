@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use App\Memo\Config\AllowedMimes;
 use App\Memo\Legacy\Environment as MemoEnvironment;
+use App\Support\MemoCspDefaults;
 use App\Support\SessionConfigurator;
 
 function memo_start_session(): void {
@@ -176,7 +177,8 @@ function memo_apply_default_security_headers(): void {
   header('X-Frame-Options: SAMEORIGIN');
   header('Referrer-Policy: strict-origin-when-cross-origin');
   header('X-Content-Type-Options: nosniff');
-  header("Content-Security-Policy: default-src 'self' cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.basemaps.cartocdn.com; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net https://cdnjs.cloudflare.com; connect-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.basemaps.cartocdn.com; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  $cspDirectives = MemoCspDefaults::headerDirectives();
+  header('Content-Security-Policy: ' . implode('; ', $cspDirectives));
   MemoEnvironment::markSecurityHeadersApplied();
 }
 
