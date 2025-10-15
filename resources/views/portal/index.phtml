@@ -2,10 +2,14 @@
 /**
  * @var array<int, array{id:int,title:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $todoItems
  * @var array<int, array{id:int,title:string,status:string,status_label:string,summary:string,nodes:array<int,string>,node_count:int,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $mindmaps
+ * @var array<int, array<string, mixed>> $recentFiles
+ * @var array<int, array<string, mixed>> $directives
  * @var callable(string):string $asset
  * @var string $memoUrl
  * @var string $mindmapUrl
  * @var string $basePath
+ * @var string $csrfToken
+ * @var string $directivesPostUrl
  */
 ?>
 <!doctype html>
@@ -274,22 +278,45 @@
                 <span class="module-label">FILES</span>
               </header>
               <ul class="file-list">
-                <li>
-                  <span class="file-code">ALPHA</span>
-                  <span class="file-ref">368-B</span>
-                </li>
-                <li>
-                  <span class="file-code">BRAVO</span>
-                  <span class="file-ref">211-C</span>
-                </li>
-                <li>
-                  <span class="file-code">CHARLIE</span>
-                  <span class="file-ref">502-A</span>
-                </li>
-                <li>
-                  <span class="file-code">DELTA</span>
-                  <span class="file-ref">145-F</span>
-                </li>
+                <?php if ($recentFiles !== []): ?>
+                  <?php foreach ($recentFiles as $file): ?>
+                    <li class="file-entry">
+                      <a
+                        class="file-entry-link"
+                        href="<?= view_escape($file['download_url']); ?>"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        <span class="file-entry-code"><?= view_escape((string)$file['context_label']); ?></span>
+                        <span class="file-entry-name"><?= view_escape((string)$file['name']); ?></span>
+                      </a>
+                      <div class="file-entry-meta">
+                        <?php if (($file['owner_label'] ?? '') !== ''): ?>
+                          <?php if (($file['owner_url'] ?? '') !== ''): ?>
+                            <a class="file-entry-source" href="<?= view_escape($file['owner_url']); ?>">
+                              <?= view_escape((string)$file['owner_label']); ?>
+                            </a>
+                          <?php else: ?>
+                            <span class="file-entry-source"><?= view_escape((string)$file['owner_label']); ?></span>
+                          <?php endif; ?>
+                        <?php endif; ?>
+                        <?php if (($file['size_label'] ?? '') !== ''): ?>
+                          <span class="file-entry-size"><?= view_escape((string)$file['size_label']); ?></span>
+                        <?php endif; ?>
+                        <?php if (($file['created_label'] ?? '') !== ''): ?>
+                          <time
+                            class="file-entry-time"
+                            <?php if (($file['created_iso'] ?? '') !== ''): ?>datetime="<?= view_escape((string)$file['created_iso']); ?>"<?php endif; ?>
+                          >
+                            <?= view_escape((string)$file['created_label']); ?>
+                          </time>
+                        <?php endif; ?>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                <?php else: ?>
+                  <li class="file-empty">暂无附件 · 在备忘录或导图中上传文件后会显示在此处。</li>
+                <?php endif; ?>
               </ul>
             </section>
 
@@ -415,75 +442,67 @@
             DIRECTIVES
           </header>
           <ul class="directive-log">
-            <li class="directive-entry" data-priority="high">
-              <span class="directive-content">
-                <span class="directive-priority high" aria-hidden="true"></span>
-                <span class="directive-text">
-                  <span class="directive-message"
-                    >Maintain shadow over channel 7A.</span
-                  >
-                  <span class="directive-meta">
-                    <span class="directive-author" aria-label="Channel"
-                      >ALPHA</span
-                    >
-                    <span class="directive-divider" aria-hidden="true">—</span>
-                    <span class="directive-time">21:47:09</span>
+            <?php if ($directives !== []): ?>
+              <?php foreach ($directives as $directive): ?>
+                <li class="directive-entry" data-priority="<?= view_escape((string)$directive['priority']); ?>">
+                  <span class="directive-content">
+                    <span class="directive-priority <?= view_escape((string)$directive['priority']); ?>" aria-hidden="true"></span>
+                    <span class="directive-text">
+                      <span class="directive-message"><?= view_escape((string)$directive['message']); ?></span>
+                      <span class="directive-meta">
+                        <span class="directive-author" aria-label="Author"><?= view_escape((string)$directive['nickname']); ?></span>
+                        <span class="directive-divider" aria-hidden="true">—</span>
+                        <time class="directive-time"<?php if (($directive['created_iso'] ?? '') !== ''): ?> datetime="<?= view_escape((string)$directive['created_iso']); ?>"<?php endif; ?>>
+                          <?= view_escape((string)$directive['created_label']); ?>
+                        </time>
+                      </span>
+                    </span>
+                    <span class="visually-hidden">Priority <?= view_escape(strtoupper((string)$directive['priority'])); ?></span>
+                  </span>
+                </li>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <li class="directive-entry directive-entry--empty" data-priority="medium">
+                <span class="directive-content">
+                  <span class="directive-priority medium" aria-hidden="true"></span>
+                  <span class="directive-text">
+                    <span class="directive-message">暂无留言，成为第一位发言者。</span>
                   </span>
                 </span>
-                <span class="visually-hidden">Priority high</span>
-              </span>
-            </li>
-            <li class="directive-entry" data-priority="medium">
-              <span class="directive-content">
-                <span
-                  class="directive-priority medium"
-                  aria-hidden="true"
-                ></span>
-                <span class="directive-text">
-                  <span class="directive-message"
-                    >Decrypt parcel HN-54 before dawn.</span
-                  >
-                  <span class="directive-meta">
-                    <span class="directive-author" aria-label="Channel"
-                      >BRAVO</span
-                    >
-                    <span class="directive-divider" aria-hidden="true">—</span>
-                    <span class="directive-time">20:13:44</span>
-                  </span>
-                </span>
-                <span class="visually-hidden">Priority medium</span>
-              </span>
-            </li>
-            <li class="directive-entry" data-priority="low">
-              <span class="directive-content">
-                <span class="directive-priority low" aria-hidden="true"></span>
-                <span class="directive-text">
-                  <span class="directive-message"
-                    >Await secondary clearance.</span
-                  >
-                  <span class="directive-meta">
-                    <span class="directive-author" aria-label="Channel"
-                      >CHARLIE</span
-                    >
-                    <span class="directive-divider" aria-hidden="true">—</span>
-                    <span class="directive-time">18:05:18</span>
-                  </span>
-                </span>
-                <span class="visually-hidden">Priority low</span>
-              </span>
-            </li>
+              </li>
+            <?php endif; ?>
           </ul>
-          <form class="note-form" autocomplete="off">
-            <label class="visually-hidden" for="note-input">记录指令</label>
-            <input
-              id="note-input"
-              name="note"
-              type="text"
-              maxlength="140"
-              placeholder=">> INPUT CHANNEL: TYPE &amp; PRESS RETURN"
-              aria-label="输入新指令"
-              required
-            />
+          <form
+            class="note-form"
+            autocomplete="off"
+            method="post"
+            action="<?= view_escape($directivesPostUrl); ?>"
+            data-endpoint="<?= view_escape($directivesPostUrl); ?>"
+          >
+            <input type="hidden" name="_csrf" value="<?= view_escape($csrfToken); ?>" />
+            <div class="note-form-fields">
+              <label class="visually-hidden" for="note-nickname">留言昵称</label>
+              <input
+                id="note-nickname"
+                name="nickname"
+                type="text"
+                maxlength="40"
+                placeholder=">> 输入昵称"
+                aria-label="留言昵称"
+                required
+              />
+              <label class="visually-hidden" for="note-input">留言内容</label>
+              <input
+                id="note-input"
+                name="message"
+                type="text"
+                maxlength="240"
+                placeholder=">> 输入留言并按回车发送"
+                aria-label="输入新留言"
+                required
+              />
+            </div>
+            <p class="note-form-feedback" data-feedback role="status" aria-live="polite"></p>
           </form>
         </section>
 

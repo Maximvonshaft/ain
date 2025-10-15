@@ -394,8 +394,12 @@ function memo_ensure_base_tables(PDO $pdo): void {
   );');
   $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    context TEXT NOT NULL DEFAULT "memo:item",
     item_id INTEGER,
     step_id INTEGER,
+    mindmap_id INTEGER,
+    node_uid TEXT,
+    session_key TEXT,
     orig_name TEXT NOT NULL,
     stored_name TEXT NOT NULL,
     mime TEXT NOT NULL,
@@ -408,6 +412,9 @@ function memo_ensure_base_tables(PDO $pdo): void {
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_context_created ON attachments(context, created_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_mindmap ON attachments(mindmap_id, context)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_session ON attachments(session_key)');
 
   $columns = $pdo->query('PRAGMA table_info(items)')->fetchAll(PDO::FETCH_ASSOC);
   $hasColumn = false;
@@ -421,12 +428,103 @@ function memo_ensure_base_tables(PDO $pdo): void {
     $pdo->exec('ALTER TABLE items ADD COLUMN previous_category_id INTEGER');
   }
 
+  memo_ensure_unified_attachments($pdo);
+  memo_ensure_portal_tables($pdo);
   memo_ensure_item_indexes($pdo);
 }
 
 function memo_ensure_item_indexes(PDO $pdo): void {
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_done_order ON items(done, order_index, updated_at DESC, id DESC)');
   $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
+}
+
+function memo_ensure_portal_tables(PDO $pdo): void {
+  $pdo->exec('CREATE TABLE IF NOT EXISTS portal_directives(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nickname TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_portal_directives_created ON portal_directives(created_at DESC, id DESC)');
+}
+
+function memo_ensure_unified_attachments(PDO $pdo): void {
+  $columns = $pdo->query('PRAGMA table_info(attachments)')->fetchAll(PDO::FETCH_ASSOC);
+  $names = [];
+  foreach ($columns as $column) {
+    $name = $column['name'] ?? null;
+    if ($name !== null) {
+      $names[] = $name;
+    }
+  }
+
+  if (!in_array('context', $names, true)) {
+    $pdo->exec('ALTER TABLE attachments ADD COLUMN context TEXT NOT NULL DEFAULT "memo:item"');
+    $pdo->exec("UPDATE attachments SET context = CASE WHEN step_id IS NOT NULL THEN 'memo:step' ELSE 'memo:item' END WHERE context IS NULL OR context = ''");
+  }
+
+  if (!in_array('mindmap_id', $names, true)) {
+    $pdo->exec('ALTER TABLE attachments ADD COLUMN mindmap_id INTEGER');
+  }
+
+  if (!in_array('node_uid', $names, true)) {
+    $pdo->exec('ALTER TABLE attachments ADD COLUMN node_uid TEXT');
+  }
+
+  if (!in_array('session_key', $names, true)) {
+    $pdo->exec('ALTER TABLE attachments ADD COLUMN session_key TEXT');
+  }
+
+  $pdo->exec("UPDATE attachments SET context = 'memo:step' WHERE context = 'memo:item' AND step_id IS NOT NULL");
+  $pdo->exec("UPDATE attachments SET context = 'memo:item' WHERE context IS NULL OR context = ''");
+
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_context_created ON attachments(context, created_at DESC, id DESC)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_mindmap ON attachments(mindmap_id, context)');
+  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_session ON attachments(session_key)');
+}
+
+function memo_migrate_mindmap_assets(PDO $pdo): void {
+  $tableExists = (int)$pdo->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='mindmap_assets'")->fetchColumn();
+  if ($tableExists === 0) {
+    return;
+  }
+
+  $count = (int)$pdo->query('SELECT COUNT(*) FROM mindmap_assets')->fetchColumn();
+  if ($count === 0) {
+    $pdo->exec('DROP TABLE mindmap_assets');
+    return;
+  }
+
+  $pdo->beginTransaction();
+  try {
+    $select = $pdo->query('SELECT id, mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at FROM mindmap_assets ORDER BY id ASC');
+    $rows = $select ? $select->fetchAll() : [];
+    $insert = $pdo->prepare('INSERT INTO attachments(context, item_id, step_id, mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
+    foreach ($rows as $row) {
+      $mindmapId = isset($row['mindmap_id']) ? (int)$row['mindmap_id'] : null;
+      $sessionKey = isset($row['session_key']) && $row['session_key'] !== '' ? (string)$row['session_key'] : null;
+      $context = $mindmapId ? 'mindmap:node' : 'mindmap:session';
+      $createdAt = isset($row['created_at']) ? (int)$row['created_at'] : now();
+      $insert->execute([
+        $context,
+        null,
+        null,
+        $mindmapId ?: null,
+        $row['node_uid'] ?? null,
+        $sessionKey,
+        $row['orig_name'] ?? '',
+        $row['stored_name'] ?? '',
+        $row['mime'] ?? 'application/octet-stream',
+        isset($row['size']) ? (int)$row['size'] : 0,
+        $createdAt,
+      ]);
+    }
+    $pdo->exec('DROP TABLE mindmap_assets');
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+  }
 }
 
 function memo_seed_default_categories(PDO $pdo): void {
@@ -449,20 +547,8 @@ function memo_ensure_mindmap_tables(PDO $pdo, bool $withDefault): void {
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );');
-  $pdo->exec('CREATE TABLE IF NOT EXISTS mindmap_assets(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mindmap_id INTEGER,
-    node_uid TEXT,
-    session_key TEXT,
-    orig_name TEXT NOT NULL,
-    stored_name TEXT NOT NULL,
-    mime TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
-  );');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
-  $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
+  memo_ensure_unified_attachments($pdo);
+  memo_migrate_mindmap_assets($pdo);
 
   if (!$withDefault) {
     return;
@@ -606,7 +692,10 @@ function get_attachment(int $id): ?array {
 }
 
 function attachments_for_item(int $item_id): array {
-  $pdo=db(); $st=$pdo->prepare('SELECT * FROM attachments WHERE item_id=? ORDER BY id DESC'); $st->execute([$item_id]); return $st->fetchAll();
+  $pdo=db();
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE item_id=? AND context IN ('memo:item','memo:step') ORDER BY created_at DESC, id DESC");
+  $st->execute([$item_id]);
+  return $st->fetchAll();
 }
 
 function attachments_for_items(array $item_ids): array {
@@ -614,7 +703,7 @@ function attachments_for_items(array $item_ids): array {
   if(!$ids){ return []; }
   $pdo=db();
   $placeholders=implode(',', array_fill(0,count($ids),'?'));
-  $st=$pdo->prepare("SELECT * FROM attachments WHERE item_id IN ($placeholders) ORDER BY item_id ASC, id DESC");
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE item_id IN ($placeholders) AND context IN ('memo:item','memo:step') ORDER BY item_id ASC, created_at DESC, id DESC");
   $st->execute($ids);
   $group=[];
   foreach($st->fetchAll() as $row){
@@ -627,14 +716,14 @@ function attachments_for_items(array $item_ids): array {
 
 function get_mindmap_asset(int $id): ?array {
   $pdo=db();
-  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE id=? LIMIT 1');
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE id=? AND context IN ('mindmap:node','mindmap:session') LIMIT 1");
   $st->execute([$id]);
   return $st->fetch() ?: null;
 }
 
 function mindmap_assets_for_map(int $map_id): array {
   $pdo=db();
-  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE mindmap_id=?');
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE mindmap_id=? AND context='mindmap:node' ORDER BY created_at DESC, id DESC");
   $st->execute([$map_id]);
   return $st->fetchAll();
 }
@@ -642,7 +731,7 @@ function mindmap_assets_for_map(int $map_id): array {
 function mindmap_assets_for_session(string $session_key): array {
   if($session_key==='') return [];
   $pdo=db();
-  $st=$pdo->prepare('SELECT * FROM mindmap_assets WHERE session_key=?');
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE session_key=? AND context='mindmap:session' ORDER BY created_at DESC, id DESC");
   $st->execute([$session_key]);
   return $st->fetchAll();
 }
@@ -652,7 +741,7 @@ function mindmap_assets_by_ids(array $ids): array {
   if(!$ids){ return []; }
   $pdo=db();
   $placeholders=implode(',',array_fill(0,count($ids),'?'));
-  $st=$pdo->prepare("SELECT * FROM mindmap_assets WHERE id IN ($placeholders)");
+  $st=$pdo->prepare("SELECT * FROM attachments WHERE id IN ($placeholders) AND context IN ('mindmap:node','mindmap:session')");
   $st->execute($ids);
   $map=[];
   foreach($st->fetchAll() as $row){
@@ -670,24 +759,30 @@ function delete_mindmap_asset(int $id, ?array $asset = null): void {
     if(is_file($path)) @unlink($path);
   }
   $pdo=db();
-  $pdo->prepare('DELETE FROM mindmap_assets WHERE id=?')->execute([$id]);
+  $pdo->prepare("DELETE FROM attachments WHERE id=? AND context IN ('mindmap:node','mindmap:session')")
+    ->execute([$id]);
 }
 
 function create_mindmap_asset(?int $map_id, ?string $node_uid, string $orig_name, string $stored_name, string $mime, int $size, string $session_key): array {
   $pdo=db();
-  $pdo->prepare('INSERT INTO mindmap_assets(mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)')
-    ->execute([
-      $map_id>0?$map_id:null,
-      $node_uid,
-      $map_id>0?null:$session_key,
-      $orig_name,
-      $stored_name,
-      $mime,
-      $size,
-      now()
-    ]);
+  $isFinalized=$map_id>0;
+  $context=$isFinalized ? 'mindmap:node' : 'mindmap:session';
+  $pdo->prepare('INSERT INTO attachments(context,item_id,step_id,mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([
+        $context,
+        null,
+        null,
+        $isFinalized?$map_id:null,
+        $node_uid,
+        $isFinalized?null:$session_key,
+        $orig_name,
+        $stored_name,
+        $mime,
+        $size,
+        now()
+      ]);
   $id=(int)$pdo->lastInsertId();
-  return get_mindmap_asset($id) ?? ['id'=>$id,'mindmap_id'=>$map_id,'node_uid'=>$node_uid,'session_key'=>$session_key,'orig_name'=>$orig_name,'stored_name'=>$stored_name,'mime'=>$mime,'size'=>$size,'created_at'=>now()];
+  return get_mindmap_asset($id) ?? ['id'=>$id,'mindmap_id'=>$map_id,'node_uid'=>$node_uid,'session_key'=>$session_key,'orig_name'=>$orig_name,'stored_name'=>$stored_name,'mime'=>$mime,'size'=>$size,'created_at'=>now(),'context'=>$context];
 }
 
 function cleanup_stale_mindmap_session_assets(int $max_age_seconds = 172800, int $batch_limit = 200): void {
@@ -695,7 +790,7 @@ function cleanup_stale_mindmap_session_assets(int $max_age_seconds = 172800, int
   $batch_limit = max(1, $batch_limit);
   $threshold = now() - $max_age_seconds;
   $pdo = db();
-  $st = $pdo->prepare("SELECT id, stored_name FROM mindmap_assets WHERE (mindmap_id IS NULL OR mindmap_id=0) AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
+  $st = $pdo->prepare("SELECT id, stored_name FROM attachments WHERE context='mindmap:session' AND session_key IS NOT NULL AND session_key<>'' AND (created_at IS NULL OR created_at < ?) LIMIT ?");
   $st->execute([$threshold, $batch_limit]);
   foreach($st->fetchAll() as $row){
     $assetId = isset($row['id']) ? (int)$row['id'] : 0;
@@ -710,8 +805,8 @@ function prune_mindmap_assets(int $map_id, array $keep_ids): void {
   $params=$ids;
   array_unshift($params,$map_id);
   $sql=$ids?
-    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=? AND id NOT IN ($placeholders)" :
-    "SELECT id, stored_name FROM mindmap_assets WHERE mindmap_id=?";
+    "SELECT id, stored_name FROM attachments WHERE mindmap_id=? AND context='mindmap:node' AND id NOT IN ($placeholders)" :
+    "SELECT id, stored_name FROM attachments WHERE mindmap_id=? AND context='mindmap:node'";
   $st=$pdo->prepare($sql);
   $st->execute($params);
   $rows=$st->fetchAll();
@@ -937,7 +1032,7 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
     $aid=(int)$asset_id;
     if($aid<=0) continue;
     $keep_ids[]=$aid;
-    $pdo->prepare('UPDATE mindmap_assets SET mindmap_id=?, node_uid=?, session_key=NULL WHERE id=?')
+    $pdo->prepare("UPDATE attachments SET mindmap_id=?, node_uid=?, session_key=NULL, context='mindmap:node' WHERE id=? AND context IN ('mindmap:node','mindmap:session')")
       ->execute([$map_id,$node_uid,$aid]);
   }
   prune_mindmap_assets($map_id,$keep_ids);
@@ -947,8 +1042,8 @@ function sync_mindmap_assets(int $map_id, array $asset_refs, string $session_key
     $params=$ids;
     array_unshift($params,$session_key);
     $sql=$ids?
-      "SELECT id, stored_name FROM mindmap_assets WHERE session_key=? AND id NOT IN ($placeholders)" :
-      "SELECT id, stored_name FROM mindmap_assets WHERE session_key=?";
+      "SELECT id, stored_name FROM attachments WHERE session_key=? AND context='mindmap:session' AND id NOT IN ($placeholders)" :
+      "SELECT id, stored_name FROM attachments WHERE session_key=? AND context='mindmap:session'";
     $st=$pdo->prepare($sql);
     $st->execute($params);
     foreach($st->fetchAll() as $row){ delete_mindmap_asset((int)$row['id'],$row); }
@@ -1323,12 +1418,20 @@ if (is_post()) {
             }
           }
           if($attachmentsData){
-            $insertAttachment=$pdo->prepare('INSERT INTO attachments(id,item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?)');
+            $insertAttachment=$pdo->prepare('INSERT INTO attachments(id,context,item_id,step_id,mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
             foreach($attachmentsData as $att){
+              $stepId = isset($att['step_id']) && $att['step_id'] !== null ? (int)$att['step_id'] : null;
+              $itemId = isset($att['item_id']) && $att['item_id'] !== null ? (int)$att['item_id'] : null;
+              $contextRaw = (string)($att['context'] ?? '');
+              $context = $contextRaw !== '' ? $contextRaw : ($stepId ? 'memo:step' : 'memo:item');
               $insertAttachment->execute([
                 (int)$att['id'],
-                $att['item_id'] !== null ? (int)$att['item_id'] : null,
-                $att['step_id'] !== null ? (int)$att['step_id'] : null,
+                $context,
+                $itemId,
+                $stepId,
+                null,
+                null,
+                null,
                 $att['orig_name'],
                 $att['stored_name'],
                 $att['mime'],
@@ -1432,8 +1535,19 @@ if (is_post()) {
         if(!$ext) throw new RuntimeException('仅允许图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本文件');
         $stored=bin2hex(random_bytes(8)).'.'.$ext; $dest=memo_upload_dir().DIRECTORY_SEPARATOR.$stored; if(!move_uploaded_file($f['tmp_name'],$dest)) throw new RuntimeException('保存失败');
         $orig=$f['name']; $itemIdForTouch=null;
-        if($kind==='item'){ $itemIdForTouch=$targetId; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$targetId,null,$orig,$stored,$mime,(int)$f['size'],now()]); }
-        else { $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?'); $rs->execute([$targetId]); $itid=($r=$rs->fetch())?(int)$r['item_id']:null; $itemIdForTouch=$itid; db()->prepare('INSERT INTO attachments(item_id,step_id,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)')->execute([$itid,$targetId,$orig,$stored,$mime,(int)$f['size'],now()]); }
+        if($kind==='item'){
+          $itemIdForTouch=$targetId;
+          db()->prepare('INSERT INTO attachments(context,item_id,step_id,mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+            ->execute(['memo:item',$targetId,null,null,null,null,$orig,$stored,$mime,(int)$f['size'],now()]);
+        }
+        else {
+          $rs=db()->prepare('SELECT item_id FROM steps WHERE id=?');
+          $rs->execute([$targetId]);
+          $itid=($r=$rs->fetch())?(int)$r['item_id']:null;
+          $itemIdForTouch=$itid;
+          db()->prepare('INSERT INTO attachments(context,item_id,step_id,mindmap_id,node_uid,session_key,orig_name,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+            ->execute(['memo:step',$itid,$targetId,null,null,null,$orig,$stored,$mime,(int)$f['size'],now()]);
+        }
         if($itemIdForTouch) db()->prepare('UPDATE items SET updated_at=? WHERE id=?')->execute([now(),$itemIdForTouch]);
         if(is_ajax()){
           $attId=(int)db()->lastInsertId(); $url='?download='.$attId; $isImg=str_starts_with($mime,'image/'); $md=$isImg ? '!['.preg_replace('/\.(zip|png|jpe?g|gif|webp|svg)$/i','',$orig).']('.$url.')' : '['.$orig.']('.$url.')';

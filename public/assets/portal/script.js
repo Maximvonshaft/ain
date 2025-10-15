@@ -13,9 +13,21 @@
   })();
 
   const directiveForm = document.querySelector(".note-form");
-  const directiveInput = directiveForm
-    ? directiveForm.querySelector("input[name='note']")
+  const directiveMessageInput = directiveForm
+    ? directiveForm.querySelector("input[name='message']")
     : null;
+  const directiveNicknameInput = directiveForm
+    ? directiveForm.querySelector("input[name='nickname']")
+    : null;
+  const directiveTokenInput = directiveForm
+    ? directiveForm.querySelector("input[name='_csrf']")
+    : null;
+  const directiveFeedback = directiveForm
+    ? directiveForm.querySelector("[data-feedback]")
+    : null;
+  const directiveEndpoint = directiveForm
+    ? directiveForm.dataset.endpoint || directiveForm.getAttribute("action") || ""
+    : "";
   const directiveLog = document.querySelector(".directive-log");
 
   const channelList = document.querySelector(".channel-list");
@@ -724,38 +736,24 @@
     hourCycle: "h23",
   });
 
-  const directiveChannels = ["ALPHA", "BRAVO", "CHARLIE", "DELTA"];
-  const directivePriorities = ["high", "medium", "low"];
-  let directiveChannelIndex = 0;
-  let directivePriorityIndex = 0;
-
-  const nextDirectiveChannel = () => {
-    const channel =
-      directiveChannels[directiveChannelIndex % directiveChannels.length];
-    directiveChannelIndex += 1;
-    return channel;
+  const setDirectiveFeedback = (message, state = "info") => {
+    if (!directiveFeedback) return;
+    directiveFeedback.textContent = message || "";
+    directiveFeedback.dataset.state = state;
   };
 
-  const nextDirectivePriority = () => {
+  const appendDirectiveLog = (entry = {}, highlight = true) => {
+    if (!directiveLog) return null;
     const priority =
-      directivePriorities[directivePriorityIndex % directivePriorities.length];
-    directivePriorityIndex += 1;
-    return priority;
-  };
-
-  const appendDirectiveLog = (message) => {
-    if (!directiveLog) return;
-    const entry = document.createElement("li");
-    entry.className = "directive-entry is-new";
-
-    const timestamp = document.createElement("span");
-    timestamp.className = "directive-time";
-    timestamp.textContent = directiveTimeFormatter.format(new Date());
-
-    const channelLabel = nextDirectiveChannel();
-
-    const priority = nextDirectivePriority();
-    entry.setAttribute("data-priority", priority);
+      typeof entry.priority === "string" && entry.priority
+        ? entry.priority
+        : "medium";
+    const listItem = document.createElement("li");
+    listItem.className = "directive-entry";
+    listItem.dataset.priority = priority;
+    if (highlight) {
+      listItem.classList.add("is-new");
+    }
 
     const content = document.createElement("span");
     content.className = "directive-content";
@@ -769,49 +767,121 @@
 
     const directiveMessage = document.createElement("span");
     directiveMessage.className = "directive-message";
-    directiveMessage.textContent = message;
+    directiveMessage.textContent = entry.message || "";
 
-    const directiveAuthor = document.createElement("span");
-    directiveAuthor.className = "directive-author";
-    directiveAuthor.setAttribute("aria-label", "Channel");
-    directiveAuthor.textContent = channelLabel;
+    const meta = document.createElement("span");
+    meta.className = "directive-meta";
+
+    const author = document.createElement("span");
+    author.className = "directive-author";
+    author.setAttribute("aria-label", "Author");
+    author.textContent = entry.nickname || "";
 
     const divider = document.createElement("span");
     divider.className = "directive-divider";
     divider.setAttribute("aria-hidden", "true");
     divider.textContent = "—";
 
-    const meta = document.createElement("span");
-    meta.className = "directive-meta";
-    meta.append(directiveAuthor, divider, timestamp);
+    const time = document.createElement("time");
+    time.className = "directive-time";
+    const timestamp =
+      typeof entry.created_at === "number" && entry.created_at > 0
+        ? entry.created_at * 1000
+        : Date.now();
+    const formattedLabel =
+      entry.created_label || directiveTimeFormatter.format(new Date(timestamp));
+    time.textContent = formattedLabel;
+    if (entry.created_iso) {
+      time.dateTime = entry.created_iso;
+    } else {
+      time.dateTime = new Date(timestamp).toISOString();
+    }
 
+    meta.append(author, divider, time);
     text.append(directiveMessage, meta);
 
     const hiddenPriority = document.createElement("span");
     hiddenPriority.className = "visually-hidden";
-    hiddenPriority.textContent = `Priority ${priority}`;
+    hiddenPriority.textContent = `Priority ${priority.toUpperCase()}`;
 
     content.append(priorityDot, text, hiddenPriority);
-    entry.append(content);
-    directiveLog.prepend(entry);
+    listItem.append(content);
+    directiveLog.prepend(listItem);
 
-    window.setTimeout(() => {
-      entry.classList.remove("is-new");
-    }, 700);
+    if (highlight) {
+      window.setTimeout(() => {
+        listItem.classList.remove("is-new");
+      }, 700);
+    }
+
+    return listItem;
   };
 
-  if (directiveForm && directiveInput && directiveLog) {
-    directiveForm.addEventListener("submit", (event) => {
+  if (
+    directiveForm &&
+    directiveMessageInput &&
+    directiveNicknameInput &&
+    directiveTokenInput &&
+    directiveLog
+  ) {
+    directiveForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const value = directiveInput.value.trim();
-      if (!value) return;
-      appendDirectiveLog(value.toUpperCase());
-      directiveInput.value = "";
-      directiveInput.classList.remove("is-commit");
-      window.requestAnimationFrame(() => {
-        directiveInput.classList.add("is-commit");
-      });
-      directiveInput.focus();
+      const nickname = directiveNicknameInput.value.trim();
+      const message = directiveMessageInput.value.trim();
+      if (!nickname || !message) {
+        setDirectiveFeedback("请填写昵称和留言内容", "error");
+        return;
+      }
+      if (!directiveEndpoint) {
+        setDirectiveFeedback("提交地址缺失", "error");
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.set("nickname", nickname);
+      params.set("message", message);
+      params.set("_csrf", directiveTokenInput.value || "");
+
+      directiveForm.classList.add("is-submitting");
+      directiveMessageInput.disabled = true;
+      directiveNicknameInput.disabled = true;
+      setDirectiveFeedback("正在提交…", "info");
+
+      try {
+        const response = await fetch(directiveEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            Accept: "application/json",
+          },
+          body: params.toString(),
+        });
+
+        const contentType = response.headers.get("content-type") || "";
+        const isJson = contentType.includes("application/json");
+        const payload = isJson ? await response.json() : null;
+
+        if (!response.ok || !payload?.ok) {
+          const feedback = payload?.message || "留言提交失败，请稍后再试";
+          setDirectiveFeedback(feedback, "error");
+          return;
+        }
+
+        appendDirectiveLog(payload.directive || {}, true);
+        setDirectiveFeedback("留言已记录", "success");
+        directiveMessageInput.value = "";
+        window.requestAnimationFrame(() => {
+          directiveMessageInput.classList.add("is-commit");
+        });
+      } catch (error) {
+        setDirectiveFeedback("网络异常，请稍后再试", "error");
+      } finally {
+        directiveForm.classList.remove("is-submitting");
+        directiveMessageInput.disabled = false;
+        directiveNicknameInput.disabled = false;
+        directiveMessageInput.focus();
+      }
     });
   }
 
