@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Middlewares\CsrfMiddleware;
+use App\Support\MemoCspDefaults;
+use Core\Config;
 use Core\Request;
 use Core\Router;
 
@@ -38,6 +40,7 @@ $assert = new Assert();
 
 testRouter($assert);
 testCsrfMiddleware($assert);
+testSecurityHeaders($assert);
 
 echo 'OK (' . $assert->count() . " assertions)\n";
 
@@ -155,6 +158,52 @@ function testCsrfMiddleware(Assert $assert): void
         $thrown = true;
     }
     $assert->true($thrown, 'Invalid token should trigger RuntimeException');
+}
+
+function testSecurityHeaders(Assert $assert): void
+{
+    $config = new Config(__DIR__ . '/../config');
+    $directives = $config->get('security.csp.directives');
+    $assert->true(is_array($directives), 'CSP directives should be configured as an array');
+
+    $defaults = MemoCspDefaults::directives();
+    $assert->same($defaults, $directives, 'Security configuration should reuse memo CSP defaults');
+
+    $imgSrc = $defaults['img-src'] ?? '';
+    $connectSrc = $defaults['connect-src'] ?? '';
+    $assert->true(str_contains($imgSrc, 'data: blob:'), 'img-src should include the data: blob: scheme with spacing');
+
+    $expectedImageSources = [
+        'https://tile.openstreetmap.org',
+        'https://*.basemaps.cartocdn.com',
+        'https://stamen-tiles.a.ssl.fastly.net',
+        'https://stamen-tiles-b.a.ssl.fastly.net',
+        'https://stamen-tiles-c.a.ssl.fastly.net',
+        'https://stamen-tiles-d.a.ssl.fastly.net',
+    ];
+
+    foreach ($expectedImageSources as $source) {
+        $assert->true(str_contains($imgSrc, $source), 'img-src should allow ' . $source);
+    }
+
+    $expectedConnectSources = [
+        'https://fonts.gstatic.com',
+        'https://cdnjs.cloudflare.com',
+        'https://tile.openstreetmap.org',
+        'https://*.basemaps.cartocdn.com',
+        'https://stamen-tiles.a.ssl.fastly.net',
+        'https://stamen-tiles-b.a.ssl.fastly.net',
+        'https://stamen-tiles-c.a.ssl.fastly.net',
+        'https://stamen-tiles-d.a.ssl.fastly.net',
+    ];
+
+    foreach ($expectedConnectSources as $source) {
+        $assert->true(str_contains($connectSrc, $source), 'connect-src should allow ' . $source);
+    }
+
+    $headerDirectives = MemoCspDefaults::headerDirectives();
+    $headerString = implode('; ', $headerDirectives);
+    $assert->true(str_contains($headerString, "img-src 'self' data: blob:"), 'Header directives should include img-src with data: blob: spacing');
 }
 
 /**
