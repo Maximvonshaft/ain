@@ -90,6 +90,79 @@ window.addEventListener('keydown',e=>{
     }
     return cloned;
   }
+  function cloneDeep(value){
+    if(value===undefined){ return value; }
+    return JSON.parse(JSON.stringify(value));
+  }
+  function tryParseMindmapPayload(raw){
+    if(typeof raw==='string'){
+      try{ return JSON.parse(raw); }catch(_){ return null; }
+    }
+    if(raw && typeof raw==='object'){
+      return raw;
+    }
+    return null;
+  }
+  function deriveTitle(payload,preferred){
+    const preferredTitle=typeof preferred==='string'?preferred.trim():'';
+    if(preferredTitle) return preferredTitle;
+    const metaName=typeof payload?.meta?.name==='string'?payload.meta.name.trim():'';
+    if(metaName) return metaName;
+    const topicName=typeof payload?.data?.topic==='string'?payload.data.topic.trim():'';
+    if(topicName) return topicName;
+    return '';
+  }
+  function normalizeImportPayload(json){
+    if(!json){ throw new Error('文件格式不兼容'); }
+    if(Array.isArray(json)){
+      const candidates=json.map((item,index)=>{
+        const raw=item && typeof item==='object' && Object.prototype.hasOwnProperty.call(item,'content') ? item.content : item;
+        const payload=tryParseMindmapPayload(raw);
+        if(!payload || !payload.data){ return null; }
+        const title=deriveTitle(payload, item && typeof item==='object' ? item.title : '');
+        return {
+          payload,
+          title: title || `导图 ${index+1}`,
+        };
+      }).filter(Boolean);
+      if(!candidates.length){ throw new Error('文件中未找到可导入的导图内容'); }
+      let chosen=candidates[0];
+      if(candidates.length>1){
+        const options=candidates.map((c,idx)=>`${idx+1}. ${c.title}`).join('\n');
+        const answer=window.prompt(`检测到 ${candidates.length} 份导图，请输入要导入的序号：\n${options}`, '1');
+        const parsed=answer!==null?Number.parseInt(answer.trim(),10):NaN;
+        if(Number.isInteger(parsed) && parsed>=1 && parsed<=candidates.length){
+          chosen=candidates[parsed-1];
+        }
+      }
+      const payload=cloneDeep(chosen.payload);
+      if(!payload || !payload.data){ throw new Error('选中的导图缺少数据'); }
+      const title=chosen.title || '';
+      if(title){
+        if(!payload.meta || typeof payload.meta!=='object'){
+          payload.meta={name:title};
+        }else if(typeof payload.meta.name!=='string' || !payload.meta.name.trim()){
+          payload.meta={...payload.meta,name:title};
+        }
+      }
+      return { payload, selectedTitle:title };
+    }
+    if(typeof json==='object'){
+      if(json.data){
+        const payload=cloneDeep(json);
+        if(!payload || !payload.data){ throw new Error('文件格式不兼容'); }
+        return { payload, selectedTitle:deriveTitle(payload,'') };
+      }
+      if(Object.prototype.hasOwnProperty.call(json,'content')){
+        const payload=tryParseMindmapPayload(json.content);
+        if(payload && payload.data){
+          const cloned=cloneDeep(payload);
+          return { payload:cloned, selectedTitle:deriveTitle(cloned,'') };
+        }
+      }
+    }
+    throw new Error('文件格式不兼容');
+  }
   async function saveMindmapRequest(id,title,data){
     const fd=new FormData();
     fd.append('action','save_mindmap');
@@ -157,9 +230,10 @@ window.addEventListener('keydown',e=>{
     reader.onload=evt=>{
       try{
         const json=JSON.parse(evt.target.result);
-        if(!json || typeof json!=='object' || !json.data){ throw new Error('文件格式不兼容'); }
-        pendingImport=json;
-        pendingImportName=file.name;
+        const normalized=normalizeImportPayload(json);
+        pendingImport=normalized.payload;
+        const selectedLabel=normalized.selectedTitle && normalized.selectedTitle.trim()?` · ${normalized.selectedTitle.trim()}`:'';
+        pendingImportName=`${file.name}${selectedLabel}`;
         if(mindImportTargetSelect && mapsData.length){
           mindImportTargetSelect.disabled=false;
           if(!mindImportTargetSelect.value){ mindImportTargetSelect.value=String(mapsData[0].id); }
@@ -168,7 +242,11 @@ window.addEventListener('keydown',e=>{
       }catch(err){
         pendingImport=null;
         pendingImportName='';
-        alert(err instanceof Error ? err.message : '无法解析导图文件');
+        if(err instanceof SyntaxError){
+          alert('无法解析导图文件');
+        }else{
+          alert(err instanceof Error ? err.message : '无法解析导图文件');
+        }
       }finally{
         if(mindImportInput){ mindImportInput.value=''; }
       }
