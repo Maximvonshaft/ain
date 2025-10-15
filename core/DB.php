@@ -4,10 +4,11 @@ namespace Core;
 
 use PDO;
 use RuntimeException;
+use Throwable;
 
 class DB
 {
-    private const SCHEMA_VERSION = 3;
+    private const SCHEMA_VERSION = 4;
 
     private static ?PDO $pdo = null;
 
@@ -101,8 +102,12 @@ class DB
         );');
         $pdo->exec('CREATE TABLE IF NOT EXISTS attachments(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            context TEXT NOT NULL DEFAULT "memo:item",
             item_id INTEGER,
             step_id INTEGER,
+            mindmap_id INTEGER,
+            node_uid TEXT,
+            session_key TEXT,
             orig_name TEXT NOT NULL,
             stored_name TEXT NOT NULL,
             mime TEXT NOT NULL,
@@ -115,6 +120,11 @@ class DB
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_steps_item_created ON steps(item_id, created_at, id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_item ON attachments(item_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_step ON attachments(step_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_context_created ON attachments(context, created_at DESC, id DESC)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_mindmap ON attachments(mindmap_id, context)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_session ON attachments(session_key)');
+        self::ensureUnifiedAttachments($pdo);
+        self::ensurePortalTables($pdo);
         self::ensurePreviousCategoryColumn($pdo);
         self::ensureItemIndexes($pdo);
     }
@@ -140,6 +150,98 @@ class DB
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_items_category_order ON items(category_id, done, order_index, updated_at DESC, id DESC)');
     }
 
+    private static function ensurePortalTables(PDO $pdo): void
+    {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS portal_directives(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nickname TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_portal_directives_created ON portal_directives(created_at DESC, id DESC)');
+    }
+
+    private static function ensureUnifiedAttachments(PDO $pdo): void
+    {
+        $columns = $pdo->query('PRAGMA table_info(attachments)')->fetchAll(PDO::FETCH_ASSOC);
+        $names = [];
+        foreach ($columns as $column) {
+            $name = $column['name'] ?? null;
+            if ($name !== null) {
+                $names[] = $name;
+            }
+        }
+
+        if (!in_array('context', $names, true)) {
+            $pdo->exec('ALTER TABLE attachments ADD COLUMN context TEXT NOT NULL DEFAULT "memo:item"');
+            $pdo->exec("UPDATE attachments SET context = CASE WHEN step_id IS NOT NULL THEN 'memo:step' ELSE 'memo:item' END WHERE context IS NULL OR context = ''");
+        }
+
+        if (!in_array('mindmap_id', $names, true)) {
+            $pdo->exec('ALTER TABLE attachments ADD COLUMN mindmap_id INTEGER');
+        }
+
+        if (!in_array('node_uid', $names, true)) {
+            $pdo->exec('ALTER TABLE attachments ADD COLUMN node_uid TEXT');
+        }
+
+        if (!in_array('session_key', $names, true)) {
+            $pdo->exec('ALTER TABLE attachments ADD COLUMN session_key TEXT');
+        }
+
+        $pdo->exec("UPDATE attachments SET context = 'memo:step' WHERE context = 'memo:item' AND step_id IS NOT NULL");
+        $pdo->exec("UPDATE attachments SET context = 'memo:item' WHERE context IS NULL OR context = ''");
+
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_context_created ON attachments(context, created_at DESC, id DESC)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_mindmap ON attachments(mindmap_id, context)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_att_session ON attachments(session_key)');
+    }
+
+    private static function migrateMindmapAssets(PDO $pdo): void
+    {
+        $tableExists = (int)$pdo->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='mindmap_assets'")->fetchColumn();
+        if ($tableExists === 0) {
+            return;
+        }
+
+        $count = (int)$pdo->query('SELECT COUNT(*) FROM mindmap_assets')->fetchColumn();
+        if ($count === 0) {
+            $pdo->exec('DROP TABLE mindmap_assets');
+            return;
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $select = $pdo->query('SELECT id, mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at FROM mindmap_assets ORDER BY id ASC');
+            $rows = $select ? $select->fetchAll() : [];
+            $insert = $pdo->prepare('INSERT INTO attachments(context, item_id, step_id, mindmap_id, node_uid, session_key, orig_name, stored_name, mime, size, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
+            foreach ($rows as $row) {
+                $mindmapId = isset($row['mindmap_id']) ? (int)$row['mindmap_id'] : null;
+                $sessionKey = isset($row['session_key']) && $row['session_key'] !== '' ? (string)$row['session_key'] : null;
+                $context = $mindmapId ? 'mindmap:node' : 'mindmap:session';
+                $createdAt = isset($row['created_at']) ? (int)$row['created_at'] : now();
+                $insert->execute([
+                    $context,
+                    null,
+                    null,
+                    $mindmapId ?: null,
+                    $row['node_uid'] ?? null,
+                    $sessionKey,
+                    $row['orig_name'] ?? '',
+                    $row['stored_name'] ?? '',
+                    $row['mime'] ?? 'application/octet-stream',
+                    isset($row['size']) ? (int)$row['size'] : 0,
+                    $createdAt,
+                ]);
+            }
+            $pdo->exec('DROP TABLE mindmap_assets');
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     private static function seedDefaultCategories(PDO $pdo): void
     {
         $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
@@ -162,20 +264,8 @@ class DB
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         );');
-        $pdo->exec('CREATE TABLE IF NOT EXISTS mindmap_assets(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mindmap_id INTEGER,
-            node_uid TEXT,
-            session_key TEXT,
-            orig_name TEXT NOT NULL,
-            stored_name TEXT NOT NULL,
-            mime TEXT NOT NULL,
-            size INTEGER NOT NULL,
-            created_at INTEGER NOT NULL,
-            FOREIGN KEY(mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE
-        );');
-        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_map ON mindmap_assets(mindmap_id)');
-        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_mindmap_assets_session ON mindmap_assets(session_key)');
+        self::ensureUnifiedAttachments($pdo);
+        self::migrateMindmapAssets($pdo);
 
         $hasMap = (int)$pdo->query('SELECT COUNT(*) FROM mindmaps')->fetchColumn();
         if ($hasMap === 0) {

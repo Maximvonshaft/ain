@@ -2,12 +2,22 @@
 
 namespace App\Controllers;
 
+use App\Middlewares\CsrfMiddleware;
 use Core\DB;
 use Core\Request;
 use PDO;
+use RuntimeException;
+use Throwable;
+
+use function bytes_h;
+use function format_datetime;
 
 final class PortalController
 {
+    public function __construct(private CsrfMiddleware $csrf)
+    {
+    }
+
     public function index(Request $request): void
     {
         $pdo = DB::pdo();
@@ -25,8 +35,53 @@ final class PortalController
 
         $todoItems = $this->loadTodoItems($pdo, $memoUrl);
         $mindmaps = $this->loadMindmaps($pdo, $memoUrl);
+        $recentFiles = $this->loadRecentAssets($pdo, $memoUrl);
+        $directives = $this->loadDirectives($pdo);
+        $csrfToken = $this->csrf->token($request);
+        $directivesPostUrl = $prefix . '/directives';
 
         require __DIR__ . '/../../resources/views/portal/index.phtml';
+    }
+
+    public function storeDirective(Request $request): void
+    {
+        $pdo = DB::pdo();
+
+        try {
+            $this->csrf->verify($request);
+        } catch (RuntimeException $e) {
+            $this->respondJson(['ok' => 0, 'message' => '会话已过期，请刷新后重试'], 419);
+        }
+
+        $nickname = trim((string)$request->input('nickname', ''));
+        $messageInput = $request->input('message', $request->input('note', ''));
+        $message = trim((string)$messageInput);
+
+        if ($nickname === '' || $message === '') {
+            $this->respondJson(['ok' => 0, 'message' => '昵称和留言均不能为空'], 422);
+        }
+
+        $nickname = mb_substr($nickname, 0, 40);
+        $message = mb_substr($message, 0, 240);
+
+        $createdAt = time();
+
+        try {
+            $stmt = $pdo->prepare('INSERT INTO portal_directives(nickname, message, created_at) VALUES(?,?,?)');
+            $stmt->execute([$nickname, $message, $createdAt]);
+        } catch (Throwable) {
+            $this->respondJson(['ok' => 0, 'message' => '保存留言失败，请稍后再试'], 500);
+        }
+
+        $id = (int)$pdo->lastInsertId();
+        $payload = $this->formatDirectiveRow([
+            'id' => $id,
+            'nickname' => $nickname,
+            'message' => $message,
+            'created_at' => $createdAt,
+        ]);
+
+        $this->respondJson(['ok' => 1, 'directive' => $payload], 201);
     }
 
     /**
@@ -111,6 +166,177 @@ final class PortalController
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadRecentAssets(PDO $pdo, string $memoUrl): array
+    {
+        $stmt = $pdo->prepare(
+            'SELECT a.id, a.context, a.item_id, a.step_id, a.mindmap_id, a.orig_name, a.mime, a.size, a.created_at, a.stored_name,
+                    i.title AS item_title,
+                    st.item_id AS step_item_id,
+                    si.title AS step_item_title,
+                    m.title AS mindmap_title
+             FROM attachments AS a
+             LEFT JOIN items AS i ON i.id = a.item_id
+             LEFT JOIN steps AS st ON st.id = a.step_id
+             LEFT JOIN items AS si ON si.id = st.item_id
+             LEFT JOIN mindmaps AS m ON m.id = a.mindmap_id
+             WHERE a.context IN ("memo:item", "memo:step", "mindmap:node")
+             ORDER BY a.created_at DESC, a.id DESC
+             LIMIT 6'
+        );
+        $stmt->execute();
+        $rows = $stmt->fetchAll() ?: [];
+
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (int)($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $stored = (string)($row['stored_name'] ?? '');
+            if ($stored === '') {
+                continue;
+            }
+
+            $context = (string)($row['context'] ?? 'memo:item');
+            $createdAt = isset($row['created_at']) ? (int)$row['created_at'] : 0;
+            $createdLabel = $createdAt > 0 ? '上传 ' . format_datetime($createdAt) : '';
+            $createdIso = $createdAt > 0 ? date('c', $createdAt) : '';
+            $size = isset($row['size']) ? (int)$row['size'] : 0;
+            $sizeLabel = $size > 0 ? bytes_h($size) : '';
+            $fileName = trim((string)($row['orig_name'] ?? ''));
+            if ($fileName === '') {
+                $fileName = '未命名附件';
+            }
+
+            $contextLabel = match ($context) {
+                'memo:step' => 'STEP',
+                'mindmap:node' => 'MINDMAP',
+                default => 'MEMO',
+            };
+
+            $ownerLabel = '';
+            $ownerUrl = '';
+            $resolvedItemId = (int)($row['item_id'] ?? 0);
+            $stepItemId = (int)($row['step_item_id'] ?? 0);
+            if ($resolvedItemId <= 0 && $stepItemId > 0) {
+                $resolvedItemId = $stepItemId;
+            }
+
+            if ($context === 'mindmap:node') {
+                $mapId = (int)($row['mindmap_id'] ?? 0);
+                $mapTitle = trim((string)($row['mindmap_title'] ?? ''));
+                if ($mapTitle === '') {
+                    $mapTitle = '未命名导图';
+                }
+                $ownerLabel = '导图 · ' . $mapTitle;
+                if ($mapId > 0) {
+                    $ownerUrl = $memoUrl . '?view=map_edit&id=' . $mapId;
+                }
+            } else {
+                $itemTitle = trim((string)($row['item_title'] ?? ''));
+                $stepItemTitle = trim((string)($row['step_item_title'] ?? ''));
+                $title = $itemTitle !== '' ? $itemTitle : $stepItemTitle;
+                if ($title === '') {
+                    $title = '未命名条目';
+                }
+                if ($context === 'memo:step') {
+                    $ownerLabel = '步骤 · ' . $title;
+                } else {
+                    $ownerLabel = '备忘录 · ' . $title;
+                }
+                if ($resolvedItemId > 0) {
+                    $ownerUrl = $memoUrl . '?view=item&id=' . $resolvedItemId;
+                }
+            }
+
+            $result[] = [
+                'id' => $id,
+                'name' => $fileName,
+                'context' => $context,
+                'context_label' => $contextLabel,
+                'owner_label' => $ownerLabel,
+                'owner_url' => $ownerUrl,
+                'size_label' => $sizeLabel,
+                'created_label' => $createdLabel,
+                'created_iso' => $createdIso,
+                'download_url' => $memoUrl . '?download=' . $id,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadDirectives(PDO $pdo): array
+    {
+        $stmt = $pdo->query(
+            'SELECT id, nickname, message, created_at FROM portal_directives ORDER BY created_at DESC, id DESC LIMIT 12'
+        );
+        $rows = $stmt ? $stmt->fetchAll() : [];
+        if (!$rows) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = $this->formatDirectiveRow($row);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function formatDirectiveRow(array $row): array
+    {
+        $id = (int)($row['id'] ?? 0);
+        $nickname = trim((string)($row['nickname'] ?? ''));
+        if ($nickname === '') {
+            $nickname = '匿名特工';
+        }
+        $message = trim((string)($row['message'] ?? ''));
+        $createdAt = isset($row['created_at']) ? (int)$row['created_at'] : time();
+        if ($createdAt <= 0) {
+            $createdAt = time();
+        }
+
+        return [
+            'id' => $id,
+            'nickname' => $nickname,
+            'message' => $message,
+            'created_at' => $createdAt,
+            'created_label' => date('H:i:s', $createdAt),
+            'created_iso' => date('c', $createdAt),
+            'priority' => $this->determineDirectivePriority($id),
+        ];
+    }
+
+    private function determineDirectivePriority(int $id): string
+    {
+        $cycle = ['high', 'medium', 'low'];
+        $count = count($cycle);
+        if ($count === 0) {
+            return 'medium';
+        }
+        $index = $id % $count;
+        return $cycle[$index];
+    }
+
+    private function respondJson(array $payload, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     /**
