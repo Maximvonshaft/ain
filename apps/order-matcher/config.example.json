@@ -1,0 +1,47 @@
+{
+  "orders_file": "../../data/orders_example.xlsx",
+  "mapping_file": "../../data/mapping_example.xlsx",
+  "output_dir": "../../output/order-matcher",
+  "orders_columns": {
+    "order_id": "A",
+    "city": "BK",
+    "province": "BL"
+  },
+  "mapping_columns": {
+    "city": "D",
+    "province": "E"
+  },
+  "orders_has_header": true,
+  "mapping_has_header": true,
+  "require_both_match": false,
+  "export_details": true,
+  "export_review": true,
+  "export_anomalies": true,
+  "thresholds": {
+    "high": 0.85,
+    "pass": 0.75,
+    "low": 0.65
+  },
+  "weights": {
+    "base": 0.7,
+    "token": 0.3
+  },
+  "alias_bonus": 0.05,
+  "sampling_ratio": 0.03,
+  "column_non_empty_threshold": 0.6,
+  "max_candidates": 400,
+  "aliases": [
+    ["Tiranë", "Tirana"],
+    ["Prishtina", "Pristina"],
+    ["地拉那", "Tirana"],
+    ["普里什蒂纳", "Pristina"]
+  ],
+  "noise_words": [
+    "city of",
+    "municipality of",
+    "prefecture",
+    "region",
+    "county"
+  ],
+  "preserve_characters": "-"
+}
