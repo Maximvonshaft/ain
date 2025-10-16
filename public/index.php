@@ -1,32 +1,20 @@
 <?php
 
-declare(strict_types=1);
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 
-use App\Support\SessionConfigurator;
-use Core\Request;
-use Core\Router;
+define('LARAVEL_START', microtime(true));
 
-/** @var \Core\Config $config */
-$config = require __DIR__ . '/../bootstrap.php';
-
-SessionConfigurator::configure($config);
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
 }
 
-$baseUrl = (string)($config->get('app.base_url', '') ?? '');
-$basePath = '';
-if ($baseUrl !== '') {
-    $parsedPath = parse_url($baseUrl, PHP_URL_PATH);
-    if (is_string($parsedPath)) {
-        $basePath = $parsedPath;
-    }
-}
+// Register the Composer autoloader...
+require __DIR__.'/../vendor/autoload.php';
 
-$request = Request::fromGlobals($basePath);
-$router = new Router();
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
 
-require __DIR__ . '/../routes/web.php';
-
-$router->dispatch($request);
+$app->handleRequest(Request::capture());
