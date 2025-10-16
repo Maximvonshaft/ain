@@ -1623,6 +1623,7 @@ body::after {
   letter-spacing: 0.22em;
   text-transform: uppercase;
   transition: color 0.2s ease, opacity 0.2s ease;
+  min-width: 0;
 }
 
 .file-entry-link:hover,
@@ -1635,11 +1636,17 @@ body::after {
   color: var(--text-muted);
   font-size: 0.68rem;
   min-width: 72px;
+  flex-shrink: 0;
 }
 
 .file-entry-name {
   color: var(--text-strong);
   font-size: 0.78rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-entry-meta {
@@ -3047,6 +3054,16 @@ body::after {
         28vw,
         250px
       );
+    gap: 28px;
+  }
+
+  .panel-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "signal"
+      "todo"
+      "files"
+      "board";
     gap: 28px;
   }
 }
