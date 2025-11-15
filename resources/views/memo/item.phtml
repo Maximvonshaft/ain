@@ -1,0 +1,190 @@
+  <!doctype html>
+  <html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>详情 · <?php echo h($it['title']); ?></title>
+    <meta name="color-scheme" content="dark"/>
+    <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-item.css'); ?>"/>
+    <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
+
+  </head>
+  <body>
+    <div class="scanlines" aria-hidden="true"></div>
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
+        <form method="post" onsubmit="return confirm('确认删除？');">
+          <?= csrf_input(); ?>
+          <input type="hidden" name="action" value="delete_item">
+          <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+          <button class="btn btn-danger">删除</button>
+        </form>
+      </div>
+      <div class="card <?php echo $doneView; ?>">
+        <h1 class="title"><?php echo $it['done']?'✅ ':''; echo h($it['title']); ?></h1>
+        <div class="meta">
+          分类：<?php echo h($it['cat_name'] ?? '未分类'); ?> ·
+          创建：<?php echo dt((int)$it['created_at']); ?> ·
+          更新：<?php echo dt((int)$it['updated_at']); ?>
+        </div>
+        <div class="split" style="margin-top:12px">
+          <div class="editbox">
+            <form method="post" id="item-form" onsubmit="return saveItemAJAX(event,this)">
+              <?= csrf_input(); ?>
+              <input type="hidden" name="action" value="edit_item">
+              <input type="hidden" name="id" value="<?php echo $it['id']; ?>">
+              <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:12px;margin-bottom:16px;align-items:center">
+                <input name="title" value="<?php echo h($it['title']); ?>" required>
+                <select name="category_id">
+                  <option value="">未分类 · Unassigned</option>
+                  <?php foreach ($cats as $c): ?>
+                    <option value="<?php echo $c['id']; ?>" <?php echo ($it['category_id']==$c['id']?'selected':''); ?>><?php echo h($c['name']); ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button class="btn btn-primary" type="submit">保存</button><span id="save-tip" class="save-tip">保存成功</span>
+                </div>
+              </div>
+              <textarea id="md-editor" name="description"><?php echo h($it['description']); ?></textarea>
+                <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
+                <div>
+                  <input id="att-file-item" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" style="display:none">
+                  <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
+                  <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>
+                </div>
+              </div>
+            </form>
+          </div>
+          <?php
+            $attachmentCount=count($itemAtts);
+            $attachmentTotalSize=0;
+            foreach($itemAtts as $attMeta){ $attachmentTotalSize+=(int)($attMeta['size'] ?? 0); }
+            $attachmentSummaryText=$attachmentCount
+              ? ('共 '.$attachmentCount.' 个附件'.($attachmentTotalSize>0 ? ' · 总计 '.bytes_h($attachmentTotalSize) : ''))
+              : '暂无附件';
+          ?>
+          <div class="preview attachment-panel">
+            <div class="attachment-panel-header">
+              <div class="attachment-panel-title">附件列表</div>
+              <div class="attachment-panel-meta" id="attachment-summary"><?php echo h($attachmentSummaryText); ?></div>
+            </div>
+            <div class="attachment-empty" id="attachment-empty" <?php echo $attachmentCount ? 'hidden' : ''; ?>>暂无附件。上传后将在此管理与预览。</div>
+            <div class="attachment-list" id="attachment-list">
+              <?php if ($itemAtts): foreach ($itemAtts as $a):
+                $mime=(string)$a['mime'];
+                $ext=strtolower(pathinfo((string)$a['orig_name'], PATHINFO_EXTENSION));
+                $isImg=str_starts_with($mime,'image/');
+                $isVideo=str_starts_with($mime,'video/');
+                $isAudio=str_starts_with($mime,'audio/');
+                $isPdf=$mime==='application/pdf' || $ext==='pdf';
+                $isZip=str_contains($mime,'zip') || $ext==='zip';
+                $isRar=str_contains($mime,'rar') || $ext==='rar';
+                $isWord=in_array($ext,['docx','docm','doc','dotx','dotm'],true) || str_contains($mime,'word');
+                $isExcel=in_array($ext,['xlsx','xls','xlsm','xlsb','csv','xltx','xltm','tsv'],true) || str_contains($mime,'spreadsheet');
+                $icon=$isImg?'🖼':($isVideo?'🎬':($isAudio?'🎧':($isPdf?'📄':($isExcel?'📊':($isWord?'📝':($isZip?'🗜':($isRar?'📦':'📎')))))));
+                $downloadUrl='?download='.$a['id'];
+                $sizeBytes=(int)$a['size'];
+                $sizeLabel=$sizeBytes>0?bytes_h($sizeBytes):'';
+                $detailParts=[];
+                if($sizeLabel!=='') $detailParts[]=$sizeLabel;
+                if($mime!=='') $detailParts[]=$mime;
+                $detailText=$detailParts?implode(' · ',$detailParts):'—';
+                $previewAttrs='data-attachment-preview="true" data-url="'.h($downloadUrl).'" data-name="'.h($a['orig_name']).'" data-mime="'.h($mime).'"';
+                if($sizeBytes>0){ $previewAttrs.=' data-size="'.$sizeBytes.'"'; }
+              ?>
+              <div class="attachment-row" data-attachment-id="<?php echo $a['id']; ?>" data-size="<?php echo $sizeBytes; ?>" data-mime="<?php echo h($mime); ?>">
+                <div class="attachment-main">
+                  <span class="attachment-icon"><?php echo $icon; ?></span>
+                  <div class="attachment-info">
+                    <div class="attachment-name"><?php echo h($a['orig_name']); ?></div>
+                    <div class="attachment-detail"><?php echo h($detailText); ?></div>
+                  </div>
+                </div>
+                <div class="attachment-actions">
+                  <button class="btn btn-primary btn-small attachment-preview-button" type="button" <?php echo $previewAttrs; ?>>预览</button>
+                  <a class="btn btn-outline btn-small" href="<?php echo $downloadUrl; ?>" download>下载</a>
+                  <form method="post">
+                    <?= csrf_input(); ?>
+                    <input type="hidden" name="action" value="delete_attachment">
+                    <input type="hidden" name="id" value="<?php echo $a['id']; ?>">
+                    <button class="btn btn-danger btn-small" style="font-size:12px">删除</button>
+                  </form>
+                </div>
+              </div>
+              <?php endforeach; endif; ?>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px">
+          <div style="font-weight:800">流程子任务（时间轴）</div>
+          <form method="post" style="display:flex;gap:6px;flex-wrap:wrap" onsubmit="return addStepForm(event)">
+            <?= csrf_input(); ?>
+            <input type="hidden" name="action" value="add_step">
+            <input type="hidden" name="item_id" value="<?php echo $it['id']; ?>">
+            <input id="new-step-title" name="title" placeholder="新增步骤 · Add step" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(6,25,14,.82);color:var(--text);letter-spacing:.08em;flex:1;min-width:220px">
+            <button class="btn btn-primary">添加</button>
+          </form>
+        </div>
+        <div class="timeline" id="timeline" data-item="<?php echo $it['id']; ?>">
+          <?php foreach ($steps as $s): ?>
+            <div class="tl-item <?php echo $s['done']?'done':''; ?>" draggable="true" data-id="<?php echo $s['id']; ?>">
+              <span class="tl-dot"></span>
+              <div class="tl-head">
+                <span class="drag">⬍</span>
+                <label style="display:flex;align-items:center;margin:0">
+                  <input type="checkbox" <?php echo $s['done']?'checked':''; ?> onchange="toggleStep(<?php echo $s['id']; ?>, this.checked)" title="完成">
+                </label>
+                <div class="tl-title" style="font-weight:700;flex:1">
+                  <span class="js-step-title"><?php echo h($s['title']); ?></span> <span class="ts"><?php echo dt((int)$s['created_at']); ?></span>
+                </div>
+                <details>
+                  <summary>编辑</summary>
+                  <div style="margin-top:6px;display:grid;gap:6px">
+                    <form method="post" onsubmit="return saveStepTitleAJAX(event, <?php echo $s['id']; ?>, this)" style="display:flex;gap:6px;flex-wrap:wrap">
+                      <input type="hidden" name="action" value="edit_step">
+                      <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                      <input name="title" value="<?php echo h($s['title']); ?>" style="padding:8px;border:1px solid var(--border);border-radius:8px;flex:1;min-width:180px">
+                      <button class="btn btn-outline" data-step-button="title-<?php echo $s['id']; ?>">保存标题</button>
+                      <span class="save-tip" data-step-tip="title-<?php echo $s['id']; ?>">保存成功</span>
+                    </form>
+                    <form method="post" onsubmit="return saveStepNotesAJAX(event, <?php echo $s['id']; ?>)" id="form-notes-<?php echo $s['id']; ?>">
+                      <input type="hidden" name="action" value="edit_step_notes">
+                      <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
+                      <textarea id="md-step-<?php echo $s['id']; ?>" name="notes" style="min-height:120px"><?php echo h($s['notes'] ?? ''); ?></textarea>
+                      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap">
+                        <div>
+                          <input id="att-file-step-<?php echo $s['id']; ?>" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" style="display:none">
+                          <button class="btn btn-outline" type="button" onclick="insertAttachmentToStep(<?php echo $s['id']; ?>)">插入附件到备注</button>
+                          <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                          <button class="btn btn-primary" type="submit" data-step-button="notes-<?php echo $s['id']; ?>">保存备注</button>
+                          <span class="save-tip" data-step-tip="notes-<?php echo $s['id']; ?>">保存成功</span>
+                          <button class="btn btn-danger" type="button" data-step-button="delete-<?php echo $s['id']; ?>" onclick="return deleteStep(<?php echo $s['id']; ?>, this)">删除子任务</button>
+                          <span class="save-tip" data-step-tip="delete-<?php echo $s['id']; ?>">已删除</span>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+              </div>
+              <div class="md-body" id="step-md-view-<?php echo $s['id']; ?>"></div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+        <script>
+      window.memoItemConfig = Object.assign({}, window.memoItemConfig, {
+        uploadAccept: <?= json_encode(memo_upload_accept_attribute()); ?>,
+        itemId: <?= (int)$it['id']; ?>
+      });
+    </script>
+    <script src="<?= memo_asset_url('assets/js/memo-item.js'); ?>" defer></script>
+  </body>
+  </html>

@@ -1,0 +1,74 @@
+  <!doctype html>
+  <html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>新建备忘录</title>
+    <meta name="color-scheme" content="dark"/>
+    <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-new.css'); ?>"/>
+    <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
+  </head>
+  <body data-density="comfortable">
+    <div class="scanlines" aria-hidden="true"></div>
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <a class="btn btn-ghost" href="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">← 返回首页</a>
+      </div>
+      <div class="card">
+        <form id="new-form" onsubmit="return saveAJAX(event)">
+          <?= csrf_input(); ?>
+          <div class="row">
+            <input id="title" name="title" placeholder="标题 · Title" required>
+            <select id="cat" name="category_id">
+              <option value="">未分类 · Unassigned</option>
+              <?php foreach ($cats as $c): ?><option value="<?php echo $c['id']; ?>"><?php echo h($c['name']); ?></option><?php endforeach; ?>
+            </select>
+            <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
+              <button class="btn btn-primary" type="submit">保存</button>
+              <span id="save-tip" class="save-tip">保存成功</span>
+            </div>
+          </div>
+          <div class="split" id="split">
+            <div class="editbox">
+              <textarea id="md-editor" name="description" placeholder="描述 · 支持 Markdown"></textarea>
+              <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:10px">
+                <div>
+                  <input id="att-file-item" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" style="display:none">
+                  <button class="btn btn-ghost" type="button" id="btn-insert-att-item">插入附件到备注</button>
+                  <span class="att-meta">图片、音视频、PDF、Word/Excel、ZIP/RAR 或文本 ≤ 15MB</span>
+                </div>
+                <button class="btn btn-ghost" type="button" id="btn-preview-toggle">预览置顶/置底</button>
+              </div>
+            </div>
+            <div class="preview attachment-panel">
+              <div class="attachment-panel-header">
+                <div class="attachment-panel-title">附件列表</div>
+                <div class="attachment-panel-meta" id="attachment-summary">暂无附件</div>
+              </div>
+              <div class="attachment-empty" id="attachment-empty">暂未上传附件。插入文件后可在此快速预览与下载。</div>
+              <div class="attachment-list" id="attachment-list"></div>
+            </div>
+          </div>
+        </form>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px">
+          <div style="font-weight:800">流程子任务（时间轴）</div>
+          <form id="add-step-form" onsubmit="return addStepAJAX(event)" style="display:flex;gap:6px;flex-wrap:wrap">
+            <input id="new-step-title" placeholder="新增步骤 · Add step" style="flex:1;min-width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(6,25,14,.82);color:var(--text);letter-spacing:.08em">
+            <button class="btn btn-primary" type="submit">添加</button>
+          </form>
+        </div>
+        <div class="timeline" id="timeline" data-item="0"></div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+        <script>
+      window.memoNewConfig = Object.assign({}, window.memoNewConfig, {
+        uploadAccept: <?= json_encode(memo_upload_accept_attribute()); ?>
+      });
+    </script>
+    <script src="<?= memo_asset_url('assets/js/memo-new.js'); ?>" defer></script>
+  </body>
+  </html>

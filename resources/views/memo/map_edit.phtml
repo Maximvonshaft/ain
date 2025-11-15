@@ -1,0 +1,237 @@
+  <!doctype html>
+  <html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>思维导图编辑器 · <?php echo h($mind['title']); ?></title>
+    <meta name="color-scheme" content="dark"/>
+    <meta name="csrf-token" content="<?= h(csrf_token()); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-common.css'); ?>"/>
+    <link rel="stylesheet" href="<?= memo_asset_url('assets/css/memo-map-edit.css'); ?>"/>
+    <script src="<?= memo_asset_url('assets/js/csrf.js'); ?>" defer></script>
+
+  </head>
+  <body>
+    <div class="scanlines" aria-hidden="true"></div>
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+      <defs>
+        <linearGradient id="mindGoldTrace" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#E3C68B" />
+          <stop offset="50%" stop-color="#C9A86A" />
+          <stop offset="100%" stop-color="#AA8C54" />
+        </linearGradient>
+        <filter id="mindSoftGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+    </svg>
+    <div class="mind-shell">
+      <div class="mind-stage">
+        <header class="mind-info-bar" id="mind-info-bar" data-collapsed="false">
+          <button type="button" class="mind-info-handle" id="mind-info-handle" aria-label="收起顶部栏" aria-expanded="true">
+            <span class="icon" aria-hidden="true">∧</span>
+          </button>
+          <div class="mind-info-content" aria-hidden="false">
+            <div class="mind-info-row">
+              <a class="map-back" href="<?= htmlspecialchars($_SERVER['PHP_SELF'].'?cat=mindmaps') ?>" aria-label="返回导图库">← 导图库</a>
+              <label class="sr-only" for="map-title">导图标题</label>
+              <input id="map-title" class="map-title-input" value="<?php echo h($mind['title']); ?>" placeholder="输入导图标题">
+              <div class="map-io" id="map-io" aria-expanded="false">
+                <button type="button" class="map-io-button" id="map-io-button" aria-haspopup="true" aria-expanded="false">导入 / 导出</button>
+                <div class="map-io-menu" id="map-io-menu" role="menu">
+                  <button type="button" data-action="import" role="menuitem">导入 JSON</button>
+                  <button type="button" data-action="export-json" role="menuitem">导出 JSON</button>
+                  <button type="button" data-action="export-pdf" role="menuitem">导出 PDF</button>
+                  <button type="button" data-action="export-jpg" role="menuitem">导出 JPG</button>
+                </div>
+              </div>
+              <div class="save-state" id="save-state">保存成功</div>
+            </div>
+            <div class="map-meta">
+              <span>导图 ID：<?php echo $mind['id'] ?: '新建'; ?></span>
+              <span>最近保存：<?php echo dt((int)$mind['updated_at']); ?></span>
+              <?php if ($mind['id']): ?>
+              <button type="button" class="map-delete-btn" id="map-delete-btn">删除导图</button>
+              <?php endif; ?>
+            </div>
+          </div>
+        </header>
+        <div id="jsmind-container" data-map-id="<?php echo $mind['id']; ?>"></div>
+      </div>
+      <input id="import-input" type="file" accept="application/json" hidden>
+      <input id="attach-file-input" type="file" accept="<?= h(memo_upload_accept_attribute()); ?>" hidden>
+      <?php if ($mind['id']): ?>
+        <form id="delete-map-form" method="post" hidden>
+          <?= csrf_input(); ?>
+          <input type="hidden" name="action" value="delete_mindmap">
+          <input type="hidden" name="id" value="<?php echo $mind['id']; ?>">
+        </form>
+      <?php endif; ?>
+      <div class="mind-dock-wrap">
+        <nav class="mind-dock" id="mind-dock" role="toolbar" aria-label="思维导图操作工具栏">
+          <button class="dock-btn" data-action="save" data-default-label="保存" aria-label="保存">
+            <span class="icon">💾</span>
+            <span class="label">保存</span>
+          </button>
+          <button class="dock-btn" data-action="undo" aria-label="撤销操作">
+            <span class="icon">↺</span>
+            <span class="label">撤销</span>
+          </button>
+          <button class="dock-btn" data-action="redo" aria-label="重做操作">
+            <span class="icon">↻</span>
+            <span class="label">重做</span>
+          </button>
+          <button class="dock-btn" data-action="sibling" aria-label="新增同级节点">
+            <span class="icon">⧉</span>
+            <span class="label">同级</span>
+          </button>
+          <button class="dock-btn" data-action="child" aria-label="新增子级节点">
+            <span class="icon">↳</span>
+            <span class="label">子级</span>
+          </button>
+          <button class="dock-btn" data-action="fold" aria-label="折叠或展开节点">
+            <span class="icon" data-fold-icon>⇅</span>
+            <span class="label" data-fold-label>折叠</span>
+          </button>
+          <button class="dock-btn" data-action="attach" aria-label="上传附件">
+            <span class="icon">📎</span>
+            <span class="label">附件</span>
+          </button>
+          <button class="dock-btn" data-action="manage-attachments" aria-label="附件管理">
+            <span class="icon">🗂</span>
+            <span class="label">管理</span>
+          </button>
+          <button class="dock-btn" data-action="relation" aria-label="关联节点">
+            <span class="icon">🪢</span>
+            <span class="label">关联</span>
+          </button>
+          <button class="dock-btn" data-action="link" aria-label="新增链接">
+            <span class="icon">🔗</span>
+            <span class="label">链接</span>
+          </button>
+          <button class="dock-btn danger" data-action="delete" aria-label="删除节点">
+            <span class="icon">🗑</span>
+            <span class="label">删除</span>
+          </button>
+        </nav>
+      </div>
+      <div class="mind-export-overlay" id="mind-export-overlay" role="status" aria-live="polite" aria-hidden="true">
+        <div class="export-spinner" aria-hidden="true"></div>
+        <div class="export-label">正在导出</div>
+        <div class="export-subtext">请稍候，我们正在生成高清导出文件…</div>
+      </div>
+      <div class="mind-relation-toast" id="mind-relation-toast" role="status" aria-live="polite"></div>
+    </div>
+    <div class="mind-import-backdrop" id="mind-import-modal" data-open="false" role="dialog" aria-modal="true" aria-labelledby="mind-import-title">
+      <div class="mind-import-panel">
+        <h3 id="mind-import-title">导入导图</h3>
+        <p>文件：<strong data-import-name>未选择文件</strong></p>
+        <div class="mind-import-options">
+          <button type="button" data-import-mode="replace">覆盖当前导图</button>
+          <button type="button" data-import-mode="append-node">导入为新节点</button>
+          <button type="button" data-import-mode="new-map">导入为新导图</button>
+        </div>
+        <div class="mind-import-footer">
+          <button type="button" data-import-cancel>取消</button>
+        </div>
+      </div>
+    </div>
+    <div class="node-popover" id="node-popover" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <header>
+        <h2>节点属性</h2>
+        <button type="button" class="close" data-pop-close aria-label="关闭">×</button>
+      </header>
+      <form id="node-inspector" autocomplete="off">
+        <div class="field">
+          <label for="node-topic-input">标题</label>
+          <input id="node-topic-input" type="text" placeholder="输入节点标题">
+        </div>
+        <div class="field">
+          <label for="node-note">备注</label>
+          <textarea id="node-note" rows="4" placeholder="例如：
+状态：已完成
+优先级：高
+负责人：张三
+标签：#重要 #任务"></textarea>
+        </div>
+      <div class="popover-actions">
+        <button type="button" data-pop-close>取消</button>
+        <button type="button" class="accent" data-pop-save>完成</button>
+      </div>
+      </form>
+    </div>
+    <div class="node-context-menu" id="node-context-menu" hidden>
+      <button type="button" data-menu-action="edit">编辑属性</button>
+    </div>
+    <div class="relation-context-menu" id="relation-context-menu" hidden>
+      <button type="button" data-relation-menu-action="delete">删除连接</button>
+    </div>
+    <div class="mind-settings" id="mind-settings" aria-hidden="true">
+      <div class="settings-panel">
+        <header>
+          <h3>设置</h3>
+          <button type="button" class="close" data-settings-close aria-label="关闭">×</button>
+        </header>
+        <label><input type="checkbox" id="setting-grid" checked> 显示背景网格</label>
+        <div class="settings-actions">
+          <button type="button" data-settings-close>关闭</button>
+        </div>
+      </div>
+    </div>
+    <div class="mind-attachment-backdrop" id="mind-attachment-manager" data-open="false" role="dialog" aria-modal="true" aria-labelledby="mind-attachment-title">
+      <div class="mind-attachment-panel">
+        <header>
+          <div class="mind-attachment-title">
+            <h3 id="mind-attachment-title">附件管理</h3>
+            <button type="button" class="mind-attachment-close" data-attachment-close aria-label="关闭附件管理">×</button>
+          </div>
+          <div class="mind-attachment-summary" id="mind-attachment-summary">正在收集附件…</div>
+          <div class="mind-attachment-controls">
+            <div class="mind-attachment-filters" id="mind-attachment-filters" role="radiogroup" aria-label="附件类型筛选">
+              <button type="button" class="mind-attachment-filter" data-filter="all" data-active="true" aria-pressed="true">全部</button>
+              <button type="button" class="mind-attachment-filter" data-filter="image" aria-pressed="false">图片</button>
+              <button type="button" class="mind-attachment-filter" data-filter="document" aria-pressed="false">文档</button>
+              <button type="button" class="mind-attachment-filter" data-filter="audio" aria-pressed="false">音频</button>
+              <button type="button" class="mind-attachment-filter" data-filter="video" aria-pressed="false">视频</button>
+              <button type="button" class="mind-attachment-filter" data-filter="archive" aria-pressed="false">压缩包</button>
+              <button type="button" class="mind-attachment-filter" data-filter="other" aria-pressed="false">其他</button>
+            </div>
+            <label class="mind-attachment-sort">排序
+              <select id="mind-attachment-sort">
+                <option value="time-desc">按时间（新 → 旧）</option>
+                <option value="time-asc">按时间（旧 → 新）</option>
+                <option value="size-desc">按大小（大 → 小）</option>
+                <option value="size-asc">按大小（小 → 大）</option>
+                <option value="type">按类型</option>
+                <option value="name">按名称</option>
+              </select>
+            </label>
+          </div>
+        </header>
+        <div class="mind-attachment-body">
+          <div class="mind-attachment-list" id="mind-attachment-list" role="listbox" aria-multiselectable="true"></div>
+        </div>
+        <div class="mind-attachment-footer">
+          <div class="mind-attachment-selection-info" id="mind-attachment-selection-info">已选择 0 个附件</div>
+          <div class="mind-attachment-bulk">
+            <button type="button" class="danger" id="mind-attachment-delete" disabled>批量删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+        <script>
+      window.memoMapConfig = Object.assign({}, window.memoMapConfig, {
+        defaultData: <?= json_encode($defaultData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        initialData: <?= json_encode($initialDataDecoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        initialAssetMeta: <?= json_encode($mindmapAssetsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+      });
+    </script>
+    <script src="<?= memo_asset_url('assets/js/memo-map-edit.js'); ?>" defer></script>
+  </body>
+  </html>

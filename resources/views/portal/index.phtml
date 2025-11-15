@@ -1,0 +1,635 @@
+<?php
+/**
+ * @var array<int, array{id:int,title:string,title_full:string,done:bool,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $todoItems
+ * @var array<int, array{id:int,title:string,title_full:string,status:string,status_label:string,summary:string,nodes:array<int,string>,node_count:int,updated_at:int|null,updated_label:string,updated_iso:string,url:string}> $mindmaps
+ * @var array<int, array{id:int,name:string,name_full:string,context:string,context_label:string,owner_label:string,owner_label_full:string,owner_url:string,size_label:string,created_label:string,created_iso:string,download_url:string}> $recentFiles
+ * @var callable(string):string $asset
+ * @var string $memoUrl
+ * @var string $mindmapUrl
+ * @var string $basePath
+*/
+?>
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coldline Intelligence Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600&family=Roboto+Mono:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+      integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link rel="stylesheet" href="<?= view_escape($asset('style.css')); ?>" />
+  </head>
+  <body data-base-path="<?= view_escape($basePath); ?>">
+    <main class="terminal-layout">
+      <aside class="sidebar sidebar-left" aria-label="身份档案终端">
+        <section class="identity-card" aria-labelledby="identity-heading">
+          <header class="section-heading" id="identity-heading">
+            IDENTITY PROFILE
+          </header>
+          <div class="profile-frame">
+            <div class="profile-avatar">
+              <img
+                class="profile-avatar-image"
+                src="<?= view_escape($asset('assets/avatar.png')); ?>"
+                alt="身份头像占位图（替换为个人照片链接）"
+                loading="lazy"
+              />
+              <span class="avatar-noise" aria-hidden="true"></span>
+              <span class="avatar-scan" aria-hidden="true"></span>
+              <span class="avatar-core" aria-hidden="true"></span>
+            </div>
+            <dl class="profile-meta">
+              <div>
+                <dt>ALIAS</dt>
+                <dd>OPERATOR ZETTA</dd>
+              </div>
+              <div>
+                <dt>STATUS</dt>
+                <dd>LINKED · LIVE</dd>
+              </div>
+              <div>
+                <dt>SIGNAL</dt>
+                <dd class="signal-status">● ONLINE</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <section class="skill-block" aria-labelledby="skill-heading">
+          <header class="section-heading" id="skill-heading">
+            SKILL ASSESSMENT
+          </header>
+          <ul class="skill-list">
+            <li>
+              <span class="skill-label">CRYPTANALYSIS</span>
+              <span class="skill-meter" data-level="92">
+                <span class="skill-meter-fill" style="width: 92%"></span>
+                <span class="skill-meter-scan"></span>
+              </span>
+            </li>
+            <li>
+              <span class="skill-label">FIELD OPS</span>
+              <span class="skill-meter" data-level="74">
+                <span class="skill-meter-fill" style="width: 74%"></span>
+                <span class="skill-meter-scan"></span>
+              </span>
+            </li>
+            <li>
+              <span class="skill-label">LINGUISTICS</span>
+              <span class="skill-meter" data-level="68">
+                <span class="skill-meter-fill" style="width: 68%"></span>
+                <span class="skill-meter-scan"></span>
+              </span>
+            </li>
+            <li>
+              <span class="skill-label">CYBERNETICS</span>
+              <span class="skill-meter" data-level="85">
+                <span class="skill-meter-fill" style="width: 85%"></span>
+                <span class="skill-meter-scan"></span>
+              </span>
+            </li>
+          </ul>
+          <div class="approved-stamp" aria-hidden="true">APPROVED</div>
+        </section>
+
+        <section class="transmission-card" aria-labelledby="channel-heading">
+          <header class="section-heading" id="channel-heading">CHANNELS</header>
+          <ul class="channel-list" aria-live="polite">
+            <li class="channel-entry" data-timezone="America/New_York">
+              <span class="channel-dot" aria-hidden="true"></span>
+              <span class="channel-label">WASH</span>
+              <span class="channel-time">--:--:--</span>
+              <span class="channel-wave" aria-hidden="true"></span>
+            </li>
+            <li class="channel-entry" data-timezone="Europe/Moscow">
+              <span class="channel-dot" aria-hidden="true"></span>
+              <span class="channel-label">MOSC</span>
+              <span class="channel-time">--:--:--</span>
+              <span class="channel-wave" aria-hidden="true"></span>
+            </li>
+            <li class="channel-entry" data-timezone="Asia/Shanghai">
+              <span class="channel-dot" aria-hidden="true"></span>
+              <span class="channel-label">BEIJ</span>
+              <span class="channel-time">--:--:--</span>
+              <span class="channel-wave" aria-hidden="true"></span>
+            </li>
+          </ul>
+        </section>
+      </aside>
+
+      <section class="panel-wrapper">
+        <section class="panel-frame" aria-labelledby="panel-heading">
+          <div class="panel-rec" aria-hidden="true">
+            REC <span class="rec-dot">▪</span>
+          </div>
+          <h1 class="visually-hidden" id="panel-heading">远程控制面板</h1>
+          <div class="panel-grid">
+            <section
+              class="module module-signal"
+              aria-label="信号状态"
+              data-plate="TERMINAL: B-47"
+            >
+              <div class="module-plate" aria-hidden="true">TERMINAL: B-47</div>
+              <header class="module-header sig">
+                <span class="module-label">SIGNAL</span>
+                <span class="module-value">LOCKED</span>
+              </header>
+              <div class="map-screen" role="img" aria-label="世界地图信号显示">
+                <div class="map-loading" aria-hidden="true">
+                  <div class="loading-phase phase-noise">
+                    <div class="noise-static"></div>
+                    <div class="noise-flash"></div>
+                  </div>
+                  <div class="loading-phase phase-terminal">
+                    <div class="terminal-screen">
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ..."
+                      ></p>
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="ПРОВЕРКА ПАМЯТИ [██████████████] OK"
+                      ></p>
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="ЗАГРУЗКА МОДУЛЯ: СЕТЕВОЙ МОНИТОРИНГ — УСПЕШНО"
+                      ></p>
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="ПОДКЛЮЧЕНИЕ К СПУТНИКУ №47 — СТАБИЛЬНО"
+                      ></p>
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="ВЫЯВЛЕН ПОЛЬЗОВАТЕЛЬ: OPS-8 / УРОВЕНЬ ДОСТУПА: 3"
+                      ></p>
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="ОТКРЫТИЕ СЕКТОРА / DATA_ROOT/CLASSIFIED..."
+                      ></p>
+                      <p
+                        class="terminal-line"
+                        data-terminal-line="СИСТЕМА ГОТОВА К АКТИВАЦИИ."
+                      ></p>
+                      <span class="terminal-cursor">&gt;_</span>
+                    </div>
+                  </div>
+                  <div class="loading-phase phase-emblem">
+                    <div class="emblem-stage">
+                      <span class="emblem-glow"></span>
+                      <span class="emblem-symbol">☭</span>
+                    </div>
+                    <div class="emblem-progress">
+                      <div class="progress-readout">
+                        ЗАГРУЗКА СИСТЕМЫ: ████▒▒▒▒▒▒▒▒ 56%
+                      </div>
+                      <div class="progress-bar">
+                        <span class="progress-track"></span>
+                        <span class="progress-fill"></span>
+                        <span class="progress-sweep progress-sweep--one"></span>
+                        <span class="progress-sweep progress-sweep--two"></span>
+                        <span
+                          class="progress-sweep progress-sweep--three"
+                        ></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="loading-phase phase-complete">
+                    <div class="complete-backdrop"></div>
+                    <div class="complete-message">
+                      <span class="complete-text"
+                        >СИСТЕМА ГОТОВА. СВЯЗЬ УСТАНОВЛЕНА.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="map-overlay"></div>
+                <div id="map" class="map-viewport" role="presentation"></div>
+                <div class="map-coords">
+                  <span class="map-coords-lat" data-coordinate="lat"
+                    >LAT --° --</span
+                  >
+                  <span class="map-coords-lon" data-coordinate="lon"
+                    >LON --° --</span
+                  >
+                </div>
+              </div>
+              <div class="classline">CLASSIFICATION: СЕКРЕТНО</div>
+            </section>
+
+            <section
+              class="module module-todo"
+              aria-label="任务列表"
+              data-plate="DIRECTIVE: 13"
+            >
+              <div class="module-plate" aria-hidden="true">DIRECTIVE: 13</div>
+              <header class="module-header todo">
+                <span class="module-label">TO-DO LIST</span>
+              </header>
+              <ul class="todo-list">
+                <?php if ($todoItems !== []): ?>
+                  <?php foreach ($todoItems as $item): ?>
+                    <li class="todo-entry">
+                      <span class="todo-indicator<?= $item['done'] ? ' done' : ''; ?>"></span>
+                      <div class="todo-content">
+                        <a
+                          class="todo-text"
+                          href="<?= view_escape($item['url']); ?>"
+                          title="<?= view_escape($item['title_full'] ?? $item['title']); ?>"
+                        >
+                          <?= view_escape($item['title']); ?>
+                        </a>
+                        <?php if ($item['updated_label'] !== ''): ?>
+                          <time class="todo-timestamp"<?php if ($item['updated_iso'] !== ''): ?> datetime="<?= view_escape($item['updated_iso']); ?>"<?php endif; ?>>
+                            <?= view_escape($item['updated_label']); ?>
+                          </time>
+                        <?php endif; ?>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                <?php else: ?>
+                  <li class="todo-empty">
+                    <span class="todo-indicator"></span>
+                    <span class="todo-text">暂无待办 · 点击进入备忘录创建任务</span>
+                  </li>
+                <?php endif; ?>
+              </ul>
+              <div class="module-footer">
+                <a class="module-link" href="<?= view_escape($memoUrl); ?>">打开备忘录</a>
+              </div>
+            </section>
+
+            <section
+              class="module module-files"
+              aria-label="文件列表"
+              data-plate="ARCHIVE: 9C"
+            >
+              <div class="module-plate" aria-hidden="true">ARCHIVE: 9C</div>
+              <header class="module-header files">
+                <span class="module-label">FILES</span>
+              </header>
+              <ul class="file-list">
+                <?php if ($recentFiles !== []): ?>
+                  <?php foreach ($recentFiles as $file): ?>
+                    <li class="file-entry">
+                      <a
+                        class="file-entry-link"
+                        href="<?= view_escape($file['download_url']); ?>"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        <span class="file-entry-code"><?= view_escape((string)$file['context_label']); ?></span>
+                        <span
+                          class="file-entry-name"
+                          title="<?= view_escape((string)($file['name_full'] ?? $file['name'])); ?>"
+                        >
+                          <?= view_escape((string)$file['name']); ?>
+                        </span>
+                      </a>
+                      <div class="file-entry-meta">
+                        <?php if (($file['owner_label'] ?? '') !== ''): ?>
+                          <?php if (($file['owner_url'] ?? '') !== ''): ?>
+                            <a
+                              class="file-entry-source"
+                              href="<?= view_escape($file['owner_url']); ?>"
+                              title="<?= view_escape((string)($file['owner_label_full'] ?? $file['owner_label'])); ?>"
+                            >
+                              <?= view_escape((string)$file['owner_label']); ?>
+                            </a>
+                          <?php else: ?>
+                            <span
+                              class="file-entry-source"
+                              title="<?= view_escape((string)($file['owner_label_full'] ?? $file['owner_label'])); ?>"
+                            >
+                              <?= view_escape((string)$file['owner_label']); ?>
+                            </span>
+                          <?php endif; ?>
+                        <?php endif; ?>
+                        <?php if (($file['size_label'] ?? '') !== ''): ?>
+                          <span class="file-entry-size"><?= view_escape((string)$file['size_label']); ?></span>
+                        <?php endif; ?>
+                        <?php if (($file['created_label'] ?? '') !== ''): ?>
+                          <time
+                            class="file-entry-time"
+                            <?php if (($file['created_iso'] ?? '') !== ''): ?>datetime="<?= view_escape((string)$file['created_iso']); ?>"<?php endif; ?>
+                          >
+                            <?= view_escape((string)$file['created_label']); ?>
+                          </time>
+                        <?php endif; ?>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                <?php else: ?>
+                  <li class="file-empty">暂无附件 · 在备忘录或导图中上传文件后会显示在此处。</li>
+                <?php endif; ?>
+              </ul>
+            </section>
+
+            <section
+              class="module module-board"
+              aria-label="作战导图库"
+              data-plate="OPS: LIBRARY"
+            >
+              <div class="module-plate" aria-hidden="true">OPS: LIBRARY</div>
+              <header class="map-library-header">
+                <span class="map-library-title">作战导图库</span>
+                <span class="map-library-subtitle"
+                  >TACTICAL BLUEPRINT INDEX</span
+                >
+              </header>
+              <div class="map-library-grid">
+                <?php if ($mindmaps !== []): ?>
+                  <?php foreach ($mindmaps as $map): ?>
+                    <article class="map-card" data-status="<?= view_escape($map['status']); ?>">
+                      <header class="map-card-header">
+                        <span
+                          class="map-card-title"
+                          title="<?= view_escape($map['title_full'] ?? $map['title']); ?>"
+                        >
+                          <?= view_escape($map['title']); ?>
+                        </span>
+                        <span class="map-card-status"><?= view_escape($map['status_label']); ?></span>
+                      </header>
+                      <a class="map-card-body" href="<?= view_escape($map['url']); ?>">
+                        <?php if ($map['nodes'] !== []): ?>
+                          <ul class="map-card-nodes">
+                            <?php foreach ($map['nodes'] as $node): ?>
+                              <li class="map-card-node"><?= view_escape($node); ?></li>
+                            <?php endforeach; ?>
+                          </ul>
+                        <?php elseif ($map['summary'] !== ''): ?>
+                          <div class="map-card-summary"><?= view_escape($map['summary']); ?></div>
+                        <?php endif; ?>
+                      </a>
+                      <footer class="map-card-meta">
+                        <?php if ($map['updated_label'] !== ''): ?>
+                          <time class="map-card-timestamp"<?php if ($map['updated_iso'] !== ''): ?> datetime="<?= view_escape($map['updated_iso']); ?>"<?php endif; ?>>
+                            <?= view_escape($map['updated_label']); ?>
+                          </time>
+                        <?php endif; ?>
+                        <?php if ($map['node_count'] > 0): ?>
+                          <span class="map-card-count">节点 <?= view_escape((string)$map['node_count']); ?></span>
+                        <?php endif; ?>
+                      </footer>
+                    </article>
+                  <?php endforeach; ?>
+                <?php else: ?>
+                  <div class="map-empty">暂无导图 · 进入思维导图快速创建。</div>
+                <?php endif; ?>
+              </div>
+              <div class="module-footer">
+                <a class="module-link" href="<?= view_escape($mindmapUrl); ?>">进入思维导图</a>
+              </div>
+            </section>
+          </div>
+          <footer class="panel-footer" aria-label="代号">
+            <span class="agent-name">JOHN DOE</span>
+          </footer>
+        </section>
+      </section>
+
+      <aside class="sidebar sidebar-right" aria-label="通讯终端">
+        <section class="personnel-card" aria-labelledby="personnel-heading">
+          <div class="encrypted-file" data-state="idle">
+            <div class="encrypted-file__inner">
+              <h2 class="encrypted-file__title" id="personnel-heading">
+                ENCRYPTED PERSONNEL FILE
+              </h2>
+              <p
+                class="encrypted-file__status"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="encrypted-file__status-icon" aria-hidden="true"
+                  >🔒</span
+                >
+                <span class="encrypted-file__status-text"
+                  >ACCESS RESTRICTED</span
+                >
+                <span
+                  class="visually-hidden encrypted-file__status-announcer"
+                ></span>
+              </p>
+              <dl class="encrypted-file__meta" aria-label="档案摘要">
+                <div class="encrypted-file__meta-row">
+                  <dt>SUBJECT</dt>
+                  <dd>VON.SHAFT,M.</dd>
+                </div>
+                <div class="encrypted-file__meta-row">
+                  <dt>CLEARANCE</dt>
+                  <dd>LEVEL 3</dd>
+                </div>
+                <div class="encrypted-file__meta-row">
+                  <dt>FILE REF</dt>
+                  <dd>0748-A</dd>
+                </div>
+                <div class="encrypted-file__meta-row">
+                  <dt>STATUS</dt>
+                  <dd>ENCRYPTION ACTIVE</dd>
+                </div>
+              </dl>
+              <button
+                class="encrypted-file__command"
+                type="button"
+                data-command
+              >
+                <span class="encrypted-file__command-icon" aria-hidden="true"
+                  >&gt;</span
+                >
+                <span class="encrypted-file__command-text"
+                  >INITIATE DECRYPTION SEQUENCE</span
+                >
+                <span class="encrypted-file__command-rotor" aria-hidden="true"
+                  >-</span
+                >
+              </button>
+            </div>
+            <span class="encrypted-file__glare" aria-hidden="true"></span>
+          </div>
+        </section>
+        <section class="queue-card" aria-labelledby="queue-heading">
+          <header class="section-heading" id="queue-heading">QUEUE</header>
+          <ol class="queue-list">
+            <li class="queue-item">ALPHA · INSERT BACKDOOR KEY</li>
+            <li class="queue-item">BRAVO · REDIRECT SUPPLY ROUTE</li>
+            <li class="queue-item">CHARLIE · JAM TRANSMISSION 4B</li>
+            <li class="queue-item">DELTA · TRACE FIELD OPERATIVE</li>
+          </ol>
+        </section>
+
+        <section class="scramble-card" aria-labelledby="scramble-heading">
+          <header class="section-heading" id="scramble-heading">
+            SCRAMBLE
+          </header>
+          <div class="scramble-track" aria-hidden="true"></div>
+        </section>
+      </aside>
+    </main>
+    <section class="decryption-sequence" data-phase="idle" aria-hidden="true">
+      <div class="decryption-sequence__static">
+        <div class="static-noise"></div>
+        <div class="static-tear static-tear--one"></div>
+        <div class="static-tear static-tear--two"></div>
+      </div>
+      <div class="decryption-sequence__terminal">
+        <p data-terminal-line="=== ГОСУДАРСТВЕННАЯ СИСТЕМА ОБРАБОТКИ ДАННЫХ ==="></p>
+        <p data-terminal-line="ЦЕНТРАЛЬНЫЙ ТЕРМИНАЛ В/Ч 0748  •  ОБРАЗЕЦ: ЕС-1840"></p>
+        <p data-terminal-line="КОД СТАНЦИИ: СЕКТОР АЛЬФА / ЛИНИЯ &quot;ЗАРЯ&quot;"></p>
+        <p data-terminal-line="ВРЕМЯ ПУСКА: 18:31:50  МСК"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[BIOS]  ПОДАЧА ПИТАНИЯ ................. ОК"></p>
+        <p data-terminal-line="[BIOS]  ОПРОС ШИНЫ ЕС ЭВМ .............. КАНАЛ-0 ГОТОВ"></p>
+        <p data-terminal-line="[BIOS]  ТАКТОВЫЙ ГЕНЕРАТОР ............. 2.5МГц  СТАБИЛЬНО"></p>
+        <p data-terminal-line="[BIOS]  ТЕРМОКОНТРОЛЬ ................. 23°C  ДОПУСК"></p>
+        <p data-terminal-line="[ASM]   РЕГИСТР IP=0xF000:0xFFF0  CS=0xF000  FLAGS=0x0246"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[POST]  ОЗУ 0000:7FFFh ПРОВЕРКА ........ [████████████] 64К ОК"></p>
+        <p data-terminal-line="[POST]  ДОП. ОЗУ 8000:FFFFh ............ [████████████] 64К ОК"></p>
+        <p data-terminal-line="[DMA]   КАНАЛЫ 0–3 ..................... ОК"></p>
+        <p data-terminal-line="[PIT]   ТАЙМЕР КАНАЛ-0 ................. ОК"></p>
+        <p data-terminal-line="[RTC]   СИНХРОНИЗАЦИЯ .................. ОК (±00.2с)"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[IO]    КЛАВИАТУРА К-765 ............... ГОТОВА"></p>
+        <p data-terminal-line="[IO]    ДАТЧИК МАГНИТНЫЙ МП-12 ........ ПОДКЛЮЧЕН"></p>
+        <p data-terminal-line="[IO]    ТЕЛЕТАЙП ТТ-4М ................. КАНАЛ ОТКРЫТ"></p>
+        <p data-terminal-line="[IO]    ПРИНТЕР Р-80 ................... ГОТОВ"></p>
+        <p data-terminal-line="[VID]   ВИДЕОАДАПТЕР 80×25 Моно ........ ОК"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[BOOT]  ЗАГРУЗОЧНЫЙ СЕКТОР 0x0000:7C00h  ПРИНЯТ"></p>
+        <p data-terminal-line="[FS]    ФАЙЛОВАЯ СИСТЕМА GOST-FS v1.3 .. МОНТИРОВАНО"></p>
+        <p data-terminal-line="[FS]    КАТАЛОГ /SYS/BOOT/ ............. ОК"></p>
+        <p data-terminal-line="[FS]    /SYS/KERNEL.BIN ................ ПРОВЕРЕНО (CRC32=9A7E-2C14)"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[KRN]   ИНИЦИАЛИЗАЦИЯ ЯДРА ............. ГОТОВО"></p>
+        <p data-terminal-line="[KRN]   ДИСПЕТЧЕР ПРОЦЕССОВ ............ ЗАПУЩЕН (PID=0001)"></p>
+        <p data-terminal-line="[KRN]   ПАМЯТЬ: БАЗОВАЯ 128К, СВОБОДНО 96К"></p>
+        <p data-terminal-line="[KRN]   ВИРТ. АДРЕСНОЕ ПРОСТРАНСТВО .... РАСПРЕДЕЛЕНО"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[NET]   МОДУЛЬ СВЯЗИ &quot;РУБИН&quot; ........... ОК"></p>
+        <p data-terminal-line="[NET]   МОДЕМ Ч/Б 2400 бод ............. СИНХРО"></p>
+        <p data-terminal-line="[NET]   РАЗРЕШЕНИЕ КАНАЛА №47 .......... ПОЛУЧЕНО"></p>
+        <p data-terminal-line="[NET]   СПУТНИК СЕВЕР-3  ................ СИГНАЛ −72dBm  СТАБИЛЕН"></p>
+        <p data-terminal-line="[NET]   PPP-СЕССИЯ ..................... УСТАНОВЛЕНА"></p>
+        <p data-terminal-line="[NET]   МАРШРУТ: СЕКТОР-ТУРКЕСТАН → УЗЕЛ-МОСКВА-2 → ЛИНИЯ-КРЫМ"></p>
+        <p data-terminal-line=""></p>
+        <p data-terminal-line="[SEC]   СТАТУС ДОСТУПА .................. ЗАКРЫТ (УРОВЕНЬ-3 ТРЕБУЕТСЯ)"></p>
+        <p data-terminal-line="[SEC]   МОДУЛЬ КРИПТО БИБЛ. ГОСТ-28147-89"></p>
+        <p data-terminal-line="[SEC]   ИНИЦИАЛ КЛЮЧА ................... OK (KID=0x7A-4F-12)"></p>
+        <p data-terminal-line="[SEC]   ГЕНЕРАТОР ШУМА Р-255 ............ ЭНТРОПИЯ 7.98 бит/Б"></p>
+        <p data-terminal-line="[SEC]   СЕССИЯ ШИФРОВАНИЯ .............. УСТАНОВЛЕНА (MODE=CTR)"></p>
+        <span class="terminal-cursor">&gt;_</span>
+      </div>
+    </section>
+    <section
+      class="dossier-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dossier-heading"
+      hidden
+    >
+      <div class="dossier-overlay__backdrop" aria-hidden="true"></div>
+      <article class="dossier" role="document">
+        <header class="dossier__header">
+          <h2 class="dossier__title" id="dossier-heading">
+            PERSONNEL DOSSIER // CLASSIFIED
+          </h2>
+          <div class="dossier__controls" role="group" aria-label="语言版本">
+            <span class="dossier__control-label">LANG</span>
+            <div class="dossier__language-switch">
+              <button
+                class="dossier__language-button is-active"
+                type="button"
+                data-dossier-lang="en"
+              >
+                EN
+              </button>
+              <button
+                class="dossier__language-button"
+                type="button"
+                data-dossier-lang="zh"
+              >
+                中文
+              </button>
+              <button
+                class="dossier__language-button"
+                type="button"
+                data-dossier-lang="ru"
+              >
+                РУС
+              </button>
+            </div>
+          </div>
+          <button class="dossier__close" type="button">CLOSE FILE</button>
+        </header>
+        <div class="dossier__viewer" data-state="idle">
+          <iframe
+            class="dossier__iframe"
+            title="Personnel dossier PDF preview"
+            loading="lazy"
+          ></iframe>
+          <div class="dossier__viewer-status" role="status">
+            Awaiting dossier request…
+          </div>
+        </div>
+        <section class="dossier__downloads" aria-labelledby="dossier-downloads">
+          <h3 class="dossier__downloads-title" id="dossier-downloads">
+            Download Translations
+          </h3>
+          <ul class="dossier__download-list">
+            <li>
+              <a
+                class="dossier__download-link"
+                href="https://assets.scriptslug.com/live/pdf/scripts/the-sopranos-105-college-1999.pdf"
+                download="resume-en.pdf"
+                data-remote-pdf="true"
+                data-download-lang="en"
+              >
+                English PDF
+              </a>
+            </li>
+            <li>
+              <a
+                class="dossier__download-link"
+                href="https://assets.scriptslug.com/live/pdf/scripts/the-sopranos-105-college-1999.pdf"
+                download="resume-zh.pdf"
+                data-remote-pdf="true"
+                data-download-lang="zh"
+              >
+                中文 PDF
+              </a>
+            </li>
+            <li>
+              <a
+                class="dossier__download-link"
+                href="https://assets.scriptslug.com/live/pdf/scripts/the-sopranos-105-college-1999.pdf"
+                download="resume-ru.pdf"
+                data-remote-pdf="true"
+                data-download-lang="ru"
+              >
+                Русский PDF
+              </a>
+            </li>
+          </ul>
+        </section>
+      </article>
+    </section>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+      integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+    <script src="<?= view_escape($asset('script.js')); ?>" defer></script>
+  </body>
+</html>
