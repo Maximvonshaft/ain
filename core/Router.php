@@ -11,6 +11,21 @@ class Router
      */
     private array $compiledRoutes = [];
 
+    /**
+     * @var array<string, array<string, callable>>
+     */
+    private array $staticRoutes = [];
+
+    /**
+     * @var array<string, array<string, true>>
+     */
+    private array $dynamicRouteMap = [];
+
+    /**
+     * @var array<string, array<string, array{0: callable, 1: array}|null>>
+     */
+    private array $resolvedCache = [];
+
     public function get(string $path, callable $handler): void
     {
         $this->addRoute('GET', $path, $handler);
@@ -26,9 +41,15 @@ class Router
         $normalized = $this->normalize($path);
         $this->routes[$method][$normalized] = $handler;
 
-        if (!array_key_exists($normalized, $this->compiledRoutes)) {
-            $this->compiledRoutes[$normalized] = $this->compileRoute($normalized);
+        if ($this->isDynamic($normalized)) {
+            $this->dynamicRouteMap[$method][$normalized] = true;
+            if (!array_key_exists($normalized, $this->compiledRoutes)) {
+                $this->compiledRoutes[$normalized] = $this->compileRoute($normalized);
+            }
+            return;
         }
+
+        $this->staticRoutes[$method][$normalized] = $handler;
     }
 
     public function dispatch(Request $request): mixed
@@ -78,25 +99,48 @@ class Router
      */
     private function resolve(string $method, string $normalized): ?array
     {
+        if (isset($this->resolvedCache[$method][$normalized])) {
+            return $this->resolvedCache[$method][$normalized];
+        }
+
+        if (isset($this->staticRoutes[$method][$normalized])) {
+            $result = [$this->staticRoutes[$method][$normalized], []];
+            $this->resolvedCache[$method][$normalized] = $result;
+            return $result;
+        }
+
         if (empty($this->routes[$method])) {
+            $this->resolvedCache[$method][$normalized] = null;
             return null;
         }
 
         foreach ($this->routes[$method] as $route => $handler) {
+            if (!$this->isDynamic($route)) {
+                continue;
+            }
             $params = $this->match($route, $normalized);
             if ($params !== null) {
-                return [$handler, $params];
+                $result = [$handler, $params];
+                $this->resolvedCache[$method][$normalized] = $result;
+                return $result;
             }
         }
 
+        $this->resolvedCache[$method][$normalized] = null;
         return null;
     }
 
     private function allowedMethodsFor(string $normalized): array
     {
         $allowed = [];
-        foreach ($this->routes as $method => $handlers) {
-            foreach ($handlers as $route => $handler) {
+        foreach ($this->staticRoutes as $method => $handlers) {
+            if (isset($handlers[$normalized])) {
+                $allowed[] = $method;
+            }
+        }
+
+        foreach ($this->dynamicRouteMap as $method => $routes) {
+            foreach ($routes as $route => $_) {
                 if ($this->match($route, $normalized) !== null) {
                     $allowed[] = $method;
                     break;
@@ -121,6 +165,11 @@ class Router
     private function normalize(string $path): string
     {
         return '/' . trim($path, '/');
+    }
+
+    private function isDynamic(string $route): bool
+    {
+        return str_contains($route, '{');
     }
 
     private function match(string $route, string $path): ?array
