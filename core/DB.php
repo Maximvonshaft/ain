@@ -11,6 +11,7 @@ class DB
     private const SCHEMA_VERSION = 4;
 
     private static ?PDO $pdo = null;
+    private static bool $schemaReady = false;
 
     public static function connect(string $path): PDO
     {
@@ -23,7 +24,9 @@ class DB
         ]);
         $pdo->exec('PRAGMA journal_mode = WAL;');
         $pdo->exec('PRAGMA foreign_keys = ON;');
-        self::runMigrations($pdo);
+        if (!self::$schemaReady) {
+            self::runMigrations($pdo);
+        }
         self::$pdo = $pdo;
         return self::$pdo;
     }
@@ -38,6 +41,10 @@ class DB
 
     private static function runMigrations(PDO $pdo): void
     {
+        if (self::$schemaReady) {
+            return;
+        }
+
         $currentVersion = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
 
         if ($currentVersion < 1) {
@@ -53,8 +60,6 @@ class DB
             self::ensureMindmapSchema($pdo);
             self::setUserVersion($pdo, 2);
             $currentVersion = 2;
-        } else {
-            self::ensureMindmapSchema($pdo);
         }
 
         self::ensureItemIndexes($pdo);
@@ -62,6 +67,8 @@ class DB
         if ($currentVersion < self::SCHEMA_VERSION) {
             self::setUserVersion($pdo, self::SCHEMA_VERSION);
         }
+
+        self::$schemaReady = true;
     }
 
     private static function setUserVersion(PDO $pdo, int $version): void
